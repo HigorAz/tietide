@@ -7,13 +7,21 @@
 
 # Resumo
 
-Breve descrição do conteúdo do documento, incluindo o propósito do projeto e os principais pontos de discussão.
+Este documento detalha a proposta de projeto para o desenvolvimento do TieTide, um software utilizado como plataforma de automação e integração como serviço (IPaaS). O projeto visa resolver o problema da "Fragmentação Digital" enfrentado por empresas modernas, oferecendo uma solução low-code, open-source e auto-hospedável, oferecendo um equilíbrio estratégico entre a robustez exigida por desenvolvedores e a simplicidade necessária para a agilidade na implantação dos processos. Os principais diferenciais da TieTide são sua experiência de usuário superior, a "Maré de Dados", e uma funcionalidade inovadora de geração de documentação de processos via Inteligência Artificial. A plataforma será construída com tecnologias modernas, incluindo TypeScript, React, NestJS e Docker, seguindo os princípios de software maduro.
 
 ## 1. Introdução
 
-- **Contexto**: Breve descrição do contexto que envolve o projeto.
-- **Justificativa**: Explicação da relevância do projeto para o campo da engenharia de software.
-- **Objetivos**: Descrição do objetivo principal do projeto e de quaisquer objetivos secundários.
+- **Contexto**: Na economia digital, a adoção de softwares como serviço (SaaS) tornou-se um pilar para a eficiência empresarial, em que seus departamentos internos optam por utilizar as ferramentas que mais se adequam as suas necessidades, com ferramentas especializadas para CRM, comunicação, marketing, finanças, operações e entre outros. Embora essa especialização otimize tarefas isoladas, ela gera um desafio operacional significativo: a fragmentação digital. Dados e processos críticos acabam confinados em "silos" tecnológicos, com baixa ou nenhuma conexão entre si. Como consequência, as organizações recorrem a workarounds manuais que são ineficientes, propensos a erros e insustentáveis em escala.
+- **Justificativa**: O mercado atual de plataformas de integração (IPaaS) oferece soluções para este problema, mas apresenta lacunas claras. De um lado, ferramentas no-code como o Zapier oferecem simplicidade, mas são restritas em robustez e podem ter um custo elevado em alto volume. No extremo oposto, plataformas enterprise como MuleSoft e Workato são extremamente poderosas, porém com uma complexidade e um custo de licenciamento que as tornam inviáveis para a maioria das pequenas e médias empresas. Soluções open-source como o n8n oferecem a flexibilidade necessária para desenvolvedores, mas frequentemente carecem de uma experiência de usuário polida que atenda também a analistas técnicos e de processos.
+A TieTide justifica-se por se posicionar estrategicamente neste espaço. O projeto propõe uma solução que une a robustez e o controle exigidos por desenvolvedores com uma interface visual e intuitiva que empodera um público técnico mais amplo. A adição de uma funcionalidade inovadora, como a documentação de processos gerada por IA, reforça ainda mais a necessidade de uma nova abordagem no setor, focada não apenas em conectar, mas em gerenciar e documentar a automação de forma inteligente.
+- **Objetivos**
+  - **Objetivo Principal**: Desenvolver uma plataforma iPaaS funcional que permita a criação, execução e monitoramento de workflows de automação de forma visual e intuitiva.
+  - **Objetivos Específicos**:
+    - Implementar a interface de usuário "Maré de Dados", garantindo uma experiência superior que simplifique a visualização de fluxos complexos;
+    - Construir um motor de execução que equilibre a simplicidade do low-code com a flexibilidade de nós de código customizáveis;
+    - Desenvolver uma Prova de Conceito para a funcionalidade de documentação automática com IA;
+    - Garantir que a plataforma seja distribuída via Docker para fácil auto-hospedagem;
+    -Aplicar rigorosamente os princípios de software maduro (Robustez, Escalabilidade, Disponibilidade, Desempenho, Extensibilidade e Resiliência) em todas as fases do projeto.
 
 ## 2. Descrição do Projeto
 
