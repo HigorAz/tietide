@@ -25,15 +25,27 @@ A TieTide justifica-se por se posicionar estrategicamente neste espaço. O proje
 
 ## 2. Descrição do Projeto
 
-* **Linha de Projeto**: Indique a categoria do projeto (Web Apps, Aplicações Mobile, Jogos Digitais, Projetos com IA ou Projetos IoT), conforme definido no regulamento.
-* **Tema do Projeto**: Descreva de forma clara e objetiva o produto, serviço ou ferramenta a ser desenvolvido.
-* **Propósito e Uso Prático**: Explique qual problema real será resolvido e como a solução será utilizada na prática.
-* **Público-Alvo**: Defina o perfil dos usuários ou clientes potenciais que se beneficiarão da solução.
-* **Problemas a Resolver**: Liste de forma objetiva os principais problemas ou necessidades que o projeto pretende atender.
-* **Diferenciação/Ineditismo**: Destaque o que torna a proposta única em relação a soluções existentes, mesmo quando o tema é semelhante a outros projetos.
-* **Limitações**: Especifique o que o projeto **não** abrangerá, evitando expectativas incorretas.
-* **Normas e Legislações Aplicáveis**: Liste normas, leis e diretrizes relevantes ao contexto do projeto (ex.: LGPD, HIPAA, WCAG, ESRB/PEGI), indicando como serão observadas.
-* **Métricas de Sucesso**: Apresente critérios iniciais para medir o desempenho e a efetividade do projeto (ex.: tempo de resposta, número de usuários atendidos, taxa de acerto do modelo de IA).
+* **Linha de Projeto**: Web Apps.
+* **Tema do Projeto**: Desenvolvimento de uma Plataforma de Automação e Integração como Serviço (iPaaS) com foco em Low-Code, Experiência do Usuário e Inovação Funcional.
+* **Propósito e Uso Prático**: Mitigar o desafio constante de integrar múltiplas ferramentas com agilidade. Na prática, a plataforma permite a integração de ferramentas e a automação de tarefas e processos que hoje dependem de intervenção manual. Um caso de uso típico seria: "Quando um novo cliente é cadastrado no CRM, disparar um fluxo que automaticamente o adiciona a uma lista de e-mail marketing, cria uma pasta para ele no Google Drive e notifica a equipe de sucesso do cliente via Slack".
+* **Público-Alvo**: Profissionais de tecnologia e de processos, na faixa dos 20 aos 45 anos, incluindo Desenvolvedores, Analistas e Líderes Técnicos.
+* **Problemas a Resolver**:
+  * Fragmentação Digital e Silos de Dados: A falta de comunicação nativa entre ferramentas SaaS essenciais;
+  * Ineficiência de Processos Manuais: A dependência de tarefas repetitivas e de baixo valor que consomem tempo e recursos;
+  * Alto Custo e Complexidade de Soluções Atuais: A lacuna entre ferramentas no-code limitadas e plataformas enterprise inacessíveis;
+  * Falta de Documentação de Processos: A dificuldade de manter um registro claro e atualizado de como as automações funcionam.
+* **Diferenciação/Ineditismo**: Os principais pontos são a experiência de usuário (UX) superior, a documentação de processos gerada por IA, o equilíbrio entre low-code e pro-code e um modelo open-source e auto-hospedável.
+* **Limitações**: Para garantir a viabilidade e a excelência na entrega dentro do escopo acadêmico, o projeto em sua versão inicial (MVP) não abrangerá:
+  * Uma biblioteca extensa de conectores pré-construídos para centenas de serviços, será limitado de 3 à 5 conectores;
+  * Funcionalidades de nível enterprise, como gerenciamento de equipes multi-tenant, dashboards complexos de usabilidade e permissões de acesso granulares;
+  * Um marketplace para conectores desenvolvidos pela comunidade.
+* **Normas e Legislações Aplicáveis**: O projeto observará as seguintes normas e legislações:
+  * Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018): A arquitetura auto-hospedável da TieTide é um diferencial que facilita a conformidade com a LGPD, pois permite que as empresas processem e armazenem seus dados em sua própria infraestrutura;
+  * Licenças de Software: O projeto será distribuído sob uma licença open-source permissiva (MIT) e garantirá a conformidade com as licenças de todas as bibliotecas e frameworks de terceiros utilizados.
+* **Métricas de Sucesso**: O sucesso do projeto será medido pelos seguintes critérios:
+  * Métricas Funcionais: Implementação bem-sucedida de todas as funcionalidades definidas como escopo do MVP, incluindo o canvas de nós, o motor de execução e a Prova de Conceito da IA de documentação;
+  * Métricas Técnicas: Atingimento das metas de requisitos não-funcionais, como tempo de resposta da API abaixo de 200ms e tempo de execução de workflows simples abaixo de 5 segundos;
+  * Métricas Acadêmicas: Aprovação do RFC pelos professores avaliadores e uma apresentação bem-sucedida e funcional do projeto no Poster + Demo Day.
 
 ## 3. Especificação Técnica
 
