@@ -49,13 +49,27 @@ A TieTide justifica-se por se posicionar estrategicamente neste espaço. O proje
 
 ## 3. Especificação Técnica
 
-Descrição detalhada da proposta, contemplando requisitos, arquitetura, tecnologias, segurança e aderência aos critérios obrigatórios da linha de projeto escolhida.
+Esta seção descreve em detalhes a proposta técnica para o desenvolvimento da TieTide, abrangendo os requisitos de software, as decisões de arquitetura e a stack tecnológica selecionada.
 
 ### 3.1. Requisitos de Software
-- **Requisitos Funcionais (RF)**: Liste de forma clara as funcionalidades que o sistema deverá oferecer.
-- **Requisitos Não-Funcionais (RNF)**: Inclua requisitos de desempenho, segurança, usabilidade, escalabilidade, disponibilidade, entre outros.
-- **Representação dos Requisitos**: Inclua um Diagrama de Casos de Uso (UML) ou outra representação visual que facilite o entendimento.
-- **Aderência aos Requisitos da Linha de Projeto**: Indique como cada requisito está alinhado aos itens “Obrigatório Atender” definidos para a linha de projeto (Web, Mobile, Jogos, IA ou IoT).
+- **Requisitos Funcionais (RF)**:
+  - RF01. Gestão de Usuários: O sistema deverá permitir o cadastro e login de usuários, com autenticação baseada em JWT (JSON Web Tokens);
+  - RF02. Gestão de Workflows: O sistema deverá prover funcionalidades CRUD (Criar, Ler, Atualizar, Deletar) completas para os workflows;
+  - RF03. Editor Visual de Fluxo: A interface deverá apresentar um canvas de "arrastar e soltar" que permita ao usuário adicionar nós, posicioná-los livremente e conectá-los para definir o fluxo de dados;
+  - RF04. Nós Essenciais: A versão MVP deverá conter os seguintes nós funcionais:
+    - Gatilhos: Manual, Agendado (Cron) e Webhook;
+    - Ações: Requisição HTTP, Execução de Código (Node.js/TypeScript) e Lógica Condicional (IF).
+  - RF05. Motor de Execução: O sistema deverá processar os workflows de forma assíncrona, utilizando uma fila de mensagens para garantir desempenho e resiliência;
+  - RF06. Histórico de Execuções: A interface deverá exibir um histórico de todas as execuções de um workflow, com seu status (sucesso, falha), data e logs detalhados;
+  - RF07. Documentação por IA (PoC): O sistema deverá ter um endpoint que, ao receber a estrutura de um workflow em formato JSON, retorne uma descrição textual do processo gerada por um modelo de IA.
+- **Requisitos Não-Funcionais (RNF)**:
+  - RNF01. Desempenho: As respostas da API devem ter uma latência inferior a 200ms para 95% das requisições. A sobrecarga de execução de um workflow simples deve ser inferior a 5 segundos;
+  - RNF02. Escalabilidade: A arquitetura do motor de execução (workers) deverá ser projetada para permitir escalabilidade horizontal independente da API principal;
+  - RNF03. Disponibilidade: O sistema deverá ser projetado para alta disponibilidade, incluindo endpoints de health check para monitoramento;
+  - RNF04. Extensibilidade: A arquitetura deverá ser modular, permitindo a adição de novos conectores (nós) com o mínimo de impacto no núcleo do sistema (Plugin Architecture);
+  - RNF05. Usabilidade: A interface deve ser intuitiva para o público-alvo, minimizando a curva de aprendizado para a criação de workflows complexos.
+- **Representação dos Requisitos**: Um Diagrama de Casos de Uso (UML) será fornecido como apêndice para ilustrar as principais interações do usuário com o sistema.
+- **Aderência aos Requisitos da Linha de Projeto**: O projeto se enquadra na linha Web Apps e cumpre todos os seus requisitos obrigatórios, como hospedagem pública, funcionalidades reais, arquitetura definida e código-fonte versionado.
 
 ### 3.2. Considerações de Design
 - **Visão Inicial da Arquitetura**: Apresente os principais componentes e suas interações.
