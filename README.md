@@ -21,7 +21,7 @@ A TieTide justifica-se por se posicionar estrategicamente neste espaço. O proje
     - Construir um motor de execução que equilibre a simplicidade do low-code com a flexibilidade de nós de código customizáveis;
     - Desenvolver uma Prova de Conceito para a funcionalidade de documentação automática com IA;
     - Garantir que a plataforma seja distribuída via Docker para fácil auto-hospedagem;
-    -Aplicar rigorosamente os princípios de software maduro (Robustez, Escalabilidade, Disponibilidade, Desempenho, Extensibilidade e Resiliência) em todas as fases do projeto.
+    - Aplicar rigorosamente os princípios de software maduro (Robustez, Escalabilidade, Disponibilidade, Desempenho, Extensibilidade e Resiliência) em todas as fases do projeto.
 
 ## 2. Descrição do Projeto
 
