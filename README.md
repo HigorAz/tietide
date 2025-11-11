@@ -7,7 +7,7 @@
 
 # Resumo
 
-Este documento detalha a proposta de projeto para o desenvolvimento do TieTide, um software utilizado como plataforma de automação e integração como serviço (IPaaS). O projeto visa resolver o problema da "Fragmentação Digital" enfrentado por empresas modernas, oferecendo uma solução low-code, open-source e auto-hospedável, oferecendo um equilíbrio estratégico entre a robustez exigida por desenvolvedores e a simplicidade necessária para a agilidade na implantação dos processos. Os principais diferenciais da TieTide são sua experiência de usuário superior, a "Maré de Dados", e uma funcionalidade inovadora de geração de documentação de processos via Inteligência Artificial. A plataforma será construída com tecnologias modernas, incluindo TypeScript, React, NestJS e Docker, seguindo os princípios de software maduro.
+Este documento detalha a proposta de projeto para o desenvolvimento do TieTide, um software utilizado como plataforma de automação e integração como serviço (IPaaS). O projeto visa resolver o problema da "Fragmentação Digital" enfrentado por empresas modernas, oferecendo uma solução low-code, open-source e auto-hospedável, que combine integração entre sistemas e automação de tarefas e processos de negócio. A ideia da TieTide é oferecer um equilíbrio estratégico entre a robustez exigida por desenvolvedores e a simplicidade necessária para a agilidade na implantação dos processos. Os principais diferenciais da TieTide são sua experiência de usuário superior, a "Maré de Dados", e uma funcionalidade inovadora de geração de documentação de processos via Inteligência Artificial. A plataforma será construída com tecnologias modernas, incluindo TypeScript, React, NestJS e Docker, seguindo os princípios de software maduro.
 
 ## 1. Introdução
 
@@ -15,13 +15,33 @@ Este documento detalha a proposta de projeto para o desenvolvimento do TieTide, 
 - **Justificativa**: O mercado atual de plataformas de integração (IPaaS) oferece soluções para este problema, mas apresenta lacunas claras. De um lado, ferramentas no-code como o Zapier oferecem simplicidade, mas são restritas em robustez e podem ter um custo elevado em alto volume. No extremo oposto, plataformas enterprise como MuleSoft e Workato são extremamente poderosas, porém com uma complexidade e um custo de licenciamento que as tornam inviáveis para a maioria das pequenas e médias empresas. Soluções open-source como o n8n oferecem a flexibilidade necessária para desenvolvedores, mas frequentemente carecem de uma experiência de usuário polida que atenda também a analistas técnicos e de processos.
 A TieTide justifica-se por se posicionar estrategicamente neste espaço. O projeto propõe uma solução que une a robustez e o controle exigidos por desenvolvedores com uma interface visual e intuitiva que empodera um público técnico mais amplo. A adição de uma funcionalidade inovadora, como a documentação de processos gerada por IA, reforça ainda mais a necessidade de uma nova abordagem no setor, focada não apenas em conectar, mas em gerenciar e documentar a automação de forma inteligente.
 - **Objetivos**
-  - **Objetivo Principal**: Desenvolver uma plataforma iPaaS funcional que permita a criação, execução e monitoramento de workflows de automação de forma visual e intuitiva.
+  - **Objetivo Principal**: Desenvolver uma plataforma iPaaS funcional que permita a criação, execução, monitoramento e documentação de workflows de integração e automação de processos de forma visual e intuitiva.
   - **Objetivos Específicos**:
-    - Implementar a interface de usuário "Maré de Dados", garantindo uma experiência superior que simplifique a visualização de fluxos complexos;
-    - Construir um motor de execução que equilibre a simplicidade do low-code com a flexibilidade de nós de código customizáveis;
-    - Desenvolver uma Prova de Conceito para a funcionalidade de documentação automática com IA;
-    - Garantir que a plataforma seja distribuída via Docker para fácil auto-hospedagem;
-    - Aplicar rigorosamente os princípios de software maduro (Robustez, Escalabilidade, Disponibilidade, Desempenho, Extensibilidade e Resiliência) em todas as fases do projeto.
+    1. Implementar o editor visual de workflows (“Maré de Dados”)
+      Desenvolver um canvas de arrastar e soltar que permita criar, editar e salvar workflows com pelo menos:
+      - 3 tipos de gatilhos (Manual, Agendado/Cron, Webhook);
+      - 3 tipos de ações (Requisição HTTP, Execução de Código, Condicional IF).
+    2. Construir o motor de execução assíncrono para workflows de integração e automação
+      Implementar um worker desacoplado da API, utilizando fila de mensagens, capaz de:
+      - Processar workflows com múltiplos nós;
+      - Manter o tempo de execução de um workflow simples abaixo de 5 segundos em 95% dos casos (em ambiente de teste controlado).
+    3. Entregar histórico e observabilidade básica das execuções
+      Implementar uma interface de histórico que exiba, para cada execução:
+      - Status (sucesso/falha);
+      - Data/hora de início e fim;
+      - Logs em JSON por nó do workflow.
+    4. Desenvolver uma Prova de Conceito de documentação automática por IA
+      Criar um endpoint que receba a estrutura JSON de um workflow e gere uma descrição textual do processo (em linguagem natural), incluindo:
+      - Objetivo do fluxo;
+      - Principais etapas (gatilhos, ações e decisões).
+    5. Empacotar a plataforma para deploy via Docker e CI/CD
+      Disponibilizar a aplicação (frontend, API e worker) em containers Docker orquestrados por docker-compose, permitindo subir o ambiente com um único comando, além de:
+      - Configurar um pipeline de CI/CD (GitHub Actions) que execute testes automatizados e build de imagens a cada push na branch principal.
+    6. Garantir critérios mínimos de qualidade técnica (“software maduro”)
+      Estabelecer e atingir metas objetivas de qualidade, como:
+      - Cobertura de testes automatizados mínima de 70% nos módulos centrais (engine de execução, API de workflows);
+      - Tempo de resposta médio da API abaixo de 200 ms em 95% das requisições de leitura em ambiente de teste;
+      - Nenhum requisito funcional crítico (RF01–RF07) sem pelo menos um teste automatizado associado.
 
 ## 2. Descrição do Projeto
 
