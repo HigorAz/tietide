@@ -528,17 +528,174 @@ Políticas operacionais (MVP)
    
 # 4. Próximos Passos
 
- - Descrição dos passos seguintes após a conclusão do documento, com uma visão geral do cronograma para Portfólio I e II.
- - Definição de Marcos: Estabelecer datas para entregas intermediárias e checkpoints.
+## 4.1 Cronograma
+| Período              | Sprint/Fase                          | Objetivo                                              | Entregas (Exit criteria)                                                                                                                                                                                                      |
+| -------------------- | ------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Até 30/11/2025**   | **CP0 – Entrega do RFC**             | RFC v1.0 aprovado                                     | RFC consolidado (seções 1–3 completas + 3.2.5 decisões + 3.3 stack + 3.4 segurança + 3.5 conformidade) assinado/validado                                                                                                      |
+| **01–14/12/2025**    | **S0 – Kickoff técnico**             | Monorepo + infraestrutura mínima sobem local e na VPS | Repositório monorepo (`apps/spa`,`apps/api`,`apps/worker`,`apps/ai`,`packages/sdk`,`infra/`); Docker Compose com **Postgres, Valkey, Traefik, Prometheus, Grafana, Loki/Promtail**; README com “como subir”; domínio + TLS ok |
+| **15–28/12/2025**    | **S1 – Editor base (Maré de Dados)** | Canvas e nós básicos funcionam                        | React + Vite + Tailwind + shadcn/ui + **React Flow**; nó custom + aresta “tinta viva”; criar/salvar/abrir workflow no browser (local state) + persistência simplificada via API stub                                          |
+| **29/12–05/01/2026** | **Buffer de fim de ano**             | Hardening/ajustes                                     | Issues de débitos S0/S1 fechadas; healthchecks e dashboards básicos no ar                                                                                                                                                     |
+| **06–19/01/2026**    | **S2 – Autenticação & Secrets**      | Login/JWT + cofres de secrets cifrados                | Auth (NestJS) com JWT; tabela `users`; **libsodium** para cifrar secrets no Postgres; painel de secrets na SPA (criar/editar/mascarar); testes unitários de crypto                                                            |
+| **20/01–02/02/2026** | **S3 – CRUD de Workflows**           | API de workflows completa + versionamento simples     | Endpoints CRUD (`/workflows`); schema Prisma (users, workflows, runs, steps, secrets); versionamento simples (v1, v2…); Swagger/OpenAPI publicado; testes integração básicos                                                  |
+| **03–16/02/2026**    | **S4 – Fila & Executor (básico)**    | BullMQ + Valkey; executar **HTTP, IF, Delay**         | Producer/consumer; **idempotency key**; **HTTP** com timeout/circuit breaker; **IF** (eval segura); **Delay/Cron adapter**; persistência de `runs/steps`                                                                      |
+| **17/02–02/03/2026** | **S5 – Webhooks & Cron real**        | Webhook-in seguro + repeatables confiáveis            | Webhook com **HMAC + timestamp/nonce**; validação de origem; **repeatable jobs** (cron) com lock; testes de duplicidade; cenários fim-a-fim (enqueue→executa→persiste)                                                        |
+| **03–16/03/2026**    | **S6 – Histórico & Observabilidade** | Tela de execuções + logs e métricas                   | Tela **Histórico** com filtro (status/data); detalhe do step (payload saneado); **Loki** com retenção 30d; **dashboards Grafana** (taxa sucesso/falha, latência, throughput); alertas por e-mail SMTP básico                  |
+| **17–30/03/2026**    | **S7 – IA PoC (RAG)**                | Serviço **FastAPI** gera documentação                 | `apps/ai` com **FastAPI**; ingestão mínima (RAG) com taxonomia de nós/JSON do workflow; endpoint `/doc-from-workflow`; integração na SPA (botão “Gerar documentação”); logs e métricas do serviço IA                          |
+| **31/03–13/04/2026** | **S8 – Qualidade & Performance**     | Cobertura testes + metas de desempenho                | **70%+** cobertura em engine/API; p95 **< 200 ms** nas leituras; workflow simples p95 **< 5 s**; testes de carga leve; pipeline CI com lint/test/coverage/build/push                                                          |
+| **14–27/04/2026**    | **S9 – Segurança & Resiliência**     | Rate-limit, DLQ, auditoria                            | Rate-limit (Traefik ou Nest); **DLQ** por execução; auditoria (quem criou/alterou/executou); headers de segurança (Helmet + Traefik); backup diário do Postgres + restore testado                                             |
+| **28/04–11/05/2026** | **S10 – UX & Documentação**          | Polimento UX e docs de operação                       | Ajustes de usabilidade no editor/painéis; **Runbooks** (incidentes/backup-restore); Guia de Deploy/Infra; contrato do **SDK de conectores**; acessibilidade básica (WCAG AA contraste/teclado)                                |
+| **12–25/05/2026**    | **S11 – Freeze & Demo**              | Estabilização + roteiro Demo Day                      | Code freeze (hotfix apenas); roteiro de **demo fim-a-fim** (gatilho→ações→histórico→documentação IA); cenários de falha/recuperação; captura de telas/vídeos                                                                  |
+| **26–30/05/2026**    | **S12 – Entrega final**              | Entrega e apresentação                                | Ambiente público estável; checklist de critérios de aceite; material para banca (slides, links, QR)                                                                                                                           |
 
+## 4.2 Marcos e Checkpoints
+
+### 4.2.1 Marcos (Go/No-Go)
+
+- M0 – RFC entregue (30/11/2025)
+
+Critérios: RFC completo e aceito pelos professores.
+
+- M1 – Infra + Editor base (até 28/12/2025)
+
+Critérios: compose sobe na VPS com TLS, canvas cria/edita nós, persistência stub/incipiente ok.
+
+- M2 – CRUD + Executor mínimo (até 16/02/2026)
+
+Critérios: CRUD de workflows, fila operando, execução de nós HTTP/IF/Delay com persistência.
+
+- M3 – Webhook + Cron confiáveis (até 02/03/2026)
+
+Critérios: HMAC + anti-replay; repeatables sem duplicação; cenários fim-a-fim validados.
+
+- M4 – Histórico + Observabilidade (até 16/03/2026)
+
+Critérios: Tela histórico funcional; dashboards Grafana e logs Loki úteis; alertas SMTP.
+
+- M5 – IA PoC integrada (até 30/03/2026)
+
+Critérios: FastAPI gera documentação coerente do workflow; botão na SPA funcionando.
+
+- M6 – Qualidade & Segurança base (até 27/04/2026)
+
+Critérios: Cobertura ≥ 70%, p95 API/execução cumpridos, rate-limit + DLQ + auditoria + backup/restore.
+
+- M7 – Freeze + Demo pronta (até 25/05/2026)
+
+Critérios: Build estável, demo roteirizada, documentação final pronta.
+
+- M8 – Entrega final (30/05/2026)
+
+Critérios: Tudo acessível publicamente; apresentação realizada.
+
+### 4.2.2 Checkpoints com professores
+
+- CP1 (meados jan/2026) – S0/S1 concluídos (infra + editor).
+
+- CP2 (fim fev/2026) – S2/S3/S4 (auth, CRUD, executor mínimo).
+
+- CP3 (meados mar/2026) – S5/S6 (webhook/cron + histórico/observabilidade).
+
+- CP4 (início abr/2026) – S7 (IA PoC integrada).
+
+- CP5 (fim abr/2026) – S8/S9 (qualidade/performance/segurança).
+
+- CP6 (meados mai/2026) – S10/S11 (UX/docs + freeze/demo).
+
+### 4.2.3 Lista de entregáveis
+
+- Infra: compose com serviços, TLS válido, healthchecks, dashboards, backups agendados.
+
+- Editor: criação/edição de workflow, biblioteca de nós, painel de propriedades, UX consistente.
+
+- API/Worker: CRUD completo, execução assíncrona com idempotência, retries/backoff, DLQ.
+
+- Segurança: JWT, secrets cifrados (libsodium), webhook HMAC + anti-replay, headers e rate-limit.
+
+- Observabilidade: logs Loki (30d), métricas Prometheus, painéis Grafana, alertas SMTP.
+
+- IA PoC: serviço FastAPI (RAG mínimo) + integração na SPA com retorno textual.
+
+- Qualidade: cobertura ≥ 70% módulos core; p95 API < 200 ms leitura; p95 execução simples < 5 s.
+
+- Documentação: Swagger, Guia de Deploy, Runbooks (incidentes/backup-restore), contrato SDK conectores, README dev.
+
+- Demo: roteiro e dados de teste, cenários de sucesso/falha, vídeo ou script passo a passo.
+
+### 4.2.4 Riscos e mitigação
+
+| Risco                        | Mitigação                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------- |
+| Atraso na IA PoC             | Entregar stub primeiro; RAG minimalista (modelo pequeno local)                      |
+| Duplicidade em cron/webhooks | Locks/repeatables; idempotency key; testes fim-a-fim                                |
+| Gargalos de logs/queue       | Ajustar retenção/concor­rência; monitorar throughput; DLQ e alertas                 |
+| Débito técnico acumulado     | Buffers previstos (fim de ano e S10); política de “bug antes de feature” pós-freeze |
+| Segurança de secrets         | libsodium + SOPS/age desde S2; revisão de permissões; auditoria ativa               |
 
 # 5. Referências
 
-Listagem de todas as fontes de pesquisa, frameworks, bibliotecas e ferramentas que serão utilizadas.
+ARJONA, Aitor; GARCÍA-LÓPEZ, Pedro; SAMPÉ, Josep; SŁOMIŃSKI, Aleksander; VILLARD, Lionel. Triggerflow: trigger-based orchestration of serverless workflows. 2021. Disponível em: https://arxiv.org/abs/2106.00583
+. Acesso em: 23 out. 2025.
+
+ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. ABNT NBR ISO/IEC 25010:2011 – Engenharia de software e de sistemas — Modelos de qualidade. Rio de Janeiro: ABNT, 2011.
+
+BRASIL. Lei nº 13.709, de 14 de agosto de 2018. Lei Geral de Proteção de Dados Pessoais (LGPD). Diário Oficial da União, Brasília, DF, 15 ago. 2018. Disponível em: https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/L13709.htm
+. Acesso em: 20 nov. 2025.
+
+BROWN, Simon. The C4 model for visualising software architecture. 2018. Disponível em: https://c4model.com/
+. Acesso em: 20 nov. 2025.
+
+FASTAPI. FastAPI — Documentation. [s.l.]: [s.n.], [s.d.]. Disponível em: https://fastapi.tiangolo.com/
+. Acesso em: 20 nov. 2025.
+
+GRAFANA LABS. Grafana / Loki / Promtail — Documentation. [s.l.]: [s.n.], [s.d.]. Disponível em: https://grafana.com/docs/
+. Acesso em: 20 nov. 2025.
+
+INTERNATIONAL ORGANIZATION FOR STANDARDIZATION. ISO/IEC 27001:2022 — Information security, cybersecurity and privacy protection — Information security management systems — Requirements. Geneva: ISO, 2022.
+
+LIBSODIUM. The sodium crypto library — Documentation. [s.l.]: [s.n.], [s.d.]. Disponível em: https://doc.libsodium.org/
+. Acesso em: 20 nov. 2025.
+
+LOUIS, J. A case study for workflow-based automation in the Internet of Things. International Journal of Computer Applications, v. 179, n. 8, p. 25–30, 2018. Disponível em: https://www.researchgate.net/publication/324877033_A_Case_Study_for_Workflow-Based_Automation_in_the_Internet_of_Things
+. Acesso em: 23 out. 2025.
+
+MALAWSKI, Maciej. Towards serverless execution of scientific workflows – HyperFlow case study. CEUR Workshop Proceedings, v. 1800, 2017. Disponível em: https://ceur-ws.org/Vol-1800/paper4.pdf. Acesso em: 23 out. 2025.
+
+NESTJS. NestJS — A progressive Node.js framework. [s.l.]: [s.n.], [s.d.]. Disponível em: https://nestjs.com/
+. Acesso em: 20 nov. 2025.
+
+OWASP FOUNDATION. OWASP Top 10 – 2021. 2021. Disponível em: https://owasp.org/www-project-top-ten/
+. Acesso em: 20 nov. 2025.
+
+PRISMA. Prisma ORM — Documentation. [s.l.]: [s.n.], [s.d.]. Disponível em: https://www.prisma.io/docs
+. Acesso em: 20 nov. 2025.
+
+PROMETHEUS. Prometheus — Documentation. [s.l.]: [s.n.], [s.d.]. Disponível em: https://prometheus.io/docs/introduction/overview/
+. Acesso em: 20 nov. 2025.
+
+SIDO, N.; VESTERGAARD, A.; BJØRHOLM, M. Low/No Code Development and Generative AI: Architectural Perspectives and Practical Use-Cases. 2024. Disponível em: https://vbn.aau.dk/ws/files/717521040/LowNOCode__GenAI.pdf
+. Acesso em: 23 out. 2025.
+
+TASKFORCE.SH. BullMQ — Documentation. [s.l.]: [s.n.], [s.d.]. Disponível em: https://docs.bullmq.io/
+. Acesso em: 20 nov. 2025.
+
+VALKEY PROJECT. Valkey — Documentation. [s.l.]: [s.n.], [s.d.]. Disponível em: https://valkey.io/
+. Acesso em: 20 nov. 2025.
+
+WASHINGTON, Jasmine. The impact of AI-assisted low-code development on software engineering. [s.l.]: [s.n.], 2024. Disponível em: https://www.researchgate.net/publication/390175006_The_Impact_of_AI-Assisted_Low-Code_Development_on_Software_Engineering
+. Acesso em: 23 out. 2025.
+
+XYFLOW. React Flow — A library for building node-based UIs. [s.l.]: [s.n.], [s.d.]. Disponível em: https://reactflow.dev/
+. Acesso em: 20 nov. 2025.
 
 # 6. Apêndices (Opcionais)
 
-Informações complementares, dados de suporte ou discussões detalhadas fora do corpo principal.
+## 6.1 Apêndice 1 — Diagrama de Casos de Uso (UML)
+Este apêndice apresenta o diagrama de casos de uso do MVP do TieTide, evidenciando as interações entre atores (Usuário, Admin, Sistemas Externos, Serviço de IA e Scheduler interno) e os casos de uso de autenticação, modelagem/validação de workflows, execução/orquestração, observabilidade/segurança e geração de documentação por IA (RAG).
+
+<img width="1098" height="1990" alt="UML TieTide" src="https://github.com/user-attachments/assets/b75435ea-cb45-49de-baa7-c2c8e283c80a" />
+Fonte: Elaborado pelo autor (2025).
+
+
 # 7. Avaliações de Professores
 
 Adicionar três páginas no final do RFC para que os Professores escolhidos possam fazer suas considerações e assinatura:
