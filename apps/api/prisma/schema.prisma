@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  workflows Workflow[]
+  secrets   Secret[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Workflow {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  definition  Json
+  isActive    Boolean  @default(false) @map("is_active")
+  version     Int      @default(1)
+  userId      String   @map("user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user       User                @relation(fields: [userId], references: [id])
+  executions WorkflowExecution[]
+  webhooks   Webhook[]
+
+  @@map("workflows")
+}
+
+model WorkflowExecution {
+  id          String          @id @default(uuid())
+  workflowId  String          @map("workflow_id")
+  status      ExecutionStatus @default(PENDING)
+  triggerType String          @map("trigger_type")
+  triggerData Json?           @map("trigger_data")
+  startedAt   DateTime?       @map("started_at")
+  finishedAt  DateTime?       @map("finished_at")
+  error       String?
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  workflow Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  steps    ExecutionStep[]
+
+  @@index([workflowId, createdAt(sort: Desc)])
+  @@map("workflow_executions")
+}
+
+enum ExecutionStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model ExecutionStep {
+  id          String          @id @default(uuid())
+  executionId String          @map("execution_id")
+  nodeId      String          @map("node_id")
+  nodeType    String          @map("node_type")
+  nodeName    String          @map("node_name")
+  status      ExecutionStatus @default(PENDING)
+  inputData   Json?           @map("input_data")
+  outputData  Json?           @map("output_data")
+  error       String?
+  startedAt   DateTime?       @map("started_at")
+  finishedAt  DateTime?       @map("finished_at")
+  durationMs  Int?            @map("duration_ms")
+
+  execution WorkflowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
+  @@map("execution_steps")
+}
+
+model Secret {
+  id        String   @id @default(uuid())
+  name      String
+  value     String
+  nonce     String
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, name])
+  @@map("secrets")
+}
+
+model Webhook {
+  id         String   @id @default(uuid())
+  workflowId String   @map("workflow_id")
+  path       String   @unique
+  hmacSecret String   @map("hmac_secret")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}

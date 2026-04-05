@@ -1,0 +1,9 @@
+[project]
+name = "tietide-ai"
+version = "0.1.0"
+description = "TieTide AI documentation service"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
