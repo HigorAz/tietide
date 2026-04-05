@@ -938,6 +938,7 @@ Go to your GitHub Project → Settings → Workflows and enable:
 ## Step 7: Create Iteration Field (Sprints)
 
 In your GitHub Project → Settings → Custom fields:
+
 1. Add a new **Iteration** field called "Sprint"
 2. Create iterations matching your sprint dates:
    - S0: Dec 1-14, 2025

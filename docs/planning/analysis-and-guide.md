@@ -14,6 +14,7 @@ Your RFC is one of the most complete I've seen for a college final project. The 
 
 **A) AI Service: Local Model with a Pragmatic Approach**
 Your RFC proposes FastAPI + local LLM (Llama/Mistral) + RAG. This is ambitious but achievable if you scope it correctly. Here's the pragmatic path:
+
 - **Model**: Use Ollama to run Llama 3.1 8B or Mistral 7B locally. Ollama gives you a Docker-friendly, OpenAI-compatible API with zero GPU configuration hassle. It runs on CPU (slower but works) or GPU if available.
 - **RAG**: Start simple. Use ChromaDB (Python, lightweight) as your vector store. Embed your node taxonomy, workflow JSON schema docs, and a few annotated examples. Don't over-engineer the retrieval — 10-20 well-crafted documents are enough for the PoC.
 - **FastAPI service**: Keep it thin. 3 endpoints: `POST /generate-docs` (main), `GET /health`, `POST /ingest` (to load RAG documents). The NestJS API calls FastAPI via HTTP.
@@ -22,14 +23,16 @@ Your RFC proposes FastAPI + local LLM (Llama/Mistral) + RAG. This is ambitious b
 
 **B) Drop the Observability Stack from Sprint 0**
 Prometheus + Grafana + Loki + Promtail is 4 extra containers from day one. This creates noise when you're trying to get the core working.
+
 - **Instead**: Use structured logging (pino/winston) to stdout + a simple `/health` endpoint. Add Prometheus metrics in S8 (Quality sprint), and Grafana/Loki only if you have time.
-- **Why**: Your professors will evaluate the *platform features*, not your Grafana dashboards.
+- **Why**: Your professors will evaluate the _platform features_, not your Grafana dashboards.
 
 **C) Use Valkey consistently (not Redis)**
 Your docs switch between "Redis" and "Valkey." Pick one name. Since Valkey is the open-source fork and BullMQ works with both, use Valkey everywhere in docs and docker-compose but configure it as Redis-compatible.
 
 **D) Simplify the Gateway for MVP**
 Traefik with TLS/Let's Encrypt is great for production but unnecessary for local dev and early sprints.
+
 - **Instead**: Use a simple nginx reverse proxy in docker-compose for local dev. Add Traefik when you deploy to VPS (around S9-S10).
 
 ### 2.2 Recommended Improvements
@@ -64,6 +67,7 @@ When a user builds a workflow, let them test individual nodes before running the
 ### Phase 0: Pre-Development Setup (1-2 days)
 
 #### Step 1: Create the GitHub Repository
+
 ```
 tietide/
 ├── .github/
@@ -90,6 +94,7 @@ tietide/
 ```
 
 #### Step 2: Initialize the Monorepo
+
 - Install pnpm globally
 - Run `pnpm init` at root
 - Create `pnpm-workspace.yaml` pointing to `apps/*` and `packages/*`
@@ -97,6 +102,7 @@ tietide/
 - Configure `turbo.json` with build/test/lint pipelines
 
 #### Step 3: Setup Development Environment
+
 - Docker Desktop installed
 - Node.js 20+ (LTS)
 - Python 3.12+ (for AI service)
@@ -105,17 +111,21 @@ tietide/
 - Create `.env.example` with all environment variables (see CLAUDE.md)
 
 #### Step 4: Create `docker-compose.yml`
+
 Start with just the infrastructure services:
+
 - PostgreSQL 16
 - Valkey (Redis-compatible)
 - (Optional) Mailhog for email testing
 
 #### Step 5: Place the CLAUDE.md at the root
+
 This is the file I'm creating for you. It will guide Claude Code through the entire project.
 
 ### Phase 1: Backend Foundation (Sprints S0-S1)
 
 #### Step 6: Scaffold NestJS API (`apps/api`)
+
 - `nest new api --strict --package-manager pnpm`
 - Configure: TypeScript strict mode, path aliases
 - Setup Prisma ORM with PostgreSQL
@@ -123,6 +133,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 - Write first test: health check endpoint
 
 #### Step 7: Implement Authentication (TDD)
+
 1. Write tests for: register, login, JWT validation
 2. Implement User entity and Prisma schema
 3. Implement AuthService (register, login, validateToken)
@@ -130,6 +141,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 5. Test with Insomnia/Postman
 
 #### Step 8: Implement Workflow CRUD (TDD)
+
 1. Write tests for: create, read, update, delete, list workflows
 2. Implement Workflow entity (JSON definition stored as JSONB)
 3. Implement WorkflowService
@@ -137,6 +149,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 5. Add OpenAPI/Swagger decorators
 
 #### Step 9: Scaffold NestJS Worker (`apps/worker`)
+
 - Create separate NestJS app for the worker
 - Configure BullMQ with Valkey connection
 - Create a basic queue consumer that logs jobs
@@ -145,6 +158,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 ### Phase 2: Execution Engine (Sprints S2-S3)
 
 #### Step 10: Build the Execution Engine (TDD)
+
 1. Define the Node interface (SDK):
    ```typescript
    interface NodeDefinition {
@@ -159,6 +173,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 6. Write integration tests: multi-node workflow execution
 
 #### Step 11: Connect API → Queue → Worker
+
 1. API enqueues workflow execution via BullMQ
 2. Worker picks up the job
 3. Worker runs the WorkflowRunner
@@ -168,12 +183,14 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 ### Phase 3: Frontend & Editor (Sprints S4-S5)
 
 #### Step 12: Scaffold React SPA (`apps/spa`)
+
 - `pnpm create vite spa --template react-ts`
 - Install: React Flow, Tailwind CSS, shadcn/ui, Zustand
 - Configure the design system (CSS variables, dark theme)
 - Create basic layout: sidebar + canvas + config panel
 
 #### Step 13: Build the Visual Editor ("Maré de Dados")
+
 1. Implement CustomNode component (hybrid circle + card)
 2. Implement LivingInkEdge component (animated connections)
 3. Implement node library sidebar (drag to add)
@@ -181,6 +198,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 5. Implement save/load workflow (connect to API)
 
 #### Step 14: Build Workflow Management Pages
+
 1. Dashboard: list all workflows
 2. Create new workflow modal
 3. Workflow settings page
@@ -189,6 +207,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 ### Phase 4: History & Monitoring (Sprint S6)
 
 #### Step 15: Execution History
+
 1. API endpoint: list executions for a workflow
 2. API endpoint: get execution detail (per-node logs)
 3. Frontend: execution history table with filters
@@ -197,11 +216,13 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 ### Phase 5: AI Documentation Service (Sprint S7)
 
 #### Step 16: Setup Ollama + Model
+
 1. Add Ollama to `docker-compose.yml` (runs Llama 3.1 8B or Mistral 7B)
 2. Pull the model on first start: `ollama pull llama3.1:8b`
 3. Verify the model responds via `http://localhost:11434/api/generate`
 
 #### Step 17: Build FastAPI AI Service (`apps/ai`)
+
 1. Create `apps/ai/` with Python project: FastAPI, chromadb, langchain, httpx
 2. Create `Dockerfile` with Python 3.12 slim
 3. Implement health check: `GET /health` (checks Ollama connectivity)
@@ -219,6 +240,7 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 6. Write tests: health check, ingestion, generation with mock Ollama
 
 #### Step 18: Integrate AI with TieTide Platform
+
 1. NestJS API endpoint: `POST /api/workflows/:id/generate-docs`
 2. API calls FastAPI service via HTTP
 3. Frontend: "Generate Documentation" button on workflow page
@@ -228,23 +250,27 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 ### Phase 6: Quality & Polish (Sprints S8-S12)
 
 #### Step 19: Quality Gates
+
 - Ensure 70%+ test coverage on core modules
 - Run load tests (k6 or artillery) for API performance
 - Fix any failing E2E tests
 
 #### Step 20: Security Hardening
+
 - Encrypt secrets in DB (libsodium)
 - Add rate limiting (NestJS throttler)
 - HMAC webhook validation
 - Security headers (Helmet)
 
 #### Step 21: Deployment
+
 - Finalize docker-compose for production
 - Setup VPS with TLS
 - Configure CI/CD pipeline (GitHub Actions)
 - Deploy and test
 
 #### Step 22: Demo Preparation
+
 - Create demo workflows with real integrations
 - Record backup video of the demo
 - Prepare presentation slides
@@ -254,30 +280,30 @@ This is the file I'm creating for you. It will guide Claude Code through the ent
 
 ## 4. Architecture Decision Records (Quick Reference)
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Language | TypeScript 100% | Type safety, code sharing, single language |
-| API Framework | NestJS | DI, modules, testing, enterprise patterns |
-| Frontend | React + Vite | Ecosystem, React Flow compatibility |
-| Database | PostgreSQL | JSONB, robustness, industry standard |
-| ORM | Prisma | Type safety, migrations, DX |
-| Queue | BullMQ + Valkey | Repeatable jobs, retry/DLQ, zero cost |
-| State Management | Zustand | Simple, performant, minimal boilerplate |
-| Canvas Library | React Flow | Industry standard for node-based UIs |
-| UI Components | shadcn/ui + Tailwind | Accessible, customizable, fast |
-| Monorepo | pnpm + Turborepo | Code sharing, single versioning |
-| AI (MVP) | Ollama + FastAPI + ChromaDB | Local model proves learning, privacy-first, self-hostable |
-| Auth | JWT (local) | Simple, stateless, well-understood |
-| Deployment | Docker Compose | Single command setup, portable |
+| Decision         | Choice                      | Rationale                                                 |
+| ---------------- | --------------------------- | --------------------------------------------------------- |
+| Language         | TypeScript 100%             | Type safety, code sharing, single language                |
+| API Framework    | NestJS                      | DI, modules, testing, enterprise patterns                 |
+| Frontend         | React + Vite                | Ecosystem, React Flow compatibility                       |
+| Database         | PostgreSQL                  | JSONB, robustness, industry standard                      |
+| ORM              | Prisma                      | Type safety, migrations, DX                               |
+| Queue            | BullMQ + Valkey             | Repeatable jobs, retry/DLQ, zero cost                     |
+| State Management | Zustand                     | Simple, performant, minimal boilerplate                   |
+| Canvas Library   | React Flow                  | Industry standard for node-based UIs                      |
+| UI Components    | shadcn/ui + Tailwind        | Accessible, customizable, fast                            |
+| Monorepo         | pnpm + Turborepo            | Code sharing, single versioning                           |
+| AI (MVP)         | Ollama + FastAPI + ChromaDB | Local model proves learning, privacy-first, self-hostable |
+| Auth             | JWT (local)                 | Simple, stateless, well-understood                        |
+| Deployment       | Docker Compose              | Single command setup, portable                            |
 
 ---
 
 ## 5. Risk Mitigation for College Context
 
-| Risk | Mitigation |
-|------|-----------|
-| Scope creep | Strict MVP: only 3 triggers + 3 actions. Everything else is "future" |
-| AI PoC fails | Have cached/pre-generated docs for demo workflows. Ollama can run on CPU if no GPU available (slower but works). Keep FastAPI service thin so it starts fast |
-| Time pressure | The editor (React Flow) and execution engine are the 2 must-haves. Everything else is secondary |
-| Demo day issues | Deploy 1 week early, have offline demo video as backup |
-| Professor expectations | Document every decision in ADRs, show testing coverage, demonstrate CI/CD |
+| Risk                   | Mitigation                                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Scope creep            | Strict MVP: only 3 triggers + 3 actions. Everything else is "future"                                                                                         |
+| AI PoC fails           | Have cached/pre-generated docs for demo workflows. Ollama can run on CPU if no GPU available (slower but works). Keep FastAPI service thin so it starts fast |
+| Time pressure          | The editor (React Flow) and execution engine are the 2 must-haves. Everything else is secondary                                                              |
+| Demo day issues        | Deploy 1 week early, have offline demo video as backup                                                                                                       |
+| Professor expectations | Document every decision in ADRs, show testing coverage, demonstrate CI/CD                                                                                    |

@@ -1,4 +1,5 @@
 # TieTide Development Methodology
+
 ## GSD + Extreme Programming with AI Agents
 
 > "The AI is your mirror. It reveals faster who you are. If you're incompetent, it produces bad things faster. If you're competent, it produces good things faster." — Akita
@@ -16,28 +17,32 @@ When you invert this — letting AI decide WHAT to build while you just type —
 
 ### The Akita Lessons Applied to TieTide
 
-| Akita's Lesson | How We Apply It |
-|----------------|----------------|
-| Only 37% of commits are features | Budget sprints: 40% features, 20% tests, 15% fixes, 15% infra, 10% docs |
-| TDD is MORE important with AI | Every GSD phase starts with tests. AI modifies code with confidence because 1000+ tests exist as safety net |
-| Refactoring is continuous | Never let a file grow past ~300 lines. Extract immediately. Don't accumulate tech debt |
-| Small releases are key | Every commit passes CI. Every commit is production-ready. Revert is always one commit away |
-| The agent never says "no" | YOU are the brake. YOU are the code review. YOU are the adult in the room |
-| CLAUDE.md is the spec that evolves | Update it every session. It's the onboarding doc that the agent reads in 2 seconds |
+| Akita's Lesson                     | How We Apply It                                                                                             |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Only 37% of commits are features   | Budget sprints: 40% features, 20% tests, 15% fixes, 15% infra, 10% docs                                     |
+| TDD is MORE important with AI      | Every GSD phase starts with tests. AI modifies code with confidence because 1000+ tests exist as safety net |
+| Refactoring is continuous          | Never let a file grow past ~300 lines. Extract immediately. Don't accumulate tech debt                      |
+| Small releases are key             | Every commit passes CI. Every commit is production-ready. Revert is always one commit away                  |
+| The agent never says "no"          | YOU are the brake. YOU are the code review. YOU are the adult in the room                                   |
+| CLAUDE.md is the spec that evolves | Update it every session. It's the onboarding doc that the agent reads in 2 seconds                          |
 
 ---
 
 ## 2. The Stack: Two Tools, Two Purposes
 
 ### Claude Code (Terminal / IDE) — The Developer
+
 Your primary coding tool. Runs in VS Code terminal or standalone terminal.
+
 - Reads your entire codebase
 - Writes code, runs tests, executes commands
 - Has access to `gh` CLI for GitHub operations
 - GSD framework installed on top for context management
 
 ### Claude Cowork (Desktop App) — The Project Manager
+
 Your non-coding work tool. Runs in Claude Desktop app.
+
 - Project management: review sprint board, plan tasks, write specs
 - Documentation: update RFC, write deployment guides, create ADRs
 - Analysis: review test coverage reports, analyze performance results
@@ -46,33 +51,37 @@ Your non-coding work tool. Runs in Claude Desktop app.
 
 ### When to Use What
 
-| Task | Tool |
-|------|------|
-| Writing code, tests, running builds | Claude Code + GSD |
-| Planning a sprint, writing specs | Claude Cowork |
-| Reviewing architecture decisions | Claude Cowork |
-| Implementing a feature (TDD) | Claude Code + GSD |
-| Updating CLAUDE.md | Claude Code |
-| Writing documentation, guides | Claude Cowork |
-| Creating presentations, posters | Claude Cowork |
-| Debugging a failing test | Claude Code |
-| Reviewing what was built today | Claude Cowork |
-| Updating GitHub issues | Claude Code (gh CLI) |
+| Task                                | Tool                 |
+| ----------------------------------- | -------------------- |
+| Writing code, tests, running builds | Claude Code + GSD    |
+| Planning a sprint, writing specs    | Claude Cowork        |
+| Reviewing architecture decisions    | Claude Cowork        |
+| Implementing a feature (TDD)        | Claude Code + GSD    |
+| Updating CLAUDE.md                  | Claude Code          |
+| Writing documentation, guides       | Claude Cowork        |
+| Creating presentations, posters     | Claude Cowork        |
+| Debugging a failing test            | Claude Code          |
+| Reviewing what was built today      | Claude Cowork        |
+| Updating GitHub issues              | Claude Code (gh CLI) |
 
 ---
 
 ## 3. GSD Framework: Solving Context Rot
 
 ### What is Context Rot?
+
 As Claude works in a long session, the context window fills up. Quality degrades:
+
 - 0-30% context: Peak quality. Thorough, comprehensive
 - 50%+: Starts rushing. Cuts corners
 - 70%+: Hallucinations. Forgotten requirements
 
 ### How GSD Fixes It
+
 GSD spawns **fresh Claude instances** (sub-agents) for each task. Each gets a clean 200K context window. Task 50 has the same quality as Task 1.
 
 ### Installation
+
 ```bash
 # Install GSD for Claude Code (global — works across all projects)
 npx get-shit-done-cc --claude --global
@@ -81,6 +90,7 @@ npx get-shit-done-cc --claude --global
 ### GSD Workflow for TieTide
 
 #### Starting a New Sprint
+
 ```bash
 # In Claude Code:
 /gsd:new-project
@@ -89,6 +99,7 @@ npx get-shit-done-cc --claude --global
 ```
 
 #### The 6-Step Phase Loop
+
 For each major feature/phase in a sprint:
 
 ```bash
@@ -122,6 +133,7 @@ For each major feature/phase in a sprint:
 ```
 
 #### Quick Tasks (Bug Fixes, Small Changes)
+
 ```bash
 # Skip the full planning cycle
 /gsd:quick "Fix the CORS error on webhook endpoint"
@@ -140,6 +152,7 @@ You're a solo developer, but you think like a team. Each "role" is a different m
 **Where**: Claude Cowork with a "TieTide Planning" Project
 
 **What the PO does**:
+
 - Reviews the sprint backlog in GitHub Projects
 - Breaks down large issues into smaller acceptance criteria
 - Prioritizes what to build this week
@@ -148,6 +161,7 @@ You're a solo developer, but you think like a team. Each "role" is a different m
 
 **How to activate**:
 In your Cowork Project, set these folder instructions:
+
 ```
 You are acting as the Product Owner for TieTide, an iPaaS platform.
 Your job is to:
@@ -164,6 +178,7 @@ The user is Higor, a solo developer building this as a college final project.
 
 **Weekly ritual**:
 Every Monday morning, open Cowork and say:
+
 > "Review the GitHub issues for sprint S[X]. Help me plan what I'll build this week. I have 5 weekday evenings (~3h each) and ~8h on the weekend. Prioritize the critical issues first."
 
 ### Role 2: Developer (Dev) — Claude Code + GSD
@@ -172,6 +187,7 @@ Every Monday morning, open Cowork and say:
 **Where**: Claude Code in terminal/IDE with GSD installed
 
 **What the Dev does**:
+
 - Implements features following TDD (Red → Green → Refactor)
 - Writes clean, typed code following CLAUDE.md patterns
 - Makes atomic commits that pass CI
@@ -179,6 +195,7 @@ Every Monday morning, open Cowork and say:
 
 **How to activate**:
 Your CLAUDE.md already has all the patterns. GSD handles the context. Start each session:
+
 ```bash
 # Check what's planned for today
 /gsd:progress
@@ -189,6 +206,7 @@ Your CLAUDE.md already has all the patterns. GSD handles the context. Start each
 ```
 
 **Session discipline (from Akita)**:
+
 - Never let the agent over-engineer. If it proposes 8 states, say "simplify, 4 states"
 - Interrupt when it takes a wrong path. Don't wait for it to finish
 - Give context it doesn't have: "Valkey uses Redis protocol but BullMQ needs this specific config"
@@ -200,6 +218,7 @@ Your CLAUDE.md already has all the patterns. GSD handles the context. Start each
 **Where**: Claude Code
 
 **What the QA does**:
+
 - Reviews test coverage for the implemented feature
 - Identifies missing edge cases
 - Runs the full test suite and verifies nothing is broken
@@ -207,8 +226,9 @@ Your CLAUDE.md already has all the patterns. GSD handles the context. Start each
 
 **How to activate**:
 After implementing a feature, switch mindset:
+
 ```
-Now act as a QA engineer reviewing what we just built. 
+Now act as a QA engineer reviewing what we just built.
 Check:
 1. Are there tests for EVERY acceptance criterion in the issue?
 2. What edge cases are NOT tested? Write tests for them.
@@ -224,6 +244,7 @@ Don't be nice. Find problems.
 **Where**: Claude Cowork
 
 **What the Tech Lead does**:
+
 - Reviews the week's commits and architecture decisions
 - Identifies tech debt accumulating
 - Ensures patterns from CLAUDE.md are being followed
@@ -232,6 +253,7 @@ Don't be nice. Find problems.
 
 **How to activate**:
 In Cowork, point to your project folder and say:
+
 > "Review the commits from this week. Check: Are files getting too large (>300 lines)? Any patterns being violated? Any new hurdles we should document in CLAUDE.md? Any tech debt accumulating? Give me a honest assessment."
 
 ### Role 5: DevOps — Claude Code
@@ -240,12 +262,14 @@ In Cowork, point to your project folder and say:
 **Where**: Claude Code
 
 **What DevOps does**:
+
 - Configures Docker Compose
 - Sets up CI/CD pipelines
 - Manages deployment
 - Handles infrastructure issues
 
 **How to activate**:
+
 ```
 We're working on infrastructure today. Focus on:
 - Docker configs must be production-ready
@@ -259,6 +283,7 @@ We're working on infrastructure today. Focus on:
 ## 5. The Weekly Rhythm
 
 ### Monday — Planning Day (Cowork)
+
 ```
 Morning (1h):
 ├── Open Claude Cowork → TieTide Planning project
@@ -269,6 +294,7 @@ Morning (1h):
 ```
 
 ### Tuesday to Thursday — Build Days (Claude Code + GSD)
+
 ```
 Evening session (~3h each):
 ├── Open Claude Code in project
@@ -291,6 +317,7 @@ Evening session (~3h each):
 ```
 
 ### Friday — Review + Hardening (Claude Code + Cowork)
+
 ```
 Evening (3h):
 ├── Claude Code: Run full test suite, check coverage
@@ -307,6 +334,7 @@ Evening (3h):
 ```
 
 ### Weekend — Deep Work (Claude Code + GSD)
+
 ```
 Saturday/Sunday (~8h total):
 ├── Larger features that need uninterrupted time
@@ -321,15 +349,15 @@ Saturday/Sunday (~8h total):
 
 Your commits should follow this distribution:
 
-| Category | Target % | Example |
-|----------|---------|---------|
-| Features (feat:) | ~35-40% | `feat: implement workflow CRUD endpoints` |
-| Tests (test:) | ~15-20% | `test: add edge cases for HTTP node timeout` |
-| Bug fixes (fix:) | ~10-15% | `fix: resolve race condition in BullMQ consumer` |
-| Refactoring (refactor:) | ~10% | `refactor: extract CryptoService from SecretsService` |
-| Infrastructure (chore:) | ~10% | `chore: add Ollama health check to docker-compose` |
-| Documentation (docs:) | ~5-10% | `docs: update CLAUDE.md with webhook hurdle` |
-| Security (security:) | ~5% | `fix(security): add HMAC timing-safe comparison` |
+| Category                | Target % | Example                                               |
+| ----------------------- | -------- | ----------------------------------------------------- |
+| Features (feat:)        | ~35-40%  | `feat: implement workflow CRUD endpoints`             |
+| Tests (test:)           | ~15-20%  | `test: add edge cases for HTTP node timeout`          |
+| Bug fixes (fix:)        | ~10-15%  | `fix: resolve race condition in BullMQ consumer`      |
+| Refactoring (refactor:) | ~10%     | `refactor: extract CryptoService from SecretsService` |
+| Infrastructure (chore:) | ~10%     | `chore: add Ollama health check to docker-compose`    |
+| Documentation (docs:)   | ~5-10%   | `docs: update CLAUDE.md with webhook hurdle`          |
+| Security (security:)    | ~5%      | `fix(security): add HMAC timing-safe comparison`      |
 
 **If 80%+ of your commits are features, you're cutting corners.** Tests, refactoring, and security should be woven into every session, not batched at the end.
 
@@ -338,6 +366,7 @@ Your commits should follow this distribution:
 ## 7. Key Rules (Non-Negotiable)
 
 ### From Akita:
+
 1. **Every commit passes CI.** No exceptions. No "will fix in next commit."
 2. **More test lines than code lines.** Target 1.5x ratio.
 3. **Refactor immediately.** Don't let files grow past 300 lines. Extract now, not later.
@@ -345,12 +374,14 @@ Your commits should follow this distribution:
 5. **Security is a habit, not a phase.** Check for issues every session, not just in sprint S9.
 
 ### From GSD:
+
 6. **Fresh context for every task.** Never work in a degraded context window. Use GSD sub-agents.
 7. **Atomic commits.** One task = one commit. Clean revert if needed.
 8. **Plans are prompts.** The PLAN.md IS the instruction, not a document that becomes one.
 9. **Goal-backward verification.** Ask "what must be TRUE?" not "what did we do?"
 
 ### From Your Project:
+
 10. **CLAUDE.md is sacred.** Update it every week. It's the team onboarding doc for your AI pair.
 11. **GitHub issues are the source of truth.** No work without an issue. No done without closing.
 12. **TDD is the default.** Red → Green → Refactor. Always. The test comes first.
