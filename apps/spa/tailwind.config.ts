@@ -27,6 +27,19 @@ const config: Config = {
         md: '8px',
         lg: '12px',
       },
+      keyframes: {
+        'pulse-ring': {
+          '0%, 100%': {
+            boxShadow: '0 0 0 0 rgba(250, 176, 5, 0.55)',
+          },
+          '50%': {
+            boxShadow: '0 0 0 8px rgba(250, 176, 5, 0)',
+          },
+        },
+      },
+      animation: {
+        'pulse-ring': 'pulse-ring 1.6s ease-in-out infinite',
+      },
     },
   },
   plugins: [],
