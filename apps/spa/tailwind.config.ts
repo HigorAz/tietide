@@ -36,9 +36,14 @@ const config: Config = {
             boxShadow: '0 0 0 8px rgba(250, 176, 5, 0)',
           },
         },
+        'living-ink': {
+          '0%': { strokeDashoffset: '28' },
+          '100%': { strokeDashoffset: '0' },
+        },
       },
       animation: {
         'pulse-ring': 'pulse-ring 1.6s ease-in-out infinite',
+        'living-ink': 'living-ink 1.2s linear infinite',
       },
     },
   },
