@@ -2,6 +2,7 @@
   "name": "@tietide/api",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
@@ -43,6 +44,7 @@
     "@nestjs/schematics": "^11.0.2",
     "@nestjs/testing": "^11.1.3",
     "@tietide/eslint-config": "workspace:*",
+    "eslint": "^9.28.0",
     "@types/express": "^5.0.4",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.16.0",
