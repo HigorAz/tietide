@@ -1,5 +1,5 @@
 import { useCallback, type DragEvent } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, useReactFlow } from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, useReactFlow, type Node } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { NodeType } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
@@ -16,7 +16,19 @@ export function Canvas() {
   const onEdgesChange = useEditorStore((s) => s.onEdgesChange);
   const onConnect = useEditorStore((s) => s.onConnect);
   const addNode = useEditorStore((s) => s.addNode);
+  const selectNode = useEditorStore((s) => s.selectNode);
   const { screenToFlowPosition } = useReactFlow();
+
+  const handleNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      selectNode(node.id);
+    },
+    [selectNode],
+  );
+
+  const handlePaneClick = useCallback(() => {
+    selectNode(null);
+  }, [selectNode]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -47,6 +59,8 @@ export function Canvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

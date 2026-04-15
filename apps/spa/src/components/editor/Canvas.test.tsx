@@ -10,10 +10,28 @@ const { screenToFlowPositionMock } = vi.hoisted(() => ({
 
 vi.mock('reactflow/dist/style.css', () => ({}));
 
+interface MockReactFlowProps {
+  children?: React.ReactNode;
+  onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
+  onPaneClick?: (event: React.MouseEvent) => void;
+}
+
 vi.mock('reactflow', () => ({
   __esModule: true,
-  default: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid="reactflow-stub">{children}</div>
+  default: ({ children, onNodeClick, onPaneClick }: MockReactFlowProps) => (
+    <div data-testid="reactflow-stub">
+      <button
+        type="button"
+        data-testid="trigger-node-click"
+        onClick={(e) => onNodeClick?.(e, { id: 'node-mock-123' })}
+      >
+        click node
+      </button>
+      <button type="button" data-testid="trigger-pane-click" onClick={(e) => onPaneClick?.(e)}>
+        click pane
+      </button>
+      {children}
+    </div>
   ),
   Background: () => null,
   Controls: () => null,
@@ -98,6 +116,26 @@ describe('Canvas', () => {
       render(<Canvas />);
       const dropzone = screen.getByTestId('canvas-dropzone');
       expect(dropzone).toContainElement(screen.getByTestId('reactflow-stub'));
+    });
+  });
+
+  describe('selection', () => {
+    it('should select a node in the editor store when a node is clicked', () => {
+      render(<Canvas />);
+      expect(useEditorStore.getState().selectedNodeId).toBeNull();
+
+      fireEvent.click(screen.getByTestId('trigger-node-click'));
+
+      expect(useEditorStore.getState().selectedNodeId).toBe('node-mock-123');
+    });
+
+    it('should clear the selection when the empty pane is clicked', () => {
+      useEditorStore.setState({ selectedNodeId: 'node-existing' });
+      render(<Canvas />);
+
+      fireEvent.click(screen.getByTestId('trigger-pane-click'));
+
+      expect(useEditorStore.getState().selectedNodeId).toBeNull();
     });
   });
 });
