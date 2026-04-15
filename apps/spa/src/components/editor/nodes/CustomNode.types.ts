@@ -7,4 +7,5 @@ export interface CustomNodeData {
   description?: string;
   nodeType: NodeType;
   status?: NodeStatus;
+  config?: Record<string, unknown>;
 }
