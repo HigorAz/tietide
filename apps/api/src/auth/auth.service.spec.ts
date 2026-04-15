@@ -1,6 +1,7 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +16,7 @@ describe('AuthService', () => {
       create: jest.Mock;
     };
   };
+  let jwt: { sign: jest.Mock };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
   beforeEach(async () => {
@@ -24,9 +26,14 @@ describe('AuthService', () => {
         create: jest.fn(),
       },
     };
+    jwt = { sign: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AuthService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        AuthService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: JwtService, useValue: jwt },
+      ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
@@ -106,6 +113,81 @@ describe('AuthService', () => {
       prisma.user.create.mockRejectedValue(new Error('database down'));
 
       await expect(service.register(validDto)).rejects.toThrow('database down');
+    });
+  });
+
+  describe('login', () => {
+    const validDto = {
+      email: 'test@example.com',
+      password: 'password123',
+    };
+
+    const storedUser = {
+      id: 'uuid-1',
+      email: validDto.email,
+      password: 'hashed_password',
+      role: 'USER' as const,
+    };
+
+    it('should return an accessToken when credentials are valid', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      const result = await service.login(validDto);
+
+      expect(result).toEqual({ accessToken: 'signed.jwt.token', tokenType: 'Bearer' });
+    });
+
+    it('should sign the JWT with sub, email, and role in the payload', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      await service.login(validDto);
+
+      expect(jwt.sign).toHaveBeenCalledWith({
+        sub: storedUser.id,
+        email: storedUser.email,
+        role: storedUser.role,
+      });
+    });
+
+    it('should throw UnauthorizedException when email is not registered', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(validDto)).rejects.toThrow('Invalid credentials');
+      expect(jwt.sign).not.toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException when password does not match', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+      await expect(service.login(validDto)).rejects.toThrow('Invalid credentials');
+      expect(jwt.sign).not.toHaveBeenCalled();
+    });
+
+    it('should compare the provided password against the stored hash via bcrypt', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      await service.login(validDto);
+
+      expect(mockedBcrypt.compare).toHaveBeenCalledWith(validDto.password, storedUser.password);
+    });
+
+    it('should not expose the password hash in the response', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      const result = await service.login(validDto);
+
+      expect(result).not.toHaveProperty('password');
     });
   });
 });

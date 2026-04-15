@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { ConflictException, ValidationPipe } from '@nestjs/common';
+import { ConflictException, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -8,10 +8,10 @@ import { AuthService } from './auth.service';
 
 describe('AuthController (integration)', () => {
   let app: INestApplication;
-  let authService: { register: jest.Mock };
+  let authService: { register: jest.Mock; login: jest.Mock };
 
   beforeEach(async () => {
-    authService = { register: jest.fn() };
+    authService = { register: jest.fn(), login: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -128,6 +128,88 @@ describe('AuthController (integration)', () => {
         .expect(400);
 
       expect(authService.register).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /auth/login', () => {
+    const validBody = {
+      email: 'test@example.com',
+      password: 'password123',
+    };
+
+    it('should return 200 with accessToken on valid credentials', async () => {
+      authService.login.mockResolvedValue({
+        accessToken: 'signed.jwt.token',
+        tokenType: 'Bearer',
+      });
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send(validBody)
+        .expect(200);
+
+      expect(res.body).toEqual({ accessToken: 'signed.jwt.token', tokenType: 'Bearer' });
+      expect(authService.login).toHaveBeenCalledWith(
+        expect.objectContaining({ email: validBody.email, password: validBody.password }),
+      );
+    });
+
+    it('should return 401 when service throws UnauthorizedException (wrong password)', async () => {
+      authService.login.mockRejectedValue(new UnauthorizedException('Invalid credentials'));
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ ...validBody, password: 'wrongpass' })
+        .expect(401);
+    });
+
+    it('should return 401 when service throws UnauthorizedException (unknown email)', async () => {
+      authService.login.mockRejectedValue(new UnauthorizedException('Invalid credentials'));
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ ...validBody, email: 'ghost@example.com' })
+        .expect(401);
+    });
+
+    it('should return 400 when email format is invalid', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ ...validBody, email: 'not-an-email' })
+        .expect(400);
+
+      expect(authService.login).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when password is missing', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: validBody.email })
+        .expect(400);
+
+      expect(authService.login).not.toHaveBeenCalled();
+    });
+
+    it('should lowercase + trim the email before passing to the service', async () => {
+      authService.login.mockResolvedValue({ accessToken: 't', tokenType: 'Bearer' });
+
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: '  TEST@Example.COM  ', password: 'password123' })
+        .expect(200);
+
+      expect(authService.login).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'test@example.com' }),
+      );
+    });
+
+    it('should reject unknown fields (forbidNonWhitelisted)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ ...validBody, role: 'ADMIN' })
+        .expect(400);
+
+      expect(authService.login).not.toHaveBeenCalled();
     });
   });
 });
