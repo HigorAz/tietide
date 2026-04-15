@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@tietide/eslint-config": "workspace:*",
+    "eslint": "^9.28.0",
     "typescript": "^6.0.2"
   }
 }
