@@ -1,5 +1,6 @@
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
+import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
 
 export function WorkflowEditorPage() {
@@ -8,6 +9,7 @@ export function WorkflowEditorPage() {
       <ReactFlowProvider>
         <NodeLibrary />
         <Canvas />
+        <NodeConfigPanel />
       </ReactFlowProvider>
     </div>
   );
