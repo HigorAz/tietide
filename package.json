@@ -37,7 +37,12 @@
       "prisma",
       "@nestjs/core",
       "msgpackr-extract"
-    ]
+    ],
+    "overrides": {
+      "path-to-regexp@>=8.0.0 <8.4.0": ">=8.4.0",
+      "lodash@<4.18.0": ">=4.18.0",
+      "picomatch@>=4.0.0 <4.0.4": ">=4.0.4"
+    }
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
