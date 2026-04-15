@@ -36,7 +36,8 @@
       "@prisma/engines",
       "prisma",
       "@nestjs/core",
-      "msgpackr-extract"
+      "msgpackr-extract",
+      "bcrypt"
     ],
     "overrides": {
       "path-to-regexp@>=8.0.0 <8.4.0": ">=8.4.0",
