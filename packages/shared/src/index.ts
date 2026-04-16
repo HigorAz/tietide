@@ -29,3 +29,9 @@ export {
   cronConfigSchema,
   webhookConfigSchema,
 } from './schemas/node.schema.js';
+export {
+  loginFormSchema,
+  registerFormSchema,
+  type LoginFormValues,
+  type RegisterFormValues,
+} from './schemas/auth.schema.js';
