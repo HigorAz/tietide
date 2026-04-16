@@ -1,5 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { WorkflowEditorPage } from '@/pages/WorkflowEditorPage';
+import { LoginPage } from '@/pages/LoginPage';
+import { RegisterPage } from '@/pages/RegisterPage';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 function Placeholder({ name }: { name: string }) {
   return (
@@ -13,12 +16,40 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Placeholder name="Login" />} />
-        <Route path="/register" element={<Placeholder name="Register" />} />
-        <Route path="/dashboard" element={<Placeholder name="Dashboard" />} />
-        <Route path="/workflows/:id" element={<WorkflowEditorPage />} />
-        <Route path="/executions" element={<Placeholder name="Execution History" />} />
-        <Route path="/executions/:id" element={<Placeholder name="Execution Detail" />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Placeholder name="Dashboard" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workflows/:id"
+          element={
+            <ProtectedRoute>
+              <WorkflowEditorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/executions"
+          element={
+            <ProtectedRoute>
+              <Placeholder name="Execution History" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/executions/:id"
+          element={
+            <ProtectedRoute>
+              <Placeholder name="Execution Detail" />
+            </ProtectedRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
