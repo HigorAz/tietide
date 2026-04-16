@@ -1,22 +1,37 @@
-import type { INestApplication } from '@nestjs/common';
+import type { ExecutionContext, INestApplication } from '@nestjs/common';
 import { ConflictException, UnauthorizedException, ValidationPipe } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 describe('AuthController (integration)', () => {
   let app: INestApplication;
-  let authService: { register: jest.Mock; login: jest.Mock };
+  let authService: { register: jest.Mock; login: jest.Mock; getProfile: jest.Mock };
+  let authedUser: { id: string; email: string; role: string } | null;
 
   beforeEach(async () => {
-    authService = { register: jest.fn(), login: jest.fn() };
+    authService = { register: jest.fn(), login: jest.fn(), getProfile: jest.fn() };
+    authedUser = { id: 'uuid-1', email: 'test@example.com', role: 'USER' };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [{ provide: AuthService, useValue: authService }],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          if (!authedUser) {
+            throw new UnauthorizedException('Missing or invalid token');
+          }
+          const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
+          req.user = authedUser;
+          return true;
+        },
+      })
+      .compile();
 
     app = module.createNestApplication();
     app.useGlobalPipes(
@@ -210,6 +225,48 @@ describe('AuthController (integration)', () => {
         .expect(400);
 
       expect(authService.login).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /auth/me', () => {
+    const profile = {
+      id: 'uuid-1',
+      email: 'test@example.com',
+      name: 'Test User',
+      role: 'USER',
+      createdAt: new Date('2026-04-15T00:00:00Z').toISOString(),
+    };
+
+    it('should return 401 when the JwtAuthGuard rejects the request (no user)', async () => {
+      authedUser = null;
+
+      await request(app.getHttpServer()).get('/auth/me').expect(401);
+      expect(authService.getProfile).not.toHaveBeenCalled();
+    });
+
+    it('should return 200 with the current user profile when authenticated', async () => {
+      authService.getProfile.mockResolvedValue(profile);
+
+      const res = await request(app.getHttpServer()).get('/auth/me').expect(200);
+
+      expect(res.body).toEqual(profile);
+      expect(res.body).not.toHaveProperty('password');
+      expect(authService.getProfile).toHaveBeenCalledWith('uuid-1');
+    });
+
+    it('should return 401 when the service reports the user has vanished', async () => {
+      authService.getProfile.mockRejectedValue(new UnauthorizedException('Invalid credentials'));
+
+      await request(app.getHttpServer()).get('/auth/me').expect(401);
+    });
+
+    it('should pass the id from the authenticated user, not from the request', async () => {
+      authedUser = { id: 'different-id', email: 'other@example.com', role: 'ADMIN' };
+      authService.getProfile.mockResolvedValue({ ...profile, id: 'different-id' });
+
+      await request(app.getHttpServer()).get('/auth/me').expect(200);
+
+      expect(authService.getProfile).toHaveBeenCalledWith('different-id');
     });
   });
 });
