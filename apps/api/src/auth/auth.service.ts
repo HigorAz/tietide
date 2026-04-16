@@ -73,6 +73,17 @@ export class AuthService {
     return { accessToken, tokenType: 'Bearer' };
   }
 
+  async getProfile(userId: string): Promise<UserResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, role: true, createdAt: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    return user;
+  }
+
   private isUniqueViolation(err: unknown): boolean {
     return (
       typeof err === 'object' &&

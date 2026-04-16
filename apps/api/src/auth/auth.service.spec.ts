@@ -190,4 +190,42 @@ describe('AuthService', () => {
       expect(result).not.toHaveProperty('password');
     });
   });
+
+  describe('getProfile', () => {
+    const userId = 'uuid-1';
+
+    const profile = {
+      id: userId,
+      email: 'alice@example.com',
+      name: 'Alice',
+      role: 'USER' as const,
+      createdAt: new Date('2026-04-15T00:00:00Z'),
+    };
+
+    it('should look up the user by id and select only safe fields', async () => {
+      prisma.user.findUnique.mockResolvedValue(profile);
+
+      await service.getProfile(userId);
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: userId },
+        select: { id: true, email: true, name: true, role: true, createdAt: true },
+      });
+    });
+
+    it('should return the profile without the password hash', async () => {
+      prisma.user.findUnique.mockResolvedValue(profile);
+
+      const result = await service.getProfile(userId);
+
+      expect(result).toEqual(profile);
+      expect(result).not.toHaveProperty('password');
+    });
+
+    it('should throw UnauthorizedException when the user no longer exists', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.getProfile(userId)).rejects.toThrow(UnauthorizedException);
+    });
+  });
 });
