@@ -7,12 +7,14 @@ import { WorkflowsModule } from './workflows/workflows.module';
 import { ExecutionsModule } from './executions/executions.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { SecretsModule } from './secrets/secrets.module';
+import { CryptoModule } from './crypto/crypto.module';
 import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    CryptoModule,
     HealthModule,
     AuthModule,
     WorkflowsModule,
