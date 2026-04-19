@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
+import { EngineService } from '../engine/engine.service';
 
 export interface ExecutionPayload {
   executionId: string;
@@ -15,11 +16,13 @@ export interface ExecutionPayload {
 export class WorkflowProcessor extends WorkerHost {
   private readonly logger = new Logger(WorkflowProcessor.name);
 
+  constructor(private readonly engine: EngineService) {
+    super();
+  }
+
   async process(job: Job<ExecutionPayload>): Promise<void> {
     this.logger.log(`Processing job ${job.id} for execution ${job.data.executionId}`);
-
-    // Engine service will be injected and called here in Sprint S4
-    // For now, this is the scaffold that proves the processor structure works
+    await this.engine.execute(job.data);
     this.logger.log(`Job ${job.id} completed`);
   }
 }
