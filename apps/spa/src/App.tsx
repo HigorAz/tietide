@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { WorkflowEditorPage } from '@/pages/WorkflowEditorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 function Placeholder({ name }: { name: string }) {
@@ -22,7 +23,7 @@ export default function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Placeholder name="Dashboard" />
+              <DashboardPage />
             </ProtectedRoute>
           }
         />
