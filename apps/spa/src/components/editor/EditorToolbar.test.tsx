@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NodeType, type Workflow } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
+import { useWorkflowsStore } from '@/stores/workflowsStore';
 
 vi.mock('@/api/workflows', () => ({
   getWorkflow: vi.fn(),
@@ -30,6 +31,7 @@ const savedResponse: Workflow = {
 describe('EditorToolbar', () => {
   beforeEach(() => {
     useEditorStore.setState({ ...initialEditorState });
+    useWorkflowsStore.setState({ workflows: [], status: 'idle', error: null });
     mockedUpdate.mockReset();
   });
 
@@ -90,6 +92,18 @@ describe('EditorToolbar', () => {
 
       await waitFor(() => expect(useEditorStore.getState().isDirty).toBe(false));
       expect(saveButton).toBeDisabled();
+    });
+
+    it('should sync the saved workflow back into workflowsStore', async () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      mockedUpdate.mockResolvedValueOnce({ ...savedResponse, version: 7 });
+      render(<EditorToolbar workflowId="wf-1" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+      await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
+      const row = useWorkflowsStore.getState().workflows.find((w) => w.id === 'wf-1');
+      expect(row?.version).toBe(7);
     });
 
     it('should keep isDirty true when the save request rejects', async () => {

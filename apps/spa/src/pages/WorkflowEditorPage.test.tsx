@@ -99,6 +99,34 @@ describe('WorkflowEditorPage', () => {
     await waitFor(() => expect(screen.getByText(/failed to load workflow/i)).toBeInTheDocument());
   });
 
+  it('should register a beforeunload warning only while the editor is dirty', async () => {
+    mockedGet.mockResolvedValueOnce(sampleWorkflow);
+    const addSpy = vi.spyOn(window, 'addEventListener');
+    const removeSpy = vi.spyOn(window, 'removeEventListener');
+
+    renderAtId('wf-abc');
+    await waitFor(() => expect(screen.getByTestId('editor-toolbar')).toBeInTheDocument());
+
+    expect(addSpy).not.toHaveBeenCalledWith('beforeunload', expect.any(Function));
+
+    useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+    await waitFor(() => expect(addSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)));
+
+    const [, handler] = addSpy.mock.calls.find(([name]) => name === 'beforeunload') ?? [];
+    const event = new Event('beforeunload') as BeforeUnloadEvent;
+    const prevent = vi.spyOn(event, 'preventDefault');
+    (handler as EventListener | undefined)?.(event);
+    expect(prevent).toHaveBeenCalled();
+
+    useEditorStore.getState().markSaved();
+    await waitFor(() =>
+      expect(removeSpy).toHaveBeenCalledWith('beforeunload', expect.any(Function)),
+    );
+
+    addSpy.mockRestore();
+    removeSpy.mockRestore();
+  });
+
   it('should reset the editor store on unmount', async () => {
     mockedGet.mockResolvedValueOnce(sampleWorkflow);
 

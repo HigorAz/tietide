@@ -150,6 +150,43 @@ describe('workflowsStore', () => {
     });
   });
 
+  describe('upsert', () => {
+    it('should replace an existing workflow in the list by id', () => {
+      useWorkflowsStore.setState({
+        workflows: [makeWorkflow({ id: 'a', version: 1 }), makeWorkflow({ id: 'b', version: 1 })],
+        status: 'ready',
+      });
+      const next = makeWorkflow({ id: 'a', version: 2, name: 'Renamed' });
+
+      useWorkflowsStore.getState().upsert(next);
+
+      const rows = useWorkflowsStore.getState().workflows;
+      expect(rows.find((w) => w.id === 'a')).toEqual(next);
+      expect(rows.map((w) => w.id)).toEqual(['a', 'b']);
+    });
+
+    it('should prepend the workflow when no row with the same id exists', () => {
+      useWorkflowsStore.setState({
+        workflows: [makeWorkflow({ id: 'existing' })],
+        status: 'ready',
+      });
+      const fresh = makeWorkflow({ id: 'new' });
+
+      useWorkflowsStore.getState().upsert(fresh);
+
+      expect(useWorkflowsStore.getState().workflows.map((w) => w.id)).toEqual(['new', 'existing']);
+    });
+
+    it('should not mutate the list for unrelated ids', () => {
+      const rows = [makeWorkflow({ id: 'a' }), makeWorkflow({ id: 'b' })];
+      useWorkflowsStore.setState({ workflows: rows, status: 'ready' });
+
+      useWorkflowsStore.getState().upsert(makeWorkflow({ id: 'a', version: 9 }));
+
+      expect(useWorkflowsStore.getState().workflows[1]).toEqual(rows[1]);
+    });
+  });
+
   describe('toggleActive', () => {
     it('should flip isActive optimistically and replace the row with the server response', async () => {
       useWorkflowsStore.setState({

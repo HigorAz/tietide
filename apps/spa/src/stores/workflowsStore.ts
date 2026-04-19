@@ -21,6 +21,7 @@ export interface WorkflowsActions {
   create: (body: CreateWorkflowBody) => Promise<Workflow>;
   remove: (id: string) => Promise<void>;
   toggleActive: (id: string, next: boolean) => Promise<void>;
+  upsert: (workflow: Workflow) => void;
 }
 
 export type WorkflowsStore = WorkflowsState & WorkflowsActions;
@@ -54,6 +55,18 @@ export const useWorkflowsStore = create<WorkflowsStore>((set, get) => ({
   remove: async (id) => {
     await apiDelete(id);
     set({ workflows: get().workflows.filter((w) => w.id !== id) });
+  },
+
+  upsert: (workflow) => {
+    const existing = get().workflows;
+    const index = existing.findIndex((w) => w.id === workflow.id);
+    if (index === -1) {
+      set({ workflows: [workflow, ...existing] });
+      return;
+    }
+    const nextRows = [...existing];
+    nextRows[index] = workflow;
+    set({ workflows: nextRows });
   },
 
   toggleActive: async (id, next) => {

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
+import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { updateWorkflow } from '@/api/workflows';
 import { cn } from '@/utils/cn';
 import { toWorkflowDefinition } from './serialization';
@@ -37,9 +38,10 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
     const { nodes, edges } = useEditorStore.getState();
     setIsSaving(true);
     try {
-      await updateWorkflow(workflowId, {
+      const saved = await updateWorkflow(workflowId, {
         definition: toWorkflowDefinition(nodes, edges),
       });
+      useWorkflowsStore.getState().upsert(saved);
       markSaved();
       showFeedback({ tone: 'success', message: 'Saved' });
     } catch {
