@@ -29,4 +29,5 @@ export interface Workflow {
   userId: string;
   createdAt: Date;
   updatedAt: Date;
+  executionCount: number;
 }
