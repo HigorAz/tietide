@@ -24,7 +24,7 @@ export function WorkflowCard({
   onDelete,
   disabled,
 }: WorkflowCardProps): JSX.Element {
-  const { id, name, isActive, updatedAt } = workflow;
+  const { id, name, isActive, updatedAt, executionCount } = workflow;
 
   const open = (): void => {
     if (disabled) return;
@@ -71,10 +71,11 @@ export function WorkflowCard({
       <div className="flex items-center justify-between text-xs text-text-secondary">
         <span
           data-testid="workflow-card-executions"
+          aria-label={`${executionCount} executions`}
           className="inline-flex items-center gap-1.5"
-          title="Execution count coming soon"
         >
-          <Activity aria-hidden="true" className="h-3.5 w-3.5" />—
+          <Activity aria-hidden="true" className="h-3.5 w-3.5" />
+          {executionCount}
         </span>
         <span data-testid="workflow-card-updated">Updated {formatRelativeTime(updatedAt)}</span>
       </div>

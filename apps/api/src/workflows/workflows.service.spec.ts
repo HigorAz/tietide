@@ -42,6 +42,13 @@ describe('WorkflowsService', () => {
     version: 1,
     createdAt: new Date('2026-04-17T00:00:00Z'),
     updatedAt: new Date('2026-04-17T00:00:00Z'),
+    _count: { executions: 0 },
+  };
+
+  const { _count: _persistedCount, ...persistedFields } = persisted;
+  const persistedResponse = {
+    ...persistedFields,
+    executionCount: _persistedCount.executions,
   };
 
   beforeEach(async () => {
@@ -81,7 +88,7 @@ describe('WorkflowsService', () => {
           },
         }),
       );
-      expect(result).toEqual(persisted);
+      expect(result).toEqual(persistedResponse);
     });
 
     it('should accept an optional description', async () => {
@@ -121,12 +128,32 @@ describe('WorkflowsService', () => {
       );
     });
 
-    it('should return the rows unchanged', async () => {
+    it('should return the rows mapped to response DTOs', async () => {
       prisma.workflow.findMany.mockResolvedValue([persisted]);
 
       const result = await service.list(userId);
 
-      expect(result).toEqual([persisted]);
+      expect(result).toEqual([persistedResponse]);
+    });
+
+    it('should request the execution count via Prisma _count', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId);
+
+      const call = prisma.workflow.findMany.mock.calls[0][0] as {
+        select: Record<string, unknown>;
+      };
+      expect(call.select._count).toEqual({ select: { executions: true } });
+    });
+
+    it('should map _count.executions to executionCount', async () => {
+      prisma.workflow.findMany.mockResolvedValue([{ ...persisted, _count: { executions: 7 } }]);
+
+      const [row] = await service.list(userId);
+
+      expect(row.executionCount).toBe(7);
+      expect(row).not.toHaveProperty('_count');
     });
 
     it('should exclude userId from the response select', async () => {

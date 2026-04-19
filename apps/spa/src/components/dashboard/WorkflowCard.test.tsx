@@ -14,6 +14,7 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   userId: 'user-1',
   createdAt: new Date('2026-04-01T12:00:00Z'),
   updatedAt: new Date('2026-04-10T12:00:00Z'),
+  executionCount: 0,
   ...overrides,
 });
 
@@ -52,10 +53,16 @@ describe('WorkflowCard', () => {
     expect(screen.queryByText(/inactive/i)).not.toBeInTheDocument();
   });
 
-  it('should render an execution count placeholder (— until the API returns counts)', () => {
-    renderCard();
+  it('should render the execution count from the workflow', () => {
+    renderCard({ executionCount: 7 });
 
-    expect(screen.getByTestId('workflow-card-executions')).toHaveTextContent('—');
+    expect(screen.getByTestId('workflow-card-executions')).toHaveTextContent('7');
+  });
+
+  it('should render 0 when the workflow has no executions yet', () => {
+    renderCard({ executionCount: 0 });
+
+    expect(screen.getByTestId('workflow-card-executions')).toHaveTextContent('0');
   });
 
   it('should call onOpen with the workflow id when the card is clicked', async () => {

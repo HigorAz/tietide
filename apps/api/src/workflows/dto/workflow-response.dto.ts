@@ -28,4 +28,7 @@ export class WorkflowResponseDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt!: Date;
+
+  @ApiProperty({ example: 0, description: 'Number of executions recorded for this workflow.' })
+  executionCount!: number;
 }
