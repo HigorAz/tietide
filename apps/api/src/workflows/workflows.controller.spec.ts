@@ -45,6 +45,7 @@ describe('WorkflowsController (integration)', () => {
     version: 1,
     createdAt: new Date('2026-04-17T00:00:00Z').toISOString(),
     updatedAt: new Date('2026-04-17T00:00:00Z').toISOString(),
+    executionCount: 0,
   };
 
   beforeEach(async () => {
