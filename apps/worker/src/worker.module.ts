@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import { WorkflowProcessor } from './processors/workflow.processor';
-import { NodeRegistry } from './nodes/registry';
+import { EngineModule } from './engine/engine.module';
 
 @Module({
   imports: [
@@ -24,7 +24,8 @@ import { NodeRegistry } from './nodes/registry';
     }),
     BullModule.registerQueue({ name: 'workflow-execution' }),
     PrismaModule,
+    EngineModule,
   ],
-  providers: [WorkflowProcessor, NodeRegistry],
+  providers: [WorkflowProcessor],
 })
 export class WorkerModule {}
