@@ -768,7 +768,7 @@ pnpm dev
 
 | Command          | Description                                       |
 | ---------------- | ------------------------------------------------- |
-| `pnpm dev`       | Start all apps in dev mode (API :3000, SPA :5173) |
+| `pnpm dev`       | Start all apps in dev mode (API :3030, SPA :5173) |
 | `pnpm build`     | Build all packages and apps                       |
 | `pnpm test`      | Run all tests across the monorepo                 |
 | `pnpm lint`      | Lint all packages                                 |
@@ -779,7 +779,7 @@ pnpm dev
 ```
 tietide/
 ├── apps/
-│   ├── api/          # NestJS REST API (port 3000)
+│   ├── api/          # NestJS REST API (port 3030)
 │   ├── worker/       # NestJS BullMQ Worker
 │   ├── spa/          # React SPA (port 5173)
 │   └── ai/           # FastAPI AI Service (port 8000)
