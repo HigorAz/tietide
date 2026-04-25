@@ -13,8 +13,10 @@ const sampleUser: PublicUser = {
   role: 'USER',
 };
 
+const initialAuthState = useAuthStore.getState();
+
 const resetStore = (): void => {
-  useAuthStore.setState({ user: null, token: null });
+  useAuthStore.setState(initialAuthState, true);
   localStorage.clear();
 };
 
@@ -46,9 +48,8 @@ describe('RegisterPage', () => {
   });
 
   it('should call authStore.register and navigate to /login on success', async () => {
-    const registerSpy = vi
-      .spyOn(useAuthStore.getState(), 'register')
-      .mockResolvedValueOnce(sampleUser);
+    const registerMock = vi.fn().mockResolvedValueOnce(sampleUser);
+    useAuthStore.setState({ register: registerMock });
     const user = userEvent.setup();
 
     renderRegister();
@@ -59,7 +60,7 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /create account|sign up|register/i }));
 
     await waitFor(() => {
-      expect(registerSpy).toHaveBeenCalledWith({
+      expect(registerMock).toHaveBeenCalledWith({
         name: 'Alice',
         email: 'alice@example.com',
         password: 'password123',
@@ -75,7 +76,8 @@ describe('RegisterPage', () => {
       isAxiosError: true,
       response: { status: 409 },
     });
-    vi.spyOn(useAuthStore.getState(), 'register').mockRejectedValueOnce(axiosError);
+    const registerMock = vi.fn().mockRejectedValueOnce(axiosError);
+    useAuthStore.setState({ register: registerMock });
     const user = userEvent.setup();
 
     renderRegister();
@@ -90,7 +92,8 @@ describe('RegisterPage', () => {
   });
 
   it('should show a validation error for a short password without calling authStore.register', async () => {
-    const registerSpy = vi.spyOn(useAuthStore.getState(), 'register');
+    const registerMock = vi.fn();
+    useAuthStore.setState({ register: registerMock });
     const user = userEvent.setup();
 
     renderRegister();
@@ -101,7 +104,7 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /create account|sign up|register/i }));
 
     expect(await screen.findByText(/at least 8 characters/i)).toBeInTheDocument();
-    expect(registerSpy).not.toHaveBeenCalled();
+    expect(registerMock).not.toHaveBeenCalled();
   });
 
   it('should link to the login page', () => {
