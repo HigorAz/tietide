@@ -4,6 +4,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/prisma.module';
 import { WorkflowProcessor } from './processors/workflow.processor';
 import { EngineModule } from './engine/engine.module';
+import { CronModule } from './cron/cron.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { EngineModule } from './engine/engine.module';
     BullModule.registerQueue({ name: 'workflow-execution' }),
     PrismaModule,
     EngineModule,
+    CronModule,
   ],
   providers: [WorkflowProcessor],
 })
