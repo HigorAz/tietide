@@ -1,4 +1,12 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
+import { ExecutionsModule } from '../executions/executions.module';
+import { WebhooksController } from './webhooks.controller';
+import { WebhooksService } from './webhooks.service';
 
-@Module({})
+@Module({
+  imports: [PrismaModule, ExecutionsModule],
+  controllers: [WebhooksController],
+  providers: [WebhooksService],
+})
 export class WebhooksModule {}
