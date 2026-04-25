@@ -47,19 +47,21 @@ model Workflow {
 }
 
 model WorkflowExecution {
-  id          String          @id @default(uuid())
-  workflowId  String          @map("workflow_id")
-  status      ExecutionStatus @default(PENDING)
-  triggerType String          @map("trigger_type")
-  triggerData Json?           @map("trigger_data")
-  startedAt   DateTime?       @map("started_at")
-  finishedAt  DateTime?       @map("finished_at")
-  error       String?
-  createdAt   DateTime        @default(now()) @map("created_at")
+  id             String          @id @default(uuid())
+  workflowId     String          @map("workflow_id")
+  status         ExecutionStatus @default(PENDING)
+  triggerType    String          @map("trigger_type")
+  triggerData    Json?           @map("trigger_data")
+  idempotencyKey String?         @map("idempotency_key")
+  startedAt      DateTime?       @map("started_at")
+  finishedAt     DateTime?       @map("finished_at")
+  error          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
 
   workflow Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   steps    ExecutionStep[]
 
+  @@unique([workflowId, idempotencyKey], name: "workflow_idempotency_key")
   @@index([workflowId, createdAt(sort: Desc)])
   @@map("workflow_executions")
 }
