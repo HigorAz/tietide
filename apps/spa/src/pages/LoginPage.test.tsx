@@ -5,8 +5,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { LoginPage } from './LoginPage';
 
+const initialAuthState = useAuthStore.getState();
+
 const resetStore = (): void => {
-  useAuthStore.setState({ user: null, token: null });
+  useAuthStore.setState(initialAuthState, true);
   localStorage.clear();
 };
 
@@ -36,7 +38,8 @@ describe('LoginPage', () => {
   });
 
   it('should call authStore.login with form values and navigate to /dashboard on success', async () => {
-    const loginSpy = vi.spyOn(useAuthStore.getState(), 'login').mockResolvedValueOnce();
+    const loginMock = vi.fn().mockResolvedValueOnce(undefined);
+    useAuthStore.setState({ login: loginMock });
     const user = userEvent.setup();
 
     renderLogin();
@@ -46,7 +49,7 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(loginSpy).toHaveBeenCalledWith({
+      expect(loginMock).toHaveBeenCalledWith({
         email: 'alice@example.com',
         password: 'password123',
       });
@@ -61,7 +64,8 @@ describe('LoginPage', () => {
       isAxiosError: true,
       response: { status: 401 },
     });
-    vi.spyOn(useAuthStore.getState(), 'login').mockRejectedValueOnce(axiosError);
+    const loginMock = vi.fn().mockRejectedValueOnce(axiosError);
+    useAuthStore.setState({ login: loginMock });
     const user = userEvent.setup();
 
     renderLogin();
@@ -75,7 +79,8 @@ describe('LoginPage', () => {
   });
 
   it('should show a validation error for an invalid email without calling authStore.login', async () => {
-    const loginSpy = vi.spyOn(useAuthStore.getState(), 'login');
+    const loginMock = vi.fn();
+    useAuthStore.setState({ login: loginMock });
     const user = userEvent.setup();
 
     renderLogin();
@@ -85,7 +90,7 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /sign in/i }));
 
     expect(await screen.findByText(/invalid email/i)).toBeInTheDocument();
-    expect(loginSpy).not.toHaveBeenCalled();
+    expect(loginMock).not.toHaveBeenCalled();
   });
 
   it('should link to the register page', () => {
