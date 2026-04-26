@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { WorkerLoggerModule } from './common/logger/logger.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { WorkflowProcessor } from './processors/workflow.processor';
 import { EngineModule } from './engine/engine.module';
@@ -12,6 +13,7 @@ import { CronModule } from './cron/cron.module';
       isGlobal: true,
       envFilePath: ['../../.env', '.env'],
     }),
+    WorkerLoggerModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

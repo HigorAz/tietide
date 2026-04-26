@@ -15,6 +15,7 @@ import { sanitizePayload } from './utils/sanitize-payload';
 export interface TriggerOptions {
   triggerData?: Record<string, unknown>;
   idempotencyKey?: string;
+  requestId?: string;
 }
 
 export interface ListOptions {
@@ -34,6 +35,7 @@ export interface WorkflowExecutionJobPayload {
   triggerType: string;
   triggerData?: Record<string, unknown>;
   userId: string;
+  requestId?: string;
 }
 
 const MAX_ATTEMPTS = 3;
@@ -98,6 +100,7 @@ export class ExecutionsService {
       triggerType: 'manual',
       triggerData: options.triggerData,
       userId,
+      requestId: options.requestId,
     };
 
     await this.queue.add(EXECUTION_JOB_NAME, payload, {

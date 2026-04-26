@@ -219,6 +219,27 @@ describe('ExecutionsService', () => {
       expect(opts.jobId).toBe(executionId);
     });
 
+    it('should propagate requestId into the BullMQ job payload for end-to-end correlation', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'manual',
+        triggerData: null,
+        idempotencyKey: null,
+        createdAt: new Date(),
+      });
+
+      await service.triggerManual(userId, workflowId, { requestId: 'req-xyz' });
+
+      expect(queue.add).toHaveBeenCalledWith(
+        'execute',
+        expect.objectContaining({ requestId: 'req-xyz' }),
+        expect.any(Object),
+      );
+    });
+
     it('should not exhaust retries silently — opts include retry/backoff', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
       prisma.workflowExecution.create.mockResolvedValue({
