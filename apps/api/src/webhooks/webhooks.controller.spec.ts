@@ -107,6 +107,21 @@ describe('WebhooksController (integration)', () => {
       expect(arg.rawBody.toString('utf8')).toBe(body);
     });
 
+    it('should forward the x-request-id header to the service for correlation', async () => {
+      webhooksService.trigger.mockResolvedValue({ executionId, status: 'PENDING' });
+
+      await request(app.getHttpServer())
+        .post(`/webhooks/${path}`)
+        .set('content-type', 'application/json')
+        .set('x-request-id', 'req-hook-1')
+        .send({})
+        .expect(202);
+
+      expect(webhooksService.trigger).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: 'req-hook-1' }),
+      );
+    });
+
     it('should treat missing webhook headers as undefined and let service decide', async () => {
       webhooksService.trigger.mockRejectedValue(
         new UnauthorizedException('Missing signature headers'),

@@ -40,7 +40,7 @@ export class WebhooksController {
   @ApiNotFoundResponse({ description: 'Webhook not found or inactive' })
   async trigger(
     @Param('path') path: string,
-    @Req() req: RawBodyRequest,
+    @Req() req: RawBodyRequest & { id?: string },
     @Headers('x-webhook-signature') signature: string | undefined,
     @Headers('x-webhook-timestamp') timestamp: string | undefined,
   ): Promise<WebhookTriggerResponseDto> {
@@ -50,6 +50,14 @@ export class WebhooksController {
       rawBody,
       signature: signature?.trim() || undefined,
       timestamp: timestamp?.trim() || undefined,
+      requestId: extractRequestId(req),
     });
   }
+}
+
+function extractRequestId(req: Request & { id?: string }): string | undefined {
+  if (typeof req.id === 'string' && req.id.length > 0) return req.id;
+  const header = req.headers?.['x-request-id'];
+  if (typeof header === 'string' && header.length > 0) return header;
+  return undefined;
 }

@@ -264,6 +264,34 @@ describe('WebhooksService', () => {
       expect(jobPayload).toEqual(expect.objectContaining({ triggerData: {} }));
     });
 
+    it('should propagate requestId into the BullMQ job payload for correlation', async () => {
+      const ts = Math.floor(fixedNowMs / 1000).toString();
+      const rawBody = Buffer.from('{}');
+      const signature = sign(rawBody, ts);
+
+      prisma.webhook.findUnique.mockResolvedValue(activeWebhook());
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'webhook',
+        triggerData: {},
+        idempotencyKey: null,
+        createdAt: new Date(),
+      });
+
+      await service.trigger({
+        path,
+        rawBody,
+        signature,
+        timestamp: ts,
+        requestId: 'req-hook-corr',
+      });
+
+      const jobPayload = queue.add.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(jobPayload).toEqual(expect.objectContaining({ requestId: 'req-hook-corr' }));
+    });
+
     it('should reject signatures of mismatched length without throwing a non-401 error', async () => {
       const ts = Math.floor(fixedNowMs / 1000).toString();
       prisma.webhook.findUnique.mockResolvedValue(activeWebhook());
