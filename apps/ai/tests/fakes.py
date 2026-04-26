@@ -1,4 +1,4 @@
-"""In-memory test doubles for embedding and vector store services."""
+"""In-memory test doubles for embedding, vector store, and LLM services."""
 
 from __future__ import annotations
 
@@ -58,3 +58,43 @@ class FakeVectorStore:
             return all(record["metadata"].get(k) == v for k, v in predicate.items())
 
         return [r for r in self.records if matches(r)]
+
+    def query(
+        self,
+        embedding: list[float],
+        n_results: int,
+    ) -> list[dict[str, Any]]:
+        """Deterministic top-N query — returns the first n_results records.
+
+        Real ChromaDB ranks by cosine similarity; for tests we just return
+        records in insertion order so behavior is predictable.
+        """
+        self.last_query: list[float] = list(embedding)
+        self.last_n_results = n_results
+        return [
+            {
+                "id": record["id"],
+                "document": record["document"],
+                "metadata": record["metadata"],
+                "distance": 0.1 * (i + 1),
+            }
+            for i, record in enumerate(self.records[:n_results])
+        ]
+
+
+class FakeLlmClient:
+    """Records prompts and returns a configurable response."""
+
+    def __init__(self, response: str = '{}', model: str = "test-model") -> None:
+        self.model = model
+        self.response = response
+        self.calls: list[dict[str, Any]] = []
+        self.raise_exc: Exception | None = None
+
+    async def generate(self, prompt: str, *, temperature: float, max_tokens: int) -> str:
+        self.calls.append(
+            {"prompt": prompt, "temperature": temperature, "max_tokens": max_tokens}
+        )
+        if self.raise_exc is not None:
+            raise self.raise_exc
+        return self.response
