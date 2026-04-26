@@ -94,5 +94,26 @@ describe('condition-evaluator', () => {
     it('should throw on an empty condition', () => {
       expect(() => evaluateCondition('')).toThrow(/invalid condition/i);
     });
+
+    it('should ignore operators inside backslash-escaped string literals', () => {
+      // The escape sequence \" must not terminate the string, so the === inside is part of the literal.
+      expect(evaluateCondition('"a\\" === b" === "a\\" === b"')).toBe(true);
+    });
+
+    it('should support single-quoted string operands', () => {
+      expect(evaluateCondition("'hello' === 'hello'")).toBe(true);
+    });
+
+    it('should throw a descriptive error when an object literal operand is malformed JSON', () => {
+      expect(() => evaluateCondition('{not: json} === 1')).toThrow(/JSON literal/i);
+    });
+
+    it('should throw a descriptive error when an array literal operand is malformed JSON', () => {
+      expect(() => evaluateCondition('[1, 2 === 1')).toThrow(/JSON literal/i);
+    });
+
+    it('should parse valid JSON object operands', () => {
+      expect(evaluateCondition('{"a":1} === {"a":1}')).toBe(false);
+    });
   });
 });
