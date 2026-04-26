@@ -12,6 +12,7 @@ export interface WebhookTriggerInput {
   rawBody: Buffer;
   signature: string | undefined;
   timestamp: string | undefined;
+  requestId?: string;
 }
 
 export interface WebhookTriggerResult {
@@ -64,6 +65,7 @@ export class WebhooksService {
       triggerType: 'webhook',
       triggerData,
       userId: webhook.workflow.userId,
+      requestId: input.requestId,
     };
 
     await this.queue.add(EXECUTION_JOB_NAME, payload, {

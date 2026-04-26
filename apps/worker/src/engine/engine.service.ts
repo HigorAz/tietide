@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import type { WorkflowDefinition } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkflowRunner } from './workflow-runner';
@@ -14,15 +15,14 @@ export interface ExecutePayload {
 
 @Injectable()
 export class EngineService {
-  private readonly log = new Logger(EngineService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly runner: WorkflowRunner,
+    private readonly log: Logger,
   ) {}
 
   async execute(payload: ExecutePayload): Promise<void> {
-    const { executionId, workflowId, triggerData } = payload;
+    const { executionId, workflowId, triggerData, requestId } = payload;
 
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
@@ -64,7 +64,10 @@ export class EngineService {
       }
     } catch (err) {
       const message = (err as Error).message ?? 'Unknown error';
-      this.log.error({ executionId, workflowId }, `Runner crashed: ${message}`);
+      this.log.error(
+        { executionId, workflowId, requestId, err: message },
+        `Runner crashed: ${message}`,
+      );
       await this.markFailed(executionId, message);
     }
   }

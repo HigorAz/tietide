@@ -145,6 +145,22 @@ describe('ExecutionsController (integration)', () => {
       );
     });
 
+    it('should forward the x-request-id header to the service for correlation', async () => {
+      executionsService.triggerManual.mockResolvedValue(accepted);
+
+      await request(app.getHttpServer())
+        .post(`/workflows/${workflowId}/execute`)
+        .set('x-request-id', 'req-corr-1')
+        .send({})
+        .expect(202);
+
+      expect(executionsService.triggerManual).toHaveBeenCalledWith(
+        'owner-uuid',
+        workflowId,
+        expect.objectContaining({ requestId: 'req-corr-1' }),
+      );
+    });
+
     it('should reject unknown body fields with 400', async () => {
       await request(app.getHttpServer())
         .post(`/workflows/${workflowId}/execute`)

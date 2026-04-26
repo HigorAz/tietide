@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AppLoggerModule } from './common/logger/logger.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -16,6 +17,7 @@ import { AiModule } from './ai/ai.module';
       isGlobal: true,
       envFilePath: ['../../.env', '.env'],
     }),
+    AppLoggerModule,
     PrismaModule,
     CryptoModule,
     HealthModule,

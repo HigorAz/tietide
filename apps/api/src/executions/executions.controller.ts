@@ -7,8 +7,10 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiAcceptedResponse,
   ApiBadRequestResponse,
@@ -54,11 +56,20 @@ export class ExecutionsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: TriggerExecutionDto,
+    @Req() req: Request & { id?: string },
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<ExecutionResponseDto> {
     return this.executions.triggerManual(user.id, id, {
       triggerData: dto.triggerData,
       idempotencyKey: idempotencyKey?.trim() || undefined,
+      requestId: extractRequestId(req),
     });
   }
+}
+
+function extractRequestId(req: Request & { id?: string }): string | undefined {
+  if (typeof req.id === 'string' && req.id.length > 0) return req.id;
+  const header = req.headers?.['x-request-id'];
+  if (typeof header === 'string' && header.length > 0) return header;
+  return undefined;
 }

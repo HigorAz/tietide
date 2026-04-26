@@ -1,4 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { Logger } from 'nestjs-pino';
 import type { WorkflowDefinition } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { EngineService } from './engine.service';
@@ -41,6 +42,7 @@ describe('EngineService', () => {
         EngineService,
         { provide: PrismaService, useValue: prisma },
         { provide: WorkflowRunner, useValue: runner },
+        { provide: Logger, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn() } },
       ],
     }).compile();
 
