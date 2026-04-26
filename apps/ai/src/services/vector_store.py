@@ -20,6 +20,11 @@ class VectorStore(Protocol):
         embeddings: list[list[float]],
     ) -> None: ...
     def count(self) -> int: ...
+    def query(
+        self,
+        embedding: list[float],
+        n_results: int,
+    ) -> list[dict[str, Any]]: ...
 
 
 class ChromaVectorStore:
@@ -64,6 +69,27 @@ class ChromaVectorStore:
 
     def count(self) -> int:
         return self._get_collection().count()
+
+    def query(
+        self,
+        embedding: list[float],
+        n_results: int,
+    ) -> list[dict[str, Any]]:
+        collection = self._get_collection()
+        result = collection.query(query_embeddings=[embedding], n_results=n_results)
+        ids = (result.get("ids") or [[]])[0]
+        documents = (result.get("documents") or [[]])[0]
+        metadatas = (result.get("metadatas") or [[]])[0]
+        distances = (result.get("distances") or [[]])[0]
+        return [
+            {
+                "id": ids[i],
+                "document": documents[i] if i < len(documents) else "",
+                "metadata": metadatas[i] if i < len(metadatas) else {},
+                "distance": distances[i] if i < len(distances) else None,
+            }
+            for i in range(len(ids))
+        ]
 
     def _get_client(self):
         if self._client is None:
