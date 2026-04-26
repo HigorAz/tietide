@@ -3,15 +3,9 @@ import { WorkflowEditorPage } from '@/pages/WorkflowEditorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { ExecutionHistoryPage } from '@/pages/ExecutionHistoryPage';
+import { ExecutionDetailPage } from '@/pages/ExecutionDetailPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-
-function Placeholder({ name }: { name: string }) {
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <h1 className="text-2xl text-text-primary">{name}</h1>
-    </div>
-  );
-}
 
 export default function App() {
   return (
@@ -36,10 +30,10 @@ export default function App() {
           }
         />
         <Route
-          path="/executions"
+          path="/workflows/:id/executions"
           element={
             <ProtectedRoute>
-              <Placeholder name="Execution History" />
+              <ExecutionHistoryPage />
             </ProtectedRoute>
           }
         />
@@ -47,7 +41,7 @@ export default function App() {
           path="/executions/:id"
           element={
             <ProtectedRoute>
-              <Placeholder name="Execution Detail" />
+              <ExecutionDetailPage />
             </ProtectedRoute>
           }
         />
