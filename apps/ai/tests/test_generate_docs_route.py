@@ -8,8 +8,13 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from src.main import app
-from src.routes.docs import get_documentation_service
-from src.services.documentation import DocumentationService
+from src.routes.docs import get_demo_cache, get_documentation_service
+from src.services.demo_cache import DemoDocumentationCache
+from src.services.documentation import (
+    DocumentationSections,
+    DocumentationService,
+    GeneratedDocumentation,
+)
 from src.services.ollama_client import OllamaTimeoutError, OllamaUnavailableError
 from src.services.prompt import PromptBuilder
 from src.services.retriever import Retriever
@@ -176,3 +181,71 @@ class TestGenerateDocsRoute:
         assert response.status_code == 200
         assert llm.calls[0]["temperature"] == 0.3
         assert llm.calls[0]["max_tokens"] == 1024
+
+    async def test_returns_cached_doc_when_payload_matches_demo(self, docs_client_factory):
+        service, llm = _build_service()
+        client = await docs_client_factory(service)
+
+        cache = DemoDocumentationCache()
+        cached_doc = GeneratedDocumentation(
+            workflow_id="wf-123",
+            workflow_name="Manual Health Check",
+            sections=DocumentationSections(
+                objective="cached-objective",
+                triggers="cached-triggers",
+                actions="cached-actions",
+                data_flow="cached-data-flow",
+                decisions="cached-decisions",
+            ),
+            documentation="# cached markdown",
+        )
+        cache.register(WORKFLOW_PAYLOAD, cached_doc)
+        app.dependency_overrides[get_demo_cache] = lambda: cache
+
+        try:
+            response = await client.post("/generate-docs", json=WORKFLOW_PAYLOAD)
+        finally:
+            app.dependency_overrides.pop(get_demo_cache, None)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["sections"]["objective"] == "cached-objective"
+        assert body["documentation"] == "# cached markdown"
+        assert llm.calls == []
+
+    async def test_falls_through_to_llm_when_payload_does_not_match_cache(
+        self, docs_client_factory
+    ):
+        service, llm = _build_service()
+        client = await docs_client_factory(service)
+
+        cache = DemoDocumentationCache()
+        unrelated_workflow = {
+            "workflow_id": "other-wf",
+            "workflow_name": "Other",
+            "definition": {"nodes": []},
+        }
+        cache.register(
+            unrelated_workflow,
+            GeneratedDocumentation(
+                workflow_id="other-wf",
+                workflow_name="Other",
+                sections=DocumentationSections(
+                    objective="no",
+                    triggers="no",
+                    actions="no",
+                    data_flow="no",
+                    decisions="no",
+                ),
+                documentation="# wrong",
+            ),
+        )
+        app.dependency_overrides[get_demo_cache] = lambda: cache
+
+        try:
+            response = await client.post("/generate-docs", json=WORKFLOW_PAYLOAD)
+        finally:
+            app.dependency_overrides.pop(get_demo_cache, None)
+
+        assert response.status_code == 200
+        assert llm.calls, "expected LLM to be called when cache misses"

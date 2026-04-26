@@ -10,9 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from src.config import settings
+from src.services.demo_cache import DemoDocumentationCache
 from src.services.documentation import (
     DocumentationGenerationError,
     DocumentationService,
+    GeneratedDocumentation,
 )
 from src.services.embeddings import SentenceTransformerEmbedder
 from src.services.ollama_client import (
@@ -23,6 +25,7 @@ from src.services.ollama_client import (
 from src.services.prompt import PromptBuilder
 from src.services.retriever import Retriever
 from src.services.vector_store import ChromaVectorStore
+from src.state import get_service_state
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +52,16 @@ class GenerateDocsResponse(BaseModel):
     sections: DocumentationSectionsResponse
     documentation: str
     model: str
+    cached: bool = False
+
+
+@lru_cache(maxsize=1)
+def get_ollama_client() -> OllamaClient:
+    return OllamaClient(
+        base_url=settings.ollama_base_url,
+        model=settings.ollama_model,
+        timeout=120.0,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -60,17 +73,29 @@ def get_documentation_service() -> DocumentationService:
         collection_name=settings.chroma_collection,
     )
     retriever = Retriever(embedder=embedder, store=store, top_k=4)
-    llm = OllamaClient(
-        base_url=settings.ollama_base_url,
-        model=settings.ollama_model,
-        timeout=120.0,
-    )
     return DocumentationService(
         retriever=retriever,
         prompt_builder=PromptBuilder(),
-        llm_client=llm,
+        llm_client=get_ollama_client(),
         temperature=0.3,
         max_tokens=1024,
+    )
+
+
+def get_demo_cache() -> DemoDocumentationCache:
+    return get_service_state().demo_cache
+
+
+def _to_response(
+    result: GeneratedDocumentation, *, cached: bool
+) -> GenerateDocsResponse:
+    return GenerateDocsResponse(
+        workflow_id=result.workflow_id,
+        workflow_name=result.workflow_name,
+        sections=DocumentationSectionsResponse(**result.sections.as_dict()),
+        documentation=result.documentation,
+        model=settings.ollama_model,
+        cached=cached,
     )
 
 
@@ -78,9 +103,17 @@ def get_documentation_service() -> DocumentationService:
 async def generate_docs(
     request: GenerateDocsRequest,
     service: DocumentationService = Depends(get_documentation_service),
+    cache: DemoDocumentationCache = Depends(get_demo_cache),
 ) -> GenerateDocsResponse:
+    payload = request.model_dump()
+
+    cached_doc = cache.get(payload)
+    if cached_doc is not None:
+        logger.info("Demo cache hit for workflow %s", request.workflow_id)
+        return _to_response(cached_doc, cached=True)
+
     try:
-        result = await service.generate(request.model_dump())
+        result = await service.generate(payload)
     except OllamaTimeoutError:
         logger.warning("Documentation generation timed out for workflow %s", request.workflow_id)
         raise HTTPException(
@@ -100,10 +133,4 @@ async def generate_docs(
             detail="AI service returned an unparseable response",
         )
 
-    return GenerateDocsResponse(
-        workflow_id=result.workflow_id,
-        workflow_name=result.workflow_name,
-        sections=DocumentationSectionsResponse(**result.sections.as_dict()),
-        documentation=result.documentation,
-        model=settings.ollama_model,
-    )
+    return _to_response(result, cached=False)
