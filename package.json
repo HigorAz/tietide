@@ -18,6 +18,8 @@
     "typecheck": "pnpm -r run typecheck",
     "ci:build": "turbo run build",
     "ci:test": "turbo run test",
+    "loadtest:api": "k6 run infra/load/k6/api-read.js",
+    "loadtest:workflow": "k6 run infra/load/k6/workflow-execute.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "prepare": "husky"
