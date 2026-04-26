@@ -3,6 +3,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ExecutionsController } from './executions.controller';
+import { WorkflowExecutionsController } from './workflow-executions.controller';
+import { ExecutionDetailController } from './execution-detail.controller';
 import { ExecutionsService } from './executions.service';
 import { EXECUTION_QUEUE_NAME } from './execution-queue.constants';
 
@@ -22,7 +24,7 @@ import { EXECUTION_QUEUE_NAME } from './execution-queue.constants';
     BullModule.registerQueue({ name: EXECUTION_QUEUE_NAME }),
     PrismaModule,
   ],
-  controllers: [ExecutionsController],
+  controllers: [ExecutionsController, WorkflowExecutionsController, ExecutionDetailController],
   providers: [ExecutionsService],
   exports: [ExecutionsService, BullModule],
 })
