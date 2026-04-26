@@ -39,11 +39,27 @@ model Workflow {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user       User                @relation(fields: [userId], references: [id])
-  executions WorkflowExecution[]
-  webhooks   Webhook[]
+  user          User                   @relation(fields: [userId], references: [id])
+  executions    WorkflowExecution[]
+  webhooks      Webhook[]
+  documentation WorkflowDocumentation?
 
   @@map("workflows")
+}
+
+model WorkflowDocumentation {
+  id            String   @id @default(uuid())
+  workflowId    String   @unique @map("workflow_id")
+  version       Int
+  documentation String
+  sections      Json
+  model         String
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@map("workflow_documentation")
 }
 
 model WorkflowExecution {

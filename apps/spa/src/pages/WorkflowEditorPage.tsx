@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
+import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
@@ -86,6 +87,7 @@ export function WorkflowEditorPage() {
         <div className="relative flex-1">
           <Canvas />
           <EditorToolbar workflowId={id} />
+          <DocumentationPanel workflowId={id} />
         </div>
         <NodeConfigPanel />
       </ReactFlowProvider>
