@@ -1,0 +1,20 @@
+{
+  "name": "Manual HTTP Health Check",
+  "description": "Manually triggered workflow that calls an external health endpoint and returns the response.",
+  "definition": {
+    "nodes": [
+      { "id": "trigger", "type": "manual-trigger", "params": {} },
+      {
+        "id": "http",
+        "type": "http-request",
+        "params": {
+          "url": "https://api.example.com/health",
+          "method": "GET",
+          "timeout": 5000
+        }
+      }
+    ],
+    "edges": [{ "from": "trigger", "to": "http" }]
+  },
+  "expected_documentation": "## Manual HTTP Health Check\n\nThis workflow is manually triggered by a user and performs a single HTTP GET request to `https://api.example.com/health` with a 5 second timeout.\n\n### Steps\n1. **Manual Trigger** — User initiates the run, optionally passing input data.\n2. **HTTP Request** — Calls the health endpoint and returns status code, headers, body, and duration.\n\n### Use cases\n- Quick verification that an external service is reachable\n- On-demand probing for incident response\n\n### Failure modes\n- Timeout after 5000ms raises a workflow error\n- Non-2xx response causes the run to fail"
+}

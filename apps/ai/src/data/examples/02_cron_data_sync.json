@@ -1,0 +1,32 @@
+{
+  "name": "Daily API Data Sync",
+  "description": "Scheduled workflow that pulls fresh data from a partner API every morning and forwards it to an internal endpoint.",
+  "definition": {
+    "nodes": [
+      { "id": "schedule", "type": "cron-trigger", "params": { "cron": "0 9 * * *" } },
+      {
+        "id": "fetch",
+        "type": "http-request",
+        "params": {
+          "url": "https://partner.example.com/api/orders",
+          "method": "GET",
+          "headers": { "authorization": "Bearer ${PARTNER_TOKEN}" }
+        }
+      },
+      {
+        "id": "forward",
+        "type": "http-request",
+        "params": {
+          "url": "https://internal.example.com/orders/ingest",
+          "method": "POST",
+          "body": "{{steps.fetch.body}}"
+        }
+      }
+    ],
+    "edges": [
+      { "from": "schedule", "to": "fetch" },
+      { "from": "fetch", "to": "forward" }
+    ]
+  },
+  "expected_documentation": "## Daily API Data Sync\n\nRuns every day at 09:00 UTC, fetches the partner orders feed, and forwards the payload to the internal ingestion endpoint.\n\n### Steps\n1. **Cron Trigger** — Fires at `0 9 * * *` (daily 09:00 UTC).\n2. **HTTP Request — fetch** — GET `https://partner.example.com/api/orders` with bearer authentication.\n3. **HTTP Request — forward** — POST the response body to the internal `orders/ingest` endpoint.\n\n### Use cases\n- ETL-style data replication between two systems\n- Daily order/inventory mirroring\n\n### Failure modes\n- Partner API outage causes the workflow to fail at the fetch step\n- Internal endpoint failure does not roll back the partner side"
+}

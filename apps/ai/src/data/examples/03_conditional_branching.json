@@ -1,0 +1,47 @@
+{
+  "name": "Order Status Conditional Notification",
+  "description": "Fetches an order and routes execution to different notification endpoints based on the order status.",
+  "definition": {
+    "nodes": [
+      { "id": "trigger", "type": "manual-trigger", "params": {} },
+      {
+        "id": "lookup",
+        "type": "http-request",
+        "params": {
+          "url": "https://api.example.com/orders/{{trigger.data.orderId}}",
+          "method": "GET"
+        }
+      },
+      {
+        "id": "is_failed",
+        "type": "conditional",
+        "params": { "condition": "{{steps.lookup.body.status}} == \"failed\"" }
+      },
+      {
+        "id": "notify_failure",
+        "type": "http-request",
+        "params": {
+          "url": "https://hooks.example.com/alerts/order-failed",
+          "method": "POST",
+          "body": { "orderId": "{{trigger.data.orderId}}" }
+        }
+      },
+      {
+        "id": "notify_ok",
+        "type": "http-request",
+        "params": {
+          "url": "https://hooks.example.com/log/order-ok",
+          "method": "POST",
+          "body": { "orderId": "{{trigger.data.orderId}}" }
+        }
+      }
+    ],
+    "edges": [
+      { "from": "trigger", "to": "lookup" },
+      { "from": "lookup", "to": "is_failed" },
+      { "from": "is_failed", "to": "notify_failure", "branch": "true" },
+      { "from": "is_failed", "to": "notify_ok", "branch": "false" }
+    ]
+  },
+  "expected_documentation": "## Order Status Conditional Notification\n\nLooks up an order by ID and notifies the appropriate downstream endpoint depending on the status field.\n\n### Steps\n1. **Manual Trigger** — Receives `orderId` in input data.\n2. **HTTP Request — lookup** — Fetches the order from the orders API.\n3. **Conditional** — Evaluates `status == \"failed\"`.\n4. **HTTP Request — notify_failure** — Posts to the failure alert webhook (true branch).\n5. **HTTP Request — notify_ok** — Posts to the success log webhook (false branch).\n\n### Use cases\n- Routing alerts based on business outcome\n- Multi-path workflows that diverge after a check\n\n### Failure modes\n- Missing `orderId` in trigger input causes URL interpolation failure\n- Conditional with malformed expression raises a node error"
+}
