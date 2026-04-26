@@ -147,6 +147,17 @@ describe('EngineService', () => {
       );
     });
 
+    it('should default error to "Unknown failure" when runner returns FAILED with no error', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+      runner.run.mockResolvedValue({ status: 'FAILED' });
+
+      await engine.execute({ executionId: 'exec-1', workflowId: 'wf-1', triggerType: 'manual' });
+
+      const lastCall = prisma.workflowExecution.update.mock.calls.pop();
+      expect(lastCall![0].data.status).toBe('FAILED');
+      expect(lastCall![0].data.error).toBe('Unknown failure');
+    });
+
     it('should set finishedAt on both success and failure paths', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
       runner.run.mockResolvedValue({ status: 'FAILED', error: 'boom' });

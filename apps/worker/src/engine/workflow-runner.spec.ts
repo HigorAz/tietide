@@ -389,6 +389,65 @@ describe('WorkflowRunner', () => {
       expect(secretResolver.getSecret).toHaveBeenCalledWith('exec-1', 'api-key');
     });
 
+    it('should return FAILED when topologicalSort detects a circular dependency', async () => {
+      registry.register(makeExecutor('a'));
+      registry.register(makeExecutor('b'));
+
+      // Two-node cycle: A -> B -> A. No node has in-degree zero.
+      const def: WorkflowDefinition = {
+        nodes: [node('A', 'a'), node('B', 'b')],
+        edges: [edge('e1', 'A', 'B'), edge('e2', 'B', 'A')],
+      };
+
+      const result = await runner.run({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        definition: def,
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(result.error).toMatch(/circular dependency/i);
+      expect(prisma.executionStep.create).not.toHaveBeenCalled();
+    });
+
+    it('should return FAILED with error message when topologicalSort throws non-cycle error', async () => {
+      registry.register(makeExecutor('a'));
+
+      // Empty workflow → topologicalSort throws a plain Error (not CircularDependencyError)
+      const def: WorkflowDefinition = { nodes: [], edges: [] };
+
+      const result = await runner.run({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        definition: def,
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(result.error).toMatch(/at least one node/i);
+    });
+
+    it('should expose a working logger on ExecutionContext (info/warn/error/debug)', async () => {
+      const exec = makeExecutor('a', async (_input, ctx) => {
+        ctx.logger.info('info-msg', { k: 1 });
+        ctx.logger.warn('warn-msg', { k: 2 });
+        ctx.logger.error('error-msg', { k: 3 });
+        ctx.logger.debug('debug-msg', { k: 4 });
+        return { data: {} };
+      });
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      const result = await runner.run({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        definition: def,
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      expect(exec.execute).toHaveBeenCalledTimes(1);
+    });
+
     it('should pass node config as params to the executor', async () => {
       const exec = makeExecutor('a');
       registry.register(exec);

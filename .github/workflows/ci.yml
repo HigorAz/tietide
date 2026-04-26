@@ -57,12 +57,23 @@ jobs:
       - name: Build packages
         run: pnpm run build
 
-      - name: Run tests
-        run: pnpm run test
+      - name: Run tests with coverage
+        run: pnpm -r --if-present run test:coverage
         env:
           DATABASE_URL: postgresql://tietide:tietide_secret@localhost:5432/tietide?schema=public
           REDIS_HOST: localhost
           REDIS_PORT: 6379
+          CI: true
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            apps/api/coverage/
+            apps/worker/coverage/
+          retention-days: 14
 
       - name: Typecheck
         run: pnpm run typecheck
