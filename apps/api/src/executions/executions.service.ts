@@ -5,11 +5,28 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from './execution-queue.constants';
 import type { ExecutionResponseDto } from './dto/execution-response.dto';
+import type {
+  ExecutionDetailResponseDto,
+  ExecutionListResponseDto,
+} from './dto/execution-detail-response.dto';
+import type { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
+import { sanitizePayload } from './utils/sanitize-payload';
 
 export interface TriggerOptions {
   triggerData?: Record<string, unknown>;
   idempotencyKey?: string;
 }
+
+export interface ListOptions {
+  status?: string;
+  from?: Date;
+  to?: Date;
+  page?: number;
+  pageSize?: number;
+}
+
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_SIZE = 20;
 
 export interface WorkflowExecutionJobPayload {
   executionId: string;
@@ -94,6 +111,87 @@ export class ExecutionsService {
     return this.toResponse(created);
   }
 
+  async list(
+    userId: string,
+    workflowId: string,
+    options: ListOptions,
+  ): Promise<ExecutionListResponseDto> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: { userId: true },
+    });
+    if (!workflow) {
+      throw new NotFoundException('Workflow not found');
+    }
+    if (workflow.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this workflow');
+    }
+
+    const where: Prisma.WorkflowExecutionWhereInput = { workflowId };
+    if (options.status) {
+      where.status = options.status as Prisma.WorkflowExecutionWhereInput['status'];
+    }
+    if (options.from || options.to) {
+      where.createdAt = {
+        ...(options.from ? { gte: options.from } : {}),
+        ...(options.to ? { lte: options.to } : {}),
+      };
+    }
+
+    const page = options.page ?? DEFAULT_PAGE;
+    const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+    const skip = (page - 1) * pageSize;
+
+    const [rows, total] = await Promise.all([
+      this.prisma.workflowExecution.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.workflowExecution.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDetailResponse(row)),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  async findOne(userId: string, executionId: string): Promise<ExecutionDetailResponseDto> {
+    const row = await this.prisma.workflowExecution.findUnique({
+      where: { id: executionId },
+      include: { workflow: { select: { userId: true } } },
+    });
+    if (!row) {
+      throw new NotFoundException('Execution not found');
+    }
+    if (row.workflow.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this execution');
+    }
+    return this.toDetailResponse(row);
+  }
+
+  async listSteps(userId: string, executionId: string): Promise<ExecutionStepResponseDto[]> {
+    const row = await this.prisma.workflowExecution.findUnique({
+      where: { id: executionId },
+      include: { workflow: { select: { userId: true } } },
+    });
+    if (!row) {
+      throw new NotFoundException('Execution not found');
+    }
+    if (row.workflow.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this execution');
+    }
+    const steps = await this.prisma.executionStep.findMany({
+      where: { executionId },
+      orderBy: { startedAt: 'asc' },
+    });
+    return steps.map((s) => this.toStepResponse(s));
+  }
+
   private toResponse(row: {
     id: string;
     workflowId: string;
@@ -111,6 +209,62 @@ export class ExecutionsService {
       triggerData: (row.triggerData as Record<string, unknown> | null) ?? null,
       idempotencyKey: row.idempotencyKey,
       createdAt: row.createdAt,
+    };
+  }
+
+  private toDetailResponse(row: {
+    id: string;
+    workflowId: string;
+    status: string;
+    triggerType: string;
+    triggerData: unknown;
+    idempotencyKey: string | null;
+    startedAt?: Date | null;
+    finishedAt?: Date | null;
+    error?: string | null;
+    createdAt: Date;
+  }): ExecutionDetailResponseDto {
+    return {
+      id: row.id,
+      workflowId: row.workflowId,
+      status: row.status,
+      triggerType: row.triggerType,
+      triggerData: sanitizePayload(row.triggerData) as Record<string, unknown> | null,
+      idempotencyKey: row.idempotencyKey,
+      startedAt: row.startedAt ?? null,
+      finishedAt: row.finishedAt ?? null,
+      error: row.error ?? null,
+      createdAt: row.createdAt,
+    };
+  }
+
+  private toStepResponse(row: {
+    id: string;
+    executionId: string;
+    nodeId: string;
+    nodeType: string;
+    nodeName: string;
+    status: string;
+    inputData: unknown;
+    outputData: unknown;
+    error: string | null;
+    startedAt: Date | null;
+    finishedAt: Date | null;
+    durationMs: number | null;
+  }): ExecutionStepResponseDto {
+    return {
+      id: row.id,
+      executionId: row.executionId,
+      nodeId: row.nodeId,
+      nodeType: row.nodeType,
+      nodeName: row.nodeName,
+      status: row.status,
+      inputData: sanitizePayload(row.inputData) as Record<string, unknown> | null,
+      outputData: sanitizePayload(row.outputData) as Record<string, unknown> | null,
+      error: row.error,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt,
+      durationMs: row.durationMs,
     };
   }
 }
