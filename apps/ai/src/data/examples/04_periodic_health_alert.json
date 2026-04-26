@@ -1,0 +1,39 @@
+{
+  "name": "Periodic Service Health Probe with Alerting",
+  "description": "Probes a critical service every 5 minutes and pages on-call only when the health check returns unhealthy.",
+  "definition": {
+    "nodes": [
+      { "id": "every_5min", "type": "cron-trigger", "params": { "cron": "*/5 * * * *" } },
+      {
+        "id": "probe",
+        "type": "http-request",
+        "params": {
+          "url": "https://api.internal.example.com/health",
+          "method": "GET",
+          "timeout": 3000
+        }
+      },
+      {
+        "id": "is_unhealthy",
+        "type": "conditional",
+        "params": { "condition": "{{steps.probe.body.status}} != \"ok\"" }
+      },
+      {
+        "id": "page",
+        "type": "http-request",
+        "params": {
+          "url": "https://hooks.pagerduty.com/incident",
+          "method": "POST",
+          "headers": { "authorization": "Bearer ${PD_TOKEN}" },
+          "body": { "service": "internal-api", "severity": "critical" }
+        }
+      }
+    ],
+    "edges": [
+      { "from": "every_5min", "to": "probe" },
+      { "from": "probe", "to": "is_unhealthy" },
+      { "from": "is_unhealthy", "to": "page", "branch": "true" }
+    ]
+  },
+  "expected_documentation": "## Periodic Service Health Probe with Alerting\n\nRuns every 5 minutes, probes the internal API, and only pages on-call when the response indicates the service is unhealthy.\n\n### Steps\n1. **Cron Trigger** — Fires at `*/5 * * * *` (every 5 minutes).\n2. **HTTP Request — probe** — GET the `/health` endpoint with a 3 second timeout.\n3. **Conditional** — Evaluates whether `status != \"ok\"`.\n4. **HTTP Request — page** — POST a critical incident to PagerDuty (only on the true branch).\n\n### Use cases\n- Synthetic monitoring with active alerting\n- Reduced alert noise via conditional gating\n\n### Failure modes\n- Probe timeout itself counts as unhealthy and triggers the page branch\n- PagerDuty webhook failure means the incident is not created"
+}

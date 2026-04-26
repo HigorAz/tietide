@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {
+      "type": "manual-trigger",
+      "name": "Manual Trigger",
+      "category": "trigger",
+      "description": "Starts a workflow manually with optional user-provided data. Used when a workflow should execute on demand rather than automatically.",
+      "params": {},
+      "outputs": ["data"],
+      "use_cases": [
+        "Ad-hoc workflow execution",
+        "Testing a workflow during development",
+        "Human-in-the-loop processes"
+      ]
+    },
+    {
+      "type": "cron-trigger",
+      "name": "Cron Trigger",
+      "category": "trigger",
+      "description": "Starts a workflow on a recurring schedule defined by a cron expression. Useful for periodic data syncs, scheduled reports, and time-based automation.",
+      "params": {
+        "cron": "string — cron expression, e.g. '0 9 * * *' for daily at 09:00"
+      },
+      "outputs": ["data"],
+      "use_cases": [
+        "Daily/weekly/monthly data sync",
+        "Scheduled report generation",
+        "Recurring health checks"
+      ]
+    },
+    {
+      "type": "http-request",
+      "name": "HTTP Request",
+      "category": "action",
+      "description": "Performs a configurable HTTP request and returns the response. Supports GET, POST, PUT, PATCH, DELETE methods with custom headers and JSON or string body.",
+      "params": {
+        "url": "string — destination URL (required)",
+        "method": "string — HTTP method, defaults to GET",
+        "headers": "object — request headers map",
+        "body": "string|object — request payload, JSON serialized when object",
+        "timeout": "number — request timeout in milliseconds, defaults to 30000"
+      },
+      "outputs": ["statusCode", "headers", "body", "duration"],
+      "use_cases": [
+        "Calling external REST APIs",
+        "Posting webhooks to third-party services",
+        "Fetching data from public endpoints"
+      ]
+    },
+    {
+      "type": "conditional",
+      "name": "Conditional (IF)",
+      "category": "logic",
+      "description": "Evaluates a condition against previous node output and routes execution to the true or false branch. Supports template interpolation of upstream node data into the condition expression.",
+      "params": {
+        "condition": "string — expression evaluated as boolean, e.g. '{{steps.http.body.status}} == \"ok\"'"
+      },
+      "outputs": ["branch", "evaluatedCondition"],
+      "use_cases": [
+        "Branching on API response status",
+        "Routing based on data presence",
+        "Multi-path workflow logic"
+      ]
+    }
+  ]
+}
