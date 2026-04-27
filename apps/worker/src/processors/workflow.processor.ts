@@ -1,6 +1,8 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from 'nestjs-pino';
 import type { Job } from 'bullmq';
+import { DlqService } from '../dlq/dlq.service';
+import { MAX_EXECUTION_ATTEMPTS } from '../dlq/dlq.constants';
 import { EngineService } from '../engine/engine.service';
 
 export interface ExecutionPayload {
@@ -17,6 +19,7 @@ export class WorkflowProcessor extends WorkerHost {
   constructor(
     private readonly engine: EngineService,
     private readonly logger: Logger,
+    private readonly dlq: DlqService,
   ) {
     super();
   }
@@ -40,5 +43,21 @@ export class WorkflowProcessor extends WorkerHost {
       );
       throw err;
     }
+  }
+
+  @OnWorkerEvent('failed')
+  async onFailed(job: Job<ExecutionPayload> | undefined, error: Error): Promise<void> {
+    if (!job) {
+      return;
+    }
+    const attemptsAllowed = job.opts?.attempts ?? MAX_EXECUTION_ATTEMPTS;
+    await this.dlq.publishFailed({
+      jobId: String(job.id ?? 'unknown'),
+      attemptsMade: job.attemptsMade,
+      attemptsAllowed,
+      failedAt: new Date(),
+      error: error?.message ?? 'Unknown error',
+      payload: job.data,
+    });
   }
 }

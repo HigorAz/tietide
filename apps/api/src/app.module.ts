@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppLoggerModule } from './common/logger/logger.module';
+import { AppThrottlerModule } from './common/throttler/throttler.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
@@ -18,6 +19,7 @@ import { AiModule } from './ai/ai.module';
       envFilePath: ['../../.env', '.env'],
     }),
     AppLoggerModule,
+    AppThrottlerModule,
     PrismaModule,
     CryptoModule,
     HealthModule,

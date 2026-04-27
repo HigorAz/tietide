@@ -76,10 +76,23 @@ describe('API → Worker contract (workflow-execution queue)', () => {
     expect(opts).toEqual(
       expect.objectContaining({
         jobId: executionId,
-        attempts: expect.any(Number),
-        backoff: expect.objectContaining({ type: 'exponential' }),
+        attempts: 3,
+        backoff: expect.objectContaining({ type: 'exponential', delay: expect.any(Number) }),
       }),
     );
+  });
+
+  it('configures retries with exponential backoff so transient failures are retried up to 3 times', async () => {
+    await executions.triggerManual(userId, workflowId, {});
+
+    const opts = queue.add.mock.calls[0][2] as {
+      attempts: number;
+      backoff: { type: string; delay: number };
+    };
+
+    expect(opts.attempts).toBe(3);
+    expect(opts.backoff.type).toBe('exponential');
+    expect(opts.backoff.delay).toBeGreaterThan(0);
   });
 
   it('persists execution as PENDING before enqueuing — queue.add fires after DB create', async () => {
