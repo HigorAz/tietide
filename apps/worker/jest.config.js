@@ -6,6 +6,7 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
+  transformIgnorePatterns: ['/node_modules/(?!(?:\\.pnpm/)?uuid)'],
   collectCoverageFrom: ['**/*.(t|j)s', '!main.ts', '!**/*.module.ts'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
