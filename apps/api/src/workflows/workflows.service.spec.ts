@@ -2,10 +2,12 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import { WorkflowsService } from './workflows.service';
 
 describe('WorkflowsService', () => {
   let service: WorkflowsService;
+  let audit: { log: jest.Mock };
   let prisma: {
     workflow: {
       create: jest.Mock;
@@ -61,9 +63,14 @@ describe('WorkflowsService', () => {
         deleteMany: jest.fn(),
       },
     };
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [WorkflowsService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        WorkflowsService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: AuditLogService, useValue: audit },
+      ],
     }).compile();
 
     service = module.get<WorkflowsService>(WorkflowsService);
@@ -111,6 +118,21 @@ describe('WorkflowsService', () => {
       const call = prisma.workflow.create.mock.calls[0][0] as { select: Record<string, boolean> };
       expect(call.select).toBeDefined();
       expect(call.select.userId).toBeFalsy();
+    });
+
+    it('should record an audit log entry with action "workflow.create"', async () => {
+      prisma.workflow.create.mockResolvedValue(persisted);
+
+      await service.create(userId, dto);
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'workflow.create',
+          resource: 'workflow',
+          resourceId: workflowId,
+        }),
+      );
     });
   });
 
@@ -290,6 +312,19 @@ describe('WorkflowsService', () => {
       expect(result).not.toHaveProperty('userId');
       expect(result.version).toBe(2);
     });
+
+    it('should record an audit log entry with action "workflow.update"', async () => {
+      await service.update(userId, workflowId, { name: 'Renamed' });
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'workflow.update',
+          resource: 'workflow',
+          resourceId: workflowId,
+        }),
+      );
+    });
   });
 
   describe('remove', () => {
@@ -302,6 +337,22 @@ describe('WorkflowsService', () => {
       expect(prisma.workflow.deleteMany).toHaveBeenCalledWith({
         where: { id: workflowId, userId },
       });
+    });
+
+    it('should record an audit log entry with action "workflow.delete"', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.deleteMany.mockResolvedValue({ count: 1 });
+
+      await service.remove(userId, workflowId);
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'workflow.delete',
+          resource: 'workflow',
+          resourceId: workflowId,
+        }),
+      );
     });
 
     it('should throw NotFoundException when the row does not exist', async () => {
