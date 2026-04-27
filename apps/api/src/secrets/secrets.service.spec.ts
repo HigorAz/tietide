@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import { SecretsService } from './secrets.service';
 
 describe('SecretsService', () => {
@@ -17,6 +18,7 @@ describe('SecretsService', () => {
     };
   };
   let crypto: { encrypt: jest.Mock; decrypt: jest.Mock };
+  let audit: { log: jest.Mock };
 
   const userId = 'user-uuid-1';
   const otherUserId = 'user-uuid-2';
@@ -33,12 +35,14 @@ describe('SecretsService', () => {
       },
     };
     crypto = { encrypt: jest.fn(), decrypt: jest.fn() };
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SecretsService,
         { provide: PrismaService, useValue: prisma },
         { provide: CryptoService, useValue: crypto },
+        { provide: AuditLogService, useValue: audit },
       ],
     }).compile();
 
@@ -100,6 +104,25 @@ describe('SecretsService', () => {
       prisma.secret.create.mockRejectedValue(p2002);
 
       await expect(service.create(userId, dto)).rejects.toThrow(ConflictException);
+    });
+
+    it('should record an audit log entry with action "secret.create" and never include the value', async () => {
+      crypto.encrypt.mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
+      prisma.secret.create.mockResolvedValue(persisted);
+
+      await service.create(userId, dto);
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'secret.create',
+          resource: 'secret',
+          resourceId: secretId,
+          metadata: expect.objectContaining({ name: dto.name }),
+        }),
+      );
+      const call = audit.log.mock.calls[0][0] as { metadata?: Record<string, unknown> };
+      expect(call.metadata).not.toHaveProperty('value');
     });
   });
 
@@ -215,6 +238,25 @@ describe('SecretsService', () => {
       expect(result).not.toHaveProperty('value');
       expect(result).not.toHaveProperty('nonce');
     });
+
+    it('should record an audit log entry with action "secret.update" and no plaintext value', async () => {
+      prisma.secret.findFirst.mockResolvedValue(existing);
+      crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
+      prisma.secret.update.mockResolvedValue(persisted);
+
+      await service.update(userId, secretId, { value: 'super-secret' });
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'secret.update',
+          resource: 'secret',
+          resourceId: secretId,
+        }),
+      );
+      const call = audit.log.mock.calls[0][0] as { metadata?: Record<string, unknown> };
+      expect(call.metadata).not.toHaveProperty('value');
+    });
   });
 
   describe('remove', () => {
@@ -232,6 +274,21 @@ describe('SecretsService', () => {
       prisma.secret.deleteMany.mockResolvedValue({ count: 0 });
 
       await expect(service.remove(otherUserId, secretId)).rejects.toThrow(NotFoundException);
+    });
+
+    it('should record an audit log entry with action "secret.delete" on success', async () => {
+      prisma.secret.deleteMany.mockResolvedValue({ count: 1 });
+
+      await service.remove(userId, secretId);
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'secret.delete',
+          resource: 'secret',
+          resourceId: secretId,
+        }),
+      );
     });
   });
 });

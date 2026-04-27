@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import { ExecutionsService } from './executions.service';
 import { EXECUTION_QUEUE_NAME } from './execution-queue.constants';
 
@@ -30,6 +31,7 @@ describe('ExecutionsService', () => {
   let service: ExecutionsService;
   let prisma: PrismaMock;
   let queue: QueueMock;
+  let audit: { log: jest.Mock };
 
   const userId = 'user-uuid-1';
   const otherUserId = 'user-uuid-2';
@@ -49,12 +51,14 @@ describe('ExecutionsService', () => {
       executionStep: { findMany: jest.fn() },
     };
     queue = { add: jest.fn(async () => undefined) };
+    audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
         ExecutionsService,
         { provide: PrismaService, useValue: prisma },
         { provide: getQueueToken(EXECUTION_QUEUE_NAME), useValue: queue },
+        { provide: AuditLogService, useValue: audit },
       ],
     }).compile();
 
@@ -261,6 +265,31 @@ describe('ExecutionsService', () => {
       };
       expect(opts.attempts).toBeGreaterThanOrEqual(1);
       expect(opts.backoff).toEqual({ type: 'exponential', delay: expect.any(Number) });
+    });
+
+    it('should record an audit log entry with action "execution.trigger"', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'manual',
+        triggerData: null,
+        idempotencyKey: null,
+        createdAt: new Date(),
+      });
+
+      await service.triggerManual(userId, workflowId, {});
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'execution.trigger',
+          resource: 'workflow',
+          resourceId: workflowId,
+          metadata: expect.objectContaining({ executionId, triggerType: 'manual' }),
+        }),
+      );
     });
   });
 

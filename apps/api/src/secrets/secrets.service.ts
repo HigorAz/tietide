@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import type { CreateSecretDto } from './dto/create-secret.dto';
 import type { UpdateSecretDto } from './dto/update-secret.dto';
 import type { SecretResponseDto } from './dto/secret-response.dto';
@@ -17,12 +18,14 @@ export class SecretsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
+    private readonly audit: AuditLogService,
   ) {}
 
   async create(userId: string, dto: CreateSecretDto): Promise<SecretResponseDto> {
     const { ciphertext, nonce } = this.crypto.encrypt(dto.value);
+    let row: SecretResponseDto;
     try {
-      return await this.prisma.secret.create({
+      row = await this.prisma.secret.create({
         data: {
           userId,
           name: dto.name,
@@ -37,6 +40,16 @@ export class SecretsService {
       }
       throw err;
     }
+
+    await this.audit.log({
+      userId,
+      action: 'secret.create',
+      resource: 'secret',
+      resourceId: row.id,
+      metadata: { name: row.name },
+    });
+
+    return row;
   }
 
   async list(userId: string): Promise<SecretResponseDto[]> {
@@ -66,8 +79,9 @@ export class SecretsService {
       data.nonce = nonce;
     }
 
+    let row: SecretResponseDto;
     try {
-      return await this.prisma.secret.update({
+      row = await this.prisma.secret.update({
         where: { id },
         data,
         select: SAFE_SELECT,
@@ -78,6 +92,16 @@ export class SecretsService {
       }
       throw err;
     }
+
+    await this.audit.log({
+      userId,
+      action: 'secret.update',
+      resource: 'secret',
+      resourceId: id,
+      metadata: { fields: Object.keys(data) },
+    });
+
+    return row;
   }
 
   async remove(userId: string, id: string): Promise<void> {
@@ -87,6 +111,13 @@ export class SecretsService {
     if (count === 0) {
       throw new NotFoundException('Secret not found');
     }
+
+    await this.audit.log({
+      userId,
+      action: 'secret.delete',
+      resource: 'secret',
+      resourceId: id,
+    });
   }
 
   private isUniqueViolation(err: unknown): boolean {
