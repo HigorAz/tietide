@@ -7,6 +7,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { WebhooksService } from './webhooks.service';
 import { WebhookTriggerResponseDto } from './dto/webhook-trigger-response.dto';
@@ -16,6 +17,7 @@ interface RawBodyRequest extends Request {
 }
 
 @ApiTags('webhooks')
+@SkipThrottle()
 @Controller('webhooks')
 export class WebhooksController {
   constructor(private readonly webhooks: WebhooksService) {}
