@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { updateWorkflow } from '@/api/workflows';
@@ -24,11 +24,28 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
 
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<SaveFeedback>(null);
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (feedbackTimerRef.current !== null) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const showFeedback = useCallback((next: SaveFeedback) => {
     setFeedback(next);
+    if (feedbackTimerRef.current !== null) {
+      clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = null;
+    }
     if (next) {
-      window.setTimeout(() => setFeedback(null), FEEDBACK_TIMEOUT_MS);
+      feedbackTimerRef.current = setTimeout(() => {
+        feedbackTimerRef.current = null;
+        setFeedback(null);
+      }, FEEDBACK_TIMEOUT_MS);
     }
   }, []);
 
