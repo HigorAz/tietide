@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from './execution-queue.constants';
 import type { ExecutionResponseDto } from './dto/execution-response.dto';
 import type {
@@ -48,6 +49,7 @@ export class ExecutionsService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(EXECUTION_QUEUE_NAME) private readonly queue: Queue,
+    private readonly audit: AuditLogService,
   ) {}
 
   async triggerManual(
@@ -109,6 +111,14 @@ export class ExecutionsService {
       backoff: { type: 'exponential', delay: BACKOFF_DELAY_MS },
       removeOnComplete: { age: 3600, count: 1000 },
       removeOnFail: { age: 24 * 3600 },
+    });
+
+    await this.audit.log({
+      userId,
+      action: 'execution.trigger',
+      resource: 'workflow',
+      resourceId: workflowId,
+      metadata: { executionId: created.id, triggerType: 'manual' },
     });
 
     return this.toResponse(created);

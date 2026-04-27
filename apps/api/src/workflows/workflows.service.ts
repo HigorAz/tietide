@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import type { WorkflowResponseDto } from './dto/workflow-response.dto';
@@ -24,7 +25,10 @@ const SAFE_SELECT = {
 
 @Injectable()
 export class WorkflowsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditLogService,
+  ) {}
 
   async create(userId: string, dto: CreateWorkflowDto): Promise<WorkflowResponseDto> {
     const row = await this.prisma.workflow.create({
@@ -35,6 +39,14 @@ export class WorkflowsService {
         definition: dto.definition as unknown as Prisma.InputJsonValue,
       },
       select: SAFE_SELECT,
+    });
+
+    await this.audit.log({
+      userId,
+      action: 'workflow.create',
+      resource: 'workflow',
+      resourceId: row.id,
+      metadata: { name: row.name },
     });
 
     return this.toResponse(row);
@@ -111,6 +123,14 @@ export class WorkflowsService {
       select: SAFE_SELECT,
     });
 
+    await this.audit.log({
+      userId,
+      action: 'workflow.update',
+      resource: 'workflow',
+      resourceId: id,
+      metadata: { fields: Object.keys(data).filter((k) => k !== 'version') },
+    });
+
     return this.toResponse(row);
   }
 
@@ -127,6 +147,13 @@ export class WorkflowsService {
     }
 
     await this.prisma.workflow.deleteMany({ where: { id, userId } });
+
+    await this.audit.log({
+      userId,
+      action: 'workflow.delete',
+      resource: 'workflow',
+      resourceId: id,
+    });
   }
 
   private toResponse(row: {
