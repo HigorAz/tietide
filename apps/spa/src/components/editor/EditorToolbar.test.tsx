@@ -151,4 +151,64 @@ describe('EditorToolbar', () => {
       expect(mockedUpdate).not.toHaveBeenCalled();
     });
   });
+
+  describe('feedback timer cleanup', () => {
+    it('should clear the pending feedback timer when the component unmounts', async () => {
+      const FEEDBACK_TIMEOUT_MS = 3000;
+      const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+      const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+      try {
+        const { unmount } = render(<EditorToolbar workflowId="wf-1" />);
+
+        await userEvent.click(screen.getByRole('button', { name: /run/i }));
+        expect(screen.getByRole('status')).toBeInTheDocument();
+
+        const feedbackCallIndex = setTimeoutSpy.mock.calls.findIndex(
+          ([, delay]) => delay === FEEDBACK_TIMEOUT_MS,
+        );
+        expect(feedbackCallIndex).toBeGreaterThanOrEqual(0);
+        const timerId = setTimeoutSpy.mock.results[feedbackCallIndex].value;
+
+        unmount();
+
+        expect(clearTimeoutSpy).toHaveBeenCalledWith(timerId);
+      } finally {
+        setTimeoutSpy.mockRestore();
+        clearTimeoutSpy.mockRestore();
+      }
+    });
+
+    it('should not invoke setFeedback after unmount when the timer would have fired', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const { unmount } = render(<EditorToolbar workflowId="wf-1" />);
+
+        await userEvent.click(screen.getByRole('button', { name: /run/i }));
+        unmount();
+
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('should clear the previous timer when feedback is shown twice in succession', async () => {
+      const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+      try {
+        render(<EditorToolbar workflowId="wf-1" />);
+        const runButton = screen.getByRole('button', { name: /run/i });
+
+        await userEvent.click(runButton);
+        const clearsAfterFirstClick = clearTimeoutSpy.mock.calls.length;
+
+        await userEvent.click(runButton);
+
+        expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThan(clearsAfterFirstClick);
+      } finally {
+        clearTimeoutSpy.mockRestore();
+      }
+    });
+  });
 });
