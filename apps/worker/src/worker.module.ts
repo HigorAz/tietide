@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { WorkflowProcessor } from './processors/workflow.processor';
 import { EngineModule } from './engine/engine.module';
 import { CronModule } from './cron/cron.module';
+import { DlqModule } from './dlq/dlq.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CronModule } from './cron/cron.module';
     PrismaModule,
     EngineModule,
     CronModule,
+    DlqModule,
   ],
   providers: [WorkflowProcessor],
 })

@@ -1,6 +1,8 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { Logger } from 'nestjs-pino';
 import type { Job } from 'bullmq';
+import { DlqService } from '../dlq/dlq.service';
+import { MAX_EXECUTION_ATTEMPTS } from '../dlq/dlq.constants';
 import { EngineService } from '../engine/engine.service';
 import { WorkflowProcessor, type ExecutionPayload } from './workflow.processor';
 
@@ -8,15 +10,18 @@ describe('WorkflowProcessor', () => {
   let processor: WorkflowProcessor;
   let engine: { execute: jest.Mock };
   let logger: { log: jest.Mock; error: jest.Mock };
+  let dlq: { publishFailed: jest.Mock };
 
   beforeEach(async () => {
     engine = { execute: jest.fn(async () => undefined) };
     logger = { log: jest.fn(), error: jest.fn() };
+    dlq = { publishFailed: jest.fn(async () => undefined) };
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowProcessor,
         { provide: EngineService, useValue: engine },
         { provide: Logger, useValue: logger },
+        { provide: DlqService, useValue: dlq },
       ],
     }).compile();
     processor = mod.get(WorkflowProcessor);
@@ -97,6 +102,64 @@ describe('WorkflowProcessor', () => {
         }),
         expect.any(String),
       );
+    });
+  });
+
+  describe('onFailed', () => {
+    function makeJob(overrides: Partial<Job<ExecutionPayload>> = {}): Job<ExecutionPayload> {
+      return {
+        id: 'job-99',
+        attemptsMade: MAX_EXECUTION_ATTEMPTS,
+        opts: { attempts: MAX_EXECUTION_ATTEMPTS },
+        data: {
+          executionId: 'exec-99',
+          workflowId: 'wf-99',
+          triggerType: 'manual',
+          userId: 'user-99',
+        },
+        ...overrides,
+      } as unknown as Job<ExecutionPayload>;
+    }
+
+    it('should forward exhausted retries to DlqService.publishFailed', async () => {
+      const job = makeJob();
+      const error = new Error('database down');
+
+      await processor.onFailed(job, error);
+
+      expect(dlq.publishFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: 'job-99',
+          attemptsMade: MAX_EXECUTION_ATTEMPTS,
+          attemptsAllowed: MAX_EXECUTION_ATTEMPTS,
+          error: 'database down',
+          payload: expect.objectContaining({ executionId: 'exec-99' }),
+        }),
+      );
+    });
+
+    it('should still call DlqService when retries remain (the service decides)', async () => {
+      const job = makeJob({
+        id: 'job-mid',
+        attemptsMade: 1,
+        opts: { attempts: MAX_EXECUTION_ATTEMPTS },
+      } as unknown as Partial<Job<ExecutionPayload>>);
+
+      await processor.onFailed(job, new Error('transient'));
+
+      expect(dlq.publishFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: 'job-mid',
+          attemptsMade: 1,
+          attemptsAllowed: MAX_EXECUTION_ATTEMPTS,
+          error: 'transient',
+        }),
+      );
+    });
+
+    it('should be safe when job or error is undefined (event noise)', async () => {
+      await expect(processor.onFailed(undefined, new Error('orphan'))).resolves.toBeUndefined();
+      expect(dlq.publishFailed).not.toHaveBeenCalled();
     });
   });
 });
