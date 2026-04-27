@@ -14,6 +14,9 @@ WORKDIR /repo
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json turbo.json ./
 COPY apps/api/package.json apps/api/
+# Required because @tietide/api postinstall runs `prisma generate` for every
+# workspace install, even in builds that don't need the API itself.
+COPY apps/api/prisma apps/api/prisma
 COPY apps/worker/package.json apps/worker/
 COPY apps/spa/package.json apps/spa/
 COPY packages/shared/package.json packages/shared/
