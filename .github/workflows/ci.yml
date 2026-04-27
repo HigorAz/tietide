@@ -36,6 +36,9 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @tietide/api db:generate
 
+      - name: Build workspace packages
+        run: pnpm --filter @tietide/shared --filter @tietide/sdk run build
+
       - name: Lint
         run: pnpm -r --if-present run lint
 
