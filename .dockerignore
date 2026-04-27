@@ -1,0 +1,55 @@
+# Source control
+.git
+.gitignore
+.gitattributes
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Dependencies and build outputs
+node_modules
+**/node_modules
+**/.pnpm-store
+dist
+**/dist
+build
+**/build
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Test artifacts
+coverage
+**/coverage
+.nyc_output
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Docs and meta
+*.md
+!README.md
+docs
+LICENSE
+.husky
+.claude
+
+# CI
+.github
+
+# Python
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+**/.venv
+**/venv
+
+# Logs
+*.log
+logs
