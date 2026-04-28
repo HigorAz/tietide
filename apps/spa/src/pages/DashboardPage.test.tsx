@@ -13,6 +13,8 @@ vi.mock('@/api/workflows', () => ({
 
 import * as workflowsApi from '@/api/workflows';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
+import { initialToastState, useToastStore } from '@/stores/toastStore';
+import { Toaster } from '@/components/ui/Toaster';
 import { DashboardPage } from './DashboardPage';
 
 const mockedList = vi.mocked(workflowsApi.listWorkflows);
@@ -37,6 +39,7 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
 const renderDashboard = (): ReturnType<typeof render> =>
   render(
     <MemoryRouter initialEntries={['/dashboard']}>
+      <Toaster />
       <Routes>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/workflows/:id" element={<div>Editor for workflow</div>} />
@@ -51,6 +54,7 @@ const resetStore = (): void => {
 describe('DashboardPage', () => {
   beforeEach(() => {
     resetStore();
+    useToastStore.setState({ ...initialToastState });
     mockedList.mockReset();
     mockedCreate.mockReset();
     mockedDelete.mockReset();
@@ -138,5 +142,33 @@ describe('DashboardPage', () => {
     mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
     await userEvent.setup().click(retry);
     expect(await screen.findByText('Alpha')).toBeInTheDocument();
+  });
+
+  it('shows a toast when the toggle request fails (issue #41)', async () => {
+    const user = userEvent.setup();
+    mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha', isActive: false })]);
+    mockedToggle.mockRejectedValueOnce(new Error('toggle blew up'));
+
+    renderDashboard();
+
+    await user.click(await screen.findByRole('switch', { name: /toggle active for alpha/i }));
+
+    expect(await screen.findByText(/toggle blew up/i)).toBeInTheDocument();
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+    expect(useToastStore.getState().toasts[0].tone).toBe('error');
+  });
+
+  it('shows a toast when the delete request fails (issue #41)', async () => {
+    const user = userEvent.setup();
+    mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+    mockedDelete.mockRejectedValueOnce(new Error('delete failed'));
+
+    renderDashboard();
+
+    await user.click(await screen.findByRole('button', { name: /delete alpha/i }));
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+
+    expect(await screen.findByText(/delete failed/i)).toBeInTheDocument();
+    expect(useToastStore.getState().toasts[0].tone).toBe('error');
   });
 });

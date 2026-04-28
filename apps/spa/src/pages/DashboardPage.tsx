@@ -7,12 +7,17 @@ import { useAuthStore } from '@/stores/authStore';
 import { WorkflowCard } from '@/components/dashboard/WorkflowCard';
 import { NewWorkflowModal } from '@/components/dashboard/NewWorkflowModal';
 import { DeleteWorkflowDialog } from '@/components/dashboard/DeleteWorkflowDialog';
+import { useToastStore } from '@/stores/toastStore';
 import { cn } from '@/utils/cn';
+
+const errorMessage = (err: unknown, fallback: string): string =>
+  err instanceof Error && err.message ? err.message : fallback;
 
 export function DashboardPage(): JSX.Element {
   const navigate = useNavigate();
   const { workflows, status, error, fetch, create, remove, toggleActive } = useWorkflowsStore();
   const logout = useAuthStore((s) => s.logout);
+  const toast = useToastStore((s) => s.show);
 
   const [showCreate, setShowCreate] = useState(false);
   const [toDelete, setToDelete] = useState<Workflow | null>(null);
@@ -28,8 +33,9 @@ export function DashboardPage(): JSX.Element {
   const handleToggle = async (id: string, next: boolean): Promise<void> => {
     try {
       await toggleActive(id, next);
-    } catch {
-      // revert handled by the store; swallow to avoid unhandled rejection in UI
+    } catch (err) {
+      // store reverts the optimistic update; surface the failure to the user.
+      toast({ tone: 'error', message: errorMessage(err, 'Could not update workflow') });
     }
   };
 
@@ -40,8 +46,12 @@ export function DashboardPage(): JSX.Element {
   };
 
   const handleDeleteConfirm = async (id: string): Promise<void> => {
-    await remove(id);
-    setToDelete(null);
+    try {
+      await remove(id);
+      setToDelete(null);
+    } catch (err) {
+      toast({ tone: 'error', message: errorMessage(err, 'Could not delete workflow') });
+    }
   };
 
   const handleSignOut = (): void => {
