@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NodeType, type Workflow } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
+import { initialToastState, useToastStore } from '@/stores/toastStore';
 
 vi.mock('@/api/workflows', () => ({
   getWorkflow: vi.fn(),
@@ -30,6 +31,7 @@ const savedResponse: Workflow = {
 describe('EditorToolbar', () => {
   beforeEach(() => {
     useEditorStore.setState({ ...initialEditorState });
+    useToastStore.setState({ ...initialToastState });
     mockedUpdate.mockReset();
   });
 
@@ -152,63 +154,44 @@ describe('EditorToolbar', () => {
     });
   });
 
-  describe('feedback timer cleanup', () => {
-    it('should clear the pending feedback timer when the component unmounts', async () => {
-      const FEEDBACK_TIMEOUT_MS = 3000;
-      const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
-      const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
-      try {
-        const { unmount } = render(<EditorToolbar workflowId="wf-1" />);
+  describe('toast feedback', () => {
+    it('should push a success toast when save succeeds', async () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      mockedUpdate.mockResolvedValueOnce(savedResponse);
+      render(<EditorToolbar workflowId="wf-1" />);
 
-        await userEvent.click(screen.getByRole('button', { name: /run/i }));
-        expect(screen.getByRole('status')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /save/i }));
 
-        const feedbackCallIndex = setTimeoutSpy.mock.calls.findIndex(
-          ([, delay]) => delay === FEEDBACK_TIMEOUT_MS,
-        );
-        expect(feedbackCallIndex).toBeGreaterThanOrEqual(0);
-        const timerId = setTimeoutSpy.mock.results[feedbackCallIndex].value;
-
-        unmount();
-
-        expect(clearTimeoutSpy).toHaveBeenCalledWith(timerId);
-      } finally {
-        setTimeoutSpy.mockRestore();
-        clearTimeoutSpy.mockRestore();
-      }
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts).toHaveLength(1);
+        expect(toasts[0]).toMatchObject({ tone: 'success' });
+        expect(toasts[0].message).toMatch(/saved/i);
+      });
     });
 
-    it('should not invoke setFeedback after unmount when the timer would have fired', async () => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      try {
-        const { unmount } = render(<EditorToolbar workflowId="wf-1" />);
+    it('should push an error toast when save fails', async () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      mockedUpdate.mockRejectedValueOnce(new Error('boom'));
+      render(<EditorToolbar workflowId="wf-1" />);
 
-        await userEvent.click(screen.getByRole('button', { name: /run/i }));
-        unmount();
+      await userEvent.click(screen.getByRole('button', { name: /save/i }));
 
-        await new Promise((resolve) => setTimeout(resolve, 50));
-
-        expect(errorSpy).not.toHaveBeenCalled();
-      } finally {
-        errorSpy.mockRestore();
-      }
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts).toHaveLength(1);
+        expect(toasts[0]).toMatchObject({ tone: 'error' });
+      });
     });
 
-    it('should clear the previous timer when feedback is shown twice in succession', async () => {
-      const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
-      try {
-        render(<EditorToolbar workflowId="wf-1" />);
-        const runButton = screen.getByRole('button', { name: /run/i });
+    it('should push an info toast when Run is clicked (placeholder)', async () => {
+      render(<EditorToolbar workflowId="wf-1" />);
 
-        await userEvent.click(runButton);
-        const clearsAfterFirstClick = clearTimeoutSpy.mock.calls.length;
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
-        await userEvent.click(runButton);
-
-        expect(clearTimeoutSpy.mock.calls.length).toBeGreaterThan(clearsAfterFirstClick);
-      } finally {
-        clearTimeoutSpy.mockRestore();
-      }
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0]).toMatchObject({ tone: 'info' });
     });
   });
 });

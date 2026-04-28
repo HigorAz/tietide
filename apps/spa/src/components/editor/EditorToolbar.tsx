@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
+import { useToastStore } from '@/stores/toastStore';
 import { updateWorkflow } from '@/api/workflows';
 import { cn } from '@/utils/cn';
 import { toWorkflowDefinition } from './serialization';
@@ -9,10 +10,7 @@ interface EditorToolbarProps {
   workflowId: string;
 }
 
-type SaveFeedback = { tone: 'success' | 'error'; message: string } | null;
-
 const RUN_PLACEHOLDER_MESSAGE = 'Run coming soon';
-const FEEDBACK_TIMEOUT_MS = 3000;
 
 export function EditorToolbar({ workflowId }: EditorToolbarProps) {
   const isDirty = useEditorStore((s) => s.isDirty);
@@ -21,33 +19,9 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const markSaved = useEditorStore((s) => s.markSaved);
+  const toast = useToastStore((s) => s.show);
 
   const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState<SaveFeedback>(null);
-  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (feedbackTimerRef.current !== null) {
-        clearTimeout(feedbackTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  const showFeedback = useCallback((next: SaveFeedback) => {
-    setFeedback(next);
-    if (feedbackTimerRef.current !== null) {
-      clearTimeout(feedbackTimerRef.current);
-      feedbackTimerRef.current = null;
-    }
-    if (next) {
-      feedbackTimerRef.current = setTimeout(() => {
-        feedbackTimerRef.current = null;
-        setFeedback(null);
-      }, FEEDBACK_TIMEOUT_MS);
-    }
-  }, []);
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
@@ -58,17 +32,17 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
         definition: toWorkflowDefinition(nodes, edges),
       });
       markSaved();
-      showFeedback({ tone: 'success', message: 'Saved' });
+      toast({ tone: 'success', message: 'Workflow saved' });
     } catch {
-      showFeedback({ tone: 'error', message: 'Save failed' });
+      toast({ tone: 'error', message: 'Save failed. Please try again.' });
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, markSaved, showFeedback, workflowId]);
+  }, [isSaving, markSaved, toast, workflowId]);
 
   const handleRun = useCallback(() => {
-    showFeedback({ tone: 'success', message: RUN_PLACEHOLDER_MESSAGE });
-  }, [showFeedback]);
+    toast({ tone: 'info', message: RUN_PLACEHOLDER_MESSAGE });
+  }, [toast]);
 
   const saveDisabled = !isDirty || isSaving;
   const undoDisabled = past.length === 0;
@@ -103,17 +77,6 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
         primary
         icon={<Save size={16} aria-hidden />}
       />
-      {feedback ? (
-        <span
-          role="status"
-          className={cn(
-            'ml-1 rounded px-2 py-1 text-xs font-medium',
-            feedback.tone === 'success' ? 'bg-success/15 text-success' : 'bg-error/15 text-error',
-          )}
-        >
-          {feedback.message}
-        </span>
-      ) : null}
     </div>
   );
 }
