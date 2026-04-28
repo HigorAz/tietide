@@ -6,10 +6,12 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { ExecutionHistoryPage } from '@/pages/ExecutionHistoryPage';
 import { ExecutionDetailPage } from '@/pages/ExecutionDetailPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { Toaster } from '@/components/ui/Toaster';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

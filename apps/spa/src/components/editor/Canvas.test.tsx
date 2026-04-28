@@ -119,6 +119,45 @@ describe('Canvas', () => {
     });
   });
 
+  describe('drag-over visual feedback (issue #41)', () => {
+    it('should mark the dropzone as drag-active while a node is being dragged over', () => {
+      render(<Canvas />);
+      const dropzone = screen.getByTestId('canvas-dropzone');
+      expect(dropzone.dataset.dragActive).toBe('false');
+
+      fireEvent.dragEnter(dropzone, { dataTransfer: { types: [CANVAS_DROP_MIME] } });
+
+      expect(dropzone.dataset.dragActive).toBe('true');
+    });
+
+    it('should clear the drag-active state on dragLeave', () => {
+      render(<Canvas />);
+      const dropzone = screen.getByTestId('canvas-dropzone');
+      fireEvent.dragEnter(dropzone, { dataTransfer: { types: [CANVAS_DROP_MIME] } });
+
+      fireEvent.dragLeave(dropzone);
+
+      expect(dropzone.dataset.dragActive).toBe('false');
+    });
+
+    it('should clear the drag-active state after a successful drop', () => {
+      render(<Canvas />);
+      const dropzone = screen.getByTestId('canvas-dropzone');
+      fireEvent.dragEnter(dropzone, { dataTransfer: { types: [CANVAS_DROP_MIME] } });
+
+      fireDrop(dropzone, {
+        dataTransfer: {
+          getData: (type: string) => (type === CANVAS_DROP_MIME ? NodeType.MANUAL_TRIGGER : ''),
+          types: [CANVAS_DROP_MIME],
+        },
+        clientX: 0,
+        clientY: 0,
+      });
+
+      expect(dropzone.dataset.dragActive).toBe('false');
+    });
+  });
+
   describe('selection', () => {
     it('should select a node in the editor store when a node is clicked', () => {
       render(<Canvas />);
