@@ -12,5 +12,7 @@ module.exports = {
   testEnvironment: 'node',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
+    '^@tietide/shared$': '<rootDir>/../../../packages/shared/src/index.ts',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };
