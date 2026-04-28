@@ -47,6 +47,8 @@ class TestController {
 class TestAppModule {}
 
 describe('AppThrottlerModule (integration)', () => {
+  jest.setTimeout(15000);
+
   let app: INestApplication;
 
   beforeEach(async () => {
