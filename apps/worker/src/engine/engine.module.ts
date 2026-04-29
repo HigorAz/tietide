@@ -4,6 +4,7 @@ import { Conditional } from '../nodes/logic/conditional';
 import { NodeRegistry } from '../nodes/registry';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { CronTrigger } from '../nodes/triggers/cron-trigger';
+import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
 import { EngineService } from './engine.service';
 import { WorkflowRunner } from './workflow-runner';
 import { SECRET_RESOLVER, StubSecretResolver } from './secret-resolver';
@@ -15,6 +16,7 @@ import { SECRET_RESOLVER, StubSecretResolver } from './secret-resolver';
     EngineService,
     ManualTrigger,
     CronTrigger,
+    WebhookTrigger,
     HttpRequestAction,
     Conditional,
     { provide: SECRET_RESOLVER, useClass: StubSecretResolver },
@@ -26,6 +28,7 @@ export class EngineModule implements OnModuleInit {
     private readonly registry: NodeRegistry,
     private readonly manualTrigger: ManualTrigger,
     private readonly cronTrigger: CronTrigger,
+    private readonly webhookTrigger: WebhookTrigger,
     private readonly httpRequest: HttpRequestAction,
     private readonly conditional: Conditional,
   ) {}
@@ -33,6 +36,7 @@ export class EngineModule implements OnModuleInit {
   onModuleInit(): void {
     this.registry.register(this.manualTrigger);
     this.registry.register(this.cronTrigger);
+    this.registry.register(this.webhookTrigger);
     this.registry.register(this.httpRequest);
     this.registry.register(this.conditional);
   }

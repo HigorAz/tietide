@@ -12,6 +12,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { SecretsModule } from './secrets/secrets.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AiModule } from './ai/ai.module';
+import { DemoModule } from './demo/demo.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AiModule } from './ai/ai.module';
     WebhooksModule,
     SecretsModule,
     AiModule,
+    DemoModule,
   ],
 })
 export class AppModule {}
