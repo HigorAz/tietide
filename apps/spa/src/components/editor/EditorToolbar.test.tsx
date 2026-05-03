@@ -10,10 +10,21 @@ vi.mock('@/api/workflows', () => ({
   updateWorkflow: vi.fn(),
 }));
 
+vi.mock('@/api/executions', () => ({
+  executeWorkflow: vi.fn(),
+}));
+
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}));
+
 import { updateWorkflow } from '@/api/workflows';
+import { executeWorkflow } from '@/api/executions';
 import { EditorToolbar } from './EditorToolbar';
 
 const mockedUpdate = vi.mocked(updateWorkflow);
+const mockedExecute = vi.mocked(executeWorkflow);
 
 const savedResponse: Workflow = {
   id: 'wf-1',
@@ -33,6 +44,8 @@ describe('EditorToolbar', () => {
     useEditorStore.setState({ ...initialEditorState });
     useToastStore.setState({ ...initialToastState });
     mockedUpdate.mockReset();
+    mockedExecute.mockReset();
+    mockNavigate.mockReset();
   });
 
   describe('rendering', () => {
@@ -143,14 +156,69 @@ describe('EditorToolbar', () => {
   });
 
   describe('Run', () => {
-    it('should render the Run button enabled and not call updateWorkflow', async () => {
+    const executionResponse = {
+      id: 'exec-1',
+      workflowId: 'wf-1',
+      status: 'PENDING' as const,
+      triggerType: 'manual',
+      triggerData: null,
+      idempotencyKey: null,
+      createdAt: '2026-05-03T15:39:00.997Z',
+    };
+
+    it('should be enabled when the workflow has unsaved changes (auto-saves on click)', () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
       render(<EditorToolbar workflowId="wf-1" />);
-      const runButton = screen.getByRole('button', { name: /run/i });
-      expect(runButton).toBeEnabled();
+      expect(screen.getByRole('button', { name: /run/i })).toBeEnabled();
+    });
 
-      await userEvent.click(runButton);
+    it('should call executeWorkflow and navigate to execution detail on success', async () => {
+      mockedExecute.mockResolvedValueOnce(executionResponse);
+      render(<EditorToolbar workflowId="wf-1" />);
 
-      expect(mockedUpdate).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
+
+      await waitFor(() => expect(mockedExecute).toHaveBeenCalledWith('wf-1'));
+      expect(mockNavigate).toHaveBeenCalledWith('/executions/exec-1');
+    });
+
+    it('should save before executing when the workflow is dirty', async () => {
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 5, y: 5 });
+      mockedUpdate.mockResolvedValueOnce(savedResponse);
+      mockedExecute.mockResolvedValueOnce(executionResponse);
+      render(<EditorToolbar workflowId="wf-1" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
+
+      await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
+      expect(mockedUpdate).toHaveBeenCalledTimes(1);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+      expect(mockNavigate).toHaveBeenCalledWith('/executions/exec-1');
+    });
+
+    it('should not call executeWorkflow when the auto-save fails', async () => {
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 5, y: 5 });
+      mockedUpdate.mockRejectedValueOnce(new Error('save boom'));
+      render(<EditorToolbar workflowId="wf-1" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
+
+      await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
+      expect(mockedExecute).not.toHaveBeenCalled();
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('should show an error toast and not navigate when execution fails to enqueue', async () => {
+      mockedExecute.mockRejectedValueOnce(new Error('boom'));
+      render(<EditorToolbar workflowId="wf-1" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
+
+      await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
+      expect(mockNavigate).not.toHaveBeenCalled();
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0]).toMatchObject({ tone: 'error' });
     });
   });
 
@@ -184,14 +252,25 @@ describe('EditorToolbar', () => {
       });
     });
 
-    it('should push an info toast when Run is clicked (placeholder)', async () => {
+    it('should push a success toast when an execution is enqueued', async () => {
+      mockedExecute.mockResolvedValueOnce({
+        id: 'exec-2',
+        workflowId: 'wf-1',
+        status: 'PENDING',
+        triggerType: 'manual',
+        triggerData: null,
+        idempotencyKey: null,
+        createdAt: '2026-05-03T15:39:00.997Z',
+      });
       render(<EditorToolbar workflowId="wf-1" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
-      const toasts = useToastStore.getState().toasts;
-      expect(toasts).toHaveLength(1);
-      expect(toasts[0]).toMatchObject({ tone: 'info' });
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts).toHaveLength(1);
+        expect(toasts[0]).toMatchObject({ tone: 'success' });
+      });
     });
   });
 });

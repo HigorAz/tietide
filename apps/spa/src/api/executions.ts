@@ -47,3 +47,18 @@ export async function listExecutionSteps(executionId: string): Promise<Execution
   const { data } = await api.get<ExecutionStep[]>(`/executions/${executionId}/steps`);
   return data;
 }
+
+export interface ExecuteWorkflowResponse {
+  id: string;
+  workflowId: string;
+  status: ExecutionStatus;
+  triggerType: string;
+  triggerData: unknown;
+  idempotencyKey: string | null;
+  createdAt: string;
+}
+
+export async function executeWorkflow(workflowId: string): Promise<ExecuteWorkflowResponse> {
+  const { data } = await api.post<ExecuteWorkflowResponse>(`/workflows/${workflowId}/execute`, {});
+  return data;
+}
