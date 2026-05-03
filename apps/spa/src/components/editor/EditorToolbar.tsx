@@ -1,16 +1,16 @@
 import { useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
 import { updateWorkflow } from '@/api/workflows';
+import { executeWorkflow } from '@/api/executions';
 import { cn } from '@/utils/cn';
 import { toWorkflowDefinition } from './serialization';
 
 interface EditorToolbarProps {
   workflowId: string;
 }
-
-const RUN_PLACEHOLDER_MESSAGE = 'Run coming soon';
 
 export function EditorToolbar({ workflowId }: EditorToolbarProps) {
   const isDirty = useEditorStore((s) => s.isDirty);
@@ -20,8 +20,10 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
   const redo = useEditorStore((s) => s.redo);
   const markSaved = useEditorStore((s) => s.markSaved);
   const toast = useToastStore((s) => s.show);
+  const navigate = useNavigate();
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
@@ -40,11 +42,29 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
     }
   }, [isSaving, markSaved, toast, workflowId]);
 
-  const handleRun = useCallback(() => {
-    toast({ tone: 'info', message: RUN_PLACEHOLDER_MESSAGE });
-  }, [toast]);
+  const handleRun = useCallback(async () => {
+    if (isRunning || isSaving) return;
+    setIsRunning(true);
+    try {
+      if (useEditorStore.getState().isDirty) {
+        const { nodes, edges } = useEditorStore.getState();
+        await updateWorkflow(workflowId, {
+          definition: toWorkflowDefinition(nodes, edges),
+        });
+        markSaved();
+      }
+      const execution = await executeWorkflow(workflowId);
+      toast({ tone: 'success', message: 'Execution started' });
+      navigate(`/executions/${execution.id}`);
+    } catch {
+      toast({ tone: 'error', message: 'Failed to start execution. Please try again.' });
+    } finally {
+      setIsRunning(false);
+    }
+  }, [isRunning, isSaving, markSaved, navigate, toast, workflowId]);
 
   const saveDisabled = !isDirty || isSaving;
+  const runDisabled = isRunning || isSaving;
   const undoDisabled = past.length === 0;
   const redoDisabled = future.length === 0;
 
@@ -69,7 +89,12 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
         icon={<Redo2 size={16} aria-hidden />}
       />
       <div aria-hidden className="mx-1 h-5 w-px bg-white/10" />
-      <ToolbarButton label="Run" onClick={handleRun} icon={<Play size={16} aria-hidden />} />
+      <ToolbarButton
+        label={isRunning ? 'Running…' : 'Run'}
+        onClick={handleRun}
+        disabled={runDisabled}
+        icon={<Play size={16} aria-hidden />}
+      />
       <ToolbarButton
         label={isSaving ? 'Saving…' : 'Save'}
         onClick={handleSave}

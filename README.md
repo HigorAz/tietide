@@ -99,7 +99,7 @@ pnpm install
 docker compose -f infra/docker/docker-compose.yml up -d
 
 # 5. Apply database migrations
-pnpm --filter @tietide/api prisma migrate dev
+pnpm --filter @tietide/api db:migrate
 
 # 6. Pull the AI model (first time only — ~5 GB)
 docker compose -f infra/docker/docker-compose.yml exec ollama ollama pull llama3.1:8b

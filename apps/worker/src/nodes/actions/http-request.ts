@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
@@ -22,7 +22,7 @@ export class HttpRequestAction implements INodeExecutor {
 
   private readonly fetchImpl: FetchLike;
 
-  constructor(fetchImpl?: FetchLike) {
+  constructor(@Optional() fetchImpl?: FetchLike) {
     this.fetchImpl = fetchImpl ?? ((url, init) => fetch(url, init));
   }
 
