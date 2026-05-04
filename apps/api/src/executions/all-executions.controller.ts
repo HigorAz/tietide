@@ -11,7 +11,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ExecutionsService } from './executions.service';
-import { ExecutionQueryDto } from './dto/execution-query.dto';
+import { AllExecutionsQueryDto } from './dto/all-executions-query.dto';
 import { ExecutionListResponseDto } from './dto/execution-detail-response.dto';
 
 @ApiTags('executions')
@@ -30,14 +30,15 @@ export class AllExecutionsController {
   @ApiBadRequestResponse({ description: 'Invalid query parameters' })
   async list(
     @CurrentUser() user: AuthenticatedUser,
-    @Query() query: ExecutionQueryDto,
+    @Query() query: AllExecutionsQueryDto,
   ): Promise<ExecutionListResponseDto> {
     return this.executions.listAllForUser(user.id, {
       status: query.status,
+      workflowId: query.workflowId,
       from: query.from,
       to: query.to,
       page: query.page,
-      pageSize: query.pageSize,
+      pageSize: query.pageSize ?? query.limit,
     });
   }
 }
