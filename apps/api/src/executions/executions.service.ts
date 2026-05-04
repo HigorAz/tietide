@@ -21,6 +21,7 @@ export interface TriggerOptions {
 
 export interface ListOptions {
   status?: string;
+  workflowId?: string;
   from?: Date;
   to?: Date;
   page?: number;
@@ -177,6 +178,9 @@ export class ExecutionsService {
     const where: Prisma.WorkflowExecutionWhereInput = { workflow: { userId } };
     if (options.status) {
       where.status = options.status as Prisma.WorkflowExecutionWhereInput['status'];
+    }
+    if (options.workflowId) {
+      where.workflowId = options.workflowId;
     }
     if (options.from || options.to) {
       where.createdAt = {
