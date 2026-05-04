@@ -17,7 +17,12 @@ vi.mock('@/api/workflows', () => ({
   toggleWorkflowActive: vi.fn(),
 }));
 
+vi.mock('@/api/ai', () => ({
+  generateWorkflowDocs: vi.fn(),
+}));
+
 import * as workflowsApi from '@/api/workflows';
+import * as aiApi from '@/api/ai';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { initialToastState, useToastStore } from '@/stores/toastStore';
 import { Toaster } from '@/components/ui/Toaster';
@@ -27,6 +32,7 @@ const mockedList = vi.mocked(workflowsApi.listWorkflows);
 const mockedCreate = vi.mocked(workflowsApi.createWorkflow);
 const mockedDelete = vi.mocked(workflowsApi.deleteWorkflow);
 const mockedToggle = vi.mocked(workflowsApi.toggleWorkflowActive);
+const mockedGenerateDocs = vi.mocked(aiApi.generateWorkflowDocs);
 
 const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   id: 'wf-1',
@@ -39,6 +45,7 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   createdAt: new Date('2026-04-01T12:00:00Z'),
   updatedAt: new Date('2026-04-10T12:00:00Z'),
   executionCount: 0,
+  documentation: null,
   ...overrides,
 });
 
@@ -65,6 +72,7 @@ describe('WorkflowsPage', () => {
     mockedCreate.mockReset();
     mockedDelete.mockReset();
     mockedToggle.mockReset();
+    mockedGenerateDocs.mockReset();
   });
 
   it('fetches and displays workflows (AC1)', async () => {
@@ -106,13 +114,14 @@ describe('WorkflowsPage', () => {
     await waitFor(() => expect(screen.queryByText('Alpha')).not.toBeInTheDocument());
   });
 
-  it('renders an empty state with a CTA when there are no workflows', async () => {
+  it('renders an empty state with the issue #111 copy and Library link', async () => {
     mockedList.mockResolvedValueOnce([]);
 
     renderWorkflows();
 
-    expect(await screen.findByText(/no workflows yet/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /create your first workflow/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /no workflows yet/i })).toBeInTheDocument();
+    expect(screen.getByText(/build from scratch/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /library/i })).toHaveAttribute('href', '/library');
   });
 
   it('calls toggleWorkflowActive when the active toggle is clicked', async () => {
@@ -285,6 +294,143 @@ describe('WorkflowsPage', () => {
         const toasts = useToastStore.getState().toasts;
         expect(toasts.some((t) => t.tone === 'success' && /deleted/i.test(t.message))).toBe(true);
       });
+    });
+  });
+
+  describe('search and layout (issue #111)', () => {
+    it('filters workflows client-side as the user types in the search input', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Order intake' }),
+        makeWorkflow({ id: 'b', name: 'Lead enrichment' }),
+        makeWorkflow({ id: 'c', name: 'Daily report' }),
+      ]);
+
+      renderWorkflows();
+
+      expect(await screen.findByText('Order intake')).toBeInTheDocument();
+
+      const search = screen.getByRole('searchbox', { name: /search workflows/i });
+      await user.type(search, 'lead');
+
+      expect(screen.queryByText('Order intake')).not.toBeInTheDocument();
+      expect(screen.queryByText('Daily report')).not.toBeInTheDocument();
+      expect(screen.getByText('Lead enrichment')).toBeInTheDocument();
+    });
+
+    it('renders rows in a list (regression guard against re-cardification)', async () => {
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+
+      renderWorkflows();
+
+      const list = await screen.findByRole('list', { name: /workflows/i });
+      const items = list.querySelectorAll('[role="listitem"], li');
+      expect(items.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('inline AI docs lifecycle (issue #111)', () => {
+    const docsResponse = {
+      workflowId: 'a',
+      version: 1,
+      documentation: '# Alpha docs\n\n## Objective\n\nSome objective text.',
+      sections: {
+        objective: 'Some objective text.',
+        triggers: '',
+        actions: '',
+        dataFlow: '',
+        decisions: '',
+      },
+      model: 'llama3.1:8b',
+      cached: false,
+      generatedAt: '2026-05-04T11:00:00Z',
+    };
+
+    it('shows "Generate docs" when the workflow has no documentation', async () => {
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
+      ]);
+
+      renderWorkflows();
+
+      expect(
+        await screen.findByRole('button', { name: /generate docs for alpha/i }),
+      ).toBeInTheDocument();
+    });
+
+    it('shows "Update docs" with relative timestamp when documentation exists', async () => {
+      const generatedAt = new Date(Date.now() - 3 * 60 * 60 * 1000); // 3h ago
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({
+          id: 'a',
+          name: 'Alpha',
+          documentation: { generatedAt, version: 1 },
+        }),
+      ]);
+
+      renderWorkflows();
+
+      const button = await screen.findByRole('button', { name: /update docs for alpha/i });
+      expect(button).toHaveTextContent(/update docs/i);
+      expect(button).toHaveTextContent(/ago/i);
+    });
+
+    it('calls generateWorkflowDocs and auto-expands the row when Generate docs is clicked', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
+      ]);
+      mockedGenerateDocs.mockResolvedValueOnce(docsResponse);
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /generate docs for alpha/i }));
+
+      await waitFor(() => expect(mockedGenerateDocs).toHaveBeenCalledWith('a'));
+      expect(await screen.findByText(/alpha docs/i)).toBeInTheDocument();
+      expect(screen.getByText(/some objective text/i)).toBeInTheDocument();
+    });
+
+    it('toggles the inline docs panel via View docs / Hide docs and fetches cached content on first expand', async () => {
+      const user = userEvent.setup();
+      const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({
+          id: 'a',
+          name: 'Alpha',
+          documentation: { generatedAt, version: 1 },
+        }),
+      ]);
+      mockedGenerateDocs.mockResolvedValueOnce({ ...docsResponse, cached: true });
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
+
+      await waitFor(() => expect(mockedGenerateDocs).toHaveBeenCalledWith('a'));
+      expect(await screen.findByText(/alpha docs/i)).toBeInTheDocument();
+
+      await user.click(await screen.findByRole('button', { name: /hide docs for alpha/i }));
+      expect(screen.queryByText(/alpha docs/i)).not.toBeInTheDocument();
+    });
+
+    it('shows an inline error with retry when generation fails (no toast spam)', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
+      ]);
+      mockedGenerateDocs.mockRejectedValueOnce(new Error('Ollama unreachable'));
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /generate docs for alpha/i }));
+
+      expect(await screen.findByText(/ollama unreachable/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /retry generating docs for alpha/i }),
+      ).toBeInTheDocument();
+      // Generation errors stay inline; do not toast.
+      expect(useToastStore.getState().toasts).toHaveLength(0);
     });
   });
 });

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Workflow } from '@tietide/shared';
+import type { Workflow, WorkflowDocumentationMeta } from '@tietide/shared';
 import {
   listWorkflows as apiList,
   createWorkflow as apiCreate,
@@ -21,6 +21,7 @@ export interface WorkflowsActions {
   create: (body: CreateWorkflowBody) => Promise<Workflow>;
   remove: (id: string) => Promise<void>;
   toggleActive: (id: string, next: boolean) => Promise<void>;
+  setDocumentationMeta: (id: string, meta: WorkflowDocumentationMeta) => void;
 }
 
 export type WorkflowsStore = WorkflowsState & WorkflowsActions;
@@ -76,5 +77,11 @@ export const useWorkflowsStore = create<WorkflowsStore>((set, get) => ({
       });
       throw err;
     }
+  },
+
+  setDocumentationMeta: (id, meta) => {
+    set({
+      workflows: get().workflows.map((w) => (w.id === id ? { ...w, documentation: meta } : w)),
+    });
   },
 }));

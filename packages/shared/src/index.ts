@@ -5,6 +5,7 @@ export type {
   WorkflowEdge,
   WorkflowDefinition,
   Workflow,
+  WorkflowDocumentationMeta,
 } from './types/workflow.types.js';
 export type { WorkflowExecution, ExecutionStep } from './types/execution.types.js';
 export type { NodeTypeDefinition } from './types/node.types.js';
