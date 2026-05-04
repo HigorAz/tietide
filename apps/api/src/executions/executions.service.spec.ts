@@ -513,6 +513,37 @@ describe('ExecutionsService', () => {
         password: '[REDACTED]',
       });
     });
+
+    it('should add workflowId equality filter alongside the userId relation filter', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([exec('e1', 'wf-a')]);
+      prisma.workflowExecution.count.mockResolvedValue(1);
+
+      await service.listAllForUser(userId, { workflowId: 'wf-a' });
+
+      expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { workflow: { userId }, workflowId: 'wf-a' },
+        }),
+      );
+      expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
+        where: { workflow: { userId }, workflowId: 'wf-a' },
+      });
+    });
+
+    it('should still scope by userId when a workflowId not owned by the caller is passed (IDOR)', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflowExecution.count.mockResolvedValue(0);
+
+      const result = await service.listAllForUser(userId, { workflowId: 'wf-of-someone-else' });
+
+      expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { workflow: { userId }, workflowId: 'wf-of-someone-else' },
+        }),
+      );
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
   });
 
   describe('findOne', () => {

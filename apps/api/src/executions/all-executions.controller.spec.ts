@@ -164,11 +164,69 @@ describe('AllExecutionsController (integration)', () => {
       await request(app.getHttpServer()).get('/executions').query({ userId: 'forged' }).expect(400);
     });
 
-    it('should not accept a workflowId in the query (cross-workflow endpoint)', async () => {
+    it('should forward workflowId filter to the service', async () => {
+      executionsService.listAllForUser.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+      });
+
+      const wfId = '550e8400-e29b-41d4-a716-446655440000';
+      await request(app.getHttpServer()).get('/executions').query({ workflowId: wfId }).expect(200);
+
+      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
+        'owner-uuid',
+        expect.objectContaining({ workflowId: wfId }),
+      );
+    });
+
+    it('should reject a non-UUID workflowId with 400', async () => {
       await request(app.getHttpServer())
         .get('/executions')
-        .query({ workflowId: '550e8400-e29b-41d4-a716-446655440000' })
+        .query({ workflowId: 'not-a-uuid' })
         .expect(400);
+      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+    });
+
+    it('should accept `limit` as an alias for pageSize and forward it as pageSize', async () => {
+      executionsService.listAllForUser.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 5,
+      });
+
+      await request(app.getHttpServer()).get('/executions').query({ limit: '5' }).expect(200);
+
+      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
+        'owner-uuid',
+        expect.objectContaining({ pageSize: 5 }),
+      );
+    });
+
+    it('should prefer pageSize when both pageSize and limit are provided', async () => {
+      executionsService.listAllForUser.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 30,
+      });
+
+      await request(app.getHttpServer())
+        .get('/executions')
+        .query({ pageSize: '30', limit: '5' })
+        .expect(200);
+
+      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
+        'owner-uuid',
+        expect.objectContaining({ pageSize: 30 }),
+      );
+    });
+
+    it('should reject limit over 100 with 400', async () => {
+      await request(app.getHttpServer()).get('/executions').query({ limit: '500' }).expect(400);
+      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
     });
   });
 });
