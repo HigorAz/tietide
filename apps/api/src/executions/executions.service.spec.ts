@@ -397,6 +397,124 @@ describe('ExecutionsService', () => {
     });
   });
 
+  describe('listAllForUser', () => {
+    const exec = (
+      id: string,
+      wfId: string,
+      status = 'SUCCESS',
+      createdAt = new Date('2026-04-20T10:00:00Z'),
+    ) => ({
+      id,
+      workflowId: wfId,
+      status,
+      triggerType: 'manual',
+      triggerData: null,
+      idempotencyKey: null,
+      startedAt: null,
+      finishedAt: null,
+      error: null,
+      createdAt,
+    });
+
+    it('should return paginated executions filtered by workflow.userId via the relation', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([
+        exec('e1', 'wf-a'),
+        exec('e2', 'wf-b', 'FAILED'),
+      ]);
+      prisma.workflowExecution.count.mockResolvedValue(2);
+
+      const result = await service.listAllForUser(userId, {});
+
+      expect(prisma.workflow.findUnique).not.toHaveBeenCalled();
+      expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { workflow: { userId } },
+          orderBy: { createdAt: 'desc' },
+          skip: 0,
+          take: 20,
+        }),
+      );
+      expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
+        where: { workflow: { userId } },
+      });
+      expect(result.total).toBe(2);
+      expect(result.page).toBe(1);
+      expect(result.pageSize).toBe(20);
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].id).toBe('e1');
+      expect(result.items[1].id).toBe('e2');
+    });
+
+    it('should return an empty list when the user has no executions', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflowExecution.count.mockResolvedValue(0);
+
+      const result = await service.listAllForUser(userId, {});
+
+      expect(result.items).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('should combine status filter with the userId relation filter', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflowExecution.count.mockResolvedValue(0);
+
+      await service.listAllForUser(userId, { status: 'FAILED' });
+
+      expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { workflow: { userId }, status: 'FAILED' },
+        }),
+      );
+      expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
+        where: { workflow: { userId }, status: 'FAILED' },
+      });
+    });
+
+    it('should apply createdAt range filters', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflowExecution.count.mockResolvedValue(0);
+
+      const from = new Date('2026-04-01T00:00:00Z');
+      const to = new Date('2026-04-30T23:59:59Z');
+      await service.listAllForUser(userId, { from, to });
+
+      expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { workflow: { userId }, createdAt: { gte: from, lte: to } },
+        }),
+      );
+    });
+
+    it('should apply pagination skip/take from page and pageSize', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflowExecution.count.mockResolvedValue(0);
+
+      await service.listAllForUser(userId, { page: 3, pageSize: 5 });
+
+      expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 5 }),
+      );
+    });
+
+    it('should redact secret-like keys in triggerData on each item', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([
+        {
+          ...exec('e1', 'wf-a'),
+          triggerData: { user: 'ada', password: 'p' },
+        },
+      ]);
+      prisma.workflowExecution.count.mockResolvedValue(1);
+
+      const result = await service.listAllForUser(userId, {});
+
+      expect(result.items[0].triggerData).toEqual({
+        user: 'ada',
+        password: '[REDACTED]',
+      });
+    });
+  });
+
   describe('findOne', () => {
     const fullExec = {
       id: executionId,

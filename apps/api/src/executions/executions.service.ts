@@ -173,6 +173,40 @@ export class ExecutionsService {
     };
   }
 
+  async listAllForUser(userId: string, options: ListOptions): Promise<ExecutionListResponseDto> {
+    const where: Prisma.WorkflowExecutionWhereInput = { workflow: { userId } };
+    if (options.status) {
+      where.status = options.status as Prisma.WorkflowExecutionWhereInput['status'];
+    }
+    if (options.from || options.to) {
+      where.createdAt = {
+        ...(options.from ? { gte: options.from } : {}),
+        ...(options.to ? { lte: options.to } : {}),
+      };
+    }
+
+    const page = options.page ?? DEFAULT_PAGE;
+    const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+    const skip = (page - 1) * pageSize;
+
+    const [rows, total] = await Promise.all([
+      this.prisma.workflowExecution.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: pageSize,
+      }),
+      this.prisma.workflowExecution.count({ where }),
+    ]);
+
+    return {
+      items: rows.map((row) => this.toDetailResponse(row)),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
   async findOne(userId: string, executionId: string): Promise<ExecutionDetailResponseDto> {
     const row = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
