@@ -59,7 +59,7 @@ export function WorkflowEditorPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-deep-blue text-text-secondary">
+      <div className="flex h-full w-full items-center justify-center text-text-secondary">
         <span>Loading workflow…</span>
       </div>
     );
@@ -67,7 +67,7 @@ export function WorkflowEditorPage() {
 
   if (status === 'error' || !id) {
     return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center gap-3 bg-deep-blue text-text-primary">
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3">
         <p>Failed to load workflow</p>
         <button
           type="button"
@@ -81,7 +81,7 @@ export function WorkflowEditorPage() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-deep-blue text-text-primary">
+    <div className="flex h-full w-full overflow-hidden">
       <ReactFlowProvider>
         <NodeLibrary />
         <div className="relative flex-1">

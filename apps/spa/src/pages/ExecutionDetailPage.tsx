@@ -36,7 +36,7 @@ export function ExecutionDetailPage(): JSX.Element {
   const backHref = detail ? `/workflows/${detail.workflowId}/executions` : '/dashboard';
 
   return (
-    <div className="min-h-screen bg-deep-blue text-text-primary">
+    <div className="flex flex-col">
       <header className="border-b border-white/5 bg-surface">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
@@ -56,7 +56,7 @@ export function ExecutionDetailPage(): JSX.Element {
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-6 px-6 py-6">
+      <main className="mx-auto w-full max-w-4xl space-y-6 px-6 py-6">
         {detailStatus === 'loading' && !detail && (
           <p className="text-sm text-text-secondary">Loading execution…</p>
         )}
