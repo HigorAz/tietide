@@ -19,6 +19,8 @@ export function DashboardPage(): JSX.Element {
 
   const [showCreate, setShowCreate] = useState(false);
   const [toDelete, setToDelete] = useState<Workflow | null>(null);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(() => new Set());
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     void fetch();
@@ -29,26 +31,48 @@ export function DashboardPage(): JSX.Element {
   };
 
   const handleToggle = async (id: string, next: boolean): Promise<void> => {
+    setTogglingIds((prev) => new Set(prev).add(id));
     try {
       await toggleActive(id, next);
+      toast({ tone: 'success', message: 'Workflow updated' });
     } catch (err) {
       // store reverts the optimistic update; surface the failure to the user.
       toast({ tone: 'error', message: errorMessage(err, 'Could not update workflow') });
+    } finally {
+      setTogglingIds((prev) => {
+        const nextSet = new Set(prev);
+        nextSet.delete(id);
+        return nextSet;
+      });
     }
   };
 
   const handleCreate = async (body: Parameters<typeof create>[0]): Promise<void> => {
-    const created = await create(body);
-    setShowCreate(false);
-    navigate(`/workflows/${created.id}`, { state: { from: '/dashboard' } });
+    try {
+      const created = await create(body);
+      toast({ tone: 'success', message: 'Workflow created' });
+      setShowCreate(false);
+      navigate(`/workflows/${created.id}`, { state: { from: '/dashboard' } });
+    } catch (err) {
+      toast({ tone: 'error', message: errorMessage(err, 'Could not create workflow') });
+      throw err;
+    }
   };
 
   const handleDeleteConfirm = async (id: string): Promise<void> => {
+    setDeletingIds((prev) => new Set(prev).add(id));
     try {
       await remove(id);
+      toast({ tone: 'success', message: 'Workflow deleted' });
       setToDelete(null);
     } catch (err) {
       toast({ tone: 'error', message: errorMessage(err, 'Could not delete workflow') });
+    } finally {
+      setDeletingIds((prev) => {
+        const nextSet = new Set(prev);
+        nextSet.delete(id);
+        return nextSet;
+      });
     }
   };
 
@@ -129,6 +153,8 @@ export function DashboardPage(): JSX.Element {
                   const target = workflows.find((w) => w.id === id) ?? null;
                   setToDelete(target);
                 }}
+                isToggling={togglingIds.has(wf.id)}
+                isDeleting={deletingIds.has(wf.id)}
               />
             ))}
           </div>

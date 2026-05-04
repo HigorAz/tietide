@@ -61,7 +61,7 @@ describe('NewWorkflowModal', () => {
     expect(arg.description).toBeUndefined();
   });
 
-  it('should render a generic error when onCreate rejects', async () => {
+  it('should not render an inline submit-error alert when onCreate rejects (toast handles it)', async () => {
     const user = userEvent.setup();
     onCreate.mockRejectedValueOnce(new Error('Server exploded'));
     render(<NewWorkflowModal onClose={onClose} onCreate={onCreate} />);
@@ -69,7 +69,24 @@ describe('NewWorkflowModal', () => {
     await user.type(screen.getByLabelText(/name/i), 'Bare');
     await user.click(screen.getByRole('button', { name: /create/i }));
 
-    expect(await screen.findByText(/server exploded/i)).toBeInTheDocument();
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
+    // No inline error rendered — the parent owns toasting.
+    expect(screen.queryByText(/server exploded/i)).not.toBeInTheDocument();
+    // Validation alerts stay visible on the form (zod), but no submit-error alert lingers.
+    const alerts = screen.queryAllByRole('alert');
+    expect(alerts).toHaveLength(0);
+  });
+
+  it('should render the shared Spinner inside the Create button while submitting', async () => {
+    const user = userEvent.setup();
+    onCreate.mockReturnValue(new Promise(() => {}));
+    render(<NewWorkflowModal onClose={onClose} onCreate={onCreate} />);
+
+    await user.type(screen.getByLabelText(/name/i), 'Bare');
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+    const submit = await screen.findByRole('button', { name: /creating/i });
+    expect(submit.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
   });
 
   it('should call onClose when Cancel is clicked', async () => {

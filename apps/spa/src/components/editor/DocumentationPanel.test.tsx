@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { WorkflowDocumentationResponse } from '@/api/ai';
 import { useDocumentationStore } from '@/stores/documentationStore';
+import { initialToastState, useToastStore } from '@/stores/toastStore';
 
 vi.mock('@/api/ai', () => ({
   generateWorkflowDocs: vi.fn(),
@@ -33,6 +34,7 @@ describe('DocumentationPanel', () => {
   beforeEach(() => {
     mockedGenerate.mockReset();
     useDocumentationStore.setState({ status: 'idle', docs: null, error: null });
+    useToastStore.setState({ ...initialToastState });
   });
 
   describe('initial state', () => {
@@ -103,6 +105,71 @@ describe('DocumentationPanel', () => {
 
       expect(await screen.findByRole('alert')).toHaveTextContent(/temporarily unavailable/i);
       expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('toast feedback', () => {
+    it('should fire a success toast when generation transitions to ready', async () => {
+      mockedGenerate.mockResolvedValueOnce(sample);
+
+      render(<DocumentationPanel workflowId="wf-1" />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /generate documentation/i }));
+
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts).toHaveLength(1);
+        expect(toasts[0]).toMatchObject({ tone: 'success' });
+        expect(toasts[0].message).toMatch(/documentation/i);
+      });
+    });
+
+    it('should fire an error toast when generation transitions to error', async () => {
+      mockedGenerate.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
+
+      render(<DocumentationPanel workflowId="wf-1" />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /generate documentation/i }));
+
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts).toHaveLength(1);
+        expect(toasts[0]).toMatchObject({ tone: 'error' });
+      });
+    });
+
+    it('should keep the inline retry block alongside the error toast', async () => {
+      mockedGenerate.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
+
+      render(<DocumentationPanel workflowId="wf-1" />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /generate documentation/i }));
+
+      // Inline alert + retry persist for in-context recovery while the toast also fires.
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(useToastStore.getState().toasts).toHaveLength(1);
+      });
+    });
+
+    it('should not fire a toast on initial idle mount', () => {
+      render(<DocumentationPanel workflowId="wf-1" />);
+
+      expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+  });
+
+  describe('spinner', () => {
+    it('should render the shared Spinner inside the trigger button while loading', async () => {
+      mockedGenerate.mockReturnValue(new Promise(() => {}));
+
+      render(<DocumentationPanel workflowId="wf-1" />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /generate documentation/i }));
+
+      const triggerButton = await screen.findByRole('button', { name: /generating/i });
+      expect(triggerButton.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
     });
   });
 });

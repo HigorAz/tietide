@@ -22,13 +22,23 @@ describe('useToastStore', () => {
       expect(toasts[0].id).toBeTypeOf('string');
     });
 
-    it('should auto-dismiss the toast after the default duration', () => {
-      useToastStore.getState().show({ tone: 'info', message: 'Hello' });
-      expect(useToastStore.getState().toasts).toHaveLength(1);
+    it('should accept the warning tone', () => {
+      useToastStore.getState().show({ tone: 'warning', message: 'Heads up' });
 
-      vi.advanceTimersByTime(4000);
+      expect(useToastStore.getState().toasts[0]).toMatchObject({ tone: 'warning' });
+    });
 
-      expect(useToastStore.getState().toasts).toHaveLength(0);
+    it('should store an optional action with label and href', () => {
+      useToastStore.getState().show({
+        tone: 'success',
+        message: 'Run started',
+        action: { label: 'View execution', href: '/executions/abc' },
+      });
+
+      expect(useToastStore.getState().toasts[0].action).toEqual({
+        label: 'View execution',
+        href: '/executions/abc',
+      });
     });
 
     it('should respect a custom durationMs override', () => {
@@ -47,6 +57,42 @@ describe('useToastStore', () => {
       vi.advanceTimersByTime(60_000);
 
       expect(useToastStore.getState().toasts).toHaveLength(1);
+    });
+  });
+
+  describe('default duration by tone', () => {
+    it('should auto-dismiss success after 5000ms', () => {
+      useToastStore.getState().show({ tone: 'success', message: 'Saved' });
+
+      vi.advanceTimersByTime(4999);
+      expect(useToastStore.getState().toasts).toHaveLength(1);
+
+      vi.advanceTimersByTime(1);
+      expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+
+    it('should auto-dismiss info after 5000ms', () => {
+      useToastStore.getState().show({ tone: 'info', message: 'FYI' });
+
+      vi.advanceTimersByTime(5000);
+      expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+
+    it('should auto-dismiss error after 8000ms', () => {
+      useToastStore.getState().show({ tone: 'error', message: 'Boom' });
+
+      vi.advanceTimersByTime(7999);
+      expect(useToastStore.getState().toasts).toHaveLength(1);
+
+      vi.advanceTimersByTime(1);
+      expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+
+    it('should auto-dismiss warning after 8000ms', () => {
+      useToastStore.getState().show({ tone: 'warning', message: 'Watch out' });
+
+      vi.advanceTimersByTime(8000);
+      expect(useToastStore.getState().toasts).toHaveLength(0);
     });
   });
 

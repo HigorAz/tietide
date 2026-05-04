@@ -4,6 +4,7 @@ import { ArrowLeft, Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
 import { executeWorkflow } from '@/api/executions';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { saveWorkflow } from './saveWorkflow';
 
@@ -45,7 +46,11 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
         await saveWorkflow(workflowId);
       }
       const execution = await executeWorkflow(workflowId);
-      toast({ tone: 'success', message: 'Execution started' });
+      toast({
+        tone: 'success',
+        message: 'Execution started',
+        action: { label: 'View execution', href: `/executions/${execution.id}` },
+      });
       navigate(`/executions/${execution.id}`);
     } catch {
       toast({ tone: 'error', message: 'Failed to start execution. Please try again.' });
@@ -98,7 +103,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           label={isRunning ? 'Running…' : 'Run'}
           onClick={handleRun}
           disabled={runDisabled}
-          icon={<Play size={16} aria-hidden />}
+          icon={isRunning ? <Spinner size="sm" label="Running" /> : <Play size={16} aria-hidden />}
           dataTour="editor-run"
         />
         <ToolbarButton
@@ -107,15 +112,19 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           disabled={saveDisabled}
           primary
           icon={
-            <span className="relative inline-flex">
-              <Save size={16} aria-hidden />
-              {isDirty && (
-                <span
-                  aria-label="Unsaved changes"
-                  className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-warning"
-                />
-              )}
-            </span>
+            isSaving ? (
+              <Spinner size="sm" label="Saving" />
+            ) : (
+              <span className="relative inline-flex">
+                <Save size={16} aria-hidden />
+                {isDirty && (
+                  <span
+                    aria-label="Unsaved changes"
+                    className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-warning"
+                  />
+                )}
+              </span>
+            )
           }
         />
       </div>

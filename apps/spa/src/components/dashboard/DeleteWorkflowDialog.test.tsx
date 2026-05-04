@@ -59,4 +59,32 @@ describe('DeleteWorkflowDialog', () => {
 
     expect(onConfirm).toHaveBeenCalledWith('wf-42');
   });
+
+  it('should not render an inline error alert when onConfirm rejects (toast handles it)', async () => {
+    const user = userEvent.setup();
+    onConfirm.mockReset();
+    onConfirm.mockRejectedValueOnce(new Error('boom'));
+    render(
+      <DeleteWorkflowDialog workflow={makeWorkflow()} onClose={onClose} onConfirm={onConfirm} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    expect(screen.queryByText(/boom/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('should render the shared Spinner inside the Delete button while submitting', async () => {
+    const user = userEvent.setup();
+    onConfirm.mockReset();
+    onConfirm.mockReturnValue(new Promise(() => {}));
+    render(
+      <DeleteWorkflowDialog workflow={makeWorkflow()} onClose={onClose} onConfirm={onConfirm} />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    const button = await screen.findByRole('button', { name: /deleting/i });
+    expect(button.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
+  });
 });

@@ -218,4 +218,73 @@ describe('DashboardPage', () => {
     expect(await screen.findByText(/delete failed/i)).toBeInTheDocument();
     expect(useToastStore.getState().toasts[0].tone).toBe('error');
   });
+
+  describe('success toasts (issue #107)', () => {
+    it('fires a success toast after creating a workflow', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([]);
+      mockedCreate.mockResolvedValueOnce(makeWorkflow({ id: 'new', name: 'New' }));
+
+      renderDashboard();
+
+      await user.click(await screen.findByRole('button', { name: /new workflow/i }));
+      await user.type(await screen.findByLabelText(/name/i), 'New');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts.some((t) => t.tone === 'success' && /created/i.test(t.message))).toBe(true);
+      });
+    });
+
+    it('fires an error toast when creation rejects', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([]);
+      mockedCreate.mockRejectedValueOnce(new Error('server exploded'));
+
+      renderDashboard();
+
+      await user.click(await screen.findByRole('button', { name: /new workflow/i }));
+      await user.type(await screen.findByLabelText(/name/i), 'New');
+      await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts.some((t) => t.tone === 'error' && /server exploded/i.test(t.message))).toBe(
+          true,
+        );
+      });
+    });
+
+    it('fires a success toast after toggling a workflow', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha', isActive: false })]);
+      mockedToggle.mockResolvedValueOnce(makeWorkflow({ id: 'a', name: 'Alpha', isActive: true }));
+
+      renderDashboard();
+
+      await user.click(await screen.findByRole('switch', { name: /toggle active for alpha/i }));
+
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts.some((t) => t.tone === 'success')).toBe(true);
+      });
+    });
+
+    it('fires a success toast after deleting a workflow', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+      mockedDelete.mockResolvedValueOnce();
+
+      renderDashboard();
+
+      await user.click(await screen.findByRole('button', { name: /delete alpha/i }));
+      await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts.some((t) => t.tone === 'success' && /deleted/i.test(t.message))).toBe(true);
+      });
+    });
+  });
 });

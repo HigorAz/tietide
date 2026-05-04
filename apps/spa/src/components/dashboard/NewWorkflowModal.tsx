@@ -1,9 +1,9 @@
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { NodeType, type WorkflowDefinition } from '@tietide/shared';
 import type { CreateWorkflowBody } from '@/api/workflows';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { Modal } from './Modal';
 
@@ -48,8 +48,6 @@ export interface NewWorkflowModalProps {
 }
 
 export function NewWorkflowModal({ onClose, onCreate }: NewWorkflowModalProps): JSX.Element {
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
   const {
     register,
     handleSubmit,
@@ -60,7 +58,6 @@ export function NewWorkflowModal({ onClose, onCreate }: NewWorkflowModalProps): 
   });
 
   const submit = handleSubmit(async (values) => {
-    setSubmitError(null);
     const body: CreateWorkflowBody = {
       name: values.name,
       definition: buildStarterDefinition(),
@@ -70,10 +67,8 @@ export function NewWorkflowModal({ onClose, onCreate }: NewWorkflowModalProps): 
     }
     try {
       await onCreate(body);
-    } catch (err) {
-      const message =
-        err instanceof Error && err.message ? err.message : 'Failed to create workflow';
-      setSubmitError(message);
+    } catch {
+      // Parent toasts the error and decides whether to keep the modal open.
     }
   });
 
@@ -124,12 +119,6 @@ export function NewWorkflowModal({ onClose, onCreate }: NewWorkflowModalProps): 
           )}
         </div>
 
-        {submitError && (
-          <p className="rounded-md bg-error/10 px-3 py-2 text-sm text-error" role="alert">
-            {submitError}
-          </p>
-        )}
-
         <div className="flex items-center justify-end gap-2 pt-2">
           <button
             type="button"
@@ -147,12 +136,13 @@ export function NewWorkflowModal({ onClose, onCreate }: NewWorkflowModalProps): 
             type="submit"
             disabled={isSubmitting}
             className={cn(
-              'rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
+              'inline-flex items-center gap-2 rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
               'hover:bg-accent-teal-hover focus:outline-none focus:ring-1 focus:ring-accent-teal',
               'disabled:cursor-not-allowed disabled:opacity-60',
             )}
           >
-            {isSubmitting ? 'Creating…' : 'Create'}
+            {isSubmitting && <Spinner size="sm" label="Creating" />}
+            <span>{isSubmitting ? 'Creating…' : 'Create'}</span>
           </button>
         </div>
       </form>

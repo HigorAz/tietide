@@ -314,5 +314,51 @@ describe('EditorToolbar', () => {
         expect(toasts[0]).toMatchObject({ tone: 'success' });
       });
     });
+
+    it('should include a "View execution" action link on the run-success toast', async () => {
+      mockedExecute.mockResolvedValueOnce({
+        id: 'exec-3',
+        workflowId: 'wf-1',
+        status: 'PENDING',
+        triggerType: 'manual',
+        triggerData: null,
+        idempotencyKey: null,
+        createdAt: '2026-05-03T15:39:00.997Z',
+      });
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
+
+      await waitFor(() => {
+        const [toast] = useToastStore.getState().toasts;
+        expect(toast?.action).toEqual({
+          label: 'View execution',
+          href: '/executions/exec-3',
+        });
+      });
+    });
+  });
+
+  describe('loading state', () => {
+    it('should render the shared Spinner inside the Save button while saving', async () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      mockedUpdate.mockReturnValueOnce(new Promise(() => {}));
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /save/i }));
+
+      const saveButton = screen.getByRole('button', { name: /saving/i });
+      expect(saveButton.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
+    });
+
+    it('should render the shared Spinner inside the Run button while running', async () => {
+      mockedExecute.mockReturnValueOnce(new Promise(() => {}));
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
+
+      const runButton = screen.getByRole('button', { name: /running/i });
+      expect(runButton.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
+    });
   });
 });

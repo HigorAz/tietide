@@ -1,9 +1,10 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginFormSchema, type LoginFormValues } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
+import { useToastStore } from '@/stores/toastStore';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 
 const inputClasses = cn(
@@ -24,7 +25,7 @@ const getStatus = (err: unknown): number | undefined =>
 export function LoginPage(): JSX.Element {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const toast = useToastStore((s) => s.show);
 
   const {
     register,
@@ -36,17 +37,14 @@ export function LoginPage(): JSX.Element {
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    setSubmitError(null);
     try {
       await login(values);
       navigate('/dashboard', { replace: true });
     } catch (err) {
       const status = getStatus(err);
-      if (status === 401) {
-        setSubmitError('Invalid credentials');
-      } else {
-        setSubmitError('Something went wrong. Please try again.');
-      }
+      const message =
+        status === 401 ? 'Invalid credentials' : 'Something went wrong. Please try again.';
+      toast({ tone: 'error', message });
     }
   });
 
@@ -95,22 +93,17 @@ export function LoginPage(): JSX.Element {
             )}
           </div>
 
-          {submitError && (
-            <p className="rounded-md bg-error/10 px-3 py-2 text-sm text-error" role="alert">
-              {submitError}
-            </p>
-          )}
-
           <button
             type="submit"
             disabled={isSubmitting}
             className={cn(
-              'w-full rounded-md bg-accent-teal px-4 py-2 text-sm font-semibold text-deep-blue',
+              'inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent-teal px-4 py-2 text-sm font-semibold text-deep-blue',
               'transition-colors hover:bg-accent-teal-hover',
               'disabled:cursor-not-allowed disabled:opacity-60',
             )}
           >
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
+            {isSubmitting && <Spinner size="sm" label="Signing in" />}
+            <span>{isSubmitting ? 'Signing in…' : 'Sign in'}</span>
           </button>
         </form>
 

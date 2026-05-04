@@ -1,6 +1,7 @@
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { Activity, Power, Trash2 } from 'lucide-react';
 import type { Workflow } from '@tietide/shared';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { formatRelativeTime } from './relativeTime';
 
@@ -10,6 +11,8 @@ export interface WorkflowCardProps {
   onToggle: (id: string, next: boolean) => void;
   onDelete: (id: string) => void;
   disabled?: boolean;
+  isToggling?: boolean;
+  isDeleting?: boolean;
 }
 
 const stop = (event: MouseEvent<HTMLElement>): void => {
@@ -23,8 +26,12 @@ export function WorkflowCard({
   onToggle,
   onDelete,
   disabled,
+  isToggling,
+  isDeleting,
 }: WorkflowCardProps): JSX.Element {
   const { id, name, isActive, updatedAt, executionCount } = workflow;
+  const toggleDisabled = disabled || isToggling;
+  const deleteDisabled = disabled || isDeleting;
 
   const open = (): void => {
     if (disabled) return;
@@ -88,18 +95,24 @@ export function WorkflowCard({
           aria-label={`Toggle active for ${name}`}
           onClick={(event) => {
             stop(event);
+            if (toggleDisabled) return;
             onToggle(id, !isActive);
           }}
-          disabled={disabled}
+          disabled={toggleDisabled}
           className={cn(
             'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition',
             'focus:outline-none focus:ring-1 focus:ring-accent-teal',
+            'disabled:cursor-not-allowed disabled:opacity-60',
             isActive
               ? 'text-accent-teal hover:bg-accent-teal/10'
               : 'text-text-secondary hover:bg-white/5',
           )}
         >
-          <Power aria-hidden="true" className="h-3.5 w-3.5" />
+          {isToggling ? (
+            <Spinner size="sm" className="h-3.5 w-3.5" label={`Updating ${name}`} />
+          ) : (
+            <Power aria-hidden="true" className="h-3.5 w-3.5" />
+          )}
           {isActive ? 'On' : 'Off'}
         </button>
         <button
@@ -107,15 +120,21 @@ export function WorkflowCard({
           aria-label={`Delete ${name}`}
           onClick={(event) => {
             stop(event);
+            if (deleteDisabled) return;
             onDelete(id);
           }}
-          disabled={disabled}
+          disabled={deleteDisabled}
           className={cn(
             'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-text-secondary transition',
             'hover:bg-error/10 hover:text-error focus:outline-none focus:ring-1 focus:ring-error',
+            'disabled:cursor-not-allowed disabled:opacity-60',
           )}
         >
-          <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+          {isDeleting ? (
+            <Spinner size="sm" className="h-3.5 w-3.5" label={`Deleting ${name}`} />
+          ) : (
+            <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+          )}
         </button>
       </div>
     </div>
