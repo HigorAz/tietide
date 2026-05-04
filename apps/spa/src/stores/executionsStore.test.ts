@@ -3,6 +3,7 @@ import type { ExecutionStep, WorkflowExecution } from '@tietide/shared';
 
 vi.mock('@/api/executions', () => ({
   listExecutions: vi.fn(),
+  listAllExecutions: vi.fn(),
   getExecution: vi.fn(),
   listExecutionSteps: vi.fn(),
 }));
@@ -11,6 +12,7 @@ import * as executionsApi from '@/api/executions';
 import { useExecutionsStore } from './executionsStore';
 
 const mockedList = vi.mocked(executionsApi.listExecutions);
+const mockedListAll = vi.mocked(executionsApi.listAllExecutions);
 const mockedGet = vi.mocked(executionsApi.getExecution);
 const mockedSteps = vi.mocked(executionsApi.listExecutionSteps);
 
@@ -63,41 +65,72 @@ describe('executionsStore', () => {
   beforeEach(() => {
     resetStore();
     mockedList.mockReset();
+    mockedListAll.mockReset();
     mockedGet.mockReset();
     mockedSteps.mockReset();
   });
 
   describe('fetchList', () => {
-    it('should populate list and set status to ready on success', async () => {
+    it('should call listExecutions(workflowId, filters) when workflowId is provided', async () => {
       const items = [makeExecution({ id: 'a' }), makeExecution({ id: 'b' })];
       mockedList.mockResolvedValueOnce({ items, total: 2, page: 1, pageSize: 20 });
 
-      await useExecutionsStore.getState().fetchList('wf-1');
+      await useExecutionsStore.getState().fetchList({ workflowId: 'wf-1' });
 
       expect(mockedList).toHaveBeenCalledWith('wf-1', {});
+      expect(mockedListAll).not.toHaveBeenCalled();
       expect(useExecutionsStore.getState().list).toEqual(items);
       expect(useExecutionsStore.getState().listTotal).toBe(2);
       expect(useExecutionsStore.getState().listStatus).toBe('ready');
       expect(useExecutionsStore.getState().listError).toBeNull();
     });
 
-    it('should pass current filters to the API call', async () => {
-      const filters = { status: 'FAILED' as const };
-      useExecutionsStore.setState({ filters });
-      mockedList.mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 20 });
+    it('should call listAllExecutions(filters) when workflowId is omitted (cross-workflow)', async () => {
+      const items = [makeExecution({ id: 'a' })];
+      mockedListAll.mockResolvedValueOnce({ items, total: 1, page: 1, pageSize: 5 });
 
-      await useExecutionsStore.getState().fetchList('wf-1');
+      await useExecutionsStore.getState().fetchList({ pageSize: 5 });
 
-      expect(mockedList).toHaveBeenCalledWith('wf-1', filters);
+      expect(mockedListAll).toHaveBeenCalledWith({ pageSize: 5 });
+      expect(mockedList).not.toHaveBeenCalled();
+      expect(useExecutionsStore.getState().list).toEqual(items);
+      expect(useExecutionsStore.getState().listStatus).toBe('ready');
     });
 
-    it('should set status to error and capture an error message on failure', async () => {
+    it('should merge stored filters with call-time params for the workflow-scoped path', async () => {
+      useExecutionsStore.setState({ filters: { status: 'FAILED' } });
+      mockedList.mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 20 });
+
+      await useExecutionsStore.getState().fetchList({ workflowId: 'wf-1' });
+
+      expect(mockedList).toHaveBeenCalledWith('wf-1', { status: 'FAILED' });
+    });
+
+    it('should not bleed stored filters into the cross-workflow path', async () => {
+      useExecutionsStore.setState({ filters: { status: 'FAILED' } });
+      mockedListAll.mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 5 });
+
+      await useExecutionsStore.getState().fetchList({ pageSize: 5 });
+
+      expect(mockedListAll).toHaveBeenCalledWith({ pageSize: 5 });
+    });
+
+    it('should set status to error and capture an error message on failure (workflow-scoped)', async () => {
       mockedList.mockRejectedValueOnce(new Error('network down'));
 
-      await useExecutionsStore.getState().fetchList('wf-1');
+      await useExecutionsStore.getState().fetchList({ workflowId: 'wf-1' });
 
       expect(useExecutionsStore.getState().listStatus).toBe('error');
       expect(useExecutionsStore.getState().listError).toBe('network down');
+    });
+
+    it('should set status to error on cross-workflow failure', async () => {
+      mockedListAll.mockRejectedValueOnce(new Error('boom'));
+
+      await useExecutionsStore.getState().fetchList({ pageSize: 5 });
+
+      expect(useExecutionsStore.getState().listStatus).toBe('error');
+      expect(useExecutionsStore.getState().listError).toBe('boom');
     });
   });
 

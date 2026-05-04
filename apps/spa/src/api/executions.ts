@@ -38,6 +38,15 @@ export async function listExecutions(
   return data;
 }
 
+export async function listAllExecutions(
+  filters: ExecutionFilters = {},
+): Promise<ExecutionListResponse> {
+  const { data } = await api.get<ExecutionListResponse>('/executions', {
+    params: buildParams(filters),
+  });
+  return data;
+}
+
 export async function getExecution(executionId: string): Promise<WorkflowExecution> {
   const { data } = await api.get<WorkflowExecution>(`/executions/${executionId}`);
   return data;

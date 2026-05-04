@@ -64,7 +64,7 @@ export function ExecutionHistoryPage(): JSX.Element {
 
   useEffect(() => {
     if (!workflowId) return;
-    void fetchList(workflowId);
+    void fetchList({ workflowId });
   }, [workflowId, fetchList, filters]);
 
   const handleStatusChange = (event: ChangeEvent<HTMLSelectElement>): void => {
