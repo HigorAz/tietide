@@ -14,6 +14,7 @@ import { SecretsModule } from './secrets/secrets.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AiModule } from './ai/ai.module';
 import { DemoModule } from './demo/demo.module';
+import { LibraryModule } from './library/library.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { DemoModule } from './demo/demo.module';
     SecretsModule,
     AiModule,
     DemoModule,
+    LibraryModule,
   ],
 })
 export class AppModule {}

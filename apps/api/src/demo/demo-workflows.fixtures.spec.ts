@@ -28,6 +28,14 @@ describe('Demo workflow fixtures', () => {
   );
 
   it.each(DEMO_WORKFLOWS.map((w) => [w.slug, w]))(
+    '"%s" should declare a non-empty category for /library display (issue #112)',
+    (_slug, fixture) => {
+      expect(typeof fixture.category).toBe('string');
+      expect(fixture.category.trim().length).toBeGreaterThan(0);
+    },
+  );
+
+  it.each(DEMO_WORKFLOWS.map((w) => [w.slug, w]))(
     '"%s" should validate against workflowDefinitionSchema',
     (_slug, fixture) => {
       const result = workflowDefinitionSchema.safeParse(fixture.definition);

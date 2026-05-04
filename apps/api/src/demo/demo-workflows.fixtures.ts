@@ -6,11 +6,19 @@ export interface DemoWebhookConfig {
   pathSuffix: string;
 }
 
+/**
+ * Demo workflow fixtures double as the source of truth for the workflow library
+ * (issue #112). DemoModule seeds them idempotently for the current user; LibraryModule
+ * exposes them at GET /v1/library/templates and clones a fresh copy on demand. Add new
+ * fixtures here and they show up in both places automatically.
+ */
 export interface DemoWorkflowFixture {
-  /** Stable identifier used to detect existing demo workflows on re-seed. */
+  /** Stable identifier used to detect existing demo workflows on re-seed and to address library templates. */
   slug: string;
   name: string;
   description: string;
+  /** Display category surfaced on the /library page (e.g., "Webhook", "Schedule", "AI"). */
+  category: string;
   /** Whether the seeded workflow should be marked active. */
   activate: boolean;
   /** When set, a Webhook record will be provisioned for this workflow. */
@@ -30,6 +38,7 @@ export const DEMO_WORKFLOWS: readonly DemoWorkflowFixture[] = [
     name: 'Demo: Webhook → Enrich → IF → Notify',
     description:
       'Inbound webhook payload is enriched via HTTP, then a conditional routes successful responses to a notification call.',
+    category: 'Webhook',
     activate: true,
     webhook: { pathSuffix: 'webhook-demo' },
     definition: {
@@ -87,6 +96,7 @@ export const DEMO_WORKFLOWS: readonly DemoWorkflowFixture[] = [
     name: 'Demo: Cron → Fetch → Archive',
     description:
       'Hourly cron pulls fresh data from a public endpoint and forwards the response to an archive sink.',
+    category: 'Schedule',
     activate: false,
     definition: {
       nodes: [
@@ -133,6 +143,7 @@ export const DEMO_WORKFLOWS: readonly DemoWorkflowFixture[] = [
     name: 'Demo: Manual → Multi-step (AI Docs Showcase)',
     description:
       'Manual trigger drives a multi-step pipeline rich enough for the AI documentation generator to produce a meaningful explanation.',
+    category: 'AI',
     activate: false,
     definition: {
       nodes: [
@@ -201,6 +212,7 @@ export const DEMO_WORKFLOWS: readonly DemoWorkflowFixture[] = [
     name: 'Demo: Manual → Failure (DLQ Showcase)',
     description:
       'Targets an unreachable host so executions exhaust the retry budget and land on the dead-letter queue — useful for demoing resilience.',
+    category: 'Reliability',
     activate: false,
     definition: {
       nodes: [
