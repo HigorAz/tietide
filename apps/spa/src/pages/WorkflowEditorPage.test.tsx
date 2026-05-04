@@ -52,9 +52,9 @@ const sampleWorkflow: Workflow = {
   executionCount: 0,
 };
 
-const renderAtId = (id: string) =>
+const renderAtId = (id: string, state?: unknown) =>
   render(
-    <MemoryRouter initialEntries={[`/workflows/${id}`]}>
+    <MemoryRouter initialEntries={[{ pathname: `/workflows/${id}`, state }]}>
       <Routes>
         <Route path="/workflows/:id" element={<WorkflowEditorPage />} />
       </Routes>
@@ -97,6 +97,33 @@ describe('WorkflowEditorPage', () => {
     renderAtId('wf-abc');
 
     await waitFor(() => expect(screen.getByText(/failed to load workflow/i)).toBeInTheDocument());
+  });
+
+  it('should default entryRoute to /workflows when no location state is supplied', async () => {
+    mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+    renderAtId('wf-abc');
+
+    await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+    expect(useEditorStore.getState().entryRoute).toBe('/workflows');
+  });
+
+  it('should use location.state.from as entryRoute when present', async () => {
+    mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+    renderAtId('wf-abc', { from: '/dashboard' });
+
+    await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+    expect(useEditorStore.getState().entryRoute).toBe('/dashboard');
+  });
+
+  it('should fall back to /workflows when location.state.from is not a valid path', async () => {
+    mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+    renderAtId('wf-abc', { from: 'not-a-path' });
+
+    await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+    expect(useEditorStore.getState().entryRoute).toBe('/workflows');
   });
 
   it('should reset the editor store on unmount', async () => {

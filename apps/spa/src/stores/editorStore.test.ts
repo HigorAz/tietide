@@ -150,6 +150,43 @@ describe('editorStore', () => {
     });
   });
 
+  describe('loadWorkflow', () => {
+    it('should default entryRoute to null when no entryRoute is supplied', () => {
+      useEditorStore.getState().loadWorkflow({
+        id: 'wf-1',
+        definition: { nodes: [], edges: [] },
+      });
+      expect(useEditorStore.getState().entryRoute).toBeNull();
+    });
+
+    it('should store the supplied entryRoute', () => {
+      useEditorStore.getState().loadWorkflow({
+        id: 'wf-1',
+        definition: { nodes: [], edges: [] },
+        entryRoute: '/dashboard',
+      });
+      expect(useEditorStore.getState().entryRoute).toBe('/dashboard');
+    });
+
+    it('should overwrite a previously stored entryRoute on subsequent loads', () => {
+      useEditorStore.setState({ entryRoute: '/library' });
+      useEditorStore.getState().loadWorkflow({
+        id: 'wf-1',
+        definition: { nodes: [], edges: [] },
+        entryRoute: '/dashboard',
+      });
+      expect(useEditorStore.getState().entryRoute).toBe('/dashboard');
+    });
+  });
+
+  describe('resetEditor', () => {
+    it('should clear entryRoute back to null', () => {
+      useEditorStore.setState({ entryRoute: '/dashboard' });
+      useEditorStore.getState().resetEditor();
+      expect(useEditorStore.getState().entryRoute).toBeNull();
+    });
+  });
+
   describe('onNodesChange — removal with selection', () => {
     it('should clear selectedNodeId when the selected node is removed', () => {
       const { addNode, onNodesChange, selectNode } = useEditorStore.getState();

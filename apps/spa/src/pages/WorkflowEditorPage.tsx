@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
 import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
@@ -13,11 +13,17 @@ type LoadStatus = 'loading' | 'ready' | 'error';
 
 export function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const loadWorkflow = useEditorStore((s) => s.loadWorkflow);
   const resetEditor = useEditorStore((s) => s.resetEditor);
   const isDirty = useEditorStore((s) => s.isDirty);
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [fetchKey, setFetchKey] = useState(0);
+
+  const entryRoute = useMemo(() => {
+    const candidate = (location.state as { from?: unknown } | null)?.from;
+    return typeof candidate === 'string' && candidate.startsWith('/') ? candidate : '/workflows';
+  }, [location.state]);
 
   useEffect(() => {
     if (!id) {
@@ -29,7 +35,7 @@ export function WorkflowEditorPage() {
     getWorkflow(id)
       .then((wf) => {
         if (cancelled) return;
-        loadWorkflow({ id: wf.id, definition: wf.definition });
+        loadWorkflow({ id: wf.id, definition: wf.definition, entryRoute });
         setStatus('ready');
       })
       .catch(() => {
@@ -39,7 +45,7 @@ export function WorkflowEditorPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, loadWorkflow, fetchKey]);
+  }, [id, loadWorkflow, fetchKey, entryRoute]);
 
   useEffect(() => {
     return () => {
