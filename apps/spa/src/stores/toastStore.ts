@@ -1,18 +1,26 @@
 import { create } from 'zustand';
 
-export type ToastTone = 'success' | 'error' | 'info';
+export type ToastTone = 'success' | 'error' | 'info' | 'warning';
+
+export interface ToastAction {
+  label: string;
+  href: string;
+}
 
 export interface Toast {
   id: string;
   tone: ToastTone;
   message: string;
+  action?: ToastAction;
 }
 
 export interface ToastInput {
   tone: ToastTone;
   message: string;
-  // Set to 0 to keep the toast until manually dismissed.
+  // Set to 0 to keep the toast until manually dismissed. Omit to use the
+  // tone-keyed default (5s for success/info, 8s for error/warning).
   durationMs?: number;
+  action?: ToastAction;
 }
 
 export interface ToastState {
@@ -30,7 +38,12 @@ export const initialToastState: ToastState = {
   toasts: [],
 };
 
-const DEFAULT_DURATION_MS = 4000;
+const DEFAULT_DURATION_BY_TONE: Record<ToastTone, number> = {
+  success: 5000,
+  info: 5000,
+  error: 8000,
+  warning: 8000,
+};
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -51,15 +64,16 @@ const nextId = (): string => {
 export const useToastStore = create<ToastStore>((set, get) => ({
   ...initialToastState,
 
-  show: ({ tone, message, durationMs = DEFAULT_DURATION_MS }) => {
+  show: ({ tone, message, durationMs, action }) => {
     const id = nextId();
-    set({ toasts: [...get().toasts, { id, tone, message }] });
+    const resolvedDuration = durationMs ?? DEFAULT_DURATION_BY_TONE[tone];
+    set({ toasts: [...get().toasts, { id, tone, message, action }] });
 
-    if (durationMs > 0) {
+    if (resolvedDuration > 0) {
       const handle = setTimeout(() => {
         timers.delete(id);
         set({ toasts: get().toasts.filter((t) => t.id !== id) });
-      }, durationMs);
+      }, resolvedDuration);
       timers.set(id, handle);
     }
 
