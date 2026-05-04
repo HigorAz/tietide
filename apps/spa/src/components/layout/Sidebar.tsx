@@ -40,6 +40,7 @@ export function Sidebar(): JSX.Element {
   return (
     <aside
       data-testid="sidebar"
+      data-tour="sidebar"
       data-collapsed={collapsed ? 'true' : 'false'}
       className={cn(
         'flex h-full flex-col border-r border-white/5 bg-elevated transition-[width] duration-150',
@@ -76,6 +77,7 @@ export function Sidebar(): JSX.Element {
             label={item.label}
             icon={item.icon}
             collapsed={collapsed}
+            tourTarget={item.tourTarget}
           />
         ))}
       </nav>

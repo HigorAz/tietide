@@ -69,6 +69,7 @@ export function Canvas() {
   return (
     <div
       data-testid="canvas-dropzone"
+      data-tour="editor-canvas"
       data-drag-active={isDragActive ? 'true' : 'false'}
       className={cn(
         'relative h-full w-full flex-1 bg-deep-blue transition-shadow',
