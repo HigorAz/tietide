@@ -3,10 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
-import { updateWorkflow } from '@/api/workflows';
 import { executeWorkflow } from '@/api/executions';
 import { cn } from '@/utils/cn';
-import { toWorkflowDefinition } from './serialization';
+import { saveWorkflow } from './saveWorkflow';
 
 interface EditorToolbarProps {
   workflowId: string;
@@ -19,7 +18,6 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const future = useEditorStore((s) => s.future);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
-  const markSaved = useEditorStore((s) => s.markSaved);
   const toast = useToastStore((s) => s.show);
   const navigate = useNavigate();
 
@@ -28,31 +26,23 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
-    const { nodes, edges } = useEditorStore.getState();
     setIsSaving(true);
     try {
-      await updateWorkflow(workflowId, {
-        definition: toWorkflowDefinition(nodes, edges),
-      });
-      markSaved();
+      await saveWorkflow(workflowId);
       toast({ tone: 'success', message: 'Workflow saved' });
     } catch {
       toast({ tone: 'error', message: 'Save failed. Please try again.' });
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, markSaved, toast, workflowId]);
+  }, [isSaving, toast, workflowId]);
 
   const handleRun = useCallback(async () => {
     if (isRunning || isSaving) return;
     setIsRunning(true);
     try {
       if (useEditorStore.getState().isDirty) {
-        const { nodes, edges } = useEditorStore.getState();
-        await updateWorkflow(workflowId, {
-          definition: toWorkflowDefinition(nodes, edges),
-        });
-        markSaved();
+        await saveWorkflow(workflowId);
       }
       const execution = await executeWorkflow(workflowId);
       toast({ tone: 'success', message: 'Execution started' });
@@ -62,7 +52,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
     } finally {
       setIsRunning(false);
     }
-  }, [isRunning, isSaving, markSaved, navigate, toast, workflowId]);
+  }, [isRunning, isSaving, navigate, toast, workflowId]);
 
   const saveDisabled = !isDirty || isSaving;
   const runDisabled = isRunning || isSaving;
