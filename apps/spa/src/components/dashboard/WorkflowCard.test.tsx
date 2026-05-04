@@ -29,13 +29,18 @@ describe('WorkflowCard', () => {
     onDelete.mockReset();
   });
 
-  const renderCard = (overrides: Partial<Workflow> = {}) =>
+  const renderCard = (
+    overrides: Partial<Workflow> = {},
+    extra: { isToggling?: boolean; isDeleting?: boolean } = {},
+  ) =>
     render(
       <WorkflowCard
         workflow={makeWorkflow(overrides)}
         onOpen={onOpen}
         onToggle={onToggle}
         onDelete={onDelete}
+        isToggling={extra.isToggling}
+        isDeleting={extra.isDeleting}
       />,
     );
 
@@ -98,5 +103,32 @@ describe('WorkflowCard', () => {
     renderCard({ updatedAt: new Date('2026-04-10T12:00:00Z') });
 
     expect(screen.getByTestId('workflow-card-updated')).toBeInTheDocument();
+  });
+
+  describe('loading state', () => {
+    it('should render the shared Spinner inside the toggle button when isToggling', () => {
+      renderCard({}, { isToggling: true });
+
+      const toggle = screen.getByRole('switch', { name: /toggle active/i });
+      expect(toggle.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
+      expect(toggle).toBeDisabled();
+    });
+
+    it('should render the shared Spinner inside the delete button when isDeleting', () => {
+      renderCard({}, { isDeleting: true });
+
+      const del = screen.getByRole('button', { name: /delete my workflow/i });
+      expect(del.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
+      expect(del).toBeDisabled();
+    });
+
+    it('should not call onToggle while isToggling', async () => {
+      const user = userEvent.setup();
+      renderCard({}, { isToggling: true });
+
+      await user.click(screen.getByRole('switch', { name: /toggle active/i }));
+
+      expect(onToggle).not.toHaveBeenCalled();
+    });
   });
 });
