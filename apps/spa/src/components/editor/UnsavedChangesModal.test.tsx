@@ -109,6 +109,13 @@ describe('UnsavedChangesModal', () => {
       expect(screen.getByRole('button', { name: /^discard$/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /^stay$/i })).toBeDisabled();
     });
+
+    it('should render the shared Spinner inside the Save button while saving', () => {
+      renderModal({ isSaving: true });
+
+      const button = screen.getByRole('button', { name: /saving/i });
+      expect(button.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
+    });
   });
 
   describe('saveError', () => {
