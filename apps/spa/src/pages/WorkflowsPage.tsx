@@ -12,7 +12,7 @@ import { cn } from '@/utils/cn';
 const errorMessage = (err: unknown, fallback: string): string =>
   err instanceof Error && err.message ? err.message : fallback;
 
-export function DashboardPage(): JSX.Element {
+export function WorkflowsPage(): JSX.Element {
   const navigate = useNavigate();
   const { workflows, status, error, fetch, create, remove, toggleActive } = useWorkflowsStore();
   const toast = useToastStore((s) => s.show);
@@ -27,7 +27,7 @@ export function DashboardPage(): JSX.Element {
   }, [fetch]);
 
   const handleOpen = (id: string): void => {
-    navigate(`/workflows/${id}`, { state: { from: '/dashboard' } });
+    navigate(`/workflows/${id}`, { state: { from: '/workflows' } });
   };
 
   const handleToggle = async (id: string, next: boolean): Promise<void> => {
@@ -52,7 +52,7 @@ export function DashboardPage(): JSX.Element {
       const created = await create(body);
       toast({ tone: 'success', message: 'Workflow created' });
       setShowCreate(false);
-      navigate(`/workflows/${created.id}`, { state: { from: '/dashboard' } });
+      navigate(`/workflows/${created.id}`, { state: { from: '/workflows' } });
     } catch (err) {
       toast({ tone: 'error', message: errorMessage(err, 'Could not create workflow') });
       throw err;
@@ -176,4 +176,4 @@ export function DashboardPage(): JSX.Element {
   );
 }
 
-export default DashboardPage;
+export default WorkflowsPage;

@@ -21,7 +21,7 @@ import * as workflowsApi from '@/api/workflows';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { initialToastState, useToastStore } from '@/stores/toastStore';
 import { Toaster } from '@/components/ui/Toaster';
-import { DashboardPage } from './DashboardPage';
+import { WorkflowsPage } from './WorkflowsPage';
 
 const mockedList = vi.mocked(workflowsApi.listWorkflows);
 const mockedCreate = vi.mocked(workflowsApi.createWorkflow);
@@ -42,12 +42,12 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   ...overrides,
 });
 
-const renderDashboard = (): ReturnType<typeof render> =>
+const renderWorkflows = (): ReturnType<typeof render> =>
   render(
-    <MemoryRouter initialEntries={['/dashboard']}>
+    <MemoryRouter initialEntries={['/workflows']}>
       <Toaster />
       <Routes>
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/workflows" element={<WorkflowsPage />} />
         <Route path="/workflows/:id" element={<div>Editor for workflow</div>} />
       </Routes>
     </MemoryRouter>,
@@ -57,7 +57,7 @@ const resetStore = (): void => {
   useWorkflowsStore.setState({ workflows: [], status: 'idle', error: null });
 };
 
-describe('DashboardPage', () => {
+describe('WorkflowsPage', () => {
   beforeEach(() => {
     resetStore();
     useToastStore.setState({ ...initialToastState });
@@ -73,7 +73,7 @@ describe('DashboardPage', () => {
       makeWorkflow({ id: 'b', name: 'Beta' }),
     ]);
 
-    renderDashboard();
+    renderWorkflows();
 
     expect(await screen.findByText('Alpha')).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
@@ -83,7 +83,7 @@ describe('DashboardPage', () => {
   it('opens the new workflow modal when Create is clicked (AC2)', async () => {
     const user = userEvent.setup();
     mockedList.mockResolvedValueOnce([]);
-    renderDashboard();
+    renderWorkflows();
 
     await user.click(await screen.findByRole('button', { name: /new workflow/i }));
 
@@ -97,7 +97,7 @@ describe('DashboardPage', () => {
     mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
     mockedDelete.mockResolvedValueOnce();
 
-    renderDashboard();
+    renderWorkflows();
 
     await user.click(await screen.findByRole('button', { name: /delete alpha/i }));
     await user.click(await screen.findByRole('button', { name: /^delete$/i }));
@@ -109,7 +109,7 @@ describe('DashboardPage', () => {
   it('renders an empty state with a CTA when there are no workflows', async () => {
     mockedList.mockResolvedValueOnce([]);
 
-    renderDashboard();
+    renderWorkflows();
 
     expect(await screen.findByText(/no workflows yet/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create your first workflow/i })).toBeInTheDocument();
@@ -120,7 +120,7 @@ describe('DashboardPage', () => {
     mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha', isActive: false })]);
     mockedToggle.mockResolvedValueOnce(makeWorkflow({ id: 'a', name: 'Alpha', isActive: true }));
 
-    renderDashboard();
+    renderWorkflows();
 
     await user.click(await screen.findByRole('switch', { name: /toggle active for alpha/i }));
 
@@ -131,22 +131,22 @@ describe('DashboardPage', () => {
     const user = userEvent.setup();
     mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
 
-    renderDashboard();
+    renderWorkflows();
 
     await user.click(await screen.findByRole('button', { name: /open alpha/i }));
 
     expect(await screen.findByText(/editor for workflow/i)).toBeInTheDocument();
   });
 
-  it('passes from=/dashboard in location state when opening a workflow (issue #104)', async () => {
+  it('passes from=/workflows in location state when opening a workflow (issue #104)', async () => {
     const user = userEvent.setup();
     mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
 
     render(
-      <MemoryRouter initialEntries={['/dashboard']}>
+      <MemoryRouter initialEntries={['/workflows']}>
         <Toaster />
         <Routes>
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/workflows" element={<WorkflowsPage />} />
           <Route path="/workflows/:id" element={<LocationStatePeek />} />
         </Routes>
       </MemoryRouter>,
@@ -154,19 +154,19 @@ describe('DashboardPage', () => {
 
     await user.click(await screen.findByRole('button', { name: /open alpha/i }));
 
-    expect(await screen.findByTestId('peek-from')).toHaveTextContent('/dashboard');
+    expect(await screen.findByTestId('peek-from')).toHaveTextContent('/workflows');
   });
 
-  it('passes from=/dashboard in location state when creating a workflow (issue #104)', async () => {
+  it('passes from=/workflows in location state when creating a workflow (issue #104)', async () => {
     const user = userEvent.setup();
     mockedList.mockResolvedValueOnce([]);
     mockedCreate.mockResolvedValueOnce(makeWorkflow({ id: 'new', name: 'New' }));
 
     render(
-      <MemoryRouter initialEntries={['/dashboard']}>
+      <MemoryRouter initialEntries={['/workflows']}>
         <Toaster />
         <Routes>
-          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/workflows" element={<WorkflowsPage />} />
           <Route path="/workflows/:id" element={<LocationStatePeek />} />
         </Routes>
       </MemoryRouter>,
@@ -176,13 +176,13 @@ describe('DashboardPage', () => {
     await user.type(await screen.findByLabelText(/name/i), 'New');
     await user.click(screen.getByRole('button', { name: /^create$/i }));
 
-    expect(await screen.findByTestId('peek-from')).toHaveTextContent('/dashboard');
+    expect(await screen.findByTestId('peek-from')).toHaveTextContent('/workflows');
   });
 
   it('shows an error banner with a retry button when the list request fails', async () => {
     mockedList.mockRejectedValueOnce(new Error('network down'));
 
-    renderDashboard();
+    renderWorkflows();
 
     expect(await screen.findByText(/network down/i)).toBeInTheDocument();
     const retry = screen.getByRole('button', { name: /retry/i });
@@ -196,7 +196,7 @@ describe('DashboardPage', () => {
     mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha', isActive: false })]);
     mockedToggle.mockRejectedValueOnce(new Error('toggle blew up'));
 
-    renderDashboard();
+    renderWorkflows();
 
     await user.click(await screen.findByRole('switch', { name: /toggle active for alpha/i }));
 
@@ -210,7 +210,7 @@ describe('DashboardPage', () => {
     mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
     mockedDelete.mockRejectedValueOnce(new Error('delete failed'));
 
-    renderDashboard();
+    renderWorkflows();
 
     await user.click(await screen.findByRole('button', { name: /delete alpha/i }));
     await user.click(await screen.findByRole('button', { name: /^delete$/i }));
@@ -225,7 +225,7 @@ describe('DashboardPage', () => {
       mockedList.mockResolvedValueOnce([]);
       mockedCreate.mockResolvedValueOnce(makeWorkflow({ id: 'new', name: 'New' }));
 
-      renderDashboard();
+      renderWorkflows();
 
       await user.click(await screen.findByRole('button', { name: /new workflow/i }));
       await user.type(await screen.findByLabelText(/name/i), 'New');
@@ -242,7 +242,7 @@ describe('DashboardPage', () => {
       mockedList.mockResolvedValueOnce([]);
       mockedCreate.mockRejectedValueOnce(new Error('server exploded'));
 
-      renderDashboard();
+      renderWorkflows();
 
       await user.click(await screen.findByRole('button', { name: /new workflow/i }));
       await user.type(await screen.findByLabelText(/name/i), 'New');
@@ -261,7 +261,7 @@ describe('DashboardPage', () => {
       mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha', isActive: false })]);
       mockedToggle.mockResolvedValueOnce(makeWorkflow({ id: 'a', name: 'Alpha', isActive: true }));
 
-      renderDashboard();
+      renderWorkflows();
 
       await user.click(await screen.findByRole('switch', { name: /toggle active for alpha/i }));
 
@@ -276,7 +276,7 @@ describe('DashboardPage', () => {
       mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
       mockedDelete.mockResolvedValueOnce();
 
-      renderDashboard();
+      renderWorkflows();
 
       await user.click(await screen.findByRole('button', { name: /delete alpha/i }));
       await user.click(await screen.findByRole('button', { name: /^delete$/i }));

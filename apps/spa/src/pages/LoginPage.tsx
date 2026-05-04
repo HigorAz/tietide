@@ -39,7 +39,7 @@ export function LoginPage(): JSX.Element {
   const onSubmit = handleSubmit(async (values) => {
     try {
       await login(values);
-      navigate('/dashboard', { replace: true });
+      navigate('/', { replace: true });
     } catch (err) {
       const status = getStatus(err);
       const message =
