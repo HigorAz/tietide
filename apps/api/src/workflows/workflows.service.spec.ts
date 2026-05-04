@@ -45,12 +45,14 @@ describe('WorkflowsService', () => {
     createdAt: new Date('2026-04-17T00:00:00Z'),
     updatedAt: new Date('2026-04-17T00:00:00Z'),
     _count: { executions: 0 },
+    documentation: null,
   };
 
-  const { _count: _persistedCount, ...persistedFields } = persisted;
+  const { _count: _persistedCount, documentation: _persistedDoc, ...persistedFields } = persisted;
   const persistedResponse = {
     ...persistedFields,
     executionCount: _persistedCount.executions,
+    documentation: _persistedDoc,
   };
 
   beforeEach(async () => {
@@ -189,6 +191,41 @@ describe('WorkflowsService', () => {
       expect(call.select).toBeDefined();
       expect(call.select.userId).toBeFalsy();
     });
+
+    it('should request the documentation relation with updatedAt and version', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId);
+
+      const call = prisma.workflow.findMany.mock.calls[0][0] as {
+        select: Record<string, unknown>;
+      };
+      expect(call.select.documentation).toEqual({
+        select: { updatedAt: true, version: true },
+      });
+    });
+
+    it('should map documentation { updatedAt, version } to { generatedAt, version }', async () => {
+      const docUpdated = new Date('2026-05-01T10:00:00Z');
+      prisma.workflow.findMany.mockResolvedValue([
+        {
+          ...persisted,
+          documentation: { updatedAt: docUpdated, version: 3 },
+        },
+      ]);
+
+      const [row] = await service.list(userId);
+
+      expect(row.documentation).toEqual({ generatedAt: docUpdated, version: 3 });
+    });
+
+    it('should expose documentation as null when none exists', async () => {
+      prisma.workflow.findMany.mockResolvedValue([{ ...persisted, documentation: null }]);
+
+      const [row] = await service.list(userId);
+
+      expect(row.documentation).toBeNull();
+    });
   });
 
   describe('findOne', () => {
@@ -221,6 +258,31 @@ describe('WorkflowsService', () => {
       const result = await service.findOne(userId, workflowId);
 
       expect(result).not.toHaveProperty('userId');
+    });
+
+    it('should include documentation metadata when present', async () => {
+      const docUpdated = new Date('2026-05-02T08:30:00Z');
+      prisma.workflow.findUnique.mockResolvedValue({
+        ...persisted,
+        userId,
+        documentation: { updatedAt: docUpdated, version: 2 },
+      });
+
+      const result = await service.findOne(userId, workflowId);
+
+      expect(result.documentation).toEqual({ generatedAt: docUpdated, version: 2 });
+    });
+
+    it('should expose documentation as null when none exists', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        ...persisted,
+        userId,
+        documentation: null,
+      });
+
+      const result = await service.findOne(userId, workflowId);
+
+      expect(result.documentation).toBeNull();
     });
   });
 

@@ -163,6 +163,25 @@ describe('WorkflowsController (integration)', () => {
       authedUser = null;
       await request(app.getHttpServer()).get('/workflows').expect(401);
     });
+
+    it('should pass through documentation metadata when present (issue #111)', async () => {
+      const generatedAt = new Date('2026-05-02T08:30:00Z').toISOString();
+      workflowsService.list.mockResolvedValue([
+        { ...persisted, documentation: { generatedAt, version: 2 } },
+      ]);
+
+      const res = await request(app.getHttpServer()).get('/workflows').expect(200);
+
+      expect(res.body[0].documentation).toEqual({ generatedAt, version: 2 });
+    });
+
+    it('should expose documentation as null when no docs exist (issue #111)', async () => {
+      workflowsService.list.mockResolvedValue([{ ...persisted, documentation: null }]);
+
+      const res = await request(app.getHttpServer()).get('/workflows').expect(200);
+
+      expect(res.body[0].documentation).toBeNull();
+    });
   });
 
   describe('GET /workflows/:id', () => {

@@ -31,4 +31,16 @@ export class WorkflowResponseDto {
 
   @ApiProperty({ example: 0, description: 'Number of executions recorded for this workflow.' })
   executionCount!: number;
+
+  @ApiProperty({
+    type: 'object',
+    nullable: true,
+    description:
+      'Metadata about the AI-generated documentation for this workflow. Null when no documentation has been generated yet.',
+    properties: {
+      generatedAt: { type: 'string', format: 'date-time' },
+      version: { type: 'integer' },
+    },
+  })
+  documentation!: { generatedAt: Date; version: number } | null;
 }

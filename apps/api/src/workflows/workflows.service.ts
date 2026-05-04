@@ -21,6 +21,7 @@ const SAFE_SELECT = {
   createdAt: true,
   updatedAt: true,
   _count: { select: { executions: true } },
+  documentation: { select: { updatedAt: true, version: true } },
 } as const;
 
 @Injectable()
@@ -166,6 +167,7 @@ export class WorkflowsService {
     createdAt: Date;
     updatedAt: Date;
     _count?: { executions: number };
+    documentation?: { updatedAt: Date; version: number } | null;
   }): WorkflowResponseDto {
     return {
       id: row.id,
@@ -177,6 +179,9 @@ export class WorkflowsService {
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       executionCount: row._count?.executions ?? 0,
+      documentation: row.documentation
+        ? { generatedAt: row.documentation.updatedAt, version: row.documentation.version }
+        : null,
     };
   }
 }
