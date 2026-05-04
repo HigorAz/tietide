@@ -20,7 +20,7 @@ const renderLogin = () =>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<div>Register Screen</div>} />
-        <Route path="/dashboard" element={<div>Dashboard Screen</div>} />
+        <Route path="/" element={<div>Home Screen</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -39,7 +39,7 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
-  it('should call authStore.login with form values and navigate to /dashboard on success', async () => {
+  it('should call authStore.login with form values and navigate to / on success', async () => {
     const loginMock = vi.fn().mockResolvedValueOnce(undefined);
     useAuthStore.setState({ login: loginMock });
     const user = userEvent.setup();
@@ -57,7 +57,7 @@ describe('LoginPage', () => {
       });
     });
     await waitFor(() => {
-      expect(screen.getByText('Dashboard Screen')).toBeInTheDocument();
+      expect(screen.getByText('Home Screen')).toBeInTheDocument();
     });
   });
 
@@ -82,7 +82,7 @@ describe('LoginPage', () => {
       expect(toasts[0]).toMatchObject({ tone: 'error' });
       expect(toasts[0].message).toMatch(/invalid credentials/i);
     });
-    expect(screen.queryByText('Dashboard Screen')).not.toBeInTheDocument();
+    expect(screen.queryByText('Home Screen')).not.toBeInTheDocument();
     // No inline error block lingers in the form.
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });

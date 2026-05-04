@@ -33,7 +33,7 @@ export function ExecutionDetailPage(): JSX.Element {
 
   const totalDuration = detail ? computeDurationMs(detail.startedAt, detail.finishedAt) : null;
 
-  const backHref = detail ? `/workflows/${detail.workflowId}/executions` : '/dashboard';
+  const backHref = detail ? `/workflows/${detail.workflowId}/executions` : '/workflows';
 
   return (
     <div className="flex flex-col">

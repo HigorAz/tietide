@@ -2,12 +2,17 @@ import { create } from 'zustand';
 import type { ExecutionStep, WorkflowExecution } from '@tietide/shared';
 import {
   listExecutions as apiList,
+  listAllExecutions as apiListAll,
   getExecution as apiGet,
   listExecutionSteps as apiSteps,
   type ExecutionFilters,
 } from '@/api/executions';
 
 export type ExecutionsStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+export interface FetchListParams extends ExecutionFilters {
+  workflowId?: string;
+}
 
 export interface ExecutionsState {
   list: WorkflowExecution[];
@@ -27,7 +32,7 @@ export interface ExecutionsState {
 }
 
 export interface ExecutionsActions {
-  fetchList: (workflowId: string) => Promise<void>;
+  fetchList: (params: FetchListParams) => Promise<void>;
   setFilters: (next: Partial<ExecutionFilters>) => void;
   fetchDetail: (executionId: string) => Promise<void>;
   fetchSteps: (executionId: string) => Promise<void>;
@@ -57,10 +62,13 @@ const initialState: ExecutionsState = {
 export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
   ...initialState,
 
-  fetchList: async (workflowId) => {
+  fetchList: async (params) => {
     set({ listStatus: 'loading', listError: null });
     try {
-      const response = await apiList(workflowId, get().filters);
+      const { workflowId, ...callFilters } = params;
+      const response = workflowId
+        ? await apiList(workflowId, { ...get().filters, ...callFilters })
+        : await apiListAll(callFilters);
       set({
         list: response.items,
         listTotal: response.total,
