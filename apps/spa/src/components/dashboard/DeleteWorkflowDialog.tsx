@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Workflow } from '@tietide/shared';
+import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from './Modal';
 import { cn } from '@/utils/cn';
 
@@ -15,18 +16,14 @@ export function DeleteWorkflowDialog({
   onConfirm,
 }: DeleteWorkflowDialogProps): JSX.Element {
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async (): Promise<void> => {
-    setError(null);
     setSubmitting(true);
     try {
       await onConfirm(workflow.id);
-    } catch (err) {
+    } catch {
       setSubmitting(false);
-      const message =
-        err instanceof Error && err.message ? err.message : 'Failed to delete workflow';
-      setError(message);
+      // Parent toasts the error.
     }
   };
 
@@ -40,12 +37,6 @@ export function DeleteWorkflowDialog({
         <span className="font-semibold text-text-primary">{workflow.name}</span>? This will
         permanently remove the workflow and its execution history.
       </p>
-
-      {error && (
-        <p className="mb-3 rounded-md bg-error/10 px-3 py-2 text-sm text-error" role="alert">
-          {error}
-        </p>
-      )}
 
       <div className="flex items-center justify-end gap-2">
         <button
@@ -65,12 +56,13 @@ export function DeleteWorkflowDialog({
           onClick={handleConfirm}
           disabled={submitting}
           className={cn(
-            'rounded-md bg-error px-3 py-1.5 text-sm font-semibold text-white transition',
+            'inline-flex items-center gap-2 rounded-md bg-error px-3 py-1.5 text-sm font-semibold text-white transition',
             'hover:bg-error/90 focus:outline-none focus:ring-1 focus:ring-error',
             'disabled:cursor-not-allowed disabled:opacity-60',
           )}
         >
-          {submitting ? 'Deleting…' : 'Delete'}
+          {submitting && <Spinner size="sm" label="Deleting" />}
+          <span>{submitting ? 'Deleting…' : 'Delete'}</span>
         </button>
       </div>
     </Modal>

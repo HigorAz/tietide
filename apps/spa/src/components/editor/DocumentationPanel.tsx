@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ClipboardCheck, ClipboardCopy, FileText, Loader2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ClipboardCheck, ClipboardCopy, FileText, X } from 'lucide-react';
 import { useDocumentationStore } from '@/stores/documentationStore';
+import { useToastStore } from '@/stores/toastStore';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { Markdown } from './markdown';
 
@@ -16,15 +18,28 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
   const error = useDocumentationStore((s) => s.error);
   const generate = useDocumentationStore((s) => s.generate);
   const reset = useDocumentationStore((s) => s.reset);
+  const toast = useToastStore((s) => s.show);
 
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
+  const previousStatusRef = useRef<typeof status | null>(null);
 
   useEffect(() => {
     if (status === 'ready' || status === 'error' || status === 'loading') {
       setOpen(true);
     }
   }, [status]);
+
+  useEffect(() => {
+    const previous = previousStatusRef.current;
+    previousStatusRef.current = status;
+    if (previous === null) return;
+    if (status === 'ready' && previous !== 'ready') {
+      toast({ tone: 'success', message: 'Documentation generated' });
+    } else if (status === 'error' && previous !== 'error') {
+      toast({ tone: 'error', message: error ?? 'Failed to generate documentation' });
+    }
+  }, [status, error, toast]);
 
   useEffect(() => {
     return () => {
@@ -70,11 +85,7 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
           'disabled:cursor-not-allowed disabled:opacity-40',
         )}
       >
-        {isLoading ? (
-          <Loader2 size={16} className="animate-spin" aria-hidden />
-        ) : (
-          <FileText size={16} aria-hidden />
-        )}
+        {isLoading ? <Spinner size="sm" label="Generating" /> : <FileText size={16} aria-hidden />}
         <span>{isLoading ? 'Generating…' : 'Generate Documentation'}</span>
       </button>
 
@@ -121,7 +132,7 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
           <div className="max-h-[60vh] overflow-y-auto pr-1">
             {status === 'loading' && (
               <div className="flex items-center gap-2 text-sm text-text-secondary">
-                <Loader2 size={16} className="animate-spin" aria-hidden />
+                <Spinner size="sm" />
                 <span>Generating documentation…</span>
               </div>
             )}

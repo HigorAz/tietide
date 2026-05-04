@@ -1,4 +1,5 @@
 import { Modal } from '@/components/dashboard/Modal';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 
 export interface UnsavedChangesModalProps {
@@ -67,12 +68,13 @@ export function UnsavedChangesModal({
           onClick={onSave}
           disabled={isSaving}
           className={cn(
-            'rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
+            'inline-flex items-center gap-2 rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
             'hover:bg-accent-teal-hover focus:outline-none focus:ring-1 focus:ring-accent-teal',
             'disabled:cursor-not-allowed disabled:opacity-60',
           )}
         >
-          {isSaving ? 'Saving…' : 'Save'}
+          {isSaving && <Spinner size="sm" label="Saving" />}
+          <span>{isSaving ? 'Saving…' : 'Save'}</span>
         </button>
       </div>
     </Modal>

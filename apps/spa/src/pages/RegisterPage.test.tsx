@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { PublicUser } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
+import { initialToastState, useToastStore } from '@/stores/toastStore';
 import { RegisterPage } from './RegisterPage';
 
 const sampleUser: PublicUser = {
@@ -17,6 +18,7 @@ const initialAuthState = useAuthStore.getState();
 
 const resetStore = (): void => {
   useAuthStore.setState(initialAuthState, true);
+  useToastStore.setState({ ...initialToastState });
   localStorage.clear();
 };
 
@@ -71,7 +73,7 @@ describe('RegisterPage', () => {
     });
   });
 
-  it('should render an email-already-registered error on 409 responses', async () => {
+  it('should toast an email-already-registered error on 409 responses', async () => {
     const axiosError = Object.assign(new Error('Conflict'), {
       isAxiosError: true,
       response: { status: 409 },
@@ -87,8 +89,30 @@ describe('RegisterPage', () => {
     await user.type(screen.getByLabelText(/password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /create account|sign up|register/i }));
 
-    expect(await screen.findByText(/email already registered/i)).toBeInTheDocument();
+    await waitFor(() => {
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0]).toMatchObject({ tone: 'error' });
+      expect(toasts[0].message).toMatch(/email already registered/i);
+    });
     expect(screen.queryByText('Login Screen')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('should render the shared Spinner inside the submit button while creating account', async () => {
+    const registerMock = vi.fn().mockReturnValue(new Promise(() => {}));
+    useAuthStore.setState({ register: registerMock });
+    const user = userEvent.setup();
+
+    renderRegister();
+
+    await user.type(screen.getByLabelText(/name/i), 'Alice');
+    await user.type(screen.getByLabelText(/email/i), 'alice@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /create account|sign up|register/i }));
+
+    const submit = await screen.findByRole('button', { name: /creating account/i });
+    expect(submit.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
   });
 
   it('should show a validation error for a short password without calling authStore.register', async () => {
