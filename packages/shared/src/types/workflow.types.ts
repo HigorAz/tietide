@@ -19,6 +19,11 @@ export interface WorkflowDefinition {
   edges: WorkflowEdge[];
 }
 
+export interface WorkflowDocumentationMeta {
+  generatedAt: Date;
+  version: number;
+}
+
 export interface Workflow {
   id: string;
   name: string;
@@ -30,4 +35,5 @@ export interface Workflow {
   createdAt: Date;
   updatedAt: Date;
   executionCount: number;
+  documentation: WorkflowDocumentationMeta | null;
 }
