@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
@@ -6,6 +6,9 @@ import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
+import { UnsavedChangesModal } from '@/components/editor/UnsavedChangesModal';
+import { saveWorkflow } from '@/components/editor/saveWorkflow';
+import { useUnsavedChangesGuard } from '@/components/editor/useUnsavedChangesGuard';
 import { getWorkflow } from '@/api/workflows';
 import { useEditorStore } from '@/stores/editorStore';
 
@@ -19,6 +22,10 @@ export function WorkflowEditorPage() {
   const isDirty = useEditorStore((s) => s.isDirty);
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [fetchKey, setFetchKey] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const blocker = useUnsavedChangesGuard(isDirty);
 
   const entryRoute = useMemo(() => {
     const candidate = (location.state as { from?: unknown } | null)?.from;
@@ -53,15 +60,28 @@ export function WorkflowEditorPage() {
     };
   }, [resetEditor]);
 
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [isDirty]);
+  const handleSaveAndProceed = useCallback(async () => {
+    if (!id) return;
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      await saveWorkflow(id);
+      blocker.proceed?.();
+    } catch {
+      setSaveError('Save failed. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [id, blocker]);
+
+  const handleDiscard = useCallback(() => {
+    blocker.proceed?.();
+  }, [blocker]);
+
+  const handleStay = useCallback(() => {
+    setSaveError(null);
+    blocker.reset?.();
+  }, [blocker]);
 
   if (status === 'loading') {
     return (
@@ -97,6 +117,14 @@ export function WorkflowEditorPage() {
         </div>
         <NodeConfigPanel />
       </ReactFlowProvider>
+      <UnsavedChangesModal
+        open={blocker.state === 'blocked'}
+        onSave={handleSaveAndProceed}
+        onDiscard={handleDiscard}
+        onStay={handleStay}
+        isSaving={isSaving}
+        saveError={saveError}
+      />
     </div>
   );
 }
