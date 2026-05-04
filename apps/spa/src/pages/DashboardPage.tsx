@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import type { Workflow } from '@tietide/shared';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
-import { useAuthStore } from '@/stores/authStore';
 import { WorkflowCard } from '@/components/dashboard/WorkflowCard';
 import { NewWorkflowModal } from '@/components/dashboard/NewWorkflowModal';
 import { DeleteWorkflowDialog } from '@/components/dashboard/DeleteWorkflowDialog';
@@ -16,7 +15,6 @@ const errorMessage = (err: unknown, fallback: string): string =>
 export function DashboardPage(): JSX.Element {
   const navigate = useNavigate();
   const { workflows, status, error, fetch, create, remove, toggleActive } = useWorkflowsStore();
-  const logout = useAuthStore((s) => s.logout);
   const toast = useToastStore((s) => s.show);
 
   const [showCreate, setShowCreate] = useState(false);
@@ -54,13 +52,8 @@ export function DashboardPage(): JSX.Element {
     }
   };
 
-  const handleSignOut = (): void => {
-    logout();
-    navigate('/login', { replace: true });
-  };
-
   return (
-    <div className="min-h-screen bg-deep-blue text-text-primary">
+    <div className="flex flex-col">
       <header className="border-b border-white/5 bg-surface">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
@@ -69,30 +62,21 @@ export function DashboardPage(): JSX.Element {
               Build, automate, and monitor your integrations.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-text-secondary transition hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal"
-            >
-              Sign out
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowCreate(true)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
-                'hover:bg-accent-teal-hover focus:outline-none focus:ring-1 focus:ring-accent-teal',
-              )}
-            >
-              <Plus aria-hidden="true" className="h-4 w-4" />
-              New workflow
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
+              'hover:bg-accent-teal-hover focus:outline-none focus:ring-1 focus:ring-accent-teal',
+            )}
+          >
+            <Plus aria-hidden="true" className="h-4 w-4" />
+            New workflow
+          </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
+      <main className="mx-auto w-full max-w-6xl px-6 py-8">
         {status === 'loading' && workflows.length === 0 && (
           <p className="text-sm text-text-secondary">Loading workflows…</p>
         )}
