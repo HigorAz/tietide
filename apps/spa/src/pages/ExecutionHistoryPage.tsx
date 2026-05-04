@@ -86,7 +86,7 @@ export function ExecutionHistoryPage(): JSX.Element {
   );
 
   return (
-    <div className="min-h-screen bg-deep-blue text-text-primary">
+    <div className="flex flex-col">
       <header className="border-b border-white/5 bg-surface">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
@@ -110,7 +110,7 @@ export function ExecutionHistoryPage(): JSX.Element {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-4 px-6 py-6">
+      <main className="mx-auto w-full max-w-6xl space-y-4 px-6 py-6">
         <section
           aria-label="Filters"
           className="flex flex-wrap items-end gap-4 rounded-lg border border-white/5 bg-surface p-4"
