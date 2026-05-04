@@ -99,6 +99,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           onClick={handleRun}
           disabled={runDisabled}
           icon={<Play size={16} aria-hidden />}
+          dataTour="editor-run"
         />
         <ToolbarButton
           label={isSaving ? 'Saving…' : 'Save'}
@@ -128,14 +129,16 @@ interface ToolbarButtonProps {
   icon: React.ReactNode;
   disabled?: boolean;
   primary?: boolean;
+  dataTour?: string;
 }
 
-function ToolbarButton({ label, onClick, icon, disabled, primary }: ToolbarButtonProps) {
+function ToolbarButton({ label, onClick, icon, disabled, primary, dataTour }: ToolbarButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      data-tour={dataTour}
       className={cn(
         'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium',
         'transition focus:outline-none focus:ring-1 focus:ring-accent-teal',
