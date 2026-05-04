@@ -8,6 +8,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { ExecutionsModule } from './executions/executions.module';
+import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { SecretsModule } from './secrets/secrets.module';
 import { CryptoModule } from './crypto/crypto.module';
@@ -29,6 +30,7 @@ import { DemoModule } from './demo/demo.module';
     AuthModule,
     WorkflowsModule,
     ExecutionsModule,
+    UsageModule,
     WebhooksModule,
     SecretsModule,
     AiModule,

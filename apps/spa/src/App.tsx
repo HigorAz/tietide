@@ -3,6 +3,7 @@ import { WorkflowEditorPage } from '@/pages/WorkflowEditorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
 import { HomePage } from '@/pages/HomePage';
+import { DashboardPage } from '@/pages/DashboardPage';
 import { WorkflowsPage } from '@/pages/WorkflowsPage';
 import { ExecutionHistoryPage } from '@/pages/ExecutionHistoryPage';
 import { ExecutionDetailPage } from '@/pages/ExecutionDetailPage';
@@ -25,7 +26,7 @@ const router = createBrowserRouter([
         ),
         children: [
           { path: '/', element: <HomePage /> },
-          { path: '/dashboard', element: <PlaceholderPage title="Dashboard" /> },
+          { path: '/dashboard', element: <DashboardPage /> },
           { path: '/workflows', element: <WorkflowsPage /> },
           { path: '/workflows/:id', element: <WorkflowEditorPage /> },
           { path: '/workflows/:id/executions', element: <ExecutionHistoryPage /> },
