@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { HelpCircle, LogOut, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
+import { useOnboardingStore } from '@/stores/onboardingStore';
 import { cn } from '@/utils/cn';
 
 export interface SidebarFooterProps {
@@ -11,9 +12,10 @@ export interface SidebarFooterProps {
 export function SidebarFooter({ collapsed }: SidebarFooterProps): JSX.Element {
   const navigate = useNavigate();
   const logout = useAuthStore((s) => s.logout);
+  const openHelpDrawer = useOnboardingStore((s) => s.openHelpDrawer);
 
   const handleHelp = (): void => {
-    // Stub: HelpDrawer is wired in issue A4.
+    openHelpDrawer();
   };
 
   const handleSettings = (): void => {

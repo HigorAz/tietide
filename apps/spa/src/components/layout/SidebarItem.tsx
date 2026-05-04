@@ -7,6 +7,7 @@ export interface SidebarItemProps {
   label: string;
   icon: LucideIcon;
   collapsed: boolean;
+  tourTarget?: string;
 }
 
 const isPathActive = (pathname: string, to: string): boolean => {
@@ -14,7 +15,13 @@ const isPathActive = (pathname: string, to: string): boolean => {
   return pathname === to || pathname.startsWith(`${to}/`);
 };
 
-export function SidebarItem({ to, label, icon: Icon, collapsed }: SidebarItemProps): JSX.Element {
+export function SidebarItem({
+  to,
+  label,
+  icon: Icon,
+  collapsed,
+  tourTarget,
+}: SidebarItemProps): JSX.Element {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const active = isPathActive(pathname, to);
@@ -24,6 +31,7 @@ export function SidebarItem({ to, label, icon: Icon, collapsed }: SidebarItemPro
       type="button"
       onClick={() => navigate(to)}
       data-active={active ? 'true' : 'false'}
+      data-tour={tourTarget}
       title={collapsed ? label : undefined}
       aria-label={collapsed ? label : undefined}
       className={cn(
