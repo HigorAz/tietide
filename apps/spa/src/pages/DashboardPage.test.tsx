@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import type { Workflow } from '@tietide/shared';
+
+function LocationStatePeek(): JSX.Element {
+  const location = useLocation();
+  const from = (location.state as { from?: unknown } | null)?.from;
+  return <div data-testid="peek-from">{typeof from === 'string' ? from : ''}</div>;
+}
 
 vi.mock('@/api/workflows', () => ({
   listWorkflows: vi.fn(),
@@ -130,6 +136,47 @@ describe('DashboardPage', () => {
     await user.click(await screen.findByRole('button', { name: /open alpha/i }));
 
     expect(await screen.findByText(/editor for workflow/i)).toBeInTheDocument();
+  });
+
+  it('passes from=/dashboard in location state when opening a workflow (issue #104)', async () => {
+    const user = userEvent.setup();
+    mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Toaster />
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/workflows/:id" element={<LocationStatePeek />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /open alpha/i }));
+
+    expect(await screen.findByTestId('peek-from')).toHaveTextContent('/dashboard');
+  });
+
+  it('passes from=/dashboard in location state when creating a workflow (issue #104)', async () => {
+    const user = userEvent.setup();
+    mockedList.mockResolvedValueOnce([]);
+    mockedCreate.mockResolvedValueOnce(makeWorkflow({ id: 'new', name: 'New' }));
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Toaster />
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/workflows/:id" element={<LocationStatePeek />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole('button', { name: /new workflow/i }));
+    await user.type(await screen.findByLabelText(/name/i), 'New');
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+    expect(await screen.findByTestId('peek-from')).toHaveTextContent('/dashboard');
   });
 
   it('shows an error banner with a retry button when the list request fails', async () => {

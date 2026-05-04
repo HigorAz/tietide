@@ -50,24 +50,66 @@ describe('EditorToolbar', () => {
 
   describe('rendering', () => {
     it('should render Save, Undo, Redo, and Run buttons', () => {
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /undo/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /redo/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /run/i })).toBeInTheDocument();
     });
+
+    it('should render a Back button (issue #104)', () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument();
+    });
+  });
+
+  describe('Back button (issue #104)', () => {
+    it('should navigate to entryRoute when clicked while not dirty', async () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/dashboard" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /^back$/i }));
+
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard');
+    });
+
+    it('should navigate to entryRoute even when dirty (the page-level guard intercepts)', async () => {
+      // The toolbar itself does not check dirty state — useBlocker at the page
+      // level intercepts the navigation. The button always triggers navigate().
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/library" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /^back$/i }));
+
+      expect(mockNavigate).toHaveBeenCalledWith('/library');
+    });
+  });
+
+  describe('Dirty indicator (issue #104)', () => {
+    it('should not render the unsaved-changes indicator when the store is clean', () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      expect(screen.queryByLabelText(/unsaved changes/i)).not.toBeInTheDocument();
+    });
+
+    it('should render the unsaved-changes indicator when the store is dirty', () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      expect(screen.getByLabelText(/unsaved changes/i)).toBeInTheDocument();
+    });
   });
 
   describe('Save', () => {
     it('should be disabled when the store is not dirty', () => {
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
       expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
     });
 
     it('should be enabled after a mutation dirties the store', () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       expect(screen.getByRole('button', { name: /save/i })).toBeEnabled();
     });
@@ -75,7 +117,7 @@ describe('EditorToolbar', () => {
     it('should call updateWorkflow with the serialized definition on click', async () => {
       useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 10, y: 20 });
       mockedUpdate.mockResolvedValueOnce(savedResponse);
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /save/i }));
 
@@ -98,7 +140,7 @@ describe('EditorToolbar', () => {
     it('should clear isDirty and re-disable Save after a successful save', async () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
       mockedUpdate.mockResolvedValueOnce(savedResponse);
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
       const saveButton = screen.getByRole('button', { name: /save/i });
 
       await userEvent.click(saveButton);
@@ -110,7 +152,7 @@ describe('EditorToolbar', () => {
     it('should keep isDirty true when the save request rejects', async () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
       mockedUpdate.mockRejectedValueOnce(new Error('boom'));
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /save/i }));
 
@@ -122,19 +164,19 @@ describe('EditorToolbar', () => {
 
   describe('Undo and Redo', () => {
     it('should disable Undo when the past stack is empty', () => {
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
       expect(screen.getByRole('button', { name: /undo/i })).toBeDisabled();
     });
 
     it('should enable Undo after a mutation pushes a snapshot', () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
       expect(screen.getByRole('button', { name: /undo/i })).toBeEnabled();
     });
 
     it('should disable Redo until an undo has occurred', async () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
       const redoButton = screen.getByRole('button', { name: /redo/i });
       expect(redoButton).toBeDisabled();
 
@@ -145,7 +187,7 @@ describe('EditorToolbar', () => {
 
     it('should invoke store.undo and store.redo on click', async () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /undo/i }));
       expect(useEditorStore.getState().nodes).toHaveLength(0);
@@ -168,13 +210,13 @@ describe('EditorToolbar', () => {
 
     it('should be enabled when the workflow has unsaved changes (auto-saves on click)', () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
       expect(screen.getByRole('button', { name: /run/i })).toBeEnabled();
     });
 
     it('should call executeWorkflow and navigate to execution detail on success', async () => {
       mockedExecute.mockResolvedValueOnce(executionResponse);
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
@@ -186,7 +228,7 @@ describe('EditorToolbar', () => {
       useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 5, y: 5 });
       mockedUpdate.mockResolvedValueOnce(savedResponse);
       mockedExecute.mockResolvedValueOnce(executionResponse);
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
@@ -199,7 +241,7 @@ describe('EditorToolbar', () => {
     it('should not call executeWorkflow when the auto-save fails', async () => {
       useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 5, y: 5 });
       mockedUpdate.mockRejectedValueOnce(new Error('save boom'));
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
@@ -210,7 +252,7 @@ describe('EditorToolbar', () => {
 
     it('should show an error toast and not navigate when execution fails to enqueue', async () => {
       mockedExecute.mockRejectedValueOnce(new Error('boom'));
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
@@ -226,7 +268,7 @@ describe('EditorToolbar', () => {
     it('should push a success toast when save succeeds', async () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
       mockedUpdate.mockResolvedValueOnce(savedResponse);
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /save/i }));
 
@@ -241,7 +283,7 @@ describe('EditorToolbar', () => {
     it('should push an error toast when save fails', async () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
       mockedUpdate.mockRejectedValueOnce(new Error('boom'));
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /save/i }));
 
@@ -262,7 +304,7 @@ describe('EditorToolbar', () => {
         idempotencyKey: null,
         createdAt: '2026-05-03T15:39:00.997Z',
       });
-      render(<EditorToolbar workflowId="wf-1" />);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 

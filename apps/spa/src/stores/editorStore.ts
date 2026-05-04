@@ -29,6 +29,7 @@ export interface EditorState {
   selectedNodeId: string | null;
   past: EditorSnapshot[];
   future: EditorSnapshot[];
+  entryRoute: string | null;
 }
 
 export interface EditorActions {
@@ -42,7 +43,11 @@ export interface EditorActions {
   updateNodeConfig: (id: string, patch: Record<string, unknown>) => void;
   undo: () => void;
   redo: () => void;
-  loadWorkflow: (payload: { id: string; definition: WorkflowDefinition }) => void;
+  loadWorkflow: (payload: {
+    id: string;
+    definition: WorkflowDefinition;
+    entryRoute?: string;
+  }) => void;
   markSaved: () => void;
   resetEditor: () => void;
 }
@@ -57,6 +62,7 @@ export const initialEditorState: EditorState = {
   selectedNodeId: null,
   past: [],
   future: [],
+  entryRoute: null,
 };
 
 const generateNodeId = (): string => {
@@ -208,7 +214,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       });
     },
 
-    loadWorkflow: ({ id, definition }) => {
+    loadWorkflow: ({ id, definition, entryRoute }) => {
       const { nodes, edges } = fromWorkflowDefinition(definition);
       set({
         workflowId: id,
@@ -218,6 +224,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         selectedNodeId: null,
         past: [],
         future: [],
+        entryRoute: entryRoute ?? null,
       });
     },
 
