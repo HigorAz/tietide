@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { WorkflowEditorPage } from '@/pages/WorkflowEditorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { HomePage } from '@/pages/HomePage';
 import { WorkflowsPage } from '@/pages/WorkflowsPage';
 import { ExecutionHistoryPage } from '@/pages/ExecutionHistoryPage';
 import { ExecutionDetailPage } from '@/pages/ExecutionDetailPage';
@@ -23,7 +24,7 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          { path: '/', element: <Navigate to="/workflows" replace /> },
+          { path: '/', element: <HomePage /> },
           { path: '/dashboard', element: <PlaceholderPage title="Dashboard" /> },
           { path: '/workflows', element: <WorkflowsPage /> },
           { path: '/workflows/:id', element: <WorkflowEditorPage /> },
