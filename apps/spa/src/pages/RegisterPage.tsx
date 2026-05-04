@@ -1,9 +1,10 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerFormSchema, type RegisterFormValues } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
+import { useToastStore } from '@/stores/toastStore';
+import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 
 const inputClasses = cn(
@@ -24,7 +25,7 @@ const getStatus = (err: unknown): number | undefined =>
 export function RegisterPage(): JSX.Element {
   const navigate = useNavigate();
   const registerUser = useAuthStore((s) => s.register);
-  const [submitError, setSubmitError] = useState<string | null>(null);
+  const toast = useToastStore((s) => s.show);
 
   const {
     register,
@@ -36,17 +37,14 @@ export function RegisterPage(): JSX.Element {
   });
 
   const onSubmit = handleSubmit(async (values) => {
-    setSubmitError(null);
     try {
       await registerUser(values);
       navigate('/login', { replace: true, state: { justRegistered: true } });
     } catch (err) {
       const status = getStatus(err);
-      if (status === 409) {
-        setSubmitError('Email already registered');
-      } else {
-        setSubmitError('Something went wrong. Please try again.');
-      }
+      const message =
+        status === 409 ? 'Email already registered' : 'Something went wrong. Please try again.';
+      toast({ tone: 'error', message });
     }
   });
 
@@ -114,22 +112,17 @@ export function RegisterPage(): JSX.Element {
             )}
           </div>
 
-          {submitError && (
-            <p className="rounded-md bg-error/10 px-3 py-2 text-sm text-error" role="alert">
-              {submitError}
-            </p>
-          )}
-
           <button
             type="submit"
             disabled={isSubmitting}
             className={cn(
-              'w-full rounded-md bg-accent-teal px-4 py-2 text-sm font-semibold text-deep-blue',
+              'inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent-teal px-4 py-2 text-sm font-semibold text-deep-blue',
               'transition-colors hover:bg-accent-teal-hover',
               'disabled:cursor-not-allowed disabled:opacity-60',
             )}
           >
-            {isSubmitting ? 'Creating account…' : 'Create account'}
+            {isSubmitting && <Spinner size="sm" label="Creating account" />}
+            <span>{isSubmitting ? 'Creating account…' : 'Create account'}</span>
           </button>
         </form>
 
