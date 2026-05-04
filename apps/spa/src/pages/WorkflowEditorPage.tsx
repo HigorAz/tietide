@@ -92,7 +92,7 @@ export function WorkflowEditorPage() {
         <NodeLibrary />
         <div className="relative flex-1">
           <Canvas />
-          <EditorToolbar workflowId={id} />
+          <EditorToolbar workflowId={id} entryRoute={entryRoute} />
           <DocumentationPanel workflowId={id} />
         </div>
         <NodeConfigPanel />
