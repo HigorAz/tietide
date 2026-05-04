@@ -55,7 +55,7 @@ const renderPage = (workflowId = 'wf-1'): ReturnType<typeof render> =>
       <Routes>
         <Route path="/workflows/:id/executions" element={<ExecutionHistoryPage />} />
         <Route path="/executions/:id" element={<div>Execution detail page</div>} />
-        <Route path="/dashboard" element={<div>Dashboard page</div>} />
+        <Route path="/workflows" element={<div>Workflows page</div>} />
       </Routes>
     </MemoryRouter>,
   );

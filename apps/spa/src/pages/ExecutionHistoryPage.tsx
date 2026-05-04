@@ -91,8 +91,8 @@ export function ExecutionHistoryPage(): JSX.Element {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <Link
-              to="/dashboard"
-              aria-label="Back to dashboard"
+              to="/workflows"
+              aria-label="Back to workflows"
               className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-text-secondary hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal"
             >
               <ArrowLeft size={14} aria-hidden />
