@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@radix-ui/react-tabs": "^1.1.13",
     "@tietide/shared": "workspace:*",
     "axios": "^1.15.0",
     "clsx": "^2.1.1",

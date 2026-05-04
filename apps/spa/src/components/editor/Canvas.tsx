@@ -1,12 +1,15 @@
 import { useCallback, useState, type DragEvent } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, useReactFlow, type Node } from 'reactflow';
+import ReactFlow, { Background, Controls, useReactFlow, type Node } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { NodeType } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import { edgeTypes } from './edges';
+import { InspectorDock } from './InspectorDock';
 import { nodeTypes } from './nodes';
 import { NODE_LIBRARY_DRAG_MIME } from './NodeLibrary';
+
+const FIT_VIEW_OPTIONS = { padding: 0.4, minZoom: 0.5 } as const;
 
 export const CANVAS_DROP_MIME = NODE_LIBRARY_DRAG_MIME;
 
@@ -87,11 +90,12 @@ export function Canvas() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
+        fitViewOptions={FIT_VIEW_OPTIONS}
       >
         <Background gap={16} color="#1A3050" />
         <Controls />
-        <MiniMap pannable zoomable />
       </ReactFlow>
+      <InspectorDock />
       {isDragActive && (
         <div
           aria-hidden
