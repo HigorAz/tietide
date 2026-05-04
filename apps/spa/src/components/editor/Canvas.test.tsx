@@ -4,8 +4,9 @@ import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { NodeType } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 
-const { screenToFlowPositionMock } = vi.hoisted(() => ({
+const { screenToFlowPositionMock, lastReactFlowProps } = vi.hoisted(() => ({
   screenToFlowPositionMock: vi.fn((p: { x: number; y: number }) => ({ x: p.x, y: p.y })),
+  lastReactFlowProps: { current: null as Record<string, unknown> | null },
 }));
 
 vi.mock('reactflow/dist/style.css', () => ({}));
@@ -14,25 +15,31 @@ interface MockReactFlowProps {
   children?: React.ReactNode;
   onNodeClick?: (event: React.MouseEvent, node: { id: string }) => void;
   onPaneClick?: (event: React.MouseEvent) => void;
+  fitView?: boolean;
+  fitViewOptions?: { padding?: number; minZoom?: number; maxZoom?: number };
 }
 
 vi.mock('reactflow', () => ({
   __esModule: true,
-  default: ({ children, onNodeClick, onPaneClick }: MockReactFlowProps) => (
-    <div data-testid="reactflow-stub">
-      <button
-        type="button"
-        data-testid="trigger-node-click"
-        onClick={(e) => onNodeClick?.(e, { id: 'node-mock-123' })}
-      >
-        click node
-      </button>
-      <button type="button" data-testid="trigger-pane-click" onClick={(e) => onPaneClick?.(e)}>
-        click pane
-      </button>
-      {children}
-    </div>
-  ),
+  default: (props: MockReactFlowProps) => {
+    lastReactFlowProps.current = props as unknown as Record<string, unknown>;
+    const { children, onNodeClick, onPaneClick } = props;
+    return (
+      <div data-testid="reactflow-stub">
+        <button
+          type="button"
+          data-testid="trigger-node-click"
+          onClick={(e) => onNodeClick?.(e, { id: 'node-mock-123' })}
+        >
+          click node
+        </button>
+        <button type="button" data-testid="trigger-pane-click" onClick={(e) => onPaneClick?.(e)}>
+          click pane
+        </button>
+        {children}
+      </div>
+    );
+  },
   Background: () => null,
   Controls: () => null,
   MiniMap: () => null,
@@ -56,6 +63,19 @@ describe('Canvas', () => {
   beforeEach(() => {
     useEditorStore.setState({ ...initialEditorState });
     screenToFlowPositionMock.mockClear();
+    lastReactFlowProps.current = null;
+  });
+
+  describe('viewport configuration', () => {
+    it('should pass fitView with padding 0.4 and minZoom 0.5 to React Flow', () => {
+      render(<Canvas />);
+      expect(lastReactFlowProps.current).not.toBeNull();
+      expect(lastReactFlowProps.current?.fitView).toBe(true);
+      expect(lastReactFlowProps.current?.fitViewOptions).toEqual({
+        padding: 0.4,
+        minZoom: 0.5,
+      });
+    });
   });
 
   describe('dragOver', () => {
