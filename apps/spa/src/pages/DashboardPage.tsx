@@ -25,7 +25,7 @@ export function DashboardPage(): JSX.Element {
   }, [fetch]);
 
   const handleOpen = (id: string): void => {
-    navigate(`/workflows/${id}`);
+    navigate(`/workflows/${id}`, { state: { from: '/dashboard' } });
   };
 
   const handleToggle = async (id: string, next: boolean): Promise<void> => {
@@ -40,7 +40,7 @@ export function DashboardPage(): JSX.Element {
   const handleCreate = async (body: Parameters<typeof create>[0]): Promise<void> => {
     const created = await create(body);
     setShowCreate(false);
-    navigate(`/workflows/${created.id}`);
+    navigate(`/workflows/${created.id}`, { state: { from: '/dashboard' } });
   };
 
   const handleDeleteConfirm = async (id: string): Promise<void> => {

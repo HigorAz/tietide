@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 import { WorkflowEditorPage } from '@/pages/WorkflowEditorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
@@ -10,33 +10,36 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
 import { Toaster } from '@/components/ui/Toaster';
 
+const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
+  { path: '/register', element: <RegisterPage /> },
+  {
+    element: (
+      <ProtectedRoute>
+        <AppShell />
+      </ProtectedRoute>
+    ),
+    children: [
+      { path: '/', element: <Navigate to="/dashboard" replace /> },
+      { path: '/dashboard', element: <DashboardPage /> },
+      { path: '/workflows', element: <PlaceholderPage title="Workflows" /> },
+      { path: '/workflows/:id', element: <WorkflowEditorPage /> },
+      { path: '/workflows/:id/executions', element: <ExecutionHistoryPage /> },
+      { path: '/executions/:id', element: <ExecutionDetailPage /> },
+      { path: '/history', element: <PlaceholderPage title="History" /> },
+      { path: '/library', element: <PlaceholderPage title="Library" /> },
+      { path: '/connections', element: <PlaceholderPage title="Connections" /> },
+      { path: '/settings', element: <PlaceholderPage title="Account settings" /> },
+    ],
+  },
+  { path: '*', element: <Navigate to="/login" replace /> },
+]);
+
 export default function App() {
   return (
-    <BrowserRouter>
+    <>
       <Toaster />
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route
-          element={
-            <ProtectedRoute>
-              <AppShell />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/workflows" element={<PlaceholderPage title="Workflows" />} />
-          <Route path="/workflows/:id" element={<WorkflowEditorPage />} />
-          <Route path="/workflows/:id/executions" element={<ExecutionHistoryPage />} />
-          <Route path="/executions/:id" element={<ExecutionDetailPage />} />
-          <Route path="/history" element={<PlaceholderPage title="History" />} />
-          <Route path="/library" element={<PlaceholderPage title="Library" />} />
-          <Route path="/connections" element={<PlaceholderPage title="Connections" />} />
-          <Route path="/settings" element={<PlaceholderPage title="Account settings" />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
+      <RouterProvider router={router} />
+    </>
   );
 }

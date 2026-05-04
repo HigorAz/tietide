@@ -1,7 +1,8 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router-dom';
 import { NodeType, type Workflow } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 
@@ -23,10 +24,11 @@ vi.mock('@/api/workflows', () => ({
   updateWorkflow: vi.fn(),
 }));
 
-import { getWorkflow } from '@/api/workflows';
+import { getWorkflow, updateWorkflow } from '@/api/workflows';
 import { WorkflowEditorPage } from './WorkflowEditorPage';
 
 const mockedGet = vi.mocked(getWorkflow);
+const mockedUpdate = vi.mocked(updateWorkflow);
 
 const sampleWorkflow: Workflow = {
   id: 'wf-abc',
@@ -52,19 +54,34 @@ const sampleWorkflow: Workflow = {
   executionCount: 0,
 };
 
-const renderAtId = (id: string) =>
-  render(
-    <MemoryRouter initialEntries={[`/workflows/${id}`]}>
-      <Routes>
-        <Route path="/workflows/:id" element={<WorkflowEditorPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+interface RenderOptions {
+  id?: string;
+  state?: unknown;
+}
+
+const buildRouter = ({ id = 'wf-abc', state }: RenderOptions = {}) => {
+  const routes: RouteObject[] = [
+    { path: '/workflows/:id', element: <WorkflowEditorPage /> },
+    { path: '/dashboard', element: <div data-testid="dashboard">Dashboard</div> },
+    { path: '/workflows', element: <div data-testid="workflows-list">Workflows</div> },
+    { path: '/library', element: <div data-testid="library">Library</div> },
+  ];
+  return createMemoryRouter(routes, {
+    initialEntries: [{ pathname: `/workflows/${id}`, state }],
+  });
+};
+
+const renderAtId = (id: string, state?: unknown) => {
+  const router = buildRouter({ id, state });
+  const view = render(<RouterProvider router={router} />);
+  return { ...view, router };
+};
 
 describe('WorkflowEditorPage', () => {
   beforeEach(() => {
     useEditorStore.setState({ ...initialEditorState });
     mockedGet.mockReset();
+    mockedUpdate.mockReset();
   });
 
   it('should show a loading state while the workflow request is in flight', () => {
@@ -99,6 +116,33 @@ describe('WorkflowEditorPage', () => {
     await waitFor(() => expect(screen.getByText(/failed to load workflow/i)).toBeInTheDocument());
   });
 
+  it('should default entryRoute to /workflows when no location state is supplied', async () => {
+    mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+    renderAtId('wf-abc');
+
+    await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+    expect(useEditorStore.getState().entryRoute).toBe('/workflows');
+  });
+
+  it('should use location.state.from as entryRoute when present', async () => {
+    mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+    renderAtId('wf-abc', { from: '/dashboard' });
+
+    await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+    expect(useEditorStore.getState().entryRoute).toBe('/dashboard');
+  });
+
+  it('should fall back to /workflows when location.state.from is not a valid path', async () => {
+    mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+    renderAtId('wf-abc', { from: 'not-a-path' });
+
+    await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+    expect(useEditorStore.getState().entryRoute).toBe('/workflows');
+  });
+
   it('should reset the editor store on unmount', async () => {
     mockedGet.mockResolvedValueOnce(sampleWorkflow);
 
@@ -110,5 +154,142 @@ describe('WorkflowEditorPage', () => {
     const state = useEditorStore.getState();
     expect(state.nodes).toHaveLength(0);
     expect(state.workflowId).toBeNull();
+  });
+
+  describe('unsaved changes guard (issue #104)', () => {
+    const mountAndDirty = async () => {
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      const view = renderAtId('wf-abc');
+      await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 50, y: 50 });
+      expect(useEditorStore.getState().isDirty).toBe(true);
+      return view;
+    };
+
+    it('should not block in-app navigation when the editor is clean', async () => {
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      const { router } = renderAtId('wf-abc');
+      await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+
+      await router.navigate('/dashboard');
+
+      await waitFor(() => expect(screen.getByTestId('dashboard')).toBeInTheDocument());
+      expect(screen.queryByRole('heading', { name: /unsaved changes/i })).not.toBeInTheDocument();
+    });
+
+    it('should open the modal when navigating in-app while dirty', async () => {
+      const { router } = await mountAndDirty();
+
+      void router.navigate('/dashboard');
+
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: /unsaved changes/i })).toBeInTheDocument(),
+      );
+      // The page is still the editor — navigation was blocked.
+      expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument();
+    });
+
+    it('Stay should close the modal and keep the user on the editor', async () => {
+      const { router } = await mountAndDirty();
+
+      void router.navigate('/dashboard');
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: /unsaved changes/i })).toBeInTheDocument(),
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /^stay$/i }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: /unsaved changes/i })).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument();
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+
+    it('Discard should proceed with the navigation without saving', async () => {
+      const { router } = await mountAndDirty();
+
+      void router.navigate('/dashboard');
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: /unsaved changes/i })).toBeInTheDocument(),
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /^discard$/i }));
+
+      await waitFor(() => expect(screen.getByTestId('dashboard')).toBeInTheDocument());
+      expect(mockedUpdate).not.toHaveBeenCalled();
+    });
+
+    it('Save should call updateWorkflow then proceed with the navigation', async () => {
+      const { router } = await mountAndDirty();
+      mockedUpdate.mockResolvedValueOnce({ ...sampleWorkflow, version: 2 });
+
+      void router.navigate('/dashboard');
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: /unsaved changes/i })).toBeInTheDocument(),
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+      await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByTestId('dashboard')).toBeInTheDocument());
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('Save failure should keep the modal open and surface an error', async () => {
+      const { router } = await mountAndDirty();
+      mockedUpdate.mockRejectedValueOnce(new Error('boom'));
+
+      void router.navigate('/dashboard');
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: /unsaved changes/i })).toBeInTheDocument(),
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/save failed/i));
+      expect(screen.queryByTestId('dashboard')).not.toBeInTheDocument();
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+
+    it('after a successful save the next navigation is unblocked (markSaved releases the guard)', async () => {
+      const { router } = await mountAndDirty();
+      mockedUpdate.mockResolvedValueOnce({ ...sampleWorkflow, version: 2 });
+
+      // First navigation — modal opens, Save resolves, we proceed.
+      void router.navigate('/dashboard');
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { name: /unsaved changes/i })).toBeInTheDocument(),
+      );
+      await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+      await waitFor(() => expect(screen.getByTestId('dashboard')).toBeInTheDocument());
+
+      // Now navigate elsewhere — clean store, no modal.
+      await router.navigate('/library');
+      await waitFor(() => expect(screen.getByTestId('library')).toBeInTheDocument());
+      expect(screen.queryByRole('heading', { name: /unsaved changes/i })).not.toBeInTheDocument();
+    });
+
+    it('should attach a beforeunload listener that prevents the event when dirty', async () => {
+      await mountAndDirty();
+
+      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+      window.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    it('should detach the beforeunload listener after markSaved', async () => {
+      await mountAndDirty();
+
+      useEditorStore.getState().markSaved();
+      // Allow the effect cleanup to run.
+      await waitFor(() => expect(useEditorStore.getState().isDirty).toBe(false));
+
+      const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+      window.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+    });
   });
 });

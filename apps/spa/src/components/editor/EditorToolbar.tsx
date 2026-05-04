@@ -1,24 +1,23 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Redo2, Save, Undo2 } from 'lucide-react';
+import { ArrowLeft, Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
-import { updateWorkflow } from '@/api/workflows';
 import { executeWorkflow } from '@/api/executions';
 import { cn } from '@/utils/cn';
-import { toWorkflowDefinition } from './serialization';
+import { saveWorkflow } from './saveWorkflow';
 
 interface EditorToolbarProps {
   workflowId: string;
+  entryRoute: string;
 }
 
-export function EditorToolbar({ workflowId }: EditorToolbarProps) {
+export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const isDirty = useEditorStore((s) => s.isDirty);
   const past = useEditorStore((s) => s.past);
   const future = useEditorStore((s) => s.future);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
-  const markSaved = useEditorStore((s) => s.markSaved);
   const toast = useToastStore((s) => s.show);
   const navigate = useNavigate();
 
@@ -27,31 +26,23 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
-    const { nodes, edges } = useEditorStore.getState();
     setIsSaving(true);
     try {
-      await updateWorkflow(workflowId, {
-        definition: toWorkflowDefinition(nodes, edges),
-      });
-      markSaved();
+      await saveWorkflow(workflowId);
       toast({ tone: 'success', message: 'Workflow saved' });
     } catch {
       toast({ tone: 'error', message: 'Save failed. Please try again.' });
     } finally {
       setIsSaving(false);
     }
-  }, [isSaving, markSaved, toast, workflowId]);
+  }, [isSaving, toast, workflowId]);
 
   const handleRun = useCallback(async () => {
     if (isRunning || isSaving) return;
     setIsRunning(true);
     try {
       if (useEditorStore.getState().isDirty) {
-        const { nodes, edges } = useEditorStore.getState();
-        await updateWorkflow(workflowId, {
-          definition: toWorkflowDefinition(nodes, edges),
-        });
-        markSaved();
+        await saveWorkflow(workflowId);
       }
       const execution = await executeWorkflow(workflowId);
       toast({ tone: 'success', message: 'Execution started' });
@@ -61,7 +52,7 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
     } finally {
       setIsRunning(false);
     }
-  }, [isRunning, isSaving, markSaved, navigate, toast, workflowId]);
+  }, [isRunning, isSaving, navigate, toast, workflowId]);
 
   const saveDisabled = !isDirty || isSaving;
   const runDisabled = isRunning || isSaving;
@@ -69,40 +60,65 @@ export function EditorToolbar({ workflowId }: EditorToolbarProps) {
   const redoDisabled = future.length === 0;
 
   return (
-    <div
-      data-testid="editor-toolbar"
-      className={cn(
-        'pointer-events-auto absolute right-4 top-4 z-10 flex items-center gap-2',
-        'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
-      )}
-    >
-      <ToolbarButton
-        label="Undo"
-        onClick={undo}
-        disabled={undoDisabled}
-        icon={<Undo2 size={16} aria-hidden />}
-      />
-      <ToolbarButton
-        label="Redo"
-        onClick={redo}
-        disabled={redoDisabled}
-        icon={<Redo2 size={16} aria-hidden />}
-      />
-      <div aria-hidden className="mx-1 h-5 w-px bg-white/10" />
-      <ToolbarButton
-        label={isRunning ? 'Running…' : 'Run'}
-        onClick={handleRun}
-        disabled={runDisabled}
-        icon={<Play size={16} aria-hidden />}
-      />
-      <ToolbarButton
-        label={isSaving ? 'Saving…' : 'Save'}
-        onClick={handleSave}
-        disabled={saveDisabled}
-        primary
-        icon={<Save size={16} aria-hidden />}
-      />
-    </div>
+    <>
+      <div
+        data-testid="editor-toolbar-back"
+        className={cn(
+          'pointer-events-auto absolute left-4 top-4 z-10 flex items-center',
+          'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
+        )}
+      >
+        <ToolbarButton
+          label="Back"
+          onClick={() => navigate(entryRoute)}
+          icon={<ArrowLeft size={16} aria-hidden />}
+        />
+      </div>
+      <div
+        data-testid="editor-toolbar"
+        className={cn(
+          'pointer-events-auto absolute right-4 top-4 z-10 flex items-center gap-2',
+          'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
+        )}
+      >
+        <ToolbarButton
+          label="Undo"
+          onClick={undo}
+          disabled={undoDisabled}
+          icon={<Undo2 size={16} aria-hidden />}
+        />
+        <ToolbarButton
+          label="Redo"
+          onClick={redo}
+          disabled={redoDisabled}
+          icon={<Redo2 size={16} aria-hidden />}
+        />
+        <div aria-hidden className="mx-1 h-5 w-px bg-white/10" />
+        <ToolbarButton
+          label={isRunning ? 'Running…' : 'Run'}
+          onClick={handleRun}
+          disabled={runDisabled}
+          icon={<Play size={16} aria-hidden />}
+        />
+        <ToolbarButton
+          label={isSaving ? 'Saving…' : 'Save'}
+          onClick={handleSave}
+          disabled={saveDisabled}
+          primary
+          icon={
+            <span className="relative inline-flex">
+              <Save size={16} aria-hidden />
+              {isDirty && (
+                <span
+                  aria-label="Unsaved changes"
+                  className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-warning"
+                />
+              )}
+            </span>
+          }
+        />
+      </div>
+    </>
   );
 }
 
