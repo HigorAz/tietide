@@ -13,6 +13,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^@tietide/shared$': '<rootDir>/../../../packages/shared/src/index.ts',
+    '^@tietide/crypto$': '<rootDir>/../../../packages/crypto/src/index.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };

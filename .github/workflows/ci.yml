@@ -37,7 +37,7 @@ jobs:
         run: pnpm --filter @tietide/api db:generate
 
       - name: Build workspace packages
-        run: pnpm --filter @tietide/shared --filter @tietide/sdk run build
+        run: pnpm --filter @tietide/shared --filter @tietide/sdk --filter @tietide/crypto run build
 
       - name: Lint
         run: pnpm -r --if-present run lint

@@ -69,6 +69,7 @@ describe('WorkflowRunner', () => {
 
     secretResolver = {
       getSecret: jest.fn(async () => 'resolved-secret'),
+      releaseExecution: jest.fn(),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -387,6 +388,35 @@ describe('WorkflowRunner', () => {
       await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
 
       expect(secretResolver.getSecret).toHaveBeenCalledWith('exec-1', 'api-key');
+    });
+
+    it('should call SecretResolver.releaseExecution exactly once after a successful run', async () => {
+      registry.register(makeExecutor('a'));
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({ executionId: 'exec-release-ok', workflowId: 'wf-1', definition: def });
+
+      expect(secretResolver.releaseExecution).toHaveBeenCalledTimes(1);
+      expect(secretResolver.releaseExecution).toHaveBeenCalledWith('exec-release-ok');
+    });
+
+    it('should call SecretResolver.releaseExecution exactly once even when a node throws', async () => {
+      registry.register(
+        makeExecutor('a', async () => {
+          throw new Error('boom');
+        }),
+      );
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      const result = await runner.run({
+        executionId: 'exec-release-fail',
+        workflowId: 'wf-1',
+        definition: def,
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(secretResolver.releaseExecution).toHaveBeenCalledTimes(1);
+      expect(secretResolver.releaseExecution).toHaveBeenCalledWith('exec-release-fail');
     });
 
     it('should return FAILED when topologicalSort detects a circular dependency', async () => {
