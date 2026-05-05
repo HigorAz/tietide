@@ -20,6 +20,7 @@ COPY apps/worker/package.json apps/worker/
 COPY apps/spa/package.json apps/spa/
 COPY packages/shared/package.json packages/shared/
 COPY packages/sdk/package.json packages/sdk/
+COPY packages/crypto/package.json packages/crypto/
 COPY packages/eslint-config/package.json packages/eslint-config/
 
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
@@ -31,6 +32,7 @@ COPY apps/api apps/api
 
 RUN pnpm --filter @tietide/shared run build \
     && pnpm --filter @tietide/sdk run build \
+    && pnpm --filter @tietide/crypto run build \
     && pnpm --filter @tietide/api run build
 
 # Strip dev dependencies for the runtime stage.

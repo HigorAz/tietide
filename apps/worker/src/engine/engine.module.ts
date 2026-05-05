@@ -7,7 +7,8 @@ import { CronTrigger } from '../nodes/triggers/cron-trigger';
 import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
 import { EngineService } from './engine.service';
 import { WorkflowRunner } from './workflow-runner';
-import { SECRET_RESOLVER, StubSecretResolver } from './secret-resolver';
+import { SECRET_RESOLVER } from './secret-resolver';
+import { PrismaSecretResolver } from './prisma-secret-resolver';
 
 @Module({
   providers: [
@@ -19,7 +20,7 @@ import { SECRET_RESOLVER, StubSecretResolver } from './secret-resolver';
     WebhookTrigger,
     HttpRequestAction,
     Conditional,
-    { provide: SECRET_RESOLVER, useClass: StubSecretResolver },
+    { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
   ],
   exports: [EngineService, NodeRegistry],
 })
