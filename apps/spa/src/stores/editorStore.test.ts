@@ -40,12 +40,18 @@ describe('editorStore', () => {
 
     it('should mark the store dirty after adding a node', () => {
       expect(useEditorStore.getState().isDirty).toBe(false);
-      useEditorStore.getState().addNode(NodeType.CODE, { x: 0, y: 0 });
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
       expect(useEditorStore.getState().isDirty).toBe(true);
     });
 
     it('should be a no-op when the node type is not in the catalog', () => {
       useEditorStore.getState().addNode('not-a-real-type' as unknown as NodeType, { x: 0, y: 0 });
+      expect(useEditorStore.getState().nodes).toHaveLength(0);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('should be a no-op when the node type is in FORBIDDEN_NODE_TYPES (e.g. code)', () => {
+      useEditorStore.getState().addNode(NodeType.CODE, { x: 0, y: 0 });
       expect(useEditorStore.getState().nodes).toHaveLength(0);
       expect(useEditorStore.getState().isDirty).toBe(false);
     });
@@ -392,7 +398,7 @@ describe('editorStore', () => {
     it('should flip skipped on every selected non-trigger node', () => {
       const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
       addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
-      addNode(NodeType.CODE, { x: 100, y: 0 });
+      addNode(NodeType.CONDITIONAL, { x: 100, y: 0 });
       const ids = useEditorStore.getState().nodes.map((n) => n.id);
       onNodesChange(ids.map((id) => ({ id, type: 'select', selected: true })));
 
@@ -406,7 +412,7 @@ describe('editorStore', () => {
     it('should leave unselected nodes untouched', () => {
       const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
       addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
-      addNode(NodeType.CODE, { x: 100, y: 0 });
+      addNode(NodeType.CONDITIONAL, { x: 100, y: 0 });
       const [first, second] = useEditorStore.getState().nodes;
       onNodesChange([{ id: first.id, type: 'select', selected: true }]);
 
@@ -461,7 +467,7 @@ describe('editorStore', () => {
     it('should push exactly one undo snapshot for an atomic multi-node toggle', () => {
       const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
       addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
-      addNode(NodeType.CODE, { x: 100, y: 0 });
+      addNode(NodeType.CONDITIONAL, { x: 100, y: 0 });
       const ids = useEditorStore.getState().nodes.map((n) => n.id);
       onNodesChange(ids.map((id) => ({ id, type: 'select', selected: true })));
       const pastBefore = useEditorStore.getState().past.length;

@@ -1,14 +1,34 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { NodeType } from '@tietide/shared';
+import { NODE_CATALOG, NodeType } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { NodeConfigPanel } from './NodeConfigPanel';
 
+// Bypasses editorStore.addNode (which blocks forbidden types per FORBIDDEN_NODE_TYPES)
+// so we can verify form dispatch for any node type — including types that exist in
+// loaded definitions but cannot be added via the palette.
 const seedNodeOfType = (nodeType: NodeType): string => {
-  useEditorStore.setState({ ...initialEditorState });
-  useEditorStore.getState().addNode(nodeType, { x: 0, y: 0 });
-  const nodeId = useEditorStore.getState().nodes[0].id;
-  useEditorStore.getState().selectNode(nodeId);
+  const def = NODE_CATALOG.find((d) => d.type === nodeType);
+  if (!def) throw new Error(`Unknown node type: ${nodeType}`);
+  const nodeId = `node-test-${nodeType}`;
+  useEditorStore.setState({
+    ...initialEditorState,
+    nodes: [
+      {
+        id: nodeId,
+        type: 'custom',
+        position: { x: 0, y: 0 },
+        data: {
+          label: def.name,
+          description: def.description,
+          nodeType: def.type,
+          status: 'idle',
+          config: {},
+        },
+      },
+    ],
+    selectedNodeId: nodeId,
+  });
   return nodeId;
 };
 
