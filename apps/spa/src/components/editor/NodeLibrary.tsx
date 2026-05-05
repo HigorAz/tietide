@@ -1,5 +1,10 @@
 import { useMemo, useState, type DragEvent } from 'react';
-import { NODE_CATALOG, NodeCategory, type NodeTypeDefinition } from '@tietide/shared';
+import {
+  FORBIDDEN_NODE_TYPES,
+  NODE_CATALOG,
+  NodeCategory,
+  type NodeTypeDefinition,
+} from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { getNodeIcon } from './nodes/nodeIcons';
 
@@ -26,7 +31,9 @@ export function NodeLibrary() {
   const [query, setQuery] = useState('');
 
   const sections = useMemo<SectionData[]>(() => {
-    const filtered = NODE_CATALOG.filter((def) => matches(def, query));
+    const filtered = NODE_CATALOG.filter(
+      (def) => !FORBIDDEN_NODE_TYPES.has(def.type) && matches(def, query),
+    );
     const triggers = filtered.filter((def) => groupForSidebar(def.category) === 'triggers');
     const actions = filtered.filter((def) => groupForSidebar(def.category) === 'actions');
     return [

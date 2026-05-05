@@ -20,9 +20,12 @@ export {
   workflowNodeSchema,
   workflowEdgeSchema,
   workflowDefinitionSchema,
+  executableWorkflowDefinitionSchema,
   createWorkflowSchema,
   updateWorkflowSchema,
+  FORBIDDEN_NODE_TYPES,
 } from './schemas/workflow.schema.js';
+export { ZodError } from 'zod';
 export {
   httpRequestConfigSchema,
   conditionalConfigSchema,
