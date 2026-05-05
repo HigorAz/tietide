@@ -6,10 +6,12 @@ import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
+import { ShortcutCheatsheet } from '@/components/editor/ShortcutCheatsheet';
 import { UnsavedChangesModal } from '@/components/editor/UnsavedChangesModal';
 import { saveWorkflow } from '@/components/editor/saveWorkflow';
 import { useUnsavedChangesGuard } from '@/components/editor/useUnsavedChangesGuard';
 import { getWorkflow } from '@/api/workflows';
+import { useEditorHotkeys } from '@/hooks/useEditorHotkeys';
 import { useEditorStore } from '@/stores/editorStore';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
@@ -24,8 +26,17 @@ export function WorkflowEditorPage() {
   const [fetchKey, setFetchKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showCheatsheet, setShowCheatsheet] = useState(false);
 
   const blocker = useUnsavedChangesGuard(isDirty);
+
+  const handleShowCheatsheet = useCallback(() => setShowCheatsheet(true), []);
+  const handleCloseCheatsheet = useCallback(() => setShowCheatsheet(false), []);
+
+  useEditorHotkeys({
+    workflowId: id ?? '',
+    onShowCheatsheet: handleShowCheatsheet,
+  });
 
   const entryRoute = useMemo(() => {
     const candidate = (location.state as { from?: unknown } | null)?.from;
@@ -125,6 +136,7 @@ export function WorkflowEditorPage() {
         isSaving={isSaving}
         saveError={saveError}
       />
+      <ShortcutCheatsheet open={showCheatsheet} onClose={handleCloseCheatsheet} />
     </div>
   );
 }

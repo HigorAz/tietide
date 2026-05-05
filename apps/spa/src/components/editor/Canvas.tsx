@@ -224,6 +224,7 @@ export function Canvas() {
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         multiSelectionKeyCode={[...MULTI_SELECT_KEYS]}
+        panActivationKeyCode="Space"
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
       >
