@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NodeType } from '@tietide/shared';
+import { buildClipboardPayload, CLIPBOARD_VERSION, type ClipboardPayload } from '@/lib/clipboard';
 import { initialEditorState, useEditorStore } from './editorStore';
 
 describe('editorStore', () => {
@@ -259,6 +260,126 @@ describe('editorStore', () => {
       onNodesChange([{ id: second.id, type: 'remove' }]);
 
       expect(useEditorStore.getState().selectedNodeId).toBe(first.id);
+    });
+  });
+
+  describe('pasteFromClipboardPayload', () => {
+    const buildPayloadFromCurrent = (): ClipboardPayload => {
+      const { nodes, edges } = useEditorStore.getState();
+      return buildClipboardPayload(nodes, edges);
+    };
+
+    it('should append the pasted nodes onto the current node list', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const payload = buildPayloadFromCurrent();
+
+      useEditorStore.getState().pasteFromClipboardPayload(payload);
+
+      expect(useEditorStore.getState().nodes).toHaveLength(2);
+    });
+
+    it('should return the array of new node ids', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.CRON_TRIGGER, { x: 100, y: 0 });
+      const payload = buildPayloadFromCurrent();
+
+      const ids = useEditorStore.getState().pasteFromClipboardPayload(payload);
+
+      expect(ids).toHaveLength(2);
+      ids.forEach((id) => expect(id).toMatch(/^node-/));
+    });
+
+    it('should set isDirty: true (AC #9)', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const payload = buildPayloadFromCurrent();
+      useEditorStore.setState({ isDirty: false });
+
+      useEditorStore.getState().pasteFromClipboardPayload(payload);
+
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+
+    it('should push an undo snapshot so the paste can be reverted', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const payload = buildPayloadFromCurrent();
+      const before = useEditorStore.getState().nodes.length;
+
+      useEditorStore.getState().pasteFromClipboardPayload(payload);
+      expect(useEditorStore.getState().nodes.length).toBe(before + 1);
+
+      useEditorStore.getState().undo();
+      expect(useEditorStore.getState().nodes.length).toBe(before);
+    });
+
+    it('should generate ids that do not collide with existing nodes (AC #3)', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const original = useEditorStore.getState().nodes[0];
+      const payload = buildClipboardPayload([original], []);
+
+      useEditorStore.getState().pasteFromClipboardPayload(payload);
+      useEditorStore.getState().pasteFromClipboardPayload(payload);
+
+      const ids = useEditorStore.getState().nodes.map((n) => n.id);
+      expect(ids.length).toBe(3);
+      expect(new Set(ids).size).toBe(3);
+    });
+
+    it('should append correctly after loadWorkflow into a different workflow (AC #6)', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.CRON_TRIGGER, { x: 100, y: 0 });
+      const payload = buildPayloadFromCurrent();
+
+      useEditorStore.getState().loadWorkflow({
+        id: 'wf-other',
+        definition: { nodes: [], edges: [] },
+      });
+      expect(useEditorStore.getState().nodes).toHaveLength(0);
+
+      useEditorStore.getState().pasteFromClipboardPayload(payload);
+
+      expect(useEditorStore.getState().workflowId).toBe('wf-other');
+      expect(useEditorStore.getState().nodes).toHaveLength(2);
+    });
+
+    it('should deselect existing nodes and select the freshly pasted ones', () => {
+      const { addNode, onNodesChange } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const existingId = useEditorStore.getState().nodes[0].id;
+      // mark the existing node as React-Flow-selected
+      onNodesChange([{ id: existingId, type: 'select', selected: true }]);
+      const payload = buildClipboardPayload(
+        useEditorStore.getState().nodes,
+        useEditorStore.getState().edges,
+      );
+
+      const newIds = useEditorStore.getState().pasteFromClipboardPayload(payload);
+
+      const all = useEditorStore.getState().nodes;
+      const existing = all.find((n) => n.id === existingId);
+      const pasted = all.filter((n) => newIds.includes(n.id));
+      expect(existing?.selected).toBeFalsy();
+      expect(pasted.every((n) => n.selected === true)).toBe(true);
+    });
+
+    it('should be a no-op when the payload contains no nodes', () => {
+      const empty: ClipboardPayload = {
+        tietideClipboard: CLIPBOARD_VERSION,
+        nodes: [],
+        edges: [],
+      };
+      const before = { ...useEditorStore.getState() };
+
+      const ids = useEditorStore.getState().pasteFromClipboardPayload(empty);
+
+      expect(ids).toEqual([]);
+      expect(useEditorStore.getState().nodes).toEqual(before.nodes);
+      expect(useEditorStore.getState().isDirty).toBe(false);
     });
   });
 });
