@@ -15,8 +15,19 @@ export interface WorkflowDocumentationResult {
   documentation: string;
   sections: DocumentationSections;
   model: string;
-  cached: boolean;
   generatedAt: Date;
+}
+
+export type LegacyWorkflowDocumentationResult = WorkflowDocumentationResult & {
+  cached: boolean;
+};
+
+interface AuthorizedWorkflow {
+  id: string;
+  userId: string;
+  name: string;
+  definition: Prisma.JsonValue;
+  version: number;
 }
 
 @Injectable()
@@ -28,23 +39,37 @@ export class WorkflowDocumentationService {
     private readonly ai: AiService,
   ) {}
 
-  async generate(userId: string, workflowId: string): Promise<WorkflowDocumentationResult> {
-    const workflow = await this.prisma.workflow.findUnique({
-      where: { id: workflowId },
-      select: { id: true, userId: true, name: true, definition: true, version: true },
-    });
+  async findExisting(
+    userId: string,
+    workflowId: string,
+  ): Promise<WorkflowDocumentationResult | null> {
+    await this.loadAuthorizedWorkflow(userId, workflowId);
 
-    if (!workflow) {
-      throw new NotFoundException('Workflow not found');
-    }
-    if (workflow.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this workflow');
-    }
+    const row = await this.prisma.workflowDocumentation.findUnique({ where: { workflowId } });
+    if (!row) return null;
 
-    const cached = await this.prisma.workflowDocumentation.findUnique({
-      where: { workflowId },
-    });
+    return {
+      workflowId,
+      version: row.version,
+      documentation: row.documentation,
+      sections: row.sections as unknown as DocumentationSections,
+      model: row.model,
+      generatedAt: row.updatedAt,
+    };
+  }
 
+  async regenerate(userId: string, workflowId: string): Promise<WorkflowDocumentationResult> {
+    const workflow = await this.loadAuthorizedWorkflow(userId, workflowId);
+    return this.runAiAndUpsert(workflow);
+  }
+
+  async generateLegacy(
+    userId: string,
+    workflowId: string,
+  ): Promise<LegacyWorkflowDocumentationResult> {
+    const workflow = await this.loadAuthorizedWorkflow(userId, workflowId);
+
+    const cached = await this.prisma.workflowDocumentation.findUnique({ where: { workflowId } });
     if (cached && cached.version === workflow.version) {
       return {
         workflowId,
@@ -57,16 +82,39 @@ export class WorkflowDocumentationService {
       };
     }
 
+    const fresh = await this.runAiAndUpsert(workflow);
+    return { ...fresh, cached: false };
+  }
+
+  private async loadAuthorizedWorkflow(
+    userId: string,
+    workflowId: string,
+  ): Promise<AuthorizedWorkflow> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: { id: true, userId: true, name: true, definition: true, version: true },
+    });
+
+    if (!workflow) {
+      throw new NotFoundException('Workflow not found');
+    }
+    if (workflow.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this workflow');
+    }
+    return workflow;
+  }
+
+  private async runAiAndUpsert(workflow: AuthorizedWorkflow): Promise<WorkflowDocumentationResult> {
     let generated;
     try {
       generated = await this.ai.generateDocs({
-        workflowId,
+        workflowId: workflow.id,
         workflowName: workflow.name,
         definition: workflow.definition as Record<string, unknown>,
       });
     } catch (err) {
       if (err instanceof AiServiceUnavailableError) {
-        this.logger.warn(`AI service unavailable for workflow ${workflowId}`);
+        this.logger.warn(`AI service unavailable for workflow ${workflow.id}`);
         throw new ServiceUnavailableException('AI service temporarily unavailable');
       }
       throw err;
@@ -74,9 +122,9 @@ export class WorkflowDocumentationService {
 
     const sectionsJson = generated.sections as unknown as Prisma.InputJsonValue;
     const row = await this.prisma.workflowDocumentation.upsert({
-      where: { workflowId },
+      where: { workflowId: workflow.id },
       create: {
-        workflowId,
+        workflowId: workflow.id,
         version: workflow.version,
         documentation: generated.documentation,
         sections: sectionsJson,
@@ -91,12 +139,11 @@ export class WorkflowDocumentationService {
     });
 
     return {
-      workflowId,
+      workflowId: workflow.id,
       version: row.version,
       documentation: row.documentation,
       sections: row.sections as unknown as DocumentationSections,
       model: row.model,
-      cached: false,
       generatedAt: row.updatedAt,
     };
   }

@@ -7,7 +7,7 @@ import { WorkflowRow } from '@/components/dashboard/WorkflowRow';
 import { NewWorkflowModal } from '@/components/dashboard/NewWorkflowModal';
 import { DeleteWorkflowDialog } from '@/components/dashboard/DeleteWorkflowDialog';
 import { useToastStore } from '@/stores/toastStore';
-import { generateWorkflowDocs } from '@/api/ai';
+import { getWorkflowDocs, regenerateWorkflowDocs } from '@/api/ai';
 import { cn } from '@/utils/cn';
 
 interface RowDocsState {
@@ -106,10 +106,10 @@ export function WorkflowsPage(): JSX.Element {
     }
   };
 
-  const fetchDocs = async (id: string): Promise<void> => {
+  const regenerateDocs = async (id: string): Promise<void> => {
     updateRowDocs(id, { isGenerating: true, error: null });
     try {
-      const response = await generateWorkflowDocs(id);
+      const response = await regenerateWorkflowDocs(id);
       updateRowDocs(id, {
         isGenerating: false,
         content: response.documentation,
@@ -129,8 +129,40 @@ export function WorkflowsPage(): JSX.Element {
     }
   };
 
+  const viewDocs = async (id: string): Promise<void> => {
+    updateRowDocs(id, { isGenerating: true, error: null });
+    try {
+      const response = await getWorkflowDocs(id);
+      if (!response) {
+        updateRowDocs(id, {
+          isGenerating: false,
+          content: null,
+          error: 'Documentation not available yet. Click Generate to create it.',
+          isExpanded: true,
+        });
+        return;
+      }
+      updateRowDocs(id, {
+        isGenerating: false,
+        content: response.documentation,
+        error: null,
+        isExpanded: true,
+      });
+      setDocumentationMeta(id, {
+        generatedAt: new Date(response.generatedAt),
+        version: response.version,
+      });
+    } catch (err) {
+      updateRowDocs(id, {
+        isGenerating: false,
+        error: errorMessage(err, 'Could not load documentation'),
+        isExpanded: true,
+      });
+    }
+  };
+
   const handleGenerateDocs = (id: string): void => {
-    void fetchDocs(id);
+    void regenerateDocs(id);
   };
 
   const handleToggleDocsExpanded = (id: string): void => {
@@ -141,7 +173,7 @@ export function WorkflowsPage(): JSX.Element {
     }
     updateRowDocs(id, { isExpanded: true });
     if (!state.content) {
-      void fetchDocs(id);
+      void viewDocs(id);
     }
   };
 

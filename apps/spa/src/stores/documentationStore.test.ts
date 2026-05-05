@@ -3,13 +3,15 @@ import { AxiosError } from 'axios';
 import type { WorkflowDocumentationResponse } from '@/api/ai';
 
 vi.mock('@/api/ai', () => ({
-  generateWorkflowDocs: vi.fn(),
+  getWorkflowDocs: vi.fn(),
+  regenerateWorkflowDocs: vi.fn(),
 }));
 
-import { generateWorkflowDocs } from '@/api/ai';
+import { getWorkflowDocs, regenerateWorkflowDocs } from '@/api/ai';
 import { useDocumentationStore } from './documentationStore';
 
-const mockedGenerate = vi.mocked(generateWorkflowDocs);
+const mockedGet = vi.mocked(getWorkflowDocs);
+const mockedRegenerate = vi.mocked(regenerateWorkflowDocs);
 
 const sample: WorkflowDocumentationResponse = {
   workflowId: 'wf-1',
@@ -23,13 +25,13 @@ const sample: WorkflowDocumentationResponse = {
     decisions: 'dec',
   },
   model: 'llama3.1:8b',
-  cached: false,
   generatedAt: '2026-04-26T01:00:00Z',
 };
 
 describe('documentationStore', () => {
   beforeEach(() => {
-    mockedGenerate.mockReset();
+    mockedGet.mockReset();
+    mockedRegenerate.mockReset();
     useDocumentationStore.setState({ status: 'idle', docs: null, error: null });
   });
 
@@ -42,16 +44,51 @@ describe('documentationStore', () => {
     });
   });
 
-  describe('generate', () => {
-    it('should set loading then ready when API resolves', async () => {
+  describe('fetch', () => {
+    it('should set status to ready with docs when the API returns a body', async () => {
+      mockedGet.mockResolvedValueOnce(sample);
+
+      await useDocumentationStore.getState().fetch('wf-1');
+
+      const state = useDocumentationStore.getState();
+      expect(state.status).toBe('ready');
+      expect(state.docs).toEqual(sample);
+      expect(state.error).toBeNull();
+    });
+
+    it('should remain idle with null docs when the API returns null (no docs yet)', async () => {
+      mockedGet.mockResolvedValueOnce(null);
+
+      await useDocumentationStore.getState().fetch('wf-1');
+
+      const state = useDocumentationStore.getState();
+      expect(state.status).toBe('idle');
+      expect(state.docs).toBeNull();
+      expect(state.error).toBeNull();
+    });
+
+    it('should set error status when the API throws', async () => {
+      mockedGet.mockRejectedValueOnce(new Error('network down'));
+
+      await useDocumentationStore.getState().fetch('wf-1');
+
+      const state = useDocumentationStore.getState();
+      expect(state.status).toBe('error');
+      expect(state.error).toBe('network down');
+      expect(state.docs).toBeNull();
+    });
+  });
+
+  describe('regenerate', () => {
+    it('should set loading then ready when regenerate resolves', async () => {
       let resolveFn: (v: WorkflowDocumentationResponse) => void = () => {};
-      mockedGenerate.mockReturnValue(
+      mockedRegenerate.mockReturnValue(
         new Promise<WorkflowDocumentationResponse>((resolve) => {
           resolveFn = resolve;
         }),
       );
 
-      const promise = useDocumentationStore.getState().generate('wf-1');
+      const promise = useDocumentationStore.getState().regenerate('wf-1');
       expect(useDocumentationStore.getState().status).toBe('loading');
       resolveFn(sample);
       await promise;
@@ -71,9 +108,9 @@ describe('documentationStore', () => {
         headers: {},
         config: { headers: {} as never },
       };
-      mockedGenerate.mockRejectedValueOnce(axiosErr);
+      mockedRegenerate.mockRejectedValueOnce(axiosErr);
 
-      await useDocumentationStore.getState().generate('wf-1');
+      await useDocumentationStore.getState().regenerate('wf-1');
       const state = useDocumentationStore.getState();
       expect(state.status).toBe('error');
       expect(state.error).toMatch(/temporarily unavailable/i);
@@ -81,8 +118,8 @@ describe('documentationStore', () => {
     });
 
     it('should set generic error message for unknown failures', async () => {
-      mockedGenerate.mockRejectedValueOnce(new Error('boom'));
-      await useDocumentationStore.getState().generate('wf-1');
+      mockedRegenerate.mockRejectedValueOnce(new Error('boom'));
+      await useDocumentationStore.getState().regenerate('wf-1');
       const state = useDocumentationStore.getState();
       expect(state.status).toBe('error');
       expect(state.error).toBe('boom');

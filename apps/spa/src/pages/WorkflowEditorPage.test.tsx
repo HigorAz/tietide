@@ -24,6 +24,11 @@ vi.mock('@/api/workflows', () => ({
   updateWorkflow: vi.fn(),
 }));
 
+vi.mock('@/api/ai', () => ({
+  getWorkflowDocs: vi.fn().mockResolvedValue(null),
+  regenerateWorkflowDocs: vi.fn(),
+}));
+
 import { getWorkflow, updateWorkflow } from '@/api/workflows';
 import { WorkflowEditorPage } from './WorkflowEditorPage';
 

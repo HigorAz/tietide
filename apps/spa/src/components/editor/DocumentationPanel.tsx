@@ -16,13 +16,19 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
   const status = useDocumentationStore((s) => s.status);
   const docs = useDocumentationStore((s) => s.docs);
   const error = useDocumentationStore((s) => s.error);
-  const generate = useDocumentationStore((s) => s.generate);
+  const fetch = useDocumentationStore((s) => s.fetch);
+  const regenerate = useDocumentationStore((s) => s.regenerate);
   const reset = useDocumentationStore((s) => s.reset);
   const toast = useToastStore((s) => s.show);
 
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
+  const regenerateRequestedRef = useRef(false);
   const previousStatusRef = useRef<typeof status | null>(null);
+
+  useEffect(() => {
+    void fetch(workflowId);
+  }, [fetch, workflowId]);
 
   useEffect(() => {
     if (status === 'ready' || status === 'error' || status === 'loading') {
@@ -34,10 +40,13 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
     const previous = previousStatusRef.current;
     previousStatusRef.current = status;
     if (previous === null) return;
+    if (!regenerateRequestedRef.current) return;
     if (status === 'ready' && previous !== 'ready') {
       toast({ tone: 'success', message: 'Documentation generated' });
+      regenerateRequestedRef.current = false;
     } else if (status === 'error' && previous !== 'error') {
       toast({ tone: 'error', message: error ?? 'Failed to generate documentation' });
+      regenerateRequestedRef.current = false;
     }
   }, [status, error, toast]);
 
@@ -47,11 +56,12 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
     };
   }, [reset]);
 
-  const handleGenerate = useCallback(() => {
+  const handleRegenerate = useCallback(() => {
     if (status === 'loading') return;
     setCopied(false);
-    void generate(workflowId);
-  }, [generate, status, workflowId]);
+    regenerateRequestedRef.current = true;
+    void regenerate(workflowId);
+  }, [regenerate, status, workflowId]);
 
   const handleCopy = useCallback(async () => {
     if (!docs) return;
@@ -76,7 +86,7 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
     <>
       <button
         type="button"
-        onClick={handleGenerate}
+        onClick={handleRegenerate}
         disabled={isLoading}
         className={cn(
           'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium',
@@ -146,7 +156,7 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
                 <p className="mt-1 text-text-secondary">{error}</p>
                 <button
                   type="button"
-                  onClick={handleGenerate}
+                  onClick={handleRegenerate}
                   className="mt-2 rounded bg-accent-teal px-2 py-1 text-xs font-medium text-deep-blue hover:bg-accent-teal-hover"
                 >
                   Retry
@@ -156,11 +166,6 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
 
             {status === 'ready' && docs && (
               <div className="space-y-4">
-                {docs.cached && (
-                  <p className="text-xs text-text-secondary">
-                    Served from cache (workflow unchanged).
-                  </p>
-                )}
                 <Markdown source={docs.documentation} />
                 <dl className="space-y-2 border-t border-white/10 pt-3 text-sm">
                   {(
