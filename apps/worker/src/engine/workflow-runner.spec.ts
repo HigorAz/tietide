@@ -448,6 +448,169 @@ describe('WorkflowRunner', () => {
       expect(exec.execute).toHaveBeenCalledTimes(1);
     });
 
+    describe('node skip toggle', () => {
+      it('should mark a skipped node as SKIPPED and not invoke its executor', async () => {
+        registry.register(makeExecutor('a'));
+        const skipped = makeExecutor('b');
+        registry.register(skipped);
+
+        const def: WorkflowDefinition = {
+          nodes: [node('A', 'a'), { ...node('B', 'b'), skipped: true }],
+          edges: [edge('e1', 'A', 'B')],
+        };
+
+        const result = await runner.run({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          definition: def,
+          triggerData: { origin: 'manual' },
+        });
+
+        expect(result.status).toBe('SUCCESS');
+        expect(skipped.execute).not.toHaveBeenCalled();
+
+        const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+        const bUpdate = updates.find((u) => u.nodeId === 'B');
+        expect(bUpdate).toBeDefined();
+        expect(bUpdate!.status).toBe('SKIPPED');
+      });
+
+      it('should record passthrough output and forwarded input on a skipped step', async () => {
+        registry.register(makeExecutor('a', async () => ({ data: { value: 42 } })));
+        registry.register(makeExecutor('b'));
+
+        const def: WorkflowDefinition = {
+          nodes: [node('A', 'a'), { ...node('B', 'b'), skipped: true }],
+          edges: [edge('e1', 'A', 'B')],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+        const bUpdate = updates.find((u) => u.nodeId === 'B');
+        expect(bUpdate!.inputData).toEqual({ value: 42 });
+        expect(bUpdate!.outputData).toEqual({ skipped: true, passthrough: { value: 42 } });
+      });
+
+      it('should forward upstream input transparently to downstream nodes', async () => {
+        registry.register(makeExecutor('a', async () => ({ data: { value: 42 } })));
+        registry.register(makeExecutor('b'));
+        const c = makeExecutor('c');
+        registry.register(c);
+
+        const def: WorkflowDefinition = {
+          nodes: [node('A', 'a'), { ...node('B', 'b'), skipped: true }, node('C', 'c')],
+          edges: [edge('e1', 'A', 'B'), edge('e2', 'B', 'C')],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(c.execute).toHaveBeenCalledTimes(1);
+        const cInput = c.execute.mock.calls[0][0];
+        expect(cInput.data).toEqual({ value: 42 });
+      });
+
+      it('should chain pass-through across multiple consecutive skipped nodes', async () => {
+        registry.register(makeExecutor('a', async () => ({ data: { value: 42 } })));
+        registry.register(makeExecutor('b'));
+        registry.register(makeExecutor('c'));
+        const d = makeExecutor('d');
+        registry.register(d);
+
+        const def: WorkflowDefinition = {
+          nodes: [
+            node('A', 'a'),
+            { ...node('B', 'b'), skipped: true },
+            { ...node('C', 'c'), skipped: true },
+            node('D', 'd'),
+          ],
+          edges: [edge('e1', 'A', 'B'), edge('e2', 'B', 'C'), edge('e3', 'C', 'D')],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(d.execute).toHaveBeenCalledTimes(1);
+        expect(d.execute.mock.calls[0][0].data).toEqual({ value: 42 });
+
+        const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+        const statusByNode = new Map<string, string>();
+        for (const u of updates) statusByNode.set(u.nodeId as string, u.status as string);
+        expect(statusByNode.get('B')).toBe('SKIPPED');
+        expect(statusByNode.get('C')).toBe('SKIPPED');
+        expect(statusByNode.get('D')).toBe('SUCCESS');
+      });
+
+      it('should still invoke the executor when skipped is explicitly false', async () => {
+        registry.register(makeExecutor('a'));
+        const b = makeExecutor('b');
+        registry.register(b);
+
+        const def: WorkflowDefinition = {
+          nodes: [node('A', 'a'), { ...node('B', 'b'), skipped: false }],
+          edges: [edge('e1', 'A', 'B')],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(b.execute).toHaveBeenCalledTimes(1);
+      });
+
+      it.each([['manual-trigger'], ['cron-trigger'], ['webhook-trigger']])(
+        'should ignore skipped:true on a trigger node (type=%s) and execute it normally',
+        async (triggerType) => {
+          const trigger = makeExecutor(
+            triggerType,
+            async () => ({ data: { fired: true } }),
+            'trigger',
+          );
+          registry.register(trigger);
+
+          const def: WorkflowDefinition = {
+            nodes: [{ ...node('T', triggerType), skipped: true }],
+            edges: [],
+          };
+
+          await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+          expect(trigger.execute).toHaveBeenCalledTimes(1);
+          const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+          const tUpdate = updates.find((u) => u.nodeId === 'T');
+          expect(tUpdate!.status).toBe('SUCCESS');
+        },
+      );
+
+      it('should propagate reachability past a skipped node on a branch edge', async () => {
+        registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
+        registry.register(
+          makeExecutor('if', async () => ({ data: {}, metadata: { branch: 'true' } }), 'logic'),
+        );
+        registry.register(makeExecutor('skipMid'));
+        const truePath = makeExecutor('truePath');
+        registry.register(truePath);
+        registry.register(makeExecutor('falsePath'));
+
+        const def: WorkflowDefinition = {
+          nodes: [
+            node('T', 'trigger'),
+            node('IF', 'if'),
+            { ...node('S', 'skipMid'), skipped: true },
+            node('TRUE', 'truePath'),
+            node('FALSE', 'falsePath'),
+          ],
+          edges: [
+            edge('e1', 'T', 'IF'),
+            edge('e2', 'IF', 'S', 'true'),
+            edge('e3', 'S', 'TRUE'),
+            edge('e4', 'IF', 'FALSE', 'false'),
+          ],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(truePath.execute).toHaveBeenCalledTimes(1);
+      });
+    });
+
     it('should pass node config as params to the executor', async () => {
       const exec = makeExecutor('a');
       registry.register(exec);

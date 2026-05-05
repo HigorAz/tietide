@@ -9,6 +9,7 @@ export const workflowNodeSchema = z.object({
     y: z.number(),
   }),
   config: z.record(z.unknown()),
+  skipped: z.boolean().optional(),
 });
 
 export const workflowEdgeSchema = z.object({

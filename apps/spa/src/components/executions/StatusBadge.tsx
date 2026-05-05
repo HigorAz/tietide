@@ -5,7 +5,7 @@ export interface StatusBadgeProps {
   className?: string;
 }
 
-type Tone = 'success' | 'error' | 'running' | 'pending' | 'cancelled' | 'neutral';
+type Tone = 'success' | 'error' | 'running' | 'pending' | 'cancelled' | 'skipped' | 'neutral';
 
 const TONE_BY_STATUS: Record<string, Tone> = {
   SUCCESS: 'success',
@@ -13,6 +13,7 @@ const TONE_BY_STATUS: Record<string, Tone> = {
   RUNNING: 'running',
   PENDING: 'pending',
   CANCELLED: 'cancelled',
+  SKIPPED: 'skipped',
 };
 
 const TONE_CLASSES: Record<Tone, string> = {
@@ -21,6 +22,7 @@ const TONE_CLASSES: Record<Tone, string> = {
   running: 'bg-accent-teal/15 text-accent-teal',
   pending: 'bg-white/5 text-text-secondary',
   cancelled: 'bg-white/5 text-text-secondary',
+  skipped: 'bg-white/5 text-text-secondary border border-dashed border-text-secondary/40',
   neutral: 'bg-white/5 text-text-secondary',
 };
 

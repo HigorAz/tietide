@@ -13,13 +13,17 @@ export function toWorkflowDefinition(
   edges: Edge[],
 ): WorkflowDefinition {
   return {
-    nodes: nodes.map<WorkflowNode>((n) => ({
-      id: n.id,
-      type: n.data.nodeType,
-      name: n.data.label,
-      position: { x: n.position.x, y: n.position.y },
-      config: n.data.config ?? {},
-    })),
+    nodes: nodes.map<WorkflowNode>((n) => {
+      const base: WorkflowNode = {
+        id: n.id,
+        type: n.data.nodeType,
+        name: n.data.label,
+        position: { x: n.position.x, y: n.position.y },
+        config: n.data.config ?? {},
+      };
+      if (n.data.skipped) base.skipped = true;
+      return base;
+    }),
     edges: edges.map<WorkflowEdge>((e) => {
       const base: WorkflowEdge = { id: e.id, source: e.source, target: e.target };
       if (e.sourceHandle != null) base.sourceHandle = e.sourceHandle;
@@ -35,17 +39,19 @@ export function fromWorkflowDefinition(def: WorkflowDefinition): {
 } {
   const nodes = def.nodes.map<Node<CustomNodeData>>((n) => {
     const catalogEntry = NODE_CATALOG.find((d) => d.type === n.type);
+    const data: CustomNodeData = {
+      label: n.name,
+      description: catalogEntry?.description ?? '',
+      nodeType: n.type as NodeType,
+      status: 'idle',
+      config: n.config ?? {},
+    };
+    if (n.skipped === true) data.skipped = true;
     return {
       id: n.id,
       type: 'custom',
       position: { x: n.position.x, y: n.position.y },
-      data: {
-        label: n.name,
-        description: catalogEntry?.description ?? '',
-        nodeType: n.type as NodeType,
-        status: 'idle',
-        config: n.config ?? {},
-      },
+      data,
     };
   });
 

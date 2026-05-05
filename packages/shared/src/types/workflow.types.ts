@@ -4,6 +4,7 @@ export interface WorkflowNode {
   name: string;
   position: { x: number; y: number };
   config: Record<string, unknown>;
+  skipped?: boolean;
 }
 
 export interface WorkflowEdge {

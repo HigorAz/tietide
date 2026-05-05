@@ -40,9 +40,19 @@ function PayloadBlock({
   );
 }
 
+const isPassthroughOutput = (
+  output: Record<string, unknown> | null,
+): output is { skipped: true; passthrough: Record<string, unknown> } =>
+  output !== null && output.skipped === true && 'passthrough' in output;
+
 export function StepCard({ step }: StepCardProps): JSX.Element {
   const [expanded, setExpanded] = useState(false);
   const isFailed = step.status === 'FAILED';
+  const isSkipped = step.status === 'SKIPPED';
+  const forwardedPayload =
+    isSkipped && isPassthroughOutput(step.outputData)
+      ? (step.outputData.passthrough as Record<string, unknown>)
+      : null;
 
   return (
     <article
@@ -52,7 +62,9 @@ export function StepCard({ step }: StepCardProps): JSX.Element {
         'flex flex-col gap-2 rounded-lg border p-4 text-sm transition',
         isFailed
           ? 'border-error/40 bg-error/5'
-          : 'border-white/5 bg-surface hover:border-accent-teal/30',
+          : isSkipped
+            ? 'border-dashed border-text-secondary/40 bg-surface/60'
+            : 'border-white/5 bg-surface hover:border-accent-teal/30',
       )}
     >
       <header className="flex items-start justify-between gap-3">
@@ -77,6 +89,12 @@ export function StepCard({ step }: StepCardProps): JSX.Element {
         </p>
       )}
 
+      {isSkipped && (
+        <p className="rounded border border-dashed border-text-secondary/40 bg-deep-blue/40 px-2 py-1.5 text-xs italic text-text-secondary">
+          Skipped — pass-through
+        </p>
+      )}
+
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
@@ -90,12 +108,16 @@ export function StepCard({ step }: StepCardProps): JSX.Element {
         {expanded ? 'Hide details' : 'Show details'}
       </button>
 
-      {expanded && (
+      {expanded && isSkipped ? (
+        <div className="mt-1">
+          <PayloadBlock label="Forwarded payload" payload={forwardedPayload} />
+        </div>
+      ) : expanded ? (
         <div className="mt-1 grid gap-3 sm:grid-cols-2">
           <PayloadBlock label="Input" payload={step.inputData} />
           <PayloadBlock label="Output" payload={step.outputData} />
         </div>
-      )}
+      ) : null}
     </article>
   );
 }

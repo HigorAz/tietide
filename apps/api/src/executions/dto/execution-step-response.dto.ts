@@ -16,7 +16,7 @@ export class ExecutionStepResponseDto {
   @ApiProperty()
   nodeName!: string;
 
-  @ApiProperty({ enum: ['PENDING', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'] })
+  @ApiProperty({ enum: ['PENDING', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED', 'SKIPPED'] })
   status!: string;
 
   @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })

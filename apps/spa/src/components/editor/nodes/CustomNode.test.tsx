@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ReactFlowProvider, type NodeProps } from 'reactflow';
 import { NodeType } from '@tietide/shared';
 import { CustomNode } from './CustomNode';
 import type { CustomNodeData } from './CustomNode.types';
+import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 
 type Props = Partial<NodeProps<CustomNodeData>> & { data: CustomNodeData };
 
@@ -167,6 +169,69 @@ describe('CustomNode', () => {
       expect(target?.className).toContain('target');
       expect(source?.className).toContain('source');
     });
+  });
+
+  describe('skip toggle', () => {
+    beforeEach(() => {
+      useEditorStore.setState({ ...initialEditorState });
+    });
+
+    it('should render a skip-toggle button in the header', () => {
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+      expect(screen.getByTestId('custom-node-skip-toggle')).toBeInTheDocument();
+    });
+
+    it('should call editorStore.toggleNodeSkip with the node id when clicked', async () => {
+      const toggleNodeSkip = vi.fn();
+      useEditorStore.setState({ toggleNodeSkip });
+
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+
+      const user = userEvent.setup();
+      await user.click(screen.getByTestId('custom-node-skip-toggle'));
+
+      expect(toggleNodeSkip).toHaveBeenCalledWith('node-1');
+    });
+
+    it('should apply opacity-50 and a dashed outline when data.skipped is true', () => {
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle', skipped: true },
+      });
+      const root = screen.getByTestId('custom-node');
+      expect(root).toHaveAttribute('data-skipped', 'true');
+      expect(root.className).toContain('opacity-50');
+      expect(
+        root.className.includes('border-dashed') || root.className.includes('outline-dashed'),
+      ).toBe(true);
+    });
+
+    it('should render a SKIPPED badge in the node body when data.skipped is true', () => {
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle', skipped: true },
+      });
+      expect(screen.getByTestId('custom-node-skipped-badge')).toHaveTextContent(/skipped/i);
+    });
+
+    it('should not render the SKIPPED badge when data.skipped is falsy', () => {
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+      expect(screen.queryByTestId('custom-node-skipped-badge')).not.toBeInTheDocument();
+    });
+
+    it.each([[NodeType.MANUAL_TRIGGER], [NodeType.CRON_TRIGGER], [NodeType.WEBHOOK_TRIGGER]])(
+      'should not render the skip toggle on trigger nodeType=%s',
+      (nodeType) => {
+        renderNode({
+          data: { label: 'Trigger', nodeType, status: 'idle' },
+        });
+        expect(screen.queryByTestId('custom-node-skip-toggle')).not.toBeInTheDocument();
+      },
+    );
   });
 
   describe('memoization', () => {

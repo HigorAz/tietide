@@ -8,4 +8,5 @@ export interface CustomNodeData {
   nodeType: NodeType;
   status?: NodeStatus;
   config?: Record<string, unknown>;
+  skipped?: boolean;
 }

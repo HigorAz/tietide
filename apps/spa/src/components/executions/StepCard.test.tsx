@@ -64,4 +64,33 @@ describe('StepCard', () => {
 
     expect(screen.getAllByText(/no payload/i)).toHaveLength(2);
   });
+
+  describe('skipped steps', () => {
+    it('shows a "Skipped — pass-through" notice when status is SKIPPED', () => {
+      const step = makeStep({
+        status: 'SKIPPED' as ExecutionStep['status'],
+        inputData: { value: 42 },
+        outputData: { skipped: true, passthrough: { value: 42 } },
+      });
+      render(<StepCard step={step} />);
+
+      expect(screen.getByTestId(`step-card-${step.id}`)).toHaveAttribute('data-status', 'SKIPPED');
+      expect(screen.getByText(/skipped — pass-through/i)).toBeInTheDocument();
+    });
+
+    it('renders a Forwarded payload block on expansion of a skipped step', async () => {
+      const user = userEvent.setup();
+      const step = makeStep({
+        status: 'SKIPPED' as ExecutionStep['status'],
+        inputData: { value: 42 },
+        outputData: { skipped: true, passthrough: { value: 42 } },
+      });
+      render(<StepCard step={step} />);
+
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      expect(screen.getByText(/forwarded payload/i)).toBeInTheDocument();
+      expect(screen.getByText(/"value": 42/)).toBeInTheDocument();
+    });
+  });
 });
