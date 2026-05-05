@@ -1,5 +1,4 @@
-import type { OnModuleInit } from '@nestjs/common';
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CryptoCore, type EncryptedPayload } from '@tietide/crypto';
 
@@ -33,7 +32,7 @@ export class CryptoService implements OnModuleInit {
     try {
       return this.core.decrypt(ciphertext, nonce);
     } catch {
-      throw new InternalServerErrorException('Failed to decrypt secret');
+      throw new Error('Failed to decrypt secret');
     }
   }
 }

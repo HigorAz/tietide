@@ -6,14 +6,10 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  transformIgnorePatterns: ['/node_modules/(?!(?:\\.pnpm/)?uuid)'],
-  collectCoverageFrom: ['**/*.(t|j)s', '!main.ts', '!**/*.module.ts'],
+  collectCoverageFrom: ['**/*.(t|j)s', '!**/index.ts'],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/$1',
-    '^@tietide/crypto$': '<rootDir>/../../../packages/crypto/src/index.ts',
-    '^@tietide/shared$': '<rootDir>/../../../packages/shared/src/index.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 };

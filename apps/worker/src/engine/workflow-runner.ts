@@ -36,6 +36,14 @@ export class WorkflowRunner {
   ) {}
 
   async run(args: RunArgs): Promise<RunResult> {
+    try {
+      return await this.runInner(args);
+    } finally {
+      this.secretResolver.releaseExecution(args.executionId);
+    }
+  }
+
+  private async runInner(args: RunArgs): Promise<RunResult> {
     const { executionId, workflowId, definition, triggerData } = args;
 
     let order: string[];
