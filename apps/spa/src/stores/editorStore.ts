@@ -13,6 +13,7 @@ import {
 import { NODE_CATALOG, type NodeType, type WorkflowDefinition } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { fromWorkflowDefinition } from '@/components/editor/serialization';
+import { remapClipboardIds, type ClipboardPayload } from '@/lib/clipboard';
 
 const HISTORY_LIMIT = 50;
 
@@ -42,6 +43,7 @@ export interface EditorActions {
   selectNode: (id: string | null) => void;
   updateNodeConfig: (id: string, patch: Record<string, unknown>) => void;
   toggleNodeSkip: (id: string) => void;
+  pasteFromClipboardPayload: (payload: ClipboardPayload) => string[];
   undo: () => void;
   redo: () => void;
   loadWorkflow: (payload: {
@@ -200,6 +202,26 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const nextNodes = [...nodes];
       nextNodes[index] = nextNode;
       commit({ nodes: nextNodes });
+    },
+
+    pasteFromClipboardPayload: (payload) => {
+      const prev = get();
+      const { nodes: newNodes, edges: newEdges } = remapClipboardIds(payload);
+      if (newNodes.length === 0) return [];
+
+      const deselected = prev.nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
+      const selectedNew = newNodes.map((n) => ({ ...n, selected: true }));
+
+      set({
+        nodes: [...deselected, ...selectedNew],
+        edges: [...prev.edges, ...newEdges],
+        past: pushSnapshot(prev.past, { nodes: prev.nodes, edges: prev.edges }),
+        future: [],
+        isDirty: true,
+        selectedNodeId: selectedNew.length === 1 ? selectedNew[0].id : null,
+      });
+
+      return selectedNew.map((n) => n.id);
     },
 
     undo: () => {
