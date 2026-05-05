@@ -10,10 +10,15 @@ import {
   type NodeChange,
   type XYPosition,
 } from 'reactflow';
-import { NODE_CATALOG, type NodeType, type WorkflowDefinition } from '@tietide/shared';
+import {
+  NODE_CATALOG,
+  NodeCategory,
+  type NodeType,
+  type WorkflowDefinition,
+} from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { fromWorkflowDefinition } from '@/components/editor/serialization';
-import { remapClipboardIds, type ClipboardPayload } from '@/lib/clipboard';
+import { buildClipboardPayload, remapClipboardIds, type ClipboardPayload } from '@/lib/clipboard';
 
 const HISTORY_LIMIT = 50;
 
@@ -43,6 +48,9 @@ export interface EditorActions {
   selectNode: (id: string | null) => void;
   updateNodeConfig: (id: string, patch: Record<string, unknown>) => void;
   toggleNodeSkip: (id: string) => void;
+  toggleSkipOnSelected: () => void;
+  deleteSelected: () => void;
+  duplicateSelected: () => string[];
   pasteFromClipboardPayload: (payload: ClipboardPayload) => string[];
   undo: () => void;
   redo: () => void;
@@ -202,6 +210,54 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const nextNodes = [...nodes];
       nextNodes[index] = nextNode;
       commit({ nodes: nextNodes });
+    },
+
+    toggleSkipOnSelected: () => {
+      const { nodes } = get();
+      const targets = nodes.filter((n) => {
+        if (n.selected !== true) return false;
+        const cat = NODE_CATALOG.find((d) => d.type === n.data.nodeType)?.category;
+        return cat !== NodeCategory.TRIGGER;
+      });
+      if (targets.length === 0) return;
+
+      const targetIds = new Set(targets.map((n) => n.id));
+      const nextNodes = nodes.map((n) =>
+        targetIds.has(n.id) ? { ...n, data: { ...n.data, skipped: !n.data.skipped } } : n,
+      );
+      commit({ nodes: nextNodes });
+    },
+
+    deleteSelected: () => {
+      const prev = get();
+      const removedIds = new Set(prev.nodes.filter((n) => n.selected === true).map((n) => n.id));
+      if (removedIds.size === 0) return;
+
+      const nextNodes = prev.nodes.filter((n) => !removedIds.has(n.id));
+      const nextEdges = prev.edges.filter(
+        (e) => !removedIds.has(e.source) && !removedIds.has(e.target),
+      );
+      const nextSelection =
+        prev.selectedNodeId !== null && removedIds.has(prev.selectedNodeId)
+          ? null
+          : prev.selectedNodeId;
+
+      set({
+        nodes: nextNodes,
+        edges: nextEdges,
+        selectedNodeId: nextSelection,
+        past: pushSnapshot(prev.past, { nodes: prev.nodes, edges: prev.edges }),
+        future: [],
+        isDirty: true,
+      });
+    },
+
+    duplicateSelected: () => {
+      const prev = get();
+      const selected = prev.nodes.filter((n) => n.selected === true);
+      if (selected.length === 0) return [];
+      const payload = buildClipboardPayload(selected, prev.edges);
+      return get().pasteFromClipboardPayload(payload);
     },
 
     pasteFromClipboardPayload: (payload) => {
