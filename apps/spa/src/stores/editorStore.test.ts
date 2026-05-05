@@ -150,6 +150,55 @@ describe('editorStore', () => {
     });
   });
 
+  describe('toggleNodeSkip', () => {
+    it('should flip an unset skipped flag to true and mark the store dirty', () => {
+      const { addNode, toggleNodeSkip } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+      useEditorStore.setState({ isDirty: false });
+
+      toggleNodeSkip(nodeId);
+
+      expect(useEditorStore.getState().nodes[0].data.skipped).toBe(true);
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+
+    it('should flip skipped back to false on a second call', () => {
+      const { addNode, toggleNodeSkip } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+
+      toggleNodeSkip(nodeId);
+      toggleNodeSkip(nodeId);
+
+      expect(useEditorStore.getState().nodes[0].data.skipped).toBe(false);
+    });
+
+    it('should push a snapshot to past so undo restores the previous skipped state', () => {
+      const { addNode, toggleNodeSkip, undo } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+
+      toggleNodeSkip(nodeId);
+      expect(useEditorStore.getState().nodes[0].data.skipped).toBe(true);
+
+      undo();
+      expect(useEditorStore.getState().nodes[0].data.skipped).toBeFalsy();
+    });
+
+    it('should be a no-op when the target node id does not exist', () => {
+      const { addNode, toggleNodeSkip } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      useEditorStore.setState({ isDirty: false });
+      const snapshot = useEditorStore.getState().nodes;
+
+      toggleNodeSkip('node-does-not-exist');
+
+      expect(useEditorStore.getState().nodes).toEqual(snapshot);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+  });
+
   describe('loadWorkflow', () => {
     it('should default entryRoute to null when no entryRoute is supplied', () => {
       useEditorStore.getState().loadWorkflow({

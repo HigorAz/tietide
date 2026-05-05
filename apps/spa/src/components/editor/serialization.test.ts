@@ -178,6 +178,55 @@ describe('serialization', () => {
     });
   });
 
+  describe('skipped flag', () => {
+    it('should write skipped onto the WorkflowNode when set on data.skipped', () => {
+      const rfNode = makeRfNode({
+        id: 'n-skip',
+        data: {
+          label: 'Skip me',
+          nodeType: NodeType.HTTP_REQUEST,
+          status: 'idle',
+          skipped: true,
+        },
+      });
+
+      const def = toWorkflowDefinition([rfNode], []);
+
+      expect(def.nodes[0].skipped).toBe(true);
+    });
+
+    it('should not include the skipped key when data.skipped is falsy', () => {
+      const rfNode = makeRfNode({
+        id: 'n-no-skip',
+        data: { label: 'Plain', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+
+      const def = toWorkflowDefinition([rfNode], []);
+
+      expect('skipped' in def.nodes[0]).toBe(false);
+    });
+
+    it('should hydrate skipped from a WorkflowNode onto data.skipped', () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'n-1',
+            type: NodeType.HTTP_REQUEST,
+            name: 'Skipped',
+            position: { x: 0, y: 0 },
+            config: {},
+            skipped: true,
+          },
+        ],
+        edges: [],
+      };
+
+      const { nodes } = fromWorkflowDefinition(def);
+
+      expect(nodes[0].data.skipped).toBe(true);
+    });
+  });
+
   describe('round-trip', () => {
     it('should preserve a canonical WorkflowDefinition through from→to', () => {
       const def: WorkflowDefinition = {
