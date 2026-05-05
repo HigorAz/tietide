@@ -263,6 +263,215 @@ describe('editorStore', () => {
     });
   });
 
+  describe('deleteSelected', () => {
+    it('should remove every selected node', () => {
+      const { addNode, onNodesChange, deleteSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      const [first, second] = useEditorStore.getState().nodes;
+      onNodesChange([{ id: first.id, type: 'select', selected: true }]);
+
+      deleteSelected();
+
+      const remaining = useEditorStore.getState().nodes;
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].id).toBe(second.id);
+    });
+
+    it('should drop edges that lose an endpoint after deletion', () => {
+      const { addNode, onNodesChange, onConnect, deleteSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      const [source, target] = useEditorStore.getState().nodes;
+      onConnect({
+        source: source.id,
+        target: target.id,
+        sourceHandle: null,
+        targetHandle: null,
+      });
+      onNodesChange([{ id: source.id, type: 'select', selected: true }]);
+
+      deleteSelected();
+
+      expect(useEditorStore.getState().edges).toHaveLength(0);
+    });
+
+    it('should be a no-op when no nodes are selected', () => {
+      const { addNode, deleteSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      useEditorStore.setState({ isDirty: false });
+      const before = useEditorStore.getState().nodes;
+
+      deleteSelected();
+
+      expect(useEditorStore.getState().nodes).toEqual(before);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+  });
+
+  describe('duplicateSelected', () => {
+    it('should append a copy of every selected node with fresh ids', () => {
+      const { addNode, onNodesChange, duplicateSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      const originalIds = useEditorStore.getState().nodes.map((n) => n.id);
+      onNodesChange(originalIds.map((id) => ({ id, type: 'select', selected: true })));
+
+      duplicateSelected();
+
+      const all = useEditorStore.getState().nodes;
+      expect(all).toHaveLength(4);
+      const newOnes = all.filter((n) => !originalIds.includes(n.id));
+      expect(newOnes).toHaveLength(2);
+      newOnes.forEach((n) => expect(n.id).toMatch(/^node-/));
+    });
+
+    it('should also copy inter-edges between selected nodes', () => {
+      const { addNode, onNodesChange, onConnect, duplicateSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      const [source, target] = useEditorStore.getState().nodes;
+      onConnect({
+        source: source.id,
+        target: target.id,
+        sourceHandle: null,
+        targetHandle: null,
+      });
+      onNodesChange([
+        { id: source.id, type: 'select', selected: true },
+        { id: target.id, type: 'select', selected: true },
+      ]);
+
+      duplicateSelected();
+
+      expect(useEditorStore.getState().edges).toHaveLength(2);
+    });
+
+    it('should select only the freshly duplicated nodes', () => {
+      const { addNode, onNodesChange, duplicateSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const originalId = useEditorStore.getState().nodes[0].id;
+      onNodesChange([{ id: originalId, type: 'select', selected: true }]);
+
+      duplicateSelected();
+
+      const all = useEditorStore.getState().nodes;
+      const original = all.find((n) => n.id === originalId);
+      const duplicated = all.find((n) => n.id !== originalId);
+      expect(original?.selected).toBeFalsy();
+      expect(duplicated?.selected).toBe(true);
+    });
+
+    it('should be a no-op when no nodes are selected', () => {
+      const { addNode, duplicateSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      useEditorStore.setState({ isDirty: false });
+      const before = useEditorStore.getState().nodes;
+
+      duplicateSelected();
+
+      expect(useEditorStore.getState().nodes).toEqual(before);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('should push an undo snapshot so the duplicate can be reverted', () => {
+      const { addNode, onNodesChange, duplicateSelected, undo } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const originalId = useEditorStore.getState().nodes[0].id;
+      onNodesChange([{ id: originalId, type: 'select', selected: true }]);
+
+      duplicateSelected();
+      expect(useEditorStore.getState().nodes).toHaveLength(2);
+
+      undo();
+      expect(useEditorStore.getState().nodes).toHaveLength(1);
+    });
+  });
+
+  describe('toggleSkipOnSelected', () => {
+    it('should flip skipped on every selected non-trigger node', () => {
+      const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.CODE, { x: 100, y: 0 });
+      const ids = useEditorStore.getState().nodes.map((n) => n.id);
+      onNodesChange(ids.map((id) => ({ id, type: 'select', selected: true })));
+
+      toggleSkipOnSelected();
+
+      useEditorStore.getState().nodes.forEach((n) => {
+        expect(n.data.skipped).toBe(true);
+      });
+    });
+
+    it('should leave unselected nodes untouched', () => {
+      const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.CODE, { x: 100, y: 0 });
+      const [first, second] = useEditorStore.getState().nodes;
+      onNodesChange([{ id: first.id, type: 'select', selected: true }]);
+
+      toggleSkipOnSelected();
+
+      const after = useEditorStore.getState().nodes;
+      expect(after.find((n) => n.id === first.id)?.data.skipped).toBe(true);
+      expect(after.find((n) => n.id === second.id)?.data.skipped).toBeFalsy();
+    });
+
+    it('should not toggle skip on trigger nodes even when selected', () => {
+      const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      const [trigger, action] = useEditorStore.getState().nodes;
+      onNodesChange([
+        { id: trigger.id, type: 'select', selected: true },
+        { id: action.id, type: 'select', selected: true },
+      ]);
+
+      toggleSkipOnSelected();
+
+      const after = useEditorStore.getState().nodes;
+      expect(after.find((n) => n.id === trigger.id)?.data.skipped).toBeFalsy();
+      expect(after.find((n) => n.id === action.id)?.data.skipped).toBe(true);
+    });
+
+    it('should flip skipped back to false on a second call (idempotent toggle)', () => {
+      const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const id = useEditorStore.getState().nodes[0].id;
+      onNodesChange([{ id, type: 'select', selected: true }]);
+
+      toggleSkipOnSelected();
+      toggleSkipOnSelected();
+
+      expect(useEditorStore.getState().nodes[0].data.skipped).toBe(false);
+    });
+
+    it('should be a no-op when no nodes are selected', () => {
+      const { addNode, toggleSkipOnSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      useEditorStore.setState({ isDirty: false });
+      const before = useEditorStore.getState().nodes;
+
+      toggleSkipOnSelected();
+
+      expect(useEditorStore.getState().nodes).toEqual(before);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('should push exactly one undo snapshot for an atomic multi-node toggle', () => {
+      const { addNode, onNodesChange, toggleSkipOnSelected } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.CODE, { x: 100, y: 0 });
+      const ids = useEditorStore.getState().nodes.map((n) => n.id);
+      onNodesChange(ids.map((id) => ({ id, type: 'select', selected: true })));
+      const pastBefore = useEditorStore.getState().past.length;
+
+      toggleSkipOnSelected();
+
+      expect(useEditorStore.getState().past.length).toBe(pastBefore + 1);
+    });
+  });
+
   describe('pasteFromClipboardPayload', () => {
     const buildPayloadFromCurrent = (): ClipboardPayload => {
       const { nodes, edges } = useEditorStore.getState();
