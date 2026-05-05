@@ -8,6 +8,7 @@ export enum ExecutionStatusFilter {
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
+  SKIPPED = 'SKIPPED',
 }
 
 export class ExecutionQueryDto {

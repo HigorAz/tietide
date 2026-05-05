@@ -4,6 +4,7 @@ export const ExecutionStatus = {
   SUCCESS: 'SUCCESS',
   FAILED: 'FAILED',
   CANCELLED: 'CANCELLED',
+  SKIPPED: 'SKIPPED',
 } as const;
 
 export type ExecutionStatus = (typeof ExecutionStatus)[keyof typeof ExecutionStatus];

@@ -41,6 +41,7 @@ export interface EditorActions {
   onConnect: (connection: Connection) => void;
   selectNode: (id: string | null) => void;
   updateNodeConfig: (id: string, patch: Record<string, unknown>) => void;
+  toggleNodeSkip: (id: string) => void;
   undo: () => void;
   redo: () => void;
   loadWorkflow: (payload: {
@@ -180,6 +181,21 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const nextNode: Node<CustomNodeData> = {
         ...current,
         data: { ...current.data, config: nextConfig },
+      };
+      const nextNodes = [...nodes];
+      nextNodes[index] = nextNode;
+      commit({ nodes: nextNodes });
+    },
+
+    toggleNodeSkip: (id) => {
+      const { nodes } = get();
+      const index = nodes.findIndex((n) => n.id === id);
+      if (index === -1) return;
+
+      const current = nodes[index];
+      const nextNode: Node<CustomNodeData> = {
+        ...current,
+        data: { ...current.data, skipped: !current.data.skipped },
       };
       const nextNodes = [...nodes];
       nextNodes[index] = nextNode;

@@ -88,6 +88,7 @@ enum ExecutionStatus {
   SUCCESS
   FAILED
   CANCELLED
+  SKIPPED
 }
 
 model ExecutionStep {

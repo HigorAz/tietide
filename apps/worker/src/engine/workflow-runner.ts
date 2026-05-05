@@ -82,6 +82,15 @@ export class WorkflowRunner {
         triggerData,
       );
 
+      if (n.skipped === true) {
+        await this.recordSkipped(executionId, n, input.data);
+        const passthroughOutput: NodeOutput = { data: input.data };
+        outputs.set(n.id, passthroughOutput);
+        executionOrder.push(n.id);
+        this.propagateReachability(passthroughOutput, outgoingEdges.get(n.id) ?? [], reachable);
+        continue;
+      }
+
       const startedAt = new Date();
       const step = await this.prisma.executionStep.create({
         data: {
@@ -195,6 +204,35 @@ export class WorkflowRunner {
     await this.prisma.executionStep.update({
       where: { id: step.id },
       data: { nodeId: n.id, status: 'CANCELLED' },
+    });
+  }
+
+  private async recordSkipped(
+    executionId: string,
+    n: WorkflowNode,
+    forwardedInput: Record<string, unknown>,
+  ): Promise<void> {
+    const startedAt = new Date();
+    const step = await this.prisma.executionStep.create({
+      data: {
+        executionId,
+        nodeId: n.id,
+        nodeType: n.type,
+        nodeName: n.name,
+        status: 'SKIPPED',
+        startedAt,
+      },
+    });
+    await this.prisma.executionStep.update({
+      where: { id: step.id },
+      data: {
+        nodeId: n.id,
+        status: 'SKIPPED',
+        inputData: forwardedInput as object,
+        outputData: { skipped: true, passthrough: forwardedInput } as object,
+        finishedAt: new Date(),
+        durationMs: 0,
+      },
     });
   }
 
