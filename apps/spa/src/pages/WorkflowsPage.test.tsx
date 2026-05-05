@@ -18,7 +18,8 @@ vi.mock('@/api/workflows', () => ({
 }));
 
 vi.mock('@/api/ai', () => ({
-  generateWorkflowDocs: vi.fn(),
+  getWorkflowDocs: vi.fn(),
+  regenerateWorkflowDocs: vi.fn(),
 }));
 
 import * as workflowsApi from '@/api/workflows';
@@ -32,7 +33,8 @@ const mockedList = vi.mocked(workflowsApi.listWorkflows);
 const mockedCreate = vi.mocked(workflowsApi.createWorkflow);
 const mockedDelete = vi.mocked(workflowsApi.deleteWorkflow);
 const mockedToggle = vi.mocked(workflowsApi.toggleWorkflowActive);
-const mockedGenerateDocs = vi.mocked(aiApi.generateWorkflowDocs);
+const mockedGetDocs = vi.mocked(aiApi.getWorkflowDocs);
+const mockedRegenerateDocs = vi.mocked(aiApi.regenerateWorkflowDocs);
 
 const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   id: 'wf-1',
@@ -72,7 +74,8 @@ describe('WorkflowsPage', () => {
     mockedCreate.mockReset();
     mockedDelete.mockReset();
     mockedToggle.mockReset();
-    mockedGenerateDocs.mockReset();
+    mockedGetDocs.mockReset();
+    mockedRegenerateDocs.mockReset();
   });
 
   it('fetches and displays workflows (AC1)', async () => {
@@ -342,7 +345,6 @@ describe('WorkflowsPage', () => {
         decisions: '',
       },
       model: 'llama3.1:8b',
-      cached: false,
       generatedAt: '2026-05-04T11:00:00Z',
     };
 
@@ -375,23 +377,24 @@ describe('WorkflowsPage', () => {
       expect(button).toHaveTextContent(/ago/i);
     });
 
-    it('calls generateWorkflowDocs and auto-expands the row when Generate docs is clicked', async () => {
+    it('calls regenerateWorkflowDocs (POST) and auto-expands when Generate docs is clicked', async () => {
       const user = userEvent.setup();
       mockedList.mockResolvedValueOnce([
         makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
       ]);
-      mockedGenerateDocs.mockResolvedValueOnce(docsResponse);
+      mockedRegenerateDocs.mockResolvedValueOnce(docsResponse);
 
       renderWorkflows();
 
       await user.click(await screen.findByRole('button', { name: /generate docs for alpha/i }));
 
-      await waitFor(() => expect(mockedGenerateDocs).toHaveBeenCalledWith('a'));
+      await waitFor(() => expect(mockedRegenerateDocs).toHaveBeenCalledWith('a'));
+      expect(mockedGetDocs).not.toHaveBeenCalled();
       expect(await screen.findByText(/alpha docs/i)).toBeInTheDocument();
       expect(screen.getByText(/some objective text/i)).toBeInTheDocument();
     });
 
-    it('toggles the inline docs panel via View docs / Hide docs and fetches cached content on first expand', async () => {
+    it('calls getWorkflowDocs (GET) on first expand of the View docs toggle, never the regenerate POST', async () => {
       const user = userEvent.setup();
       const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
       mockedList.mockResolvedValueOnce([
@@ -401,25 +404,46 @@ describe('WorkflowsPage', () => {
           documentation: { generatedAt, version: 1 },
         }),
       ]);
-      mockedGenerateDocs.mockResolvedValueOnce({ ...docsResponse, cached: true });
+      mockedGetDocs.mockResolvedValueOnce(docsResponse);
 
       renderWorkflows();
 
       await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
 
-      await waitFor(() => expect(mockedGenerateDocs).toHaveBeenCalledWith('a'));
+      await waitFor(() => expect(mockedGetDocs).toHaveBeenCalledWith('a'));
+      expect(mockedRegenerateDocs).not.toHaveBeenCalled();
       expect(await screen.findByText(/alpha docs/i)).toBeInTheDocument();
 
       await user.click(await screen.findByRole('button', { name: /hide docs for alpha/i }));
       expect(screen.queryByText(/alpha docs/i)).not.toBeInTheDocument();
     });
 
-    it('shows an inline error with retry when generation fails (no toast spam)', async () => {
+    it('renders an inline empty-state hint when GET returns null (no docs yet) without firing regenerate', async () => {
+      const user = userEvent.setup();
+      const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({
+          id: 'a',
+          name: 'Alpha',
+          documentation: { generatedAt, version: 1 },
+        }),
+      ]);
+      mockedGetDocs.mockResolvedValueOnce(null);
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
+
+      expect(await screen.findByText(/not available yet/i)).toBeInTheDocument();
+      expect(mockedRegenerateDocs).not.toHaveBeenCalled();
+    });
+
+    it('shows an inline error with retry when regeneration fails (no toast spam)', async () => {
       const user = userEvent.setup();
       mockedList.mockResolvedValueOnce([
         makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
       ]);
-      mockedGenerateDocs.mockRejectedValueOnce(new Error('Ollama unreachable'));
+      mockedRegenerateDocs.mockRejectedValueOnce(new Error('Ollama unreachable'));
 
       renderWorkflows();
 

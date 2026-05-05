@@ -36,9 +36,11 @@ export class WorkflowDocumentationResponseDto {
   @ApiProperty({ example: 'llama3.1:8b' })
   model!: string;
 
-  @ApiProperty({ description: 'True when result came from cache (workflow unchanged).' })
-  cached!: boolean;
-
   @ApiProperty({ type: String, format: 'date-time' })
   generatedAt!: Date;
+}
+
+export class LegacyWorkflowDocumentationResponseDto extends WorkflowDocumentationResponseDto {
+  @ApiProperty({ description: 'True when result came from cache (workflow unchanged).' })
+  cached!: boolean;
 }
