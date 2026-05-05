@@ -1,6 +1,7 @@
 import { memo, type MouseEvent } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { SkipForward } from 'lucide-react';
+import { NODE_CATALOG, NodeCategory } from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { useEditorStore } from '@/stores/editorStore';
 import { getNodeIcon } from './nodeIcons';
@@ -17,6 +18,8 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
   const status: NodeStatus = data.status ?? 'idle';
   const Icon = getNodeIcon(data.nodeType);
   const skipped = data.skipped === true;
+  const isTrigger =
+    NODE_CATALOG.find((d) => d.type === data.nodeType)?.category === NodeCategory.TRIGGER;
   const toggleNodeSkip = useEditorStore((s) => s.toggleNodeSkip);
 
   const onSkipClick = (e: MouseEvent<HTMLButtonElement>): void => {
@@ -41,22 +44,24 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
         className="!w-2 !h-2 !bg-accent-teal !border-0"
       />
 
-      <button
-        type="button"
-        data-testid="custom-node-skip-toggle"
-        aria-label={skipped ? 'Resume node' : 'Skip node'}
-        aria-pressed={skipped}
-        onClick={onSkipClick}
-        className={cn(
-          'absolute -top-2 right-0 rounded-full p-1',
-          'bg-elevated/90 border border-white/10 text-text-secondary',
-          'hover:text-accent-teal hover:border-accent-teal',
-          'focus:outline-none focus:ring-2 focus:ring-accent-teal',
-          skipped && 'text-accent-teal border-accent-teal',
-        )}
-      >
-        <SkipForward size={12} strokeWidth={2} aria-hidden />
-      </button>
+      {!isTrigger && (
+        <button
+          type="button"
+          data-testid="custom-node-skip-toggle"
+          aria-label={skipped ? 'Resume node' : 'Skip node'}
+          aria-pressed={skipped}
+          onClick={onSkipClick}
+          className={cn(
+            'absolute -top-2 right-0 rounded-full p-1',
+            'bg-elevated/90 border border-white/10 text-text-secondary',
+            'hover:text-accent-teal hover:border-accent-teal',
+            'focus:outline-none focus:ring-2 focus:ring-accent-teal',
+            skipped && 'text-accent-teal border-accent-teal',
+          )}
+        >
+          <SkipForward size={12} strokeWidth={2} aria-hidden />
+        </button>
+      )}
 
       <div
         data-testid="custom-node-ring"

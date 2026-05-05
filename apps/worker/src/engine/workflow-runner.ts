@@ -1,5 +1,11 @@
 import { Inject, Injectable, Logger as NestLogger } from '@nestjs/common';
-import type { WorkflowDefinition, WorkflowNode, WorkflowEdge } from '@tietide/shared';
+import {
+  NODE_CATALOG,
+  NodeCategory,
+  type WorkflowDefinition,
+  type WorkflowNode,
+  type WorkflowEdge,
+} from '@tietide/shared';
 import type { ExecutionContext, Logger, NodeOutput } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
@@ -82,7 +88,7 @@ export class WorkflowRunner {
         triggerData,
       );
 
-      if (n.skipped === true) {
+      if (n.skipped === true && !this.isTriggerNode(n)) {
         await this.recordSkipped(executionId, n, input.data);
         const passthroughOutput: NodeOutput = { data: input.data };
         outputs.set(n.id, passthroughOutput);
@@ -205,6 +211,10 @@ export class WorkflowRunner {
       where: { id: step.id },
       data: { nodeId: n.id, status: 'CANCELLED' },
     });
+  }
+
+  private isTriggerNode(n: WorkflowNode): boolean {
+    return NODE_CATALOG.find((d) => d.type === n.type)?.category === NodeCategory.TRIGGER;
   }
 
   private async recordSkipped(

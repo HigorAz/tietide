@@ -555,6 +555,30 @@ describe('WorkflowRunner', () => {
         expect(b.execute).toHaveBeenCalledTimes(1);
       });
 
+      it.each([['manual-trigger'], ['cron-trigger'], ['webhook-trigger']])(
+        'should ignore skipped:true on a trigger node (type=%s) and execute it normally',
+        async (triggerType) => {
+          const trigger = makeExecutor(
+            triggerType,
+            async () => ({ data: { fired: true } }),
+            'trigger',
+          );
+          registry.register(trigger);
+
+          const def: WorkflowDefinition = {
+            nodes: [{ ...node('T', triggerType), skipped: true }],
+            edges: [],
+          };
+
+          await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+          expect(trigger.execute).toHaveBeenCalledTimes(1);
+          const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+          const tUpdate = updates.find((u) => u.nodeId === 'T');
+          expect(tUpdate!.status).toBe('SUCCESS');
+        },
+      );
+
       it('should propagate reachability past a skipped node on a branch edge', async () => {
         registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
         registry.register(

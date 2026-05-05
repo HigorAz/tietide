@@ -222,6 +222,16 @@ describe('CustomNode', () => {
       });
       expect(screen.queryByTestId('custom-node-skipped-badge')).not.toBeInTheDocument();
     });
+
+    it.each([[NodeType.MANUAL_TRIGGER], [NodeType.CRON_TRIGGER], [NodeType.WEBHOOK_TRIGGER]])(
+      'should not render the skip toggle on trigger nodeType=%s',
+      (nodeType) => {
+        renderNode({
+          data: { label: 'Trigger', nodeType, status: 'idle' },
+        });
+        expect(screen.queryByTestId('custom-node-skip-toggle')).not.toBeInTheDocument();
+      },
+    );
   });
 
   describe('memoization', () => {
