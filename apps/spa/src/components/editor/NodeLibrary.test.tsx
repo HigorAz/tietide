@@ -12,7 +12,7 @@ const getItem = (label: string): HTMLElement => {
 
 describe('NodeLibrary', () => {
   describe('rendering', () => {
-    it('should render all 6 node types grouped under Triggers and Actions', () => {
+    it('should render the visible node types grouped under Triggers and Actions', () => {
       render(<NodeLibrary />);
 
       const triggers = screen.getByRole('region', { name: /triggers/i });
@@ -23,15 +23,19 @@ describe('NodeLibrary', () => {
 
       const actions = screen.getByRole('region', { name: /actions/i });
       expect(within(actions).getByText('HTTP Request')).toBeInTheDocument();
-      expect(within(actions).getByText('Code')).toBeInTheDocument();
       expect(within(actions).getByText('Conditional (IF)')).toBeInTheDocument();
-      expect(within(actions).queryAllByTestId('node-library-item')).toHaveLength(3);
+      expect(within(actions).queryAllByTestId('node-library-item')).toHaveLength(2);
+    });
+
+    it('should not expose forbidden node types (Code) in the palette', () => {
+      render(<NodeLibrary />);
+      expect(screen.queryByText('Code')).not.toBeInTheDocument();
     });
 
     it('should render an icon, name, and description on every item', () => {
       render(<NodeLibrary />);
       const items = screen.getAllByTestId('node-library-item');
-      expect(items).toHaveLength(6);
+      expect(items).toHaveLength(5);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -81,7 +85,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(6);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(5);
     });
   });
 

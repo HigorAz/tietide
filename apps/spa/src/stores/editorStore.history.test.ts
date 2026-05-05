@@ -47,7 +47,7 @@ describe('editorStore — history and workflow lifecycle', () => {
       undo();
       expect(useEditorStore.getState().future).toHaveLength(1);
 
-      useEditorStore.getState().addNode(NodeType.CODE, { x: 0, y: 0 });
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
 
       expect(useEditorStore.getState().future).toHaveLength(0);
     });
@@ -180,7 +180,7 @@ describe('editorStore — history and workflow lifecycle', () => {
     it('should restore the initial state and clear history + workflowId', () => {
       const { addNode, loadWorkflow, resetEditor } = useEditorStore.getState();
       loadWorkflow({ id: 'wf-9', definition: { nodes: [], edges: [] } });
-      addNode(NodeType.CODE, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
       useEditorStore.getState().selectNode('node-x');
 
       resetEditor();

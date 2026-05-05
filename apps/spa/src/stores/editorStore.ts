@@ -11,6 +11,7 @@ import {
   type XYPosition,
 } from 'reactflow';
 import {
+  FORBIDDEN_NODE_TYPES,
   NODE_CATALOG,
   NodeCategory,
   type NodeType,
@@ -109,6 +110,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     ...initialEditorState,
 
     addNode: (nodeType, position) => {
+      if (FORBIDDEN_NODE_TYPES.has(nodeType)) return;
       const def = NODE_CATALOG.find((d) => d.type === nodeType);
       if (!def) return;
 

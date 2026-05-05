@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { executableWorkflowDefinitionSchema, ZodError } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
@@ -24,6 +25,23 @@ const SAFE_SELECT = {
   documentation: { select: { updatedAt: true, version: true } },
 } as const;
 
+function assertExecutableDefinition(definition: unknown): void {
+  try {
+    executableWorkflowDefinitionSchema.parse(definition);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new BadRequestException({
+        message: 'Workflow definition is not executable',
+        issues: error.issues.map((issue) => ({
+          path: issue.path,
+          message: issue.message,
+        })),
+      });
+    }
+    throw error;
+  }
+}
+
 @Injectable()
 export class WorkflowsService {
   constructor(
@@ -32,6 +50,8 @@ export class WorkflowsService {
   ) {}
 
   async create(userId: string, dto: CreateWorkflowDto): Promise<WorkflowResponseDto> {
+    assertExecutableDefinition(dto.definition);
+
     const row = await this.prisma.workflow.create({
       data: {
         userId,
@@ -91,6 +111,10 @@ export class WorkflowsService {
       throw new BadRequestException(
         'Provide at least one of: name, description, definition, isActive',
       );
+    }
+
+    if (dto.definition !== undefined) {
+      assertExecutableDefinition(dto.definition);
     }
 
     const existing = await this.prisma.workflow.findUnique({

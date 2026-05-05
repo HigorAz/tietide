@@ -136,6 +136,23 @@ describe('WorkflowsService', () => {
         }),
       );
     });
+
+    it('should reject definitions containing a "code" node with BadRequestException', async () => {
+      const definitionWithCode = {
+        ...validDefinition,
+        nodes: [
+          ...validDefinition.nodes,
+          { id: 'n2', type: 'code', name: 'Run JS', position: { x: 100, y: 0 }, config: {} },
+        ],
+      };
+
+      await expect(
+        service.create(userId, { name: 'Demo', definition: definitionWithCode }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.workflow.create).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
+    });
   });
 
   describe('list', () => {
@@ -386,6 +403,22 @@ describe('WorkflowsService', () => {
           resourceId: workflowId,
         }),
       );
+    });
+
+    it('should reject definitions containing a "code" node with BadRequestException', async () => {
+      const definitionWithCode = {
+        ...validDefinition,
+        nodes: [
+          ...validDefinition.nodes,
+          { id: 'n2', type: 'code', name: 'Run JS', position: { x: 100, y: 0 }, config: {} },
+        ],
+      };
+
+      await expect(
+        service.update(userId, workflowId, { definition: definitionWithCode }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.workflow.update).not.toHaveBeenCalled();
     });
   });
 
