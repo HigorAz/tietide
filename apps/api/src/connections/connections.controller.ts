@@ -9,11 +9,13 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Post,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -21,10 +23,12 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { ConnectionType, PROVIDER_CONFIG_SCHEMAS, type ProviderConfigMap } from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ConnectionsService } from './connections.service';
+import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { ConnectionResponseDto } from './dto/connection-response.dto';
 
@@ -41,6 +45,40 @@ export class ConnectionsController {
   @ApiOkResponse({ type: ConnectionResponseDto, isArray: true })
   async list(@CurrentUser() user: AuthenticatedUser): Promise<ConnectionResponseDto[]> {
     return this.connections.list(user.id);
+  }
+
+  @Post()
+  @ApiOperation({
+    summary: 'Create an API-key connection (OAuth connections use /connections/oauth/start)',
+  })
+  @ApiCreatedResponse({ type: ConnectionResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid input or unsupported type/provider' })
+  async create(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateConnectionDto,
+  ): Promise<ConnectionResponseDto> {
+    if (dto.type !== ConnectionType.API_KEY) {
+      throw new BadRequestException(
+        'Only API_KEY connections may be created here. Use /connections/oauth/start for OAuth.',
+      );
+    }
+    const schema = PROVIDER_CONFIG_SCHEMAS[dto.provider as keyof ProviderConfigMap];
+    if (!schema) {
+      throw new BadRequestException(`Unknown provider "${dto.provider}"`);
+    }
+    const result = schema.safeParse(dto.config);
+    if (!result.success) {
+      const issues = result.error.issues
+        .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
+        .join('; ');
+      throw new BadRequestException(`Invalid config for provider "${dto.provider}": ${issues}`);
+    }
+    return this.connections.create(user.id, {
+      type: dto.type,
+      provider: dto.provider,
+      name: dto.name,
+      config: result.data as Record<string, unknown>,
+    });
   }
 
   @Get(':id')
