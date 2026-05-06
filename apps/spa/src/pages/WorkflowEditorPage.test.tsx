@@ -90,6 +90,34 @@ const sampleWorkflow: Workflow = {
   documentation: null,
 };
 
+const sampleExecution = (status: WorkflowExecution['status']): WorkflowExecution => ({
+  id: 'exec-1',
+  workflowId: 'wf-abc',
+  status,
+  triggerType: 'manual',
+  triggerData: null,
+  startedAt: new Date('2026-05-06T10:00:00Z'),
+  finishedAt: null,
+  error: null,
+  createdAt: new Date('2026-05-06T10:00:00Z'),
+});
+
+const sampleStep = (overrides: Partial<ExecutionStep> = {}): ExecutionStep => ({
+  id: 'step-1',
+  executionId: 'exec-1',
+  nodeId: 'n-1',
+  nodeType: 'manual-trigger',
+  nodeName: 'Start',
+  status: 'SUCCESS',
+  inputData: null,
+  outputData: { ok: true },
+  error: null,
+  startedAt: new Date('2026-05-06T10:00:00Z'),
+  finishedAt: new Date('2026-05-06T10:00:01Z'),
+  durationMs: 1000,
+  ...overrides,
+});
+
 interface RenderOptions {
   id?: string;
   state?: unknown;
@@ -206,34 +234,6 @@ describe('WorkflowEditorPage', () => {
   });
 
   describe('live execution overlay (issue #118)', () => {
-    const sampleExecution = (status: WorkflowExecution['status']): WorkflowExecution => ({
-      id: 'exec-1',
-      workflowId: 'wf-abc',
-      status,
-      triggerType: 'manual',
-      triggerData: null,
-      startedAt: new Date('2026-05-06T10:00:00Z'),
-      finishedAt: null,
-      error: null,
-      createdAt: new Date('2026-05-06T10:00:00Z'),
-    });
-
-    const sampleStep = (overrides: Partial<ExecutionStep> = {}): ExecutionStep => ({
-      id: 'step-1',
-      executionId: 'exec-1',
-      nodeId: 'n-1',
-      nodeType: 'manual-trigger',
-      nodeName: 'Start',
-      status: 'SUCCESS',
-      inputData: null,
-      outputData: { ok: true },
-      error: null,
-      startedAt: new Date('2026-05-06T10:00:00Z'),
-      finishedAt: new Date('2026-05-06T10:00:01Z'),
-      durationMs: 1000,
-      ...overrides,
-    });
-
     it('should NOT call the WS singleton when no ?execution param is present', async () => {
       mockedGet.mockResolvedValueOnce(sampleWorkflow);
 
@@ -318,6 +318,51 @@ describe('WorkflowEditorPage', () => {
       renderAtId('wf-abc');
       await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
       expect(mockedSocket.onEvent).toHaveBeenCalled();
+    });
+  });
+
+  describe('historical execution replay mode (issue #119)', () => {
+    it.each(['FAILED', 'CANCELLED'] as const)(
+      'should hydrate replay-only state and skip WS for terminal executions (%s)',
+      async (status) => {
+        useAuthStore.setState({ token: 'jwt-token', user: null });
+        mockedGet.mockResolvedValueOnce(sampleWorkflow);
+        mockedGetExecution.mockResolvedValueOnce(sampleExecution(status));
+        mockedListSteps.mockResolvedValueOnce([sampleStep({ status })]);
+
+        renderAtId('wf-abc', undefined, '?execution=exec-1');
+
+        await waitFor(() => {
+          expect(useExecutionLiveStore.getState().nodes.get('n-1')?.status).toBe('failed');
+        });
+        expect(mockedSocket.connect).not.toHaveBeenCalled();
+        expect(mockedSocket.subscribe).not.toHaveBeenCalled();
+      },
+    );
+
+    it('should populate the InspectorDock Run tab with historical input/output for a terminal execution', async () => {
+      const user = userEvent.setup();
+      useAuthStore.setState({ token: 'jwt-token', user: null });
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      mockedGetExecution.mockResolvedValueOnce(sampleExecution('SUCCESS'));
+      mockedListSteps.mockResolvedValueOnce([
+        sampleStep({
+          status: 'SUCCESS',
+          inputData: { url: 'https://example.com' },
+          outputData: { ok: true, status: 200 },
+        }),
+      ]);
+
+      renderAtId('wf-abc', undefined, '?execution=exec-1');
+
+      await waitFor(() =>
+        expect(useExecutionLiveStore.getState().nodes.get('n-1')?.status).toBe('success'),
+      );
+
+      await user.click(screen.getByRole('tab', { name: /run/i }));
+
+      expect(screen.getByTestId('run-node-input')).toHaveTextContent('https://example.com');
+      expect(screen.getByTestId('run-node-output')).toHaveTextContent('"status": 200');
     });
   });
 
