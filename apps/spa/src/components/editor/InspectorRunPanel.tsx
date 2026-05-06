@@ -66,15 +66,20 @@ function JsonBlock({ label, testId, value }: JsonBlockProps): JSX.Element {
 
 export function InspectorRunPanel(): JSX.Element {
   const liveNodes = useExecutionLiveStore((s) => s.nodes);
+  const viewAtTime = useExecutionLiveStore((s) => s.viewAtTime);
   const editorNodes = useEditorStore((s) => s.nodes);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const entries: RunEntry[] = useMemo(() => {
     const labels = new Map(editorNodes.map((n) => [n.id, n.data.label]));
     return Array.from(liveNodes.entries())
+      .filter(([, state]) => {
+        if (viewAtTime === null) return true;
+        return state.startedAt !== null && state.startedAt <= viewAtTime;
+      })
       .map(([id, state]) => ({ id, state, label: labels.get(id) ?? id }))
       .sort((a, b) => (a.state.startedAt ?? '').localeCompare(b.state.startedAt ?? ''));
-  }, [liveNodes, editorNodes]);
+  }, [liveNodes, editorNodes, viewAtTime]);
 
   useEffect(() => {
     if (entries.length === 0) {
