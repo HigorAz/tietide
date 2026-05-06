@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
@@ -11,6 +12,9 @@ async function bootstrap() {
 
   // Replace default logger with Pino — structured JSON logs
   app.useLogger(app.get(Logger));
+
+  // Socket.IO adapter — required for the executions WebSocket gateway.
+  app.useWebSocketAdapter(new IoAdapter(app));
 
   // Security headers — first middleware
   app.use(helmet());

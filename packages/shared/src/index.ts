@@ -8,6 +8,11 @@ export type {
   WorkflowDocumentationMeta,
 } from './types/workflow.types.js';
 export type { WorkflowExecution, ExecutionStep } from './types/execution.types.js';
+export type {
+  ExecutionEventType,
+  ExecutionEventStatus,
+  ExecutionEventEnvelope,
+} from './types/execution-events.types.js';
 export type { NodeTypeDefinition } from './types/node.types.js';
 
 // Constants
@@ -39,6 +44,13 @@ export {
   type LoginFormValues,
   type RegisterFormValues,
 } from './schemas/auth.schema.js';
+
+export {
+  EXECUTION_EVENT_TYPES,
+  EXECUTION_CHANNEL_PREFIX,
+  executionChannel,
+  parseExecutionChannel,
+} from './types/execution-events.types.js';
 
 // Utilities
 export { sanitizePayload } from './utils/sanitize-payload.js';
