@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
 import { ExecutionEventsService } from '../events/execution-events.service';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
+import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
 import { CircularDependencyError, topologicalSort } from './topological-sort';
 
 export interface RunArgs {
@@ -18,6 +19,7 @@ export interface RunArgs {
   workflowId: string;
   definition: WorkflowDefinition;
   triggerData?: Record<string, unknown>;
+  isDryRun?: boolean;
 }
 
 export interface RunResult {
@@ -34,6 +36,7 @@ export class WorkflowRunner {
     private readonly registry: NodeRegistry,
     private readonly prisma: PrismaService,
     @Inject(SECRET_RESOLVER) private readonly secretResolver: SecretResolver,
+    @Inject(CONNECTION_RESOLVER) private readonly connectionResolver: ConnectionResolver,
     private readonly events: ExecutionEventsService,
   ) {}
 
@@ -42,11 +45,12 @@ export class WorkflowRunner {
       return await this.runInner(args);
     } finally {
       this.secretResolver.releaseExecution(args.executionId);
+      this.connectionResolver.releaseExecution(args.executionId);
     }
   }
 
   private async runInner(args: RunArgs): Promise<RunResult> {
-    const { executionId, workflowId, definition, triggerData } = args;
+    const { executionId, workflowId, definition, triggerData, isDryRun = false } = args;
 
     let order: string[];
     try {
@@ -128,7 +132,7 @@ export class WorkflowRunner {
       const started = Date.now();
       try {
         const executor = this.registry.resolve(n.type)!;
-        const ctx = this.buildContext(executionId, workflowId, n.id);
+        const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun);
         const output = await executor.execute(input, ctx);
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
@@ -217,7 +221,9 @@ export class WorkflowRunner {
         data = outputs.get(last)?.data ?? {};
       }
     }
-    return { data, params: n.config };
+    const rawConnectionId = (n.config as { connectionId?: unknown }).connectionId;
+    const connectionId = typeof rawConnectionId === 'string' ? rawConnectionId : undefined;
+    return connectionId ? { data, params: n.config, connectionId } : { data, params: n.config };
   }
 
   private propagateReachability(
@@ -296,8 +302,14 @@ export class WorkflowRunner {
     });
   }
 
-  private buildContext(executionId: string, workflowId: string, nodeId: string): ExecutionContext {
-    const resolver = this.secretResolver;
+  private buildContext(
+    executionId: string,
+    workflowId: string,
+    nodeId: string,
+    isDryRun: boolean,
+  ): ExecutionContext {
+    const secrets = this.secretResolver;
+    const connections = this.connectionResolver;
     const logger: Logger = {
       info: (msg, ctx) => this.log.log({ nodeId, ctx }, msg),
       warn: (msg, ctx) => this.log.warn({ nodeId, ctx }, msg),
@@ -309,7 +321,12 @@ export class WorkflowRunner {
       workflowId,
       nodeId,
       logger,
-      getSecret: (name: string) => resolver.getSecret(executionId, name),
+      isDryRun,
+      getSecret: (name: string) => secrets.getSecret(executionId, name),
+      getConnection: <TConfig = Record<string, unknown>>(connectionId: string) =>
+        connections.getConnection<TConfig>(executionId, connectionId),
+      markConnectionForRefresh: (connectionId: string) =>
+        connections.markForRefresh(executionId, connectionId),
     };
   }
 }
