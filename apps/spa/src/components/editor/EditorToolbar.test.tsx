@@ -320,7 +320,7 @@ describe('EditorToolbar', () => {
       });
     });
 
-    it('should include a "View execution" action link on the run-success toast', async () => {
+    it('should not attach a navigation action to the run-success toast (replay opens in-place)', async () => {
       mockedExecute.mockResolvedValueOnce({
         id: 'exec-3',
         workflowId: 'wf-1',
@@ -336,10 +336,8 @@ describe('EditorToolbar', () => {
 
       await waitFor(() => {
         const [toast] = useToastStore.getState().toasts;
-        expect(toast?.action).toEqual({
-          label: 'View execution',
-          href: '/executions/exec-3',
-        });
+        expect(toast?.message).toBe('Execution started');
+        expect(toast?.action).toBeUndefined();
       });
     });
   });

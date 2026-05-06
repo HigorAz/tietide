@@ -68,6 +68,7 @@ describe('AllExecutionsController (integration)', () => {
         total: 1,
         page: 1,
         pageSize: 20,
+        nextCursor: null,
       });
 
       const res = await request(app.getHttpServer()).get('/executions').expect(200);
@@ -77,6 +78,7 @@ describe('AllExecutionsController (integration)', () => {
         total: 1,
         page: 1,
         pageSize: 20,
+        nextCursor: null,
       });
       expect(executionsService.listAllForUser).toHaveBeenCalledWith(
         'owner-uuid',
@@ -226,6 +228,40 @@ describe('AllExecutionsController (integration)', () => {
 
     it('should reject limit over 100 with 400', async () => {
       await request(app.getHttpServer()).get('/executions').query({ limit: '500' }).expect(400);
+      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+    });
+
+    it('should forward cursor to the service', async () => {
+      executionsService.listAllForUser.mockResolvedValue({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      const cursor = 'eyJjcmVhdGVkQXQiOiIyMDI2LTA0LTIwVDEwOjAwOjAwLjAwMFoiLCJpZCI6ImFiYyJ9';
+      await request(app.getHttpServer()).get('/executions').query({ cursor }).expect(200);
+
+      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
+        'owner-uuid',
+        expect.objectContaining({ cursor }),
+      );
+    });
+
+    it('should reject a cursor with non-base64url characters', async () => {
+      await request(app.getHttpServer())
+        .get('/executions')
+        .query({ cursor: 'invalid cursor!' })
+        .expect(400);
+      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+    });
+
+    it('should reject a cursor over 256 characters', async () => {
+      await request(app.getHttpServer())
+        .get('/executions')
+        .query({ cursor: 'a'.repeat(257) })
+        .expect(400);
       expect(executionsService.listAllForUser).not.toHaveBeenCalled();
     });
   });

@@ -1,6 +1,17 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDate, IsEnum, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsDate,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { ExecutionStatusFilter } from './execution-query.dto';
 
 export class AllExecutionsQueryDto {
@@ -57,4 +68,14 @@ export class AllExecutionsQueryDto {
   @Min(1)
   @Max(100)
   limit?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: 'Opaque pagination cursor returned by a prior response',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  @Matches(/^[A-Za-z0-9_-]+$/)
+  cursor?: string;
 }

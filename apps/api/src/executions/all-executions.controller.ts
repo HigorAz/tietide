@@ -39,6 +39,7 @@ export class AllExecutionsController {
       to: query.to,
       page: query.page,
       pageSize: query.pageSize ?? query.limit,
+      cursor: query.cursor,
     });
   }
 }
