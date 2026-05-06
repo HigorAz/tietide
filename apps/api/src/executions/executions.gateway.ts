@@ -76,6 +76,11 @@ export class ExecutionsGateway implements OnGatewayConnection, OnGatewayDisconne
       return;
     }
 
+    if (payload.aud === 'oauth-state' || !payload.sub || !payload.email || !payload.role) {
+      this.rejectConnection(socket, 'Invalid token');
+      return;
+    }
+
     const user: AuthedUser = {
       id: payload.sub,
       email: payload.email,

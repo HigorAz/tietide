@@ -1,0 +1,118 @@
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  ConnectionProvider,
+  slackOAuth2ConfigSchema,
+  type SlackOAuth2Config,
+} from '@tietide/shared';
+import { BaseOAuthProvider } from './base-oauth.provider';
+import type {
+  AuthorizeUrlArgs,
+  ExchangeCodeArgs,
+  OAuthProvider,
+  TokenExchangeResult,
+} from './oauth-provider.interface';
+
+const AUTHORIZE_URL = 'https://slack.com/oauth/v2/authorize';
+const TOKEN_URL_DEFAULT = 'https://slack.com/api/oauth.v2.access';
+
+const DEFAULT_SCOPES = ['chat:write', 'channels:read'] as const;
+
+const ALLOWED_SCOPES = new Set([
+  'chat:write',
+  'channels:read',
+  'channels:history',
+  'groups:read',
+  'groups:history',
+  'im:read',
+  'im:history',
+  'users:read',
+  'users:read.email',
+  'files:read',
+  'files:write',
+  'reactions:read',
+  'reactions:write',
+]);
+
+interface SlackTokenResponse {
+  ok?: unknown;
+  error?: unknown;
+  access_token?: unknown;
+  scope?: unknown;
+  bot_user_id?: unknown;
+  team?: { id?: unknown };
+}
+
+@Injectable()
+export class SlackOAuthProvider extends BaseOAuthProvider implements OAuthProvider {
+  readonly id = ConnectionProvider.SLACK;
+  readonly displayName = 'Slack';
+  readonly defaultScopes: readonly string[] = DEFAULT_SCOPES;
+  readonly allowedScopes: ReadonlySet<string> = ALLOWED_SCOPES;
+
+  redirectUri(): string {
+    return this.env('SLACK_OAUTH_REDIRECT_URI');
+  }
+
+  buildAuthorizeUrl(args: AuthorizeUrlArgs): string {
+    const params = new URLSearchParams({
+      client_id: this.env('SLACK_OAUTH_CLIENT_ID'),
+      scope: args.scopes.join(','),
+      redirect_uri: args.redirectUri,
+      state: args.state,
+    });
+    return `${AUTHORIZE_URL}?${params.toString()}`;
+  }
+
+  async exchangeCode(args: ExchangeCodeArgs): Promise<TokenExchangeResult> {
+    const raw = (await this.postForm(this.tokenUrl(), {
+      grant_type: 'authorization_code',
+      code: args.code,
+      redirect_uri: args.redirectUri,
+      client_id: this.env('SLACK_OAUTH_CLIENT_ID'),
+      client_secret: this.env('SLACK_OAUTH_CLIENT_SECRET'),
+    })) as SlackTokenResponse;
+
+    if (raw.ok === false) {
+      const code = typeof raw.error === 'string' ? raw.error : 'slack_error';
+      throw new InternalServerErrorException(`Slack OAuth error: ${code}`);
+    }
+
+    const accessToken = raw.access_token;
+    const teamId = raw.team?.id;
+    const botUserId = raw.bot_user_id;
+    if (
+      typeof accessToken !== 'string' ||
+      typeof teamId !== 'string' ||
+      typeof botUserId !== 'string'
+    ) {
+      throw new InternalServerErrorException('Slack token response missing required fields');
+    }
+
+    const config: SlackOAuth2Config = slackOAuth2ConfigSchema.parse({
+      accessToken,
+      teamId,
+      botUserId,
+      scope: typeof raw.scope === 'string' ? raw.scope : '',
+    });
+
+    return {
+      config,
+      refreshToken: null,
+      expiresAt: null,
+    };
+  }
+
+  async refresh(_args: {
+    refreshToken: string;
+    currentConfig: Record<string, unknown>;
+  }): Promise<TokenExchangeResult> {
+    void _args;
+    throw new InternalServerErrorException(
+      'Slack tokens do not expire by default and are not refreshable from this client',
+    );
+  }
+
+  private tokenUrl(): string {
+    return this.envOptional('SLACK_OAUTH_TOKEN_URL', TOKEN_URL_DEFAULT);
+  }
+}

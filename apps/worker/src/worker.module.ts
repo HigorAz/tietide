@@ -8,6 +8,7 @@ import { WorkflowProcessor } from './processors/workflow.processor';
 import { EngineModule } from './engine/engine.module';
 import { CronModule } from './cron/cron.module';
 import { DlqModule } from './dlq/dlq.module';
+import { OAuthRefreshModule } from './connections/refresh/oauth-refresh.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { DlqModule } from './dlq/dlq.module';
     EngineModule,
     CronModule,
     DlqModule,
+    OAuthRefreshModule,
   ],
   providers: [WorkflowProcessor],
 })

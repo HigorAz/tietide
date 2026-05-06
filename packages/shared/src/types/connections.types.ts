@@ -19,6 +19,7 @@ export type ConnectionStatus = (typeof ConnectionStatus)[keyof typeof Connection
 
 export const ConnectionProvider = {
   GOOGLE: 'google',
+  MICROSOFT: 'microsoft',
   SLACK: 'slack',
   NOTION: 'notion',
   OPENAI: 'openai',
