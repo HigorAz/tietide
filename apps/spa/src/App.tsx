@@ -7,6 +7,7 @@ import { DashboardPage } from '@/pages/DashboardPage';
 import { WorkflowsPage } from '@/pages/WorkflowsPage';
 import { ExecutionHistoryPage } from '@/pages/ExecutionHistoryPage';
 import { ExecutionDetailPage } from '@/pages/ExecutionDetailPage';
+import { GlobalHistoryPage } from '@/pages/GlobalHistoryPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -32,7 +33,7 @@ const router = createBrowserRouter([
           { path: '/workflows/:id', element: <WorkflowEditorPage /> },
           { path: '/workflows/:id/executions', element: <ExecutionHistoryPage /> },
           { path: '/executions/:id', element: <ExecutionDetailPage /> },
-          { path: '/history', element: <PlaceholderPage title="History" /> },
+          { path: '/history', element: <GlobalHistoryPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/connections', element: <PlaceholderPage title="Connections" /> },
           { path: '/settings', element: <PlaceholderPage title="Account settings" /> },

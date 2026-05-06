@@ -5,10 +5,12 @@ export type ExecutionStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CA
 
 export interface ExecutionFilters {
   status?: ExecutionStatus;
+  workflowId?: string;
   from?: Date;
   to?: Date;
   page?: number;
   pageSize?: number;
+  cursor?: string;
 }
 
 export interface ExecutionListResponse {
@@ -16,15 +18,18 @@ export interface ExecutionListResponse {
   total: number;
   page: number;
   pageSize: number;
+  nextCursor: string | null;
 }
 
 const buildParams = (filters: ExecutionFilters): Record<string, string | number> => {
   const params: Record<string, string | number> = {};
   if (filters.status) params.status = filters.status;
+  if (filters.workflowId) params.workflowId = filters.workflowId;
   if (filters.from) params.from = filters.from.toISOString();
   if (filters.to) params.to = filters.to.toISOString();
   if (filters.page !== undefined) params.page = filters.page;
   if (filters.pageSize !== undefined) params.pageSize = filters.pageSize;
+  if (filters.cursor) params.cursor = filters.cursor;
   return params;
 };
 
