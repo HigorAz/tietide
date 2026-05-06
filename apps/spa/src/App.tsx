@@ -5,8 +5,6 @@ import { RegisterPage } from '@/pages/RegisterPage';
 import { HomePage } from '@/pages/HomePage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { WorkflowsPage } from '@/pages/WorkflowsPage';
-import { ExecutionHistoryPage } from '@/pages/ExecutionHistoryPage';
-import { ExecutionDetailPage } from '@/pages/ExecutionDetailPage';
 import { GlobalHistoryPage } from '@/pages/GlobalHistoryPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
@@ -31,8 +29,6 @@ const router = createBrowserRouter([
           { path: '/dashboard', element: <DashboardPage /> },
           { path: '/workflows', element: <WorkflowsPage /> },
           { path: '/workflows/:id', element: <WorkflowEditorPage /> },
-          { path: '/workflows/:id/executions', element: <ExecutionHistoryPage /> },
-          { path: '/executions/:id', element: <ExecutionDetailPage /> },
           { path: '/history', element: <GlobalHistoryPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/connections', element: <PlaceholderPage title="Connections" /> },
