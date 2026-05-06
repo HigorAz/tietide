@@ -89,13 +89,8 @@ const resetStores = (): void => {
     listTotal: 0,
     listStatus: 'idle',
     listError: null,
+    listNextCursor: null,
     filters: {},
-    detail: null,
-    detailStatus: 'idle',
-    detailError: null,
-    steps: [],
-    stepsStatus: 'idle',
-    stepsError: null,
     fetchList: realFetchList,
   });
   useToastStore.setState({ ...initialToastState });
@@ -122,7 +117,13 @@ describe('HomePage', () => {
     mockedListAllExecutions.mockReset();
     // Default to empty so tests opt-in to data when relevant.
     mockedListWorkflows.mockResolvedValue([]);
-    mockedListAllExecutions.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 5 });
+    mockedListAllExecutions.mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 5,
+      nextCursor: null,
+    });
   });
 
   it('renders the greeting with user.name (AC: greeting)', async () => {
@@ -260,6 +261,7 @@ describe('HomePage', () => {
       total: 1,
       page: 1,
       pageSize: 5,
+      nextCursor: null,
     });
 
     renderHome();

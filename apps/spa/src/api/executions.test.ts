@@ -35,6 +35,7 @@ const sampleListResponse: ExecutionListResponse = {
   total: 1,
   page: 1,
   pageSize: 20,
+  nextCursor: null,
 };
 
 const sampleStep: ExecutionStep = {

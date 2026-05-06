@@ -80,12 +80,6 @@ const resetStores = (): void => {
     listError: null,
     listNextCursor: null,
     filters: {},
-    detail: null,
-    detailStatus: 'idle',
-    detailError: null,
-    steps: [],
-    stepsStatus: 'idle',
-    stepsError: null,
   });
   useWorkflowsStore.setState({ workflows: [], status: 'idle', error: null });
 };
