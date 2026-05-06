@@ -2,9 +2,24 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import type { ExecutionEventEnvelope, ExecutionStep } from '@tietide/shared';
 import {
   initialExecutionLiveState,
+  selectNodeStateAt,
+  selectScrubberBounds,
   useExecutionLiveStore,
   type ExecutionLiveStatus,
+  type NodeRunState,
 } from './executionLiveStore';
+
+const runState = (overrides: Partial<NodeRunState> = {}): NodeRunState => ({
+  status: 'success',
+  nodeType: 'http-request',
+  startedAt: '2026-05-06T10:00:00.000Z',
+  finishedAt: '2026-05-06T10:00:01.000Z',
+  durationMs: 1000,
+  input: null,
+  output: { ok: true },
+  error: null,
+  ...overrides,
+});
 
 const baseEvent = (overrides: Partial<ExecutionEventEnvelope>): ExecutionEventEnvelope => ({
   type: 'step.started',
@@ -232,6 +247,170 @@ describe('executionLiveStore', () => {
       expect(state.executionId).toBeNull();
       expect(state.nodes.size).toBe(0);
     });
+
+    it('should clear mode and viewAtTime in addition to status/executionId/nodes', () => {
+      const { setMode, setViewAtTime, reset } = useExecutionLiveStore.getState();
+      setMode('replay');
+      setViewAtTime('2026-05-06T10:00:00.500Z');
+      reset();
+      const state = useExecutionLiveStore.getState();
+      expect(state.mode).toBeNull();
+      expect(state.viewAtTime).toBeNull();
+    });
+  });
+
+  describe('setMode', () => {
+    it('should set mode to live, replay, or null', () => {
+      const { setMode } = useExecutionLiveStore.getState();
+      setMode('live');
+      expect(useExecutionLiveStore.getState().mode).toBe('live');
+      setMode('replay');
+      expect(useExecutionLiveStore.getState().mode).toBe('replay');
+      setMode(null);
+      expect(useExecutionLiveStore.getState().mode).toBeNull();
+    });
+  });
+
+  describe('setViewAtTime', () => {
+    it('should set the cursor to an ISO timestamp and clear it back to null', () => {
+      const { setViewAtTime } = useExecutionLiveStore.getState();
+      setViewAtTime('2026-05-06T10:00:00.500Z');
+      expect(useExecutionLiveStore.getState().viewAtTime).toBe('2026-05-06T10:00:00.500Z');
+      setViewAtTime(null);
+      expect(useExecutionLiveStore.getState().viewAtTime).toBeNull();
+    });
+  });
+
+  describe('selectScrubberBounds', () => {
+    it('should return null when there are no nodes with timing data', () => {
+      const state = useExecutionLiveStore.getState();
+      expect(selectScrubberBounds(state)).toBeNull();
+    });
+
+    it('should return the earliest startedAt and latest finishedAt across all nodes', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map<string, NodeRunState>([
+          [
+            'a',
+            runState({
+              startedAt: '2026-05-06T10:00:00.000Z',
+              finishedAt: '2026-05-06T10:00:01.000Z',
+            }),
+          ],
+          [
+            'b',
+            runState({
+              startedAt: '2026-05-06T10:00:02.000Z',
+              finishedAt: '2026-05-06T10:00:05.000Z',
+            }),
+          ],
+        ]),
+      });
+      const bounds = selectScrubberBounds(useExecutionLiveStore.getState());
+      expect(bounds).not.toBeNull();
+      expect(bounds!.minIso).toBe('2026-05-06T10:00:00.000Z');
+      expect(bounds!.maxIso).toBe('2026-05-06T10:00:05.000Z');
+      expect(bounds!.maxMs - bounds!.minMs).toBe(5000);
+    });
+
+    it('should fall back to startedAt when finishedAt is null on the latest step', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map<string, NodeRunState>([
+          [
+            'a',
+            runState({
+              startedAt: '2026-05-06T10:00:00.000Z',
+              finishedAt: '2026-05-06T10:00:01.000Z',
+            }),
+          ],
+          [
+            'b',
+            runState({
+              status: 'running',
+              startedAt: '2026-05-06T10:00:02.500Z',
+              finishedAt: null,
+            }),
+          ],
+        ]),
+      });
+      const bounds = selectScrubberBounds(useExecutionLiveStore.getState());
+      expect(bounds!.maxIso).toBe('2026-05-06T10:00:02.500Z');
+    });
+
+    it('should ignore nodes whose startedAt is null', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map<string, NodeRunState>([
+          [
+            'a',
+            runState({
+              startedAt: '2026-05-06T10:00:00.000Z',
+              finishedAt: '2026-05-06T10:00:01.000Z',
+            }),
+          ],
+          ['b', runState({ status: 'idle', startedAt: null, finishedAt: null })],
+        ]),
+      });
+      const bounds = selectScrubberBounds(useExecutionLiveStore.getState());
+      expect(bounds!.minIso).toBe('2026-05-06T10:00:00.000Z');
+      expect(bounds!.maxIso).toBe('2026-05-06T10:00:01.000Z');
+    });
+  });
+
+  describe('selectNodeStateAt', () => {
+    const seedTwoSteps = (): void => {
+      useExecutionLiveStore.setState({
+        nodes: new Map<string, NodeRunState>([
+          [
+            'first',
+            runState({
+              status: 'success',
+              startedAt: '2026-05-06T10:00:00.000Z',
+              finishedAt: '2026-05-06T10:00:01.000Z',
+              output: { ok: true },
+            }),
+          ],
+          [
+            'second',
+            runState({
+              status: 'failed',
+              startedAt: '2026-05-06T10:00:02.000Z',
+              finishedAt: '2026-05-06T10:00:03.000Z',
+              error: { message: 'boom', code: null },
+              output: null,
+            }),
+          ],
+        ]),
+      });
+    };
+
+    it('should return undefined for an unknown node id', () => {
+      seedTwoSteps();
+      expect(selectNodeStateAt(useExecutionLiveStore.getState(), 'missing')).toBeUndefined();
+    });
+
+    it('should return the raw node state when viewAtTime is null', () => {
+      seedTwoSteps();
+      const node = selectNodeStateAt(useExecutionLiveStore.getState(), 'first');
+      expect(node?.status).toBe('success');
+      expect(node?.output).toEqual({ ok: true });
+    });
+
+    it('should return an idle-shaped state when startedAt is after viewAtTime', () => {
+      seedTwoSteps();
+      useExecutionLiveStore.getState().setViewAtTime('2026-05-06T10:00:01.500Z');
+      const node = selectNodeStateAt(useExecutionLiveStore.getState(), 'second');
+      expect(node?.status).toBe('idle');
+      expect(node?.output).toBeNull();
+      expect(node?.error).toBeNull();
+    });
+
+    it('should return the original state once finishedAt is at or before viewAtTime', () => {
+      seedTwoSteps();
+      useExecutionLiveStore.getState().setViewAtTime('2026-05-06T10:00:01.500Z');
+      const node = selectNodeStateAt(useExecutionLiveStore.getState(), 'first');
+      expect(node?.status).toBe('success');
+      expect(node?.output).toEqual({ ok: true });
+    });
   });
 
   describe('initialExecutionLiveState constant', () => {
@@ -239,6 +418,11 @@ describe('executionLiveStore', () => {
       expect(initialExecutionLiveState.status).toBe<ExecutionLiveStatus>('idle');
       expect(initialExecutionLiveState.executionId).toBeNull();
       expect(initialExecutionLiveState.nodes.size).toBe(0);
+    });
+
+    it('should default mode and viewAtTime to null', () => {
+      expect(initialExecutionLiveState.mode).toBeNull();
+      expect(initialExecutionLiveState.viewAtTime).toBeNull();
     });
   });
 });
