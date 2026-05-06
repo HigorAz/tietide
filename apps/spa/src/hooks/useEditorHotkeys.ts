@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { saveWorkflow } from '@/components/editor/saveWorkflow';
 import { executeWorkflow } from '@/api/executions';
@@ -13,7 +13,7 @@ export interface UseEditorHotkeysParams {
 }
 
 export function useEditorHotkeys({ workflowId, onShowCheatsheet }: UseEditorHotkeysParams): void {
-  const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
   const toast = useToastStore((s) => s.show);
 
   const handleSave = useCallback(async (): Promise<void> => {
@@ -32,16 +32,12 @@ export function useEditorHotkeys({ workflowId, onShowCheatsheet }: UseEditorHotk
         await saveWorkflow(workflowId);
       }
       const execution = await executeWorkflow(workflowId);
-      toast({
-        tone: 'success',
-        message: 'Execution started',
-        action: { label: 'View execution', href: `/executions/${execution.id}` },
-      });
-      navigate(`/executions/${execution.id}`);
+      toast({ tone: 'success', message: 'Execution started' });
+      setSearchParams({ execution: execution.id });
     } catch {
       toast({ tone: 'error', message: 'Failed to start execution. Please try again.' });
     }
-  }, [navigate, toast, workflowId]);
+  }, [setSearchParams, toast, workflowId]);
 
   useHotkeys(
     SHORTCUTS_BY_ID.save.hotkey as string,

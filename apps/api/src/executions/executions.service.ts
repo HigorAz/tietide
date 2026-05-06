@@ -12,6 +12,7 @@ import type {
 } from './dto/execution-detail-response.dto';
 import type { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
 import { sanitizePayload } from '@tietide/shared';
+import { decodeCursor, encodeCursor } from './cursor';
 
 export interface TriggerOptions {
   triggerData?: Record<string, unknown>;
@@ -26,6 +27,7 @@ export interface ListOptions {
   to?: Date;
   page?: number;
   pageSize?: number;
+  cursor?: string;
 }
 
 const DEFAULT_PAGE = 1;
@@ -171,43 +173,89 @@ export class ExecutionsService {
       total,
       page,
       pageSize,
+      nextCursor: null,
     };
   }
 
   async listAllForUser(userId: string, options: ListOptions): Promise<ExecutionListResponseDto> {
-    const where: Prisma.WorkflowExecutionWhereInput = { workflow: { userId } };
+    const baseWhere: Prisma.WorkflowExecutionWhereInput = { workflow: { userId } };
     if (options.status) {
-      where.status = options.status as Prisma.WorkflowExecutionWhereInput['status'];
+      baseWhere.status = options.status as Prisma.WorkflowExecutionWhereInput['status'];
     }
     if (options.workflowId) {
-      where.workflowId = options.workflowId;
+      baseWhere.workflowId = options.workflowId;
     }
     if (options.from || options.to) {
-      where.createdAt = {
+      baseWhere.createdAt = {
         ...(options.from ? { gte: options.from } : {}),
         ...(options.to ? { lte: options.to } : {}),
       };
     }
 
-    const page = options.page ?? DEFAULT_PAGE;
     const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
+
+    if (options.cursor) {
+      const cursor = decodeCursor(options.cursor);
+      const rowWhere: Prisma.WorkflowExecutionWhereInput = {
+        AND: [
+          baseWhere,
+          {
+            OR: [
+              { createdAt: { lt: cursor.createdAt } },
+              { AND: [{ createdAt: cursor.createdAt }, { id: { lt: cursor.id } }] },
+            ],
+          },
+        ],
+      };
+
+      const [peeked, total] = await Promise.all([
+        this.prisma.workflowExecution.findMany({
+          where: rowWhere,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: pageSize + 1,
+        }),
+        this.prisma.workflowExecution.count({ where: baseWhere }),
+      ]);
+
+      const hasMore = peeked.length > pageSize;
+      const rows = hasMore ? peeked.slice(0, pageSize) : peeked;
+      const last = rows[rows.length - 1];
+      const nextCursor =
+        hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
+
+      return {
+        items: rows.map((row) => this.toDetailResponse(row)),
+        total,
+        page: options.page ?? DEFAULT_PAGE,
+        pageSize,
+        nextCursor,
+      };
+    }
+
+    const page = options.page ?? DEFAULT_PAGE;
     const skip = (page - 1) * pageSize;
 
     const [rows, total] = await Promise.all([
       this.prisma.workflowExecution.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
+        where: baseWhere,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip,
         take: pageSize,
       }),
-      this.prisma.workflowExecution.count({ where }),
+      this.prisma.workflowExecution.count({ where: baseWhere }),
     ]);
+
+    const last = rows[rows.length - 1];
+    const hasMore = skip + rows.length < total;
+    const nextCursor =
+      hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
 
     return {
       items: rows.map((row) => this.toDetailResponse(row)),
       total,
       page,
       pageSize,
+      nextCursor,
     };
   }
 

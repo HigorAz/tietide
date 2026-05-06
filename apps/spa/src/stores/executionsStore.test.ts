@@ -1,11 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ExecutionStep, WorkflowExecution } from '@tietide/shared';
+import type { WorkflowExecution } from '@tietide/shared';
 
 vi.mock('@/api/executions', () => ({
   listExecutions: vi.fn(),
   listAllExecutions: vi.fn(),
-  getExecution: vi.fn(),
-  listExecutionSteps: vi.fn(),
 }));
 
 import * as executionsApi from '@/api/executions';
@@ -13,8 +11,6 @@ import { useExecutionsStore } from './executionsStore';
 
 const mockedList = vi.mocked(executionsApi.listExecutions);
 const mockedListAll = vi.mocked(executionsApi.listAllExecutions);
-const mockedGet = vi.mocked(executionsApi.getExecution);
-const mockedSteps = vi.mocked(executionsApi.listExecutionSteps);
 
 const makeExecution = (overrides: Partial<WorkflowExecution> = {}): WorkflowExecution => ({
   id: 'exec-1',
@@ -29,35 +25,14 @@ const makeExecution = (overrides: Partial<WorkflowExecution> = {}): WorkflowExec
   ...overrides,
 });
 
-const makeStep = (overrides: Partial<ExecutionStep> = {}): ExecutionStep => ({
-  id: 'step-1',
-  executionId: 'exec-1',
-  nodeId: 'trigger-1',
-  nodeType: 'manual_trigger',
-  nodeName: 'Start',
-  status: 'SUCCESS',
-  inputData: null,
-  outputData: { ok: true },
-  error: null,
-  startedAt: new Date('2026-04-20T10:00:00Z'),
-  finishedAt: new Date('2026-04-20T10:00:01Z'),
-  durationMs: 1000,
-  ...overrides,
-});
-
 const resetStore = (): void => {
   useExecutionsStore.setState({
     list: [],
     listTotal: 0,
     listStatus: 'idle',
     listError: null,
+    listNextCursor: null,
     filters: {},
-    detail: null,
-    detailStatus: 'idle',
-    detailError: null,
-    steps: [],
-    stepsStatus: 'idle',
-    stepsError: null,
   });
 };
 
@@ -66,14 +41,18 @@ describe('executionsStore', () => {
     resetStore();
     mockedList.mockReset();
     mockedListAll.mockReset();
-    mockedGet.mockReset();
-    mockedSteps.mockReset();
   });
 
   describe('fetchList', () => {
     it('should call listExecutions(workflowId, filters) when workflowId is provided', async () => {
       const items = [makeExecution({ id: 'a' }), makeExecution({ id: 'b' })];
-      mockedList.mockResolvedValueOnce({ items, total: 2, page: 1, pageSize: 20 });
+      mockedList.mockResolvedValueOnce({
+        items,
+        total: 2,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
 
       await useExecutionsStore.getState().fetchList({ workflowId: 'wf-1' });
 
@@ -87,7 +66,13 @@ describe('executionsStore', () => {
 
     it('should call listAllExecutions(filters) when workflowId is omitted (cross-workflow)', async () => {
       const items = [makeExecution({ id: 'a' })];
-      mockedListAll.mockResolvedValueOnce({ items, total: 1, page: 1, pageSize: 5 });
+      mockedListAll.mockResolvedValueOnce({
+        items,
+        total: 1,
+        page: 1,
+        pageSize: 5,
+        nextCursor: null,
+      });
 
       await useExecutionsStore.getState().fetchList({ pageSize: 5 });
 
@@ -99,7 +84,13 @@ describe('executionsStore', () => {
 
     it('should merge stored filters with call-time params for the workflow-scoped path', async () => {
       useExecutionsStore.setState({ filters: { status: 'FAILED' } });
-      mockedList.mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 20 });
+      mockedList.mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
 
       await useExecutionsStore.getState().fetchList({ workflowId: 'wf-1' });
 
@@ -108,7 +99,13 @@ describe('executionsStore', () => {
 
     it('should not bleed stored filters into the cross-workflow path', async () => {
       useExecutionsStore.setState({ filters: { status: 'FAILED' } });
-      mockedListAll.mockResolvedValueOnce({ items: [], total: 0, page: 1, pageSize: 5 });
+      mockedListAll.mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 5,
+        nextCursor: null,
+      });
 
       await useExecutionsStore.getState().fetchList({ pageSize: 5 });
 
@@ -131,6 +128,84 @@ describe('executionsStore', () => {
 
       expect(useExecutionsStore.getState().listStatus).toBe('error');
       expect(useExecutionsStore.getState().listError).toBe('boom');
+    });
+
+    it('should store nextCursor from the API response', async () => {
+      mockedListAll.mockResolvedValueOnce({
+        items: [makeExecution({ id: 'a' })],
+        total: 50,
+        page: 1,
+        pageSize: 20,
+        nextCursor: 'c1',
+      });
+
+      await useExecutionsStore.getState().fetchList({});
+
+      expect(useExecutionsStore.getState().listNextCursor).toBe('c1');
+    });
+
+    it('should reset listNextCursor when fetchList is called fresh', async () => {
+      useExecutionsStore.setState({ listNextCursor: 'stale' });
+      mockedListAll.mockResolvedValueOnce({
+        items: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      await useExecutionsStore.getState().fetchList({});
+
+      expect(useExecutionsStore.getState().listNextCursor).toBeNull();
+    });
+  });
+
+  describe('loadMore', () => {
+    it('should append rows and update nextCursor when one is set', async () => {
+      useExecutionsStore.setState({
+        list: [makeExecution({ id: 'a' })],
+        listNextCursor: 'c1',
+        filters: { status: 'SUCCESS' },
+      });
+      mockedListAll.mockResolvedValueOnce({
+        items: [makeExecution({ id: 'b' }), makeExecution({ id: 'c' })],
+        total: 50,
+        page: 1,
+        pageSize: 20,
+        nextCursor: 'c2',
+      });
+
+      await useExecutionsStore.getState().loadMore();
+
+      expect(mockedListAll).toHaveBeenCalledWith({ status: 'SUCCESS', cursor: 'c1' });
+      expect(useExecutionsStore.getState().list.map((e) => e.id)).toEqual(['a', 'b', 'c']);
+      expect(useExecutionsStore.getState().listNextCursor).toBe('c2');
+    });
+
+    it('should null out listNextCursor when the API returns no further cursor', async () => {
+      useExecutionsStore.setState({
+        list: [makeExecution({ id: 'a' })],
+        listNextCursor: 'c1',
+      });
+      mockedListAll.mockResolvedValueOnce({
+        items: [makeExecution({ id: 'b' })],
+        total: 2,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      await useExecutionsStore.getState().loadMore();
+
+      expect(useExecutionsStore.getState().listNextCursor).toBeNull();
+    });
+
+    it('should be a no-op when no nextCursor is set', async () => {
+      useExecutionsStore.setState({ listNextCursor: null });
+
+      await useExecutionsStore.getState().loadMore();
+
+      expect(mockedListAll).not.toHaveBeenCalled();
     });
   });
 
@@ -156,50 +231,6 @@ describe('executionsStore', () => {
       expect(useExecutionsStore.getState().filters).toEqual({
         from: new Date('2026-04-01T00:00:00Z'),
       });
-    });
-  });
-
-  describe('fetchDetail', () => {
-    it('should populate detail and set status to ready on success', async () => {
-      const exec = makeExecution({ id: 'a' });
-      mockedGet.mockResolvedValueOnce(exec);
-
-      await useExecutionsStore.getState().fetchDetail('a');
-
-      expect(mockedGet).toHaveBeenCalledWith('a');
-      expect(useExecutionsStore.getState().detail).toEqual(exec);
-      expect(useExecutionsStore.getState().detailStatus).toBe('ready');
-    });
-
-    it('should set status to error on failure', async () => {
-      mockedGet.mockRejectedValueOnce(new Error('not found'));
-
-      await useExecutionsStore.getState().fetchDetail('a');
-
-      expect(useExecutionsStore.getState().detailStatus).toBe('error');
-      expect(useExecutionsStore.getState().detailError).toBe('not found');
-    });
-  });
-
-  describe('fetchSteps', () => {
-    it('should populate steps and set status to ready on success', async () => {
-      const steps = [makeStep({ id: 's1' }), makeStep({ id: 's2' })];
-      mockedSteps.mockResolvedValueOnce(steps);
-
-      await useExecutionsStore.getState().fetchSteps('exec-1');
-
-      expect(mockedSteps).toHaveBeenCalledWith('exec-1');
-      expect(useExecutionsStore.getState().steps).toEqual(steps);
-      expect(useExecutionsStore.getState().stepsStatus).toBe('ready');
-    });
-
-    it('should set status to error on failure', async () => {
-      mockedSteps.mockRejectedValueOnce(new Error('boom'));
-
-      await useExecutionsStore.getState().fetchSteps('exec-1');
-
-      expect(useExecutionsStore.getState().stepsStatus).toBe('error');
-      expect(useExecutionsStore.getState().stepsError).toBe('boom');
     });
   });
 });

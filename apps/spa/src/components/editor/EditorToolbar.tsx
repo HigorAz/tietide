@@ -47,11 +47,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
         await saveWorkflow(workflowId);
       }
       const execution = await executeWorkflow(workflowId);
-      toast({
-        tone: 'success',
-        message: 'Execution started',
-        action: { label: 'View execution', href: `/executions/${execution.id}` },
-      });
+      toast({ tone: 'success', message: 'Execution started' });
       setSearchParams({ execution: execution.id });
     } catch {
       toast({ tone: 'error', message: 'Failed to start execution. Please try again.' });

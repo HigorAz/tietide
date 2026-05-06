@@ -44,4 +44,11 @@ export class ExecutionListResponseDto {
 
   @ApiProperty({ type: Number })
   pageSize!: number;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Opaque cursor for the next page, or null when no more rows',
+  })
+  nextCursor!: string | null;
 }
