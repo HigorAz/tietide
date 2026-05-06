@@ -15,6 +15,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    headers: {
+      // Preserves window.opener for OAuth popups (e.g. Google) that send
+      // Cross-Origin-Opener-Policy: same-origin from the provider's consent
+      // screen. Without this, the popup → opener postMessage bridge for
+      // /connections fails. See docs/deployment.md for the Nginx equivalent.
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+    },
     proxy: {
       '/v1': {
         target: 'http://localhost:3030',
