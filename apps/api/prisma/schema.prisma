@@ -16,9 +16,10 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  workflows Workflow[]
-  secrets   Secret[]
-  auditLogs AuditLog[]
+  workflows   Workflow[]
+  secrets     Secret[]
+  connections Connection[]
+  auditLogs   AuditLog[]
 
   @@map("users")
 }
@@ -124,6 +125,43 @@ model Secret {
 
   @@unique([userId, name])
   @@map("secrets")
+}
+
+model Connection {
+  id                    String           @id @default(uuid())
+  userId                String           @map("user_id")
+  type                  ConnectionType
+  provider              String
+  name                  String
+  status                ConnectionStatus @default(ACTIVE)
+  configEncrypted       String           @map("config_encrypted")
+  configNonce           String           @map("config_nonce")
+  refreshTokenEncrypted String?          @map("refresh_token_encrypted")
+  refreshTokenNonce     String?          @map("refresh_token_nonce")
+  expiresAt             DateTime?        @map("expires_at")
+  lastUsedAt            DateTime?        @map("last_used_at")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, provider])
+  @@map("connections")
+}
+
+enum ConnectionType {
+  OAUTH2
+  API_KEY
+  BASIC_AUTH
+  BEARER_TOKEN
+  CUSTOM
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  EXPIRED
+  ERROR
+  REVOKED
 }
 
 model Webhook {
