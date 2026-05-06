@@ -4,7 +4,7 @@ import { SkipForward } from 'lucide-react';
 import { NODE_CATALOG, NodeCategory } from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { useEditorStore } from '@/stores/editorStore';
-import { useExecutionLiveStore } from '@/stores/executionLiveStore';
+import { selectNodeStateAt, useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { getNodeIcon } from './nodeIcons';
 import type { CustomNodeData, NodeStatus } from './CustomNode.types';
 
@@ -17,7 +17,7 @@ const STATUS_RING_CLASS: Record<NodeStatus, string> = {
 };
 
 function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
-  const liveStatus = useExecutionLiveStore((s) => s.nodes.get(id)?.status);
+  const liveStatus = useExecutionLiveStore((s) => selectNodeStateAt(s, id)?.status);
   const status: NodeStatus = liveStatus ?? data.status ?? 'idle';
   const Icon = getNodeIcon(data.nodeType);
   const skipped = data.skipped === true;

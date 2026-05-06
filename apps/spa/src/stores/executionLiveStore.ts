@@ -10,6 +10,8 @@ import type { ExecutionEventEnvelope, ExecutionEventType, ExecutionStep } from '
  */
 export type ExecutionLiveStatus = 'idle' | 'running' | 'success' | 'error';
 
+export type ExecutionLiveMode = 'live' | 'replay' | null;
+
 export type NodeRunStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 
 export interface NodeRunState {
@@ -26,12 +28,16 @@ export interface NodeRunState {
 export interface ExecutionLiveState {
   status: ExecutionLiveStatus;
   executionId: string | null;
+  mode: ExecutionLiveMode;
+  viewAtTime: string | null;
   nodes: Map<string, NodeRunState>;
 }
 
 export interface ExecutionLiveActions {
   setStatus: (status: ExecutionLiveStatus) => void;
   setExecutionId: (id: string | null) => void;
+  setMode: (mode: ExecutionLiveMode) => void;
+  setViewAtTime: (time: string | null) => void;
   applyEvent: (envelope: ExecutionEventEnvelope) => void;
   seedFromSteps: (steps: ExecutionStep[]) => void;
   reset: () => void;
@@ -65,6 +71,8 @@ const toIso = (value: Date | string | null | undefined): string | null => {
 export const initialExecutionLiveState: ExecutionLiveState = {
   status: 'idle',
   executionId: null,
+  mode: null,
+  viewAtTime: null,
   nodes: new Map(),
 };
 
@@ -74,6 +82,10 @@ export const useExecutionLiveStore = create<ExecutionLiveStore>((set) => ({
   setStatus: (status) => set({ status }),
 
   setExecutionId: (executionId) => set({ executionId }),
+
+  setMode: (mode) => set({ mode }),
+
+  setViewAtTime: (viewAtTime) => set({ viewAtTime }),
 
   applyEvent: (envelope) =>
     set((state) => {
@@ -133,5 +145,74 @@ export const useExecutionLiveStore = create<ExecutionLiveStore>((set) => ({
       };
     }),
 
-  reset: () => set({ status: 'idle', executionId: null, nodes: new Map() }),
+  reset: () =>
+    set({
+      status: 'idle',
+      executionId: null,
+      mode: null,
+      viewAtTime: null,
+      nodes: new Map(),
+    }),
 }));
+
+/**
+ * Returns the chronological min/max of the hydrated steps' timing data, both as
+ * ISO strings and as epoch milliseconds. The scrubber uses milliseconds because
+ * `<input type="range">` and Radix Slider work on numeric values; the store
+ * keeps the cursor as ISO so it composes with `selectNodeStateAt` directly.
+ *
+ * Returns null when no node has a startedAt — i.e. nothing to scrub yet.
+ */
+export function selectScrubberBounds(
+  state: ExecutionLiveState,
+): { minIso: string; maxIso: string; minMs: number; maxMs: number } | null {
+  let minIso: string | null = null;
+  let maxIso: string | null = null;
+
+  for (const node of state.nodes.values()) {
+    if (!node.startedAt) continue;
+    if (minIso === null || node.startedAt < minIso) minIso = node.startedAt;
+    const candidateMax = node.finishedAt ?? node.startedAt;
+    if (maxIso === null || candidateMax > maxIso) maxIso = candidateMax;
+  }
+
+  if (minIso === null || maxIso === null) return null;
+
+  return {
+    minIso,
+    maxIso,
+    minMs: Date.parse(minIso),
+    maxMs: Date.parse(maxIso),
+  };
+}
+
+/**
+ * Read-boundary selector: returns the node's runtime state filtered by the
+ * scrubber cursor (`viewAtTime`). Behavior:
+ *
+ *   - viewAtTime null → original state (no filtering)
+ *   - startedAt > viewAtTime → idle-shaped state (output/error suppressed)
+ *   - otherwise → original state
+ *
+ * The simpler "started or not" interpretation matches the issue text. A future
+ * polish could interpolate `running` between startedAt and finishedAt.
+ */
+export function selectNodeStateAt(
+  state: ExecutionLiveState,
+  nodeId: string,
+): NodeRunState | undefined {
+  const node = state.nodes.get(nodeId);
+  if (!node) return undefined;
+  if (state.viewAtTime === null) return node;
+  if (node.startedAt === null || node.startedAt > state.viewAtTime) {
+    return {
+      ...node,
+      status: 'idle',
+      durationMs: null,
+      input: null,
+      output: null,
+      error: null,
+    };
+  }
+  return node;
+}
