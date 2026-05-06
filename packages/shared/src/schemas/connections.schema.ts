@@ -8,6 +8,14 @@ export const googleOAuth2ConfigSchema = z.object({
   tokenType: z.string().min(1),
 });
 
+export const microsoftOAuth2ConfigSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1),
+  scope: z.string(),
+  tokenType: z.string().min(1),
+  tenantId: z.string().optional(),
+});
+
 export const slackOAuth2ConfigSchema = z.object({
   accessToken: z.string().min(1),
   teamId: z.string().min(1),
@@ -32,6 +40,7 @@ export const anthropicApiKeyConfigSchema = z.object({
 });
 
 export type GoogleOAuth2Config = z.infer<typeof googleOAuth2ConfigSchema>;
+export type MicrosoftOAuth2Config = z.infer<typeof microsoftOAuth2ConfigSchema>;
 export type SlackOAuth2Config = z.infer<typeof slackOAuth2ConfigSchema>;
 export type NotionOAuth2Config = z.infer<typeof notionOAuth2ConfigSchema>;
 export type OpenAIApiKeyConfig = z.infer<typeof openAIApiKeyConfigSchema>;
@@ -39,6 +48,7 @@ export type AnthropicApiKeyConfig = z.infer<typeof anthropicApiKeyConfigSchema>;
 
 export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.GOOGLE]: googleOAuth2ConfigSchema,
+  [ConnectionProvider.MICROSOFT]: microsoftOAuth2ConfigSchema,
   [ConnectionProvider.SLACK]: slackOAuth2ConfigSchema,
   [ConnectionProvider.NOTION]: notionOAuth2ConfigSchema,
   [ConnectionProvider.OPENAI]: openAIApiKeyConfigSchema,
@@ -47,6 +57,7 @@ export const PROVIDER_CONFIG_SCHEMAS = {
 
 export type ProviderConfigMap = {
   google: GoogleOAuth2Config;
+  microsoft: MicrosoftOAuth2Config;
   slack: SlackOAuth2Config;
   notion: NotionOAuth2Config;
   openai: OpenAIApiKeyConfig;

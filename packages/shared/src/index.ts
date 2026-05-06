@@ -48,12 +48,14 @@ export {
 } from './schemas/auth.schema.js';
 export {
   googleOAuth2ConfigSchema,
+  microsoftOAuth2ConfigSchema,
   slackOAuth2ConfigSchema,
   notionOAuth2ConfigSchema,
   openAIApiKeyConfigSchema,
   anthropicApiKeyConfigSchema,
   PROVIDER_CONFIG_SCHEMAS,
   type GoogleOAuth2Config,
+  type MicrosoftOAuth2Config,
   type SlackOAuth2Config,
   type NotionOAuth2Config,
   type OpenAIApiKeyConfig,
