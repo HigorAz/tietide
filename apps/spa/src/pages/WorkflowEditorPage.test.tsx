@@ -255,6 +255,7 @@ describe('WorkflowEditorPage', () => {
 
       await waitFor(() => expect(mockedSocket.connect).toHaveBeenCalledWith('jwt-token'));
       expect(mockedSocket.subscribe).toHaveBeenCalledWith('exec-1');
+      expect(useExecutionLiveStore.getState().mode).toBe('live');
     });
 
     it('should seed the live store with the steps returned by the REST endpoint', async () => {
@@ -284,6 +285,7 @@ describe('WorkflowEditorPage', () => {
       });
       expect(mockedSocket.connect).not.toHaveBeenCalled();
       expect(mockedSocket.subscribe).not.toHaveBeenCalled();
+      expect(useExecutionLiveStore.getState().mode).toBe('replay');
     });
 
     it('should NOT connect WS when the user has no auth token even if execution is RUNNING', async () => {

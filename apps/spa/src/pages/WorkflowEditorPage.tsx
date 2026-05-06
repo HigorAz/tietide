@@ -30,6 +30,7 @@ export function WorkflowEditorPage() {
   const isDirty = useEditorStore((s) => s.isDirty);
   const seedExecutionFromSteps = useExecutionLiveStore((s) => s.seedFromSteps);
   const setExecutionStoreId = useExecutionLiveStore((s) => s.setExecutionId);
+  const setExecutionMode = useExecutionLiveStore((s) => s.setMode);
   const resetExecutionLive = useExecutionLiveStore((s) => s.reset);
   const token = useAuthStore((s) => s.token);
   const [status, setStatus] = useState<LoadStatus>('loading');
@@ -107,6 +108,7 @@ export function WorkflowEditorPage() {
         seedExecutionFromSteps(steps);
 
         const isLive = execution.status === 'PENDING' || execution.status === 'RUNNING';
+        setExecutionMode(isLive ? 'live' : 'replay');
         if (isLive && token) {
           executionSocket.connect(token);
           executionSocket.subscribe(executionId);
@@ -122,7 +124,14 @@ export function WorkflowEditorPage() {
       executionSocket.disconnect();
       resetExecutionLive();
     };
-  }, [executionId, token, resetExecutionLive, setExecutionStoreId, seedExecutionFromSteps]);
+  }, [
+    executionId,
+    token,
+    resetExecutionLive,
+    setExecutionStoreId,
+    setExecutionMode,
+    seedExecutionFromSteps,
+  ]);
 
   const handleSaveAndProceed = useCallback(async () => {
     if (!id) return;
