@@ -39,3 +39,6 @@ export {
   type LoginFormValues,
   type RegisterFormValues,
 } from './schemas/auth.schema.js';
+
+// Utilities
+export { sanitizePayload } from './utils/sanitize-payload.js';

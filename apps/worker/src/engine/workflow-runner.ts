@@ -9,6 +9,7 @@ import {
 import type { ExecutionContext, Logger, NodeOutput } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
+import { ExecutionEventsService } from '../events/execution-events.service';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 import { CircularDependencyError, topologicalSort } from './topological-sort';
 
@@ -33,6 +34,7 @@ export class WorkflowRunner {
     private readonly registry: NodeRegistry,
     private readonly prisma: PrismaService,
     @Inject(SECRET_RESOLVER) private readonly secretResolver: SecretResolver,
+    private readonly events: ExecutionEventsService,
   ) {}
 
   async run(args: RunArgs): Promise<RunResult> {
@@ -116,6 +118,12 @@ export class WorkflowRunner {
           startedAt,
         },
       });
+      await this.events.publishStepStarted({
+        executionId,
+        nodeId: n.id,
+        nodeType: n.type,
+        startedAt,
+      });
 
       const started = Date.now();
       try {
@@ -123,6 +131,7 @@ export class WorkflowRunner {
         const ctx = this.buildContext(executionId, workflowId, n.id);
         const output = await executor.execute(input, ctx);
         const durationMs = Date.now() - started;
+        const finishedAt = new Date();
 
         outputs.set(n.id, output);
         executionOrder.push(n.id);
@@ -134,15 +143,26 @@ export class WorkflowRunner {
             status: 'SUCCESS',
             inputData: input.data as object,
             outputData: output.data as object,
-            finishedAt: new Date(),
+            finishedAt,
             durationMs,
           },
+        });
+        await this.events.publishStepCompleted({
+          executionId,
+          nodeId: n.id,
+          nodeType: n.type,
+          startedAt,
+          finishedAt,
+          durationMs,
+          input: input.data,
+          output: output.data,
         });
 
         this.propagateReachability(output, outgoingEdges.get(n.id) ?? [], reachable);
       } catch (err) {
         const message = (err as Error).message ?? 'Unknown error';
         const durationMs = Date.now() - started;
+        const finishedAt = new Date();
         this.log.warn(
           { executionId, workflowId, nodeId: n.id, nodeType: n.type },
           `Node failed: ${message}`,
@@ -154,9 +174,19 @@ export class WorkflowRunner {
             status: 'FAILED',
             inputData: input.data as object,
             error: message,
-            finishedAt: new Date(),
+            finishedAt,
             durationMs,
           },
+        });
+        await this.events.publishStepFailed({
+          executionId,
+          nodeId: n.id,
+          nodeType: n.type,
+          startedAt,
+          finishedAt,
+          durationMs,
+          input: input.data,
+          error: { message },
         });
         failure = { nodeId: n.id, error: message };
       }
@@ -241,16 +271,28 @@ export class WorkflowRunner {
         startedAt,
       },
     });
+    const finishedAt = new Date();
+    const passthroughOutput = { skipped: true, passthrough: forwardedInput };
     await this.prisma.executionStep.update({
       where: { id: step.id },
       data: {
         nodeId: n.id,
         status: 'SKIPPED',
         inputData: forwardedInput as object,
-        outputData: { skipped: true, passthrough: forwardedInput } as object,
-        finishedAt: new Date(),
+        outputData: passthroughOutput as object,
+        finishedAt,
         durationMs: 0,
       },
+    });
+    await this.events.publishStepSkipped({
+      executionId,
+      nodeId: n.id,
+      nodeType: n.type,
+      startedAt,
+      finishedAt,
+      durationMs: 0,
+      input: forwardedInput,
+      output: passthroughOutput,
     });
   }
 

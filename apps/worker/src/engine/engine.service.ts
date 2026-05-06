@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
 import type { WorkflowDefinition } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { ExecutionEventsService } from '../events/execution-events.service';
 import { WorkflowRunner } from './workflow-runner';
 
 export interface ExecutePayload {
@@ -19,6 +20,7 @@ export class EngineService {
     private readonly prisma: PrismaService,
     private readonly runner: WorkflowRunner,
     private readonly log: Logger,
+    private readonly events: ExecutionEventsService,
   ) {}
 
   async execute(payload: ExecutePayload): Promise<void> {
@@ -47,19 +49,28 @@ export class EngineService {
         triggerData,
       });
 
+      const finishedAt = new Date();
       if (result.status === 'SUCCESS') {
         await this.prisma.workflowExecution.update({
           where: { id: executionId },
-          data: { status: 'SUCCESS', finishedAt: new Date() },
+          data: { status: 'SUCCESS', finishedAt },
+        });
+        await this.events.publishExecutionCompleted({
+          executionId,
+          finishedAt,
+          status: 'SUCCESS',
         });
       } else {
+        const error = result.error ?? 'Unknown failure';
         await this.prisma.workflowExecution.update({
           where: { id: executionId },
-          data: {
-            status: 'FAILED',
-            error: result.error ?? 'Unknown failure',
-            finishedAt: new Date(),
-          },
+          data: { status: 'FAILED', error, finishedAt },
+        });
+        await this.events.publishExecutionCompleted({
+          executionId,
+          finishedAt,
+          status: 'FAILED',
+          error: { message: error },
         });
       }
     } catch (err) {
@@ -73,9 +84,16 @@ export class EngineService {
   }
 
   private async markFailed(executionId: string, error: string): Promise<void> {
+    const finishedAt = new Date();
     await this.prisma.workflowExecution.update({
       where: { id: executionId },
-      data: { status: 'FAILED', error, finishedAt: new Date() },
+      data: { status: 'FAILED', error, finishedAt },
+    });
+    await this.events.publishExecutionCompleted({
+      executionId,
+      finishedAt,
+      status: 'FAILED',
+      error: { message: error },
     });
   }
 }

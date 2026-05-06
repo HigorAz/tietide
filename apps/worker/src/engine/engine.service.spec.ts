@@ -2,6 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { Logger } from 'nestjs-pino';
 import type { WorkflowDefinition } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { ExecutionEventsService } from '../events/execution-events.service';
 import { EngineService } from './engine.service';
 import { WorkflowRunner, type RunArgs, type RunResult } from './workflow-runner';
 
@@ -12,6 +13,10 @@ interface PrismaMock {
 
 interface RunnerMock {
   run: jest.Mock;
+}
+
+interface EventsMock {
+  publishExecutionCompleted: jest.Mock;
 }
 
 type _RunnerRef = Pick<WorkflowRunner, 'run'>;
@@ -27,6 +32,7 @@ describe('EngineService', () => {
   let engine: EngineService;
   let prisma: PrismaMock;
   let runner: RunnerMock;
+  let events: EventsMock;
 
   beforeEach(async () => {
     prisma = {
@@ -36,6 +42,9 @@ describe('EngineService', () => {
     runner = {
       run: jest.fn<Promise<RunResult>, [RunArgs]>(async () => ({ status: 'SUCCESS' })),
     };
+    events = {
+      publishExecutionCompleted: jest.fn(async () => undefined),
+    };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +52,7 @@ describe('EngineService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: WorkflowRunner, useValue: runner },
         { provide: Logger, useValue: { log: jest.fn(), error: jest.fn(), warn: jest.fn() } },
+        { provide: ExecutionEventsService, useValue: events },
       ],
     }).compile();
 
@@ -166,6 +176,61 @@ describe('EngineService', () => {
 
       const finalCall = prisma.workflowExecution.update.mock.calls.pop();
       expect(finalCall![0].data.finishedAt).toBeInstanceOf(Date);
+    });
+
+    describe('execution.completed events', () => {
+      it('should publish execution.completed with SUCCESS exactly once on success path', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue({ status: 'SUCCESS' });
+
+        await engine.execute({ executionId: 'exec-1', workflowId: 'wf-1', triggerType: 'manual' });
+
+        expect(events.publishExecutionCompleted).toHaveBeenCalledTimes(1);
+        const args = events.publishExecutionCompleted.mock.calls[0][0];
+        expect(args.executionId).toBe('exec-1');
+        expect(args.status).toBe('SUCCESS');
+        expect(args.finishedAt).toBeInstanceOf(Date);
+        expect(args.error).toBeUndefined();
+      });
+
+      it('should publish execution.completed with FAILED + error when runner reports failure', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue({ status: 'FAILED', error: 'node B exploded' });
+
+        await engine.execute({ executionId: 'exec-1', workflowId: 'wf-1', triggerType: 'manual' });
+
+        expect(events.publishExecutionCompleted).toHaveBeenCalledTimes(1);
+        const args = events.publishExecutionCompleted.mock.calls[0][0];
+        expect(args.status).toBe('FAILED');
+        expect(args.error).toEqual({ message: 'node B exploded' });
+      });
+
+      it('should publish execution.completed with FAILED when workflow not found', async () => {
+        prisma.workflow.findUnique.mockResolvedValue(null);
+
+        await engine.execute({
+          executionId: 'exec-1',
+          workflowId: 'missing',
+          triggerType: 'manual',
+        });
+
+        expect(events.publishExecutionCompleted).toHaveBeenCalledTimes(1);
+        const args = events.publishExecutionCompleted.mock.calls[0][0];
+        expect(args.status).toBe('FAILED');
+        expect(args.error?.message).toMatch(/not found/i);
+      });
+
+      it('should publish execution.completed with FAILED when runner crashes', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockRejectedValue(new Error('unexpected'));
+
+        await engine.execute({ executionId: 'exec-1', workflowId: 'wf-1', triggerType: 'manual' });
+
+        expect(events.publishExecutionCompleted).toHaveBeenCalledTimes(1);
+        const args = events.publishExecutionCompleted.mock.calls[0][0];
+        expect(args.status).toBe('FAILED');
+        expect(args.error?.message).toContain('unexpected');
+      });
     });
   });
 });

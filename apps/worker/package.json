@@ -23,6 +23,7 @@
     "@tietide/shared": "workspace:*",
     "@tietide/sdk": "workspace:*",
     "bullmq": "^5.52.2",
+    "ioredis": "^5.10.1",
     "libsodium-wrappers": "^0.8.3",
     "nestjs-pino": "^4.3.0",
     "pino-http": "^10.4.0",
