@@ -112,6 +112,64 @@ SMTP_USER=tietide-monitor@example.com
 SMTP_PASSWORD=...
 ```
 
+### 3.3 OAuth2 provider registration
+
+Each provider you want to enable requires registering an OAuth client at the provider's developer console and pasting the resulting client id + secret into the `.env` file. The redirect URI must be `https://<your-domain>/v1/connections/oauth/callback?provider=<provider-id>` and must be entered verbatim (provider-side exact-match validation).
+
+#### Google
+
+1. Open https://console.cloud.google.com/apis/credentials
+2. **Create credentials → OAuth client ID → Web application**
+3. Authorized redirect URI: `https://<DOMAIN>/v1/connections/oauth/callback?provider=google`
+4. Copy the generated client id and secret into:
+   - `GOOGLE_OAUTH_CLIENT_ID`
+   - `GOOGLE_OAUTH_CLIENT_SECRET`
+   - `GOOGLE_OAUTH_REDIRECT_URI=https://<DOMAIN>/v1/connections/oauth/callback?provider=google`
+5. Enable the APIs you plan to call (Gmail API, Calendar API, Drive API, etc.) under **APIs & Services → Library**.
+
+#### Microsoft (Entra)
+
+1. Open https://entra.microsoft.com → **Identity → App registrations → New registration**
+2. **Supported account types**: choose multitenant (`AzureADMultipleOrgs`) for `MS_OAUTH_TENANT=common`, or single-tenant if locking to your own tenant id.
+3. **Redirect URI** (Web): `https://<DOMAIN>/v1/connections/oauth/callback?provider=microsoft`
+4. After creating the app, go to **Certificates & secrets → New client secret** and copy the secret value.
+5. Paste into:
+   - `MS_OAUTH_CLIENT_ID` (Application (client) ID)
+   - `MS_OAUTH_CLIENT_SECRET` (the secret value, not the secret id)
+   - `MS_OAUTH_REDIRECT_URI`
+   - `MS_OAUTH_TENANT=common` (or a specific tenant id)
+6. Under **API permissions**, grant the delegated scopes you intend to expose (e.g. `Mail.Read`, `Calendars.ReadWrite`). The platform's allowlist is enforced server-side too — see `apps/api/src/connections/oauth/providers/microsoft.provider.ts`.
+
+#### Slack
+
+1. Open https://api.slack.com/apps → **Create New App → From scratch**
+2. **OAuth & Permissions** → add a Redirect URL: `https://<DOMAIN>/v1/connections/oauth/callback?provider=slack`
+3. Add the bot/user scopes you want to expose (`chat:write`, `channels:read`, etc.).
+4. **Basic Information** → copy Client ID + Client Secret into:
+   - `SLACK_OAUTH_CLIENT_ID`
+   - `SLACK_OAUTH_CLIENT_SECRET`
+   - `SLACK_OAUTH_REDIRECT_URI`
+5. Slack tokens do not expire by default — the worker's refresh job is a no-op for them.
+
+#### Notion
+
+1. Open https://www.notion.so/my-integrations → **New integration**
+2. Choose **Public** integration type.
+3. Set Redirect URI: `https://<DOMAIN>/v1/connections/oauth/callback?provider=notion`
+4. Copy OAuth client ID + secret into:
+   - `NOTION_OAUTH_CLIENT_ID`
+   - `NOTION_OAUTH_CLIENT_SECRET`
+   - `NOTION_OAUTH_REDIRECT_URI`
+5. Notion tokens do not expire and there is no refresh token — the worker's refresh job is a no-op.
+
+#### Important: time sync
+
+The OAuth state JWT has a 10-minute TTL. If the VPS clock drifts more than a few seconds the callback will reject otherwise-valid states. Ensure `chronyd`/`systemd-timesyncd` is running.
+
+```bash
+timedatectl status        # NTP synchronized: yes
+```
+
 ---
 
 ## 4. Bring the dependencies up

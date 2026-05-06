@@ -1,3 +1,4 @@
+import { UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { JwtStrategy, type JwtPayload } from './jwt.strategy';
 
@@ -53,6 +54,23 @@ describe('JwtStrategy', () => {
       const result = strategy.validate(payload);
 
       expect(result.role).toBe('ADMIN');
+    });
+
+    it('should reject tokens with the oauth-state audience claim', () => {
+      const payload: JwtPayload = {
+        sub: 'user-1',
+        email: 'a@b.com',
+        role: 'USER',
+        aud: 'oauth-state',
+      };
+
+      expect(() => strategy.validate(payload)).toThrow(UnauthorizedException);
+    });
+
+    it('should reject tokens missing required identity claims', () => {
+      const payload: JwtPayload = { aud: 'something' };
+
+      expect(() => strategy.validate(payload)).toThrow(UnauthorizedException);
     });
   });
 });
