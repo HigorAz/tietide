@@ -3,8 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router-dom';
-import { NodeType, type Workflow } from '@tietide/shared';
+import {
+  NodeType,
+  type ExecutionStep,
+  type Workflow,
+  type WorkflowExecution,
+} from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
+import { initialExecutionLiveState, useExecutionLiveStore } from '@/stores/executionLiveStore';
+import { useAuthStore } from '@/stores/authStore';
 
 vi.mock('reactflow/dist/style.css', () => ({}));
 vi.mock('reactflow', () => ({
@@ -29,11 +36,34 @@ vi.mock('@/api/ai', () => ({
   regenerateWorkflowDocs: vi.fn(),
 }));
 
+vi.mock('@/api/executions', () => ({
+  getExecution: vi.fn(),
+  listExecutionSteps: vi.fn(),
+  executeWorkflow: vi.fn(),
+}));
+
+vi.mock('@/lib/execution-socket', () => ({
+  executionSocket: {
+    connect: vi.fn(),
+    subscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+    disconnect: vi.fn(),
+    onEvent: vi.fn(() => () => {}),
+    onError: vi.fn(() => () => {}),
+    isConnected: vi.fn(() => false),
+  },
+}));
+
 import { getWorkflow, updateWorkflow } from '@/api/workflows';
+import { getExecution, listExecutionSteps } from '@/api/executions';
+import { executionSocket } from '@/lib/execution-socket';
 import { WorkflowEditorPage } from './WorkflowEditorPage';
 
 const mockedGet = vi.mocked(getWorkflow);
 const mockedUpdate = vi.mocked(updateWorkflow);
+const mockedGetExecution = vi.mocked(getExecution);
+const mockedListSteps = vi.mocked(listExecutionSteps);
+const mockedSocket = vi.mocked(executionSocket);
 
 const sampleWorkflow: Workflow = {
   id: 'wf-abc',
@@ -63,9 +93,10 @@ const sampleWorkflow: Workflow = {
 interface RenderOptions {
   id?: string;
   state?: unknown;
+  search?: string;
 }
 
-const buildRouter = ({ id = 'wf-abc', state }: RenderOptions = {}) => {
+const buildRouter = ({ id = 'wf-abc', state, search }: RenderOptions = {}) => {
   const routes: RouteObject[] = [
     { path: '/workflows/:id', element: <WorkflowEditorPage /> },
     { path: '/dashboard', element: <div data-testid="dashboard">Dashboard</div> },
@@ -73,12 +104,12 @@ const buildRouter = ({ id = 'wf-abc', state }: RenderOptions = {}) => {
     { path: '/library', element: <div data-testid="library">Library</div> },
   ];
   return createMemoryRouter(routes, {
-    initialEntries: [{ pathname: `/workflows/${id}`, state }],
+    initialEntries: [{ pathname: `/workflows/${id}`, search, state }],
   });
 };
 
-const renderAtId = (id: string, state?: unknown) => {
-  const router = buildRouter({ id, state });
+const renderAtId = (id: string, state?: unknown, search?: string) => {
+  const router = buildRouter({ id, state, search });
   const view = render(<RouterProvider router={router} />);
   return { ...view, router };
 };
@@ -86,8 +117,20 @@ const renderAtId = (id: string, state?: unknown) => {
 describe('WorkflowEditorPage', () => {
   beforeEach(() => {
     useEditorStore.setState({ ...initialEditorState });
+    useExecutionLiveStore.setState({ ...initialExecutionLiveState, nodes: new Map() });
+    useAuthStore.setState({ user: null, token: null });
     mockedGet.mockReset();
     mockedUpdate.mockReset();
+    mockedGetExecution.mockReset();
+    mockedListSteps.mockReset();
+    mockedSocket.connect.mockReset();
+    mockedSocket.subscribe.mockReset();
+    mockedSocket.unsubscribe.mockReset();
+    mockedSocket.disconnect.mockReset();
+    mockedSocket.onEvent.mockReset();
+    mockedSocket.onEvent.mockReturnValue(() => {});
+    mockedSocket.onError.mockReset();
+    mockedSocket.onError.mockReturnValue(() => {});
   });
 
   it('should show a loading state while the workflow request is in flight', () => {
@@ -160,6 +203,122 @@ describe('WorkflowEditorPage', () => {
     const state = useEditorStore.getState();
     expect(state.nodes).toHaveLength(0);
     expect(state.workflowId).toBeNull();
+  });
+
+  describe('live execution overlay (issue #118)', () => {
+    const sampleExecution = (status: WorkflowExecution['status']): WorkflowExecution => ({
+      id: 'exec-1',
+      workflowId: 'wf-abc',
+      status,
+      triggerType: 'manual',
+      triggerData: null,
+      startedAt: new Date('2026-05-06T10:00:00Z'),
+      finishedAt: null,
+      error: null,
+      createdAt: new Date('2026-05-06T10:00:00Z'),
+    });
+
+    const sampleStep = (overrides: Partial<ExecutionStep> = {}): ExecutionStep => ({
+      id: 'step-1',
+      executionId: 'exec-1',
+      nodeId: 'n-1',
+      nodeType: 'manual-trigger',
+      nodeName: 'Start',
+      status: 'SUCCESS',
+      inputData: null,
+      outputData: { ok: true },
+      error: null,
+      startedAt: new Date('2026-05-06T10:00:00Z'),
+      finishedAt: new Date('2026-05-06T10:00:01Z'),
+      durationMs: 1000,
+      ...overrides,
+    });
+
+    it('should NOT call the WS singleton when no ?execution param is present', async () => {
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+      renderAtId('wf-abc');
+
+      await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+      expect(mockedSocket.connect).not.toHaveBeenCalled();
+      expect(mockedSocket.subscribe).not.toHaveBeenCalled();
+      expect(mockedListSteps).not.toHaveBeenCalled();
+    });
+
+    it('should connect WS and subscribe when opened with ?execution=<runningId>', async () => {
+      useAuthStore.setState({ token: 'jwt-token', user: null });
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      mockedGetExecution.mockResolvedValueOnce(sampleExecution('RUNNING'));
+      mockedListSteps.mockResolvedValueOnce([]);
+
+      renderAtId('wf-abc', undefined, '?execution=exec-1');
+
+      await waitFor(() => expect(mockedSocket.connect).toHaveBeenCalledWith('jwt-token'));
+      expect(mockedSocket.subscribe).toHaveBeenCalledWith('exec-1');
+    });
+
+    it('should seed the live store with the steps returned by the REST endpoint', async () => {
+      useAuthStore.setState({ token: 'jwt-token', user: null });
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      mockedGetExecution.mockResolvedValueOnce(sampleExecution('RUNNING'));
+      mockedListSteps.mockResolvedValueOnce([sampleStep({ status: 'RUNNING' })]);
+
+      renderAtId('wf-abc', undefined, '?execution=exec-1');
+
+      await waitFor(() => {
+        const node = useExecutionLiveStore.getState().nodes.get('n-1');
+        expect(node?.status).toBe('running');
+      });
+    });
+
+    it('should hydrate replay-only state and skip WS for terminal executions (SUCCESS)', async () => {
+      useAuthStore.setState({ token: 'jwt-token', user: null });
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      mockedGetExecution.mockResolvedValueOnce(sampleExecution('SUCCESS'));
+      mockedListSteps.mockResolvedValueOnce([sampleStep({ status: 'SUCCESS' })]);
+
+      renderAtId('wf-abc', undefined, '?execution=exec-1');
+
+      await waitFor(() => {
+        expect(useExecutionLiveStore.getState().nodes.get('n-1')?.status).toBe('success');
+      });
+      expect(mockedSocket.connect).not.toHaveBeenCalled();
+      expect(mockedSocket.subscribe).not.toHaveBeenCalled();
+    });
+
+    it('should NOT connect WS when the user has no auth token even if execution is RUNNING', async () => {
+      // token already null from beforeEach
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      mockedGetExecution.mockResolvedValueOnce(sampleExecution('RUNNING'));
+      mockedListSteps.mockResolvedValueOnce([]);
+
+      renderAtId('wf-abc', undefined, '?execution=exec-1');
+
+      await waitFor(() => expect(mockedListSteps).toHaveBeenCalled());
+      expect(mockedSocket.connect).not.toHaveBeenCalled();
+    });
+
+    it('should unsubscribe and disconnect on unmount', async () => {
+      useAuthStore.setState({ token: 'jwt-token', user: null });
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      mockedGetExecution.mockResolvedValueOnce(sampleExecution('RUNNING'));
+      mockedListSteps.mockResolvedValueOnce([]);
+
+      const { unmount } = renderAtId('wf-abc', undefined, '?execution=exec-1');
+      await waitFor(() => expect(mockedSocket.subscribe).toHaveBeenCalled());
+
+      unmount();
+
+      expect(mockedSocket.unsubscribe).toHaveBeenCalledWith('exec-1');
+      expect(mockedSocket.disconnect).toHaveBeenCalled();
+    });
+
+    it('should register an onEvent listener so events route to the live store', async () => {
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      renderAtId('wf-abc');
+      await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+      expect(mockedSocket.onEvent).toHaveBeenCalled();
+    });
   });
 
   describe('unsaved changes guard (issue #104)', () => {

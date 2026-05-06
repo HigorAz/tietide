@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
 import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
@@ -11,17 +11,27 @@ import { UnsavedChangesModal } from '@/components/editor/UnsavedChangesModal';
 import { saveWorkflow } from '@/components/editor/saveWorkflow';
 import { useUnsavedChangesGuard } from '@/components/editor/useUnsavedChangesGuard';
 import { getWorkflow } from '@/api/workflows';
+import { getExecution, listExecutionSteps } from '@/api/executions';
 import { useEditorHotkeys } from '@/hooks/useEditorHotkeys';
 import { useEditorStore } from '@/stores/editorStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
+import { useAuthStore } from '@/stores/authStore';
+import { executionSocket } from '@/lib/execution-socket';
 
 type LoadStatus = 'loading' | 'ready' | 'error';
 
 export function WorkflowEditorPage() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const executionId = searchParams.get('execution');
   const location = useLocation();
   const loadWorkflow = useEditorStore((s) => s.loadWorkflow);
   const resetEditor = useEditorStore((s) => s.resetEditor);
   const isDirty = useEditorStore((s) => s.isDirty);
+  const seedExecutionFromSteps = useExecutionLiveStore((s) => s.seedFromSteps);
+  const setExecutionStoreId = useExecutionLiveStore((s) => s.setExecutionId);
+  const resetExecutionLive = useExecutionLiveStore((s) => s.reset);
+  const token = useAuthStore((s) => s.token);
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [fetchKey, setFetchKey] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -70,6 +80,49 @@ export function WorkflowEditorPage() {
       resetEditor();
     };
   }, [resetEditor]);
+
+  // Forward live execution events from the WS singleton into the live store.
+  useEffect(() => {
+    return executionSocket.onEvent((envelope) => {
+      useExecutionLiveStore.getState().applyEvent(envelope);
+    });
+  }, []);
+
+  // When an `?execution=<id>` is present, seed the live store from the REST
+  // steps endpoint and (only if the execution is still in flight) open the WS
+  // and subscribe. Terminal executions render as a static replay.
+  useEffect(() => {
+    if (!executionId) return;
+    let cancelled = false;
+    resetExecutionLive();
+    setExecutionStoreId(executionId);
+
+    (async () => {
+      try {
+        const [execution, steps] = await Promise.all([
+          getExecution(executionId),
+          listExecutionSteps(executionId),
+        ]);
+        if (cancelled) return;
+        seedExecutionFromSteps(steps);
+
+        const isLive = execution.status === 'PENDING' || execution.status === 'RUNNING';
+        if (isLive && token) {
+          executionSocket.connect(token);
+          executionSocket.subscribe(executionId);
+        }
+      } catch {
+        // Hydration failed (404, network) — leave the empty state in place.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      executionSocket.unsubscribe(executionId);
+      executionSocket.disconnect();
+      resetExecutionLive();
+    };
+  }, [executionId, token, resetExecutionLive, setExecutionStoreId, seedExecutionFromSteps]);
 
   const handleSaveAndProceed = useCallback(async () => {
     if (!id) return;
