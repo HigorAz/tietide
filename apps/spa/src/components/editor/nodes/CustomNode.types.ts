@@ -1,6 +1,6 @@
 import type { NodeType } from '@tietide/shared';
 
-export type NodeStatus = 'idle' | 'running' | 'success' | 'failed';
+export type NodeStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 
 export interface CustomNodeData {
   label: string;

@@ -4,6 +4,7 @@ import { SkipForward } from 'lucide-react';
 import { NODE_CATALOG, NodeCategory } from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { useEditorStore } from '@/stores/editorStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { getNodeIcon } from './nodeIcons';
 import type { CustomNodeData, NodeStatus } from './CustomNode.types';
 
@@ -12,10 +13,12 @@ const STATUS_RING_CLASS: Record<NodeStatus, string> = {
   running: 'ring-status-running animate-pulse-ring',
   success: 'ring-status-success',
   failed: 'ring-status-failed',
+  skipped: 'ring-status-idle/40',
 };
 
 function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
-  const status: NodeStatus = data.status ?? 'idle';
+  const liveStatus = useExecutionLiveStore((s) => s.nodes.get(id)?.status);
+  const status: NodeStatus = liveStatus ?? data.status ?? 'idle';
   const Icon = getNodeIcon(data.nodeType);
   const skipped = data.skipped === true;
   const isTrigger =

@@ -6,6 +6,19 @@ import { NodeType } from '@tietide/shared';
 import { CustomNode } from './CustomNode';
 import type { CustomNodeData } from './CustomNode.types';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
+import { useExecutionLiveStore, type NodeRunState } from '@/stores/executionLiveStore';
+
+const baseRunState = (overrides: Partial<NodeRunState> = {}): NodeRunState => ({
+  status: 'running',
+  nodeType: 'http-request',
+  startedAt: null,
+  finishedAt: null,
+  durationMs: null,
+  input: null,
+  output: null,
+  error: null,
+  ...overrides,
+});
 
 type Props = Partial<NodeProps<CustomNodeData>> & { data: CustomNodeData };
 
@@ -105,11 +118,16 @@ describe('CustomNode', () => {
   });
 
   describe('status ring', () => {
+    beforeEach(() => {
+      useExecutionLiveStore.getState().reset();
+    });
+
     it.each([
       ['idle', 'status-idle'],
       ['running', 'status-running'],
       ['success', 'status-success'],
       ['failed', 'status-failed'],
+      ['skipped', 'status-idle'],
     ] as const)('should apply %s color when status=%s', (status, expectedClassFragment) => {
       renderNode({
         data: {
@@ -132,6 +150,42 @@ describe('CustomNode', () => {
         },
       });
       expect(screen.getByTestId('custom-node-ring').className).toContain('animate-pulse-ring');
+    });
+  });
+
+  describe('live execution status override', () => {
+    beforeEach(() => {
+      useExecutionLiveStore.getState().reset();
+    });
+
+    it('should reflect status from executionLiveStore when present', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map([['node-1', baseRunState({ status: 'running' })]]),
+      });
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+      expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-status', 'running');
+    });
+
+    it('should override data.status (success ring takes over after completion)', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map([['node-1', baseRunState({ status: 'success' })]]),
+      });
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'running' },
+      });
+      expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-status', 'success');
+    });
+
+    it('should fall back to data.status when no live entry exists for this node', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map([['other-node', baseRunState({ status: 'running' })]]),
+      });
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'failed' },
+      });
+      expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-status', 'failed');
     });
   });
 
