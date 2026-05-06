@@ -3,6 +3,7 @@ import type { WorkflowDefinition } from '@tietide/shared';
 import type { INodeExecutor, NodeInput, NodeOutput, ExecutionContext } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
+import { ExecutionEventsService } from '../events/execution-events.service';
 import { WorkflowRunner } from './workflow-runner';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 
@@ -48,11 +49,20 @@ interface PrismaMock {
   executionStep: PrismaStepMock;
 }
 
+interface EventsMock {
+  publishStepStarted: jest.Mock;
+  publishStepCompleted: jest.Mock;
+  publishStepFailed: jest.Mock;
+  publishStepSkipped: jest.Mock;
+  publishExecutionCompleted: jest.Mock;
+}
+
 describe('WorkflowRunner', () => {
   let runner: WorkflowRunner;
   let registry: NodeRegistry;
   let prisma: PrismaMock;
   let secretResolver: SecretResolver;
+  let events: EventsMock;
 
   beforeEach(async () => {
     registry = new NodeRegistry();
@@ -72,12 +82,21 @@ describe('WorkflowRunner', () => {
       releaseExecution: jest.fn(),
     };
 
+    events = {
+      publishStepStarted: jest.fn(async () => undefined),
+      publishStepCompleted: jest.fn(async () => undefined),
+      publishStepFailed: jest.fn(async () => undefined),
+      publishStepSkipped: jest.fn(async () => undefined),
+      publishExecutionCompleted: jest.fn(async () => undefined),
+    };
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowRunner,
         { provide: NodeRegistry, useValue: registry },
         { provide: PrismaService, useValue: prisma },
         { provide: SECRET_RESOLVER, useValue: secretResolver },
+        { provide: ExecutionEventsService, useValue: events },
       ],
     }).compile();
 
@@ -638,6 +657,124 @@ describe('WorkflowRunner', () => {
         await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
 
         expect(truePath.execute).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('execution event emission', () => {
+      it('should emit step.started + step.completed for each node in topological order', async () => {
+        registry.register(makeExecutor('a'));
+        registry.register(makeExecutor('b'));
+
+        const def: WorkflowDefinition = {
+          nodes: [node('A', 'a'), node('B', 'b')],
+          edges: [edge('e1', 'A', 'B')],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        const startedNodes = events.publishStepStarted.mock.calls.map((c) => c[0].nodeId);
+        const completedNodes = events.publishStepCompleted.mock.calls.map((c) => c[0].nodeId);
+        expect(startedNodes).toEqual(['A', 'B']);
+        expect(completedNodes).toEqual(['A', 'B']);
+        expect(events.publishStepFailed).not.toHaveBeenCalled();
+      });
+
+      it('should emit step.started before step.completed for the same node', async () => {
+        registry.register(makeExecutor('a'));
+        const sequence: string[] = [];
+        events.publishStepStarted.mockImplementation(async ({ nodeId }) => {
+          sequence.push(`started:${nodeId}`);
+        });
+        events.publishStepCompleted.mockImplementation(async ({ nodeId }) => {
+          sequence.push(`completed:${nodeId}`);
+        });
+
+        const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(sequence).toEqual(['started:A', 'completed:A']);
+      });
+
+      it('should emit step.failed (not step.completed) when a node throws', async () => {
+        registry.register(
+          makeExecutor('a', async () => {
+            throw new Error('kaboom');
+          }),
+        );
+        const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(events.publishStepStarted).toHaveBeenCalledTimes(1);
+        expect(events.publishStepFailed).toHaveBeenCalledTimes(1);
+        expect(events.publishStepCompleted).not.toHaveBeenCalled();
+        const failedArgs = events.publishStepFailed.mock.calls[0][0];
+        expect(failedArgs.nodeId).toBe('A');
+        expect(failedArgs.error.message).toContain('kaboom');
+      });
+
+      it('should emit step.skipped (and not step.started) for a skipped node', async () => {
+        registry.register(makeExecutor('a', async () => ({ data: { value: 42 } })));
+        registry.register(makeExecutor('b'));
+
+        const def: WorkflowDefinition = {
+          nodes: [node('A', 'a'), { ...node('B', 'b'), skipped: true }],
+          edges: [edge('e1', 'A', 'B')],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        const startedNodes = events.publishStepStarted.mock.calls.map((c) => c[0].nodeId);
+        const skippedNodes = events.publishStepSkipped.mock.calls.map((c) => c[0].nodeId);
+        expect(startedNodes).toEqual(['A']);
+        expect(skippedNodes).toEqual(['B']);
+        const skippedArgs = events.publishStepSkipped.mock.calls[0][0];
+        expect(skippedArgs.input).toEqual({ value: 42 });
+        expect(skippedArgs.output).toEqual({
+          skipped: true,
+          passthrough: { value: 42 },
+        });
+      });
+
+      it("should pass raw input/output through to events (sanitization is the service's job)", async () => {
+        registry.register(makeExecutor('a', async () => ({ data: { token: 'tk', body: 'ok' } })));
+        const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+        await runner.run({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          definition: def,
+          triggerData: { password: 'p' },
+        });
+
+        const completedArgs = events.publishStepCompleted.mock.calls[0][0];
+        expect(completedArgs.input).toEqual({ password: 'p' });
+        expect(completedArgs.output).toEqual({ token: 'tk', body: 'ok' });
+      });
+
+      it('should not emit any step events for CANCELLED downstream nodes', async () => {
+        registry.register(makeExecutor('a'));
+        registry.register(
+          makeExecutor('b', async () => {
+            throw new Error('boom');
+          }),
+        );
+        registry.register(makeExecutor('c'));
+
+        const def: WorkflowDefinition = {
+          nodes: [node('A', 'a'), node('B', 'b'), node('C', 'c')],
+          edges: [edge('e1', 'A', 'B'), edge('e2', 'B', 'C')],
+        };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        const allNodeIdsSeen = [
+          ...events.publishStepStarted.mock.calls,
+          ...events.publishStepCompleted.mock.calls,
+          ...events.publishStepFailed.mock.calls,
+          ...events.publishStepSkipped.mock.calls,
+        ].map((c) => c[0].nodeId);
+        expect(allNodeIdsSeen).not.toContain('C');
       });
     });
 

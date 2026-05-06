@@ -11,7 +11,7 @@ import type {
   ExecutionListResponseDto,
 } from './dto/execution-detail-response.dto';
 import type { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
-import { sanitizePayload } from './utils/sanitize-payload';
+import { sanitizePayload } from '@tietide/shared';
 
 export interface TriggerOptions {
   triggerData?: Record<string, unknown>;

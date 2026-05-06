@@ -1,4 +1,4 @@
-import { sanitizePayload } from './sanitize-payload';
+import { sanitizePayload } from '@tietide/shared';
 
 describe('sanitizePayload', () => {
   it('should return null when input is null or undefined', () => {

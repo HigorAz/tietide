@@ -5,12 +5,14 @@ import { NodeRegistry } from '../nodes/registry';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { CronTrigger } from '../nodes/triggers/cron-trigger';
 import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
+import { ExecutionEventsModule } from '../events/execution-events.module';
 import { EngineService } from './engine.service';
 import { WorkflowRunner } from './workflow-runner';
 import { SECRET_RESOLVER } from './secret-resolver';
 import { PrismaSecretResolver } from './prisma-secret-resolver';
 
 @Module({
+  imports: [ExecutionEventsModule],
   providers: [
     NodeRegistry,
     WorkflowRunner,
