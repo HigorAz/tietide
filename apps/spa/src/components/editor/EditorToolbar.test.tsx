@@ -15,8 +15,10 @@ vi.mock('@/api/executions', () => ({
 }));
 
 const mockNavigate = vi.fn();
+const mockSetSearchParams = vi.fn();
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [new URLSearchParams(), mockSetSearchParams],
 }));
 
 import { updateWorkflow } from '@/api/workflows';
@@ -47,6 +49,7 @@ describe('EditorToolbar', () => {
     mockedUpdate.mockReset();
     mockedExecute.mockReset();
     mockNavigate.mockReset();
+    mockSetSearchParams.mockReset();
   });
 
   describe('rendering', () => {
@@ -215,14 +218,15 @@ describe('EditorToolbar', () => {
       expect(screen.getByRole('button', { name: /run/i })).toBeEnabled();
     });
 
-    it('should call executeWorkflow and navigate to execution detail on success', async () => {
+    it('should call executeWorkflow and set ?execution=<id> on the URL on success', async () => {
       mockedExecute.mockResolvedValueOnce(executionResponse);
       render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
       await waitFor(() => expect(mockedExecute).toHaveBeenCalledWith('wf-1'));
-      expect(mockNavigate).toHaveBeenCalledWith('/executions/exec-1');
+      expect(mockSetSearchParams).toHaveBeenCalledWith({ execution: 'exec-1' });
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
 
     it('should save before executing when the workflow is dirty', async () => {
@@ -236,7 +240,7 @@ describe('EditorToolbar', () => {
       await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
       expect(mockedUpdate).toHaveBeenCalledTimes(1);
       expect(useEditorStore.getState().isDirty).toBe(false);
-      expect(mockNavigate).toHaveBeenCalledWith('/executions/exec-1');
+      expect(mockSetSearchParams).toHaveBeenCalledWith({ execution: 'exec-1' });
     });
 
     it('should not call executeWorkflow when the auto-save fails', async () => {
@@ -248,17 +252,17 @@ describe('EditorToolbar', () => {
 
       await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
       expect(mockedExecute).not.toHaveBeenCalled();
-      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(mockSetSearchParams).not.toHaveBeenCalled();
     });
 
-    it('should show an error toast and not navigate when execution fails to enqueue', async () => {
+    it('should show an error toast and not change the URL when execution fails to enqueue', async () => {
       mockedExecute.mockRejectedValueOnce(new Error('boom'));
       render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
       await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
-      expect(mockNavigate).not.toHaveBeenCalled();
+      expect(mockSetSearchParams).not.toHaveBeenCalled();
       const toasts = useToastStore.getState().toasts;
       expect(toasts).toHaveLength(1);
       expect(toasts[0]).toMatchObject({ tone: 'error' });
