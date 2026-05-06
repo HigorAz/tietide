@@ -36,4 +36,13 @@ export class UpdateWorkflowDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({
+    maxLength: 200,
+    description: 'Optional message attached to the version snapshot when definition changes.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  versionMessage?: string;
 }

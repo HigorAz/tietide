@@ -16,10 +16,11 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  workflows   Workflow[]
-  secrets     Secret[]
-  connections Connection[]
-  auditLogs   AuditLog[]
+  workflows        Workflow[]
+  secrets          Secret[]
+  connections      Connection[]
+  auditLogs        AuditLog[]
+  workflowVersions WorkflowVersion[]
 
   @@map("users")
 }
@@ -44,8 +45,26 @@ model Workflow {
   executions    WorkflowExecution[]
   webhooks      Webhook[]
   documentation WorkflowDocumentation?
+  versions      WorkflowVersion[]
 
   @@map("workflows")
+}
+
+model WorkflowVersion {
+  id          String   @id @default(uuid())
+  workflowId  String   @map("workflow_id")
+  version     Int
+  definition  Json
+  message     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdById String?  @map("created_by_id")
+
+  workflow  Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id])
+
+  @@unique([workflowId, version])
+  @@index([workflowId, createdAt(sort: Desc)])
+  @@map("workflow_versions")
 }
 
 model WorkflowDocumentation {

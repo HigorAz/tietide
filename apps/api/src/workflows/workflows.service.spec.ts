@@ -16,6 +16,10 @@ describe('WorkflowsService', () => {
       update: jest.Mock;
       deleteMany: jest.Mock;
     };
+    workflowVersion: {
+      create: jest.Mock;
+    };
+    $transaction: jest.Mock;
   };
 
   const userId = 'user-uuid-1';
@@ -64,7 +68,18 @@ describe('WorkflowsService', () => {
         update: jest.fn(),
         deleteMany: jest.fn(),
       },
+      workflowVersion: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+      $transaction: jest.fn(),
     };
+    // Default: $transaction passes the mocked prisma through as the "tx" client
+    prisma.$transaction.mockImplementation(async (cb: unknown) => {
+      if (typeof cb === 'function') {
+        return (cb as (tx: typeof prisma) => Promise<unknown>)(prisma);
+      }
+      return undefined;
+    });
     audit = { log: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -77,6 +92,13 @@ describe('WorkflowsService', () => {
 
     service = module.get<WorkflowsService>(WorkflowsService);
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(async (cb: unknown) => {
+      if (typeof cb === 'function') {
+        return (cb as (tx: typeof prisma) => Promise<unknown>)(prisma);
+      }
+      return undefined;
+    });
+    prisma.workflowVersion.create.mockResolvedValue({});
   });
 
   describe('create', () => {
@@ -151,7 +173,31 @@ describe('WorkflowsService', () => {
       ).rejects.toThrow(BadRequestException);
 
       expect(prisma.workflow.create).not.toHaveBeenCalled();
+      expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
       expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    it('should seed an initial WorkflowVersion v1 with the new definition', async () => {
+      prisma.workflow.create.mockResolvedValue(persisted);
+
+      await service.create(userId, dto);
+
+      expect(prisma.workflowVersion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          workflowId,
+          version: 1,
+          definition: validDefinition,
+          createdById: userId,
+        }),
+      });
+    });
+
+    it('should perform create + initial snapshot in a single $transaction', async () => {
+      prisma.workflow.create.mockResolvedValue(persisted);
+
+      await service.create(userId, dto);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -309,18 +355,12 @@ describe('WorkflowsService', () => {
       prisma.workflow.update.mockResolvedValue({ ...persisted, version: 2 });
     });
 
-    it('should increment version by 1 and apply partial fields', async () => {
+    it('should apply partial fields without bumping version when definition is unchanged', async () => {
       await service.update(userId, workflowId, { name: 'Renamed' });
 
-      expect(prisma.workflow.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: workflowId },
-          data: {
-            name: 'Renamed',
-            version: { increment: 1 },
-          },
-        }),
-      );
+      const call = prisma.workflow.update.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(call.data.name).toBe('Renamed');
+      expect(call.data.version).toBeUndefined();
     });
 
     it('should accept an updated definition and persist it verbatim', async () => {
@@ -338,17 +378,78 @@ describe('WorkflowsService', () => {
       );
     });
 
-    it('should not touch the definition column when definition is absent', async () => {
+    it('should NOT bump version when only isActive changes', async () => {
       await service.update(userId, workflowId, { isActive: true });
+
+      const call = prisma.workflow.update.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(call.data.isActive).toBe(true);
+      expect(call.data.version).toBeUndefined();
+    });
+
+    it('should bump version by 1 ONLY when definition changes', async () => {
+      const newDef = { ...validDefinition };
+      await service.update(userId, workflowId, { definition: newDef });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ isActive: true, version: { increment: 1 } }),
+          data: expect.objectContaining({ version: { increment: 1 } }),
         }),
       );
     });
 
+    it('should snapshot the prior definition into WorkflowVersion when definition changes', async () => {
+      // findUnique inside the transaction returns the prior state
+      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValueOnce({
+        definition: validDefinition,
+        version: 1,
+      });
+      const newDef = {
+        ...validDefinition,
+        nodes: [...validDefinition.nodes, { ...validDefinition.nodes[0], id: 'n2' }],
+      };
+
+      await service.update(userId, workflowId, { definition: newDef, versionMessage: 'tweak' });
+
+      expect(prisma.workflowVersion.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          workflowId,
+          version: 1,
+          definition: validDefinition,
+          createdById: userId,
+          message: 'tweak',
+        }),
+      });
+    });
+
+    it('should NOT call workflowVersion.create when only name/isActive change', async () => {
+      await service.update(userId, workflowId, { name: 'Renamed' });
+      await service.update(userId, workflowId, { isActive: true });
+      await service.update(userId, workflowId, { description: 'noted' });
+
+      expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+    });
+
+    it('should wrap snapshot + update in a single $transaction when definition changes', async () => {
+      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValueOnce({
+        definition: validDefinition,
+        version: 1,
+      });
+      const newDef = { ...validDefinition };
+      await service.update(userId, workflowId, { definition: newDef });
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT use $transaction when definition is unchanged', async () => {
+      await service.update(userId, workflowId, { name: 'Renamed' });
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException when the row does not exist', async () => {
+      prisma.workflow.findUnique.mockReset();
       prisma.workflow.findUnique.mockResolvedValue(null);
 
       await expect(service.update(userId, workflowId, { name: 'X' })).rejects.toThrow(
@@ -359,6 +460,7 @@ describe('WorkflowsService', () => {
     });
 
     it('should throw ForbiddenException when the row belongs to another user', async () => {
+      prisma.workflow.findUnique.mockReset();
       prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId: otherUserId });
 
       await expect(service.update(userId, workflowId, { name: 'X' })).rejects.toThrow(
@@ -369,6 +471,7 @@ describe('WorkflowsService', () => {
     });
 
     it('should throw BadRequestException with an empty body and not touch Prisma', async () => {
+      prisma.workflow.findUnique.mockReset();
       await expect(service.update(userId, workflowId, {})).rejects.toThrow(BadRequestException);
 
       expect(prisma.workflow.findUnique).not.toHaveBeenCalled();
@@ -419,6 +522,7 @@ describe('WorkflowsService', () => {
       ).rejects.toThrow(BadRequestException);
 
       expect(prisma.workflow.update).not.toHaveBeenCalled();
+      expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
     });
   });
 
