@@ -11,6 +11,7 @@ import { ExecutionsModule } from './executions/executions.module';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { SecretsModule } from './secrets/secrets.module';
+import { ConnectionsModule } from './connections/connections.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AiModule } from './ai/ai.module';
 import { DemoModule } from './demo/demo.module';
@@ -34,6 +35,7 @@ import { LibraryModule } from './library/library.module';
     UsageModule,
     WebhooksModule,
     SecretsModule,
+    ConnectionsModule,
     AiModule,
     DemoModule,
     LibraryModule,
