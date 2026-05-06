@@ -14,11 +14,13 @@ export type {
   ExecutionEventEnvelope,
 } from './types/execution-events.types.js';
 export type { NodeTypeDefinition } from './types/node.types.js';
+export type { Connection } from './types/connections.types.js';
 
 // Constants
 export { Role } from './types/user.types.js';
 export { ExecutionStatus, TriggerType } from './types/execution.types.js';
 export { NodeType, NodeCategory, NODE_CATALOG } from './types/node.types.js';
+export { ConnectionType, ConnectionStatus, ConnectionProvider } from './types/connections.types.js';
 
 // Schemas
 export {
@@ -44,6 +46,20 @@ export {
   type LoginFormValues,
   type RegisterFormValues,
 } from './schemas/auth.schema.js';
+export {
+  googleOAuth2ConfigSchema,
+  slackOAuth2ConfigSchema,
+  notionOAuth2ConfigSchema,
+  openAIApiKeyConfigSchema,
+  anthropicApiKeyConfigSchema,
+  PROVIDER_CONFIG_SCHEMAS,
+  type GoogleOAuth2Config,
+  type SlackOAuth2Config,
+  type NotionOAuth2Config,
+  type OpenAIApiKeyConfig,
+  type AnthropicApiKeyConfig,
+  type ProviderConfigMap,
+} from './schemas/connections.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,
