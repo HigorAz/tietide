@@ -1,6 +1,7 @@
-import { InternalServerErrorException } from '@nestjs/common';
-import type { ConfigService } from '@nestjs/config';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
+@Injectable()
 export abstract class BaseOAuthProvider {
   constructor(protected readonly config: ConfigService) {}
 
