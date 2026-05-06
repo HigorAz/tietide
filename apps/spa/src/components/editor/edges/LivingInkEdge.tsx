@@ -1,11 +1,15 @@
 import { memo } from 'react';
 import { getBezierPath, type EdgeProps } from 'reactflow';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
+import { cn } from '@/utils/cn';
 
 const GRADIENT_ID = 'livingInkGradient';
 const GLOW_ID = 'livingInkGlow';
 
 function LivingInkEdgeImpl({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -14,6 +18,10 @@ function LivingInkEdgeImpl({
   targetPosition,
   markerEnd,
 }: EdgeProps) {
+  const sourceStatus = useExecutionLiveStore((s) => s.nodes.get(source)?.status);
+  const targetStatus = useExecutionLiveStore((s) => s.nodes.get(target)?.status);
+  const active = sourceStatus === 'success' && targetStatus === 'running';
+
   const [edgePath] = getBezierPath({
     sourceX,
     sourceY,
@@ -40,8 +48,10 @@ function LivingInkEdgeImpl({
       </defs>
       <path
         id={id}
+        data-testid="living-ink-edge"
+        data-active={active ? 'true' : 'false'}
         d={edgePath}
-        className="react-flow__edge-path animate-living-ink"
+        className={cn('react-flow__edge-path', active ? 'animate-living-ink' : 'opacity-40')}
         fill="none"
         stroke={`url(#${GRADIENT_ID})`}
         strokeWidth={2}

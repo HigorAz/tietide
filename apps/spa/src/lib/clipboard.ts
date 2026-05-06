@@ -10,6 +10,7 @@ const NodeStatusSchema = z.union([
   z.literal('running'),
   z.literal('success'),
   z.literal('failed'),
+  z.literal('skipped'),
 ]);
 
 const ClipboardNodeDataSchema = z.object({

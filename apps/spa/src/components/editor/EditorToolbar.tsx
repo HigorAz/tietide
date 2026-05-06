@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -21,6 +21,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const redo = useEditorStore((s) => s.redo);
   const toast = useToastStore((s) => s.show);
   const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
 
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -51,13 +52,13 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
         message: 'Execution started',
         action: { label: 'View execution', href: `/executions/${execution.id}` },
       });
-      navigate(`/executions/${execution.id}`);
+      setSearchParams({ execution: execution.id });
     } catch {
       toast({ tone: 'error', message: 'Failed to start execution. Please try again.' });
     } finally {
       setIsRunning(false);
     }
-  }, [isRunning, isSaving, navigate, toast, workflowId]);
+  }, [isRunning, isSaving, setSearchParams, toast, workflowId]);
 
   const saveDisabled = !isDirty || isSaving;
   const runDisabled = isRunning || isSaving;

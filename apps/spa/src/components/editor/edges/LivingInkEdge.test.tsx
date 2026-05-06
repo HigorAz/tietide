@@ -1,7 +1,29 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { ReactFlowProvider, Position, type EdgeProps } from 'reactflow';
 import { LivingInkEdge } from './LivingInkEdge';
+import { useExecutionLiveStore, type NodeRunState } from '@/stores/executionLiveStore';
+
+const baseRunState = (overrides: Partial<NodeRunState>): NodeRunState => ({
+  status: 'idle',
+  nodeType: null,
+  startedAt: null,
+  finishedAt: null,
+  durationMs: null,
+  input: null,
+  output: null,
+  error: null,
+  ...overrides,
+});
+
+const seedActiveSegment = (sourceId: string, targetId: string): void => {
+  useExecutionLiveStore.setState({
+    nodes: new Map([
+      [sourceId, baseRunState({ status: 'success' })],
+      [targetId, baseRunState({ status: 'running' })],
+    ]),
+  });
+};
 
 const renderEdge = (overrides: Partial<EdgeProps> = {}) => {
   const props: EdgeProps = {
@@ -35,6 +57,10 @@ const renderEdge = (overrides: Partial<EdgeProps> = {}) => {
 };
 
 describe('LivingInkEdge', () => {
+  beforeEach(() => {
+    useExecutionLiveStore.getState().reset();
+  });
+
   describe('rendering', () => {
     it('should render an SVG path between two points', () => {
       const { container } = renderEdge({
@@ -81,7 +107,8 @@ describe('LivingInkEdge', () => {
   });
 
   describe('animated dash effect', () => {
-    it('should apply the living-ink animation class and a non-empty stroke-dasharray', () => {
+    it('should apply the living-ink animation class when source=success and target=running', () => {
+      seedActiveSegment('node-a', 'node-b');
       const { container } = renderEdge();
       const path = container.querySelector('path.react-flow__edge-path');
 
@@ -90,6 +117,50 @@ describe('LivingInkEdge', () => {
 
       const dash = path?.getAttribute('stroke-dasharray') ?? '';
       expect(dash.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('store-driven activation', () => {
+    it('should be inactive by default with no live state', () => {
+      const { container } = renderEdge();
+      const path = container.querySelector('path.react-flow__edge-path');
+      expect(path).toHaveAttribute('data-active', 'false');
+      expect(path?.getAttribute('class') ?? '').not.toContain('animate-living-ink');
+    });
+
+    it('should be active when source is success and target is running', () => {
+      seedActiveSegment('node-a', 'node-b');
+      const { container } = renderEdge();
+      const path = container.querySelector('path.react-flow__edge-path');
+      expect(path).toHaveAttribute('data-active', 'true');
+    });
+
+    it('should be inactive when source is still running (not yet success)', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map([
+          ['node-a', baseRunState({ status: 'running' })],
+          ['node-b', baseRunState({ status: 'running' })],
+        ]),
+      });
+      const { container } = renderEdge();
+      expect(container.querySelector('path.react-flow__edge-path')).toHaveAttribute(
+        'data-active',
+        'false',
+      );
+    });
+
+    it('should be inactive when target has already completed', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map([
+          ['node-a', baseRunState({ status: 'success' })],
+          ['node-b', baseRunState({ status: 'success' })],
+        ]),
+      });
+      const { container } = renderEdge();
+      expect(container.querySelector('path.react-flow__edge-path')).toHaveAttribute(
+        'data-active',
+        'false',
+      );
     });
   });
 

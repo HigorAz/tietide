@@ -4,6 +4,7 @@ import { MiniMap } from 'reactflow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { useExecutionLiveStore, type ExecutionLiveStatus } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
+import { InspectorRunPanel } from './InspectorRunPanel';
 
 export const INSPECTOR_DOCK_STORAGE_KEY = 'tietide-inspector-collapsed';
 
@@ -113,7 +114,7 @@ export function InspectorDock(): JSX.Element {
               </div>
             </TabsContent>
             <TabsContent value="run" className="min-h-0 flex-1">
-              <EmptyRunState message="No run yet" />
+              <InspectorRunPanel />
             </TabsContent>
             <TabsContent value="logs" className="min-h-0 flex-1">
               <EmptyRunState message="No run yet" />
