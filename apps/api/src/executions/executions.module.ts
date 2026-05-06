@@ -1,12 +1,17 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ExecutionsController } from './executions.controller';
 import { WorkflowExecutionsController } from './workflow-executions.controller';
 import { AllExecutionsController } from './all-executions.controller';
 import { ExecutionDetailController } from './execution-detail.controller';
 import { ExecutionsService } from './executions.service';
+import { ExecutionsGateway } from './executions.gateway';
+import { RedisExecutionEventsSubscriber } from './redis-execution-events.subscriber';
+import { redisSubscriberClientProvider } from './redis-subscriber.provider';
+import { EXECUTION_EVENTS_SUBSCRIBER } from './execution-events.subscriber';
 import { EXECUTION_QUEUE_NAME } from './execution-queue.constants';
 
 @Module({
@@ -24,6 +29,7 @@ import { EXECUTION_QUEUE_NAME } from './execution-queue.constants';
     }),
     BullModule.registerQueue({ name: EXECUTION_QUEUE_NAME }),
     PrismaModule,
+    AuthModule,
   ],
   controllers: [
     ExecutionsController,
@@ -31,7 +37,16 @@ import { EXECUTION_QUEUE_NAME } from './execution-queue.constants';
     AllExecutionsController,
     ExecutionDetailController,
   ],
-  providers: [ExecutionsService],
+  providers: [
+    ExecutionsService,
+    ExecutionsGateway,
+    redisSubscriberClientProvider,
+    RedisExecutionEventsSubscriber,
+    {
+      provide: EXECUTION_EVENTS_SUBSCRIBER,
+      useExisting: RedisExecutionEventsSubscriber,
+    },
+  ],
   exports: [ExecutionsService, BullModule],
 })
 export class ExecutionsModule {}
