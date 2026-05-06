@@ -11,6 +11,11 @@ vi.mock('reactflow', () => ({
   ),
 }));
 
+vi.mock('./VersionHistoryPanel', () => ({
+  __esModule: true,
+  VersionHistoryPanel: () => <div data-testid="version-history-panel-stub" />,
+}));
+
 import { InspectorDock, INSPECTOR_DOCK_STORAGE_KEY } from './InspectorDock';
 
 describe('InspectorDock', () => {
@@ -20,13 +25,23 @@ describe('InspectorDock', () => {
   });
 
   describe('rendering', () => {
-    it('should render three tabs labelled Overview, Run, Logs', () => {
+    it('should render four tabs labelled Overview, Run, Logs, Versions', () => {
       render(<InspectorDock />);
       const tabs = screen.getAllByRole('tab');
-      expect(tabs).toHaveLength(3);
+      expect(tabs).toHaveLength(4);
       expect(tabs[0]).toHaveAccessibleName(/overview/i);
       expect(tabs[1]).toHaveAccessibleName(/run/i);
       expect(tabs[2]).toHaveAccessibleName(/logs/i);
+      expect(tabs[3]).toHaveAccessibleName(/versions/i);
+    });
+
+    it('should mount the VersionHistoryPanel when the Versions tab is selected', async () => {
+      const user = userEvent.setup();
+      render(<InspectorDock />);
+
+      await user.click(screen.getByRole('tab', { name: /versions/i }));
+
+      expect(screen.getByTestId('version-history-panel-stub')).toBeInTheDocument();
     });
 
     it('should default to the Overview tab and render the React Flow MiniMap inside it', () => {

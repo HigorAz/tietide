@@ -6,7 +6,7 @@ import { cn } from '@/utils/cn';
 import { useEditorStore } from '@/stores/editorStore';
 import { selectNodeStateAt, useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { getNodeIcon } from './nodeIcons';
-import type { CustomNodeData, NodeStatus } from './CustomNode.types';
+import type { CustomNodeData, NodeStatus, NodeVersionState } from './CustomNode.types';
 
 const STATUS_RING_CLASS: Record<NodeStatus, string> = {
   idle: 'ring-status-idle/60',
@@ -14,6 +14,12 @@ const STATUS_RING_CLASS: Record<NodeStatus, string> = {
   success: 'ring-status-success',
   failed: 'ring-status-failed',
   skipped: 'ring-status-idle/40',
+};
+
+const VERSION_STATE_RING_CLASS: Record<NodeVersionState, string> = {
+  added: 'ring-accent-teal',
+  removed: 'ring-red-500/70',
+  modified: 'ring-yellow-400',
 };
 
 function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
@@ -69,12 +75,15 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
       <div
         data-testid="custom-node-ring"
         data-status={status}
+        data-version-state={data.versionState ?? null}
         className={cn(
           'relative flex items-center justify-center rounded-full',
           'h-16 w-16 ring-4 ring-offset-2 ring-offset-deep-blue',
           'bg-gradient-to-br from-elevated to-surface',
           'shadow-[inset_0_-4px_8px_rgba(0,0,0,0.35),inset_0_2px_3px_rgba(255,255,255,0.05)]',
-          STATUS_RING_CLASS[status],
+          data.versionState
+            ? VERSION_STATE_RING_CLASS[data.versionState]
+            : STATUS_RING_CLASS[status],
           selected && 'outline outline-2 outline-accent-teal',
         )}
       >

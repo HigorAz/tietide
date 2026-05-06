@@ -52,14 +52,28 @@ export class WorkflowsService {
   async create(userId: string, dto: CreateWorkflowDto): Promise<WorkflowResponseDto> {
     assertExecutableDefinition(dto.definition);
 
-    const row = await this.prisma.workflow.create({
-      data: {
-        userId,
-        name: dto.name,
-        description: dto.description ?? null,
-        definition: dto.definition as unknown as Prisma.InputJsonValue,
-      },
-      select: SAFE_SELECT,
+    const row = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.workflow.create({
+        data: {
+          userId,
+          name: dto.name,
+          description: dto.description ?? null,
+          definition: dto.definition as unknown as Prisma.InputJsonValue,
+        },
+        select: SAFE_SELECT,
+      });
+
+      await tx.workflowVersion.create({
+        data: {
+          workflowId: created.id,
+          version: created.version,
+          definition: dto.definition as unknown as Prisma.InputJsonValue,
+          createdById: userId,
+          message: 'initial version',
+        },
+      });
+
+      return created;
     });
 
     await this.audit.log({
@@ -128,7 +142,7 @@ export class WorkflowsService {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
-    const data: Prisma.WorkflowUpdateInput = { version: { increment: 1 } };
+    const data: Prisma.WorkflowUpdateInput = {};
     if (dto.name !== undefined) {
       data.name = dto.name;
     }
@@ -137,16 +151,46 @@ export class WorkflowsService {
     }
     if (dto.definition !== undefined) {
       data.definition = dto.definition as unknown as Prisma.InputJsonValue;
+      data.version = { increment: 1 };
     }
     if (dto.isActive !== undefined) {
       data.isActive = dto.isActive;
     }
 
-    const row = await this.prisma.workflow.update({
-      where: { id },
-      data,
-      select: SAFE_SELECT,
-    });
+    let row;
+    if (dto.definition !== undefined) {
+      row = await this.prisma.$transaction(async (tx) => {
+        const prior = await tx.workflow.findUnique({
+          where: { id },
+          select: { definition: true, version: true },
+        });
+        if (!prior) {
+          throw new NotFoundException('Workflow not found');
+        }
+
+        await tx.workflowVersion.create({
+          data: {
+            workflowId: id,
+            version: prior.version,
+            definition: prior.definition as Prisma.InputJsonValue,
+            createdById: userId,
+            message: dto.versionMessage ?? null,
+          },
+        });
+
+        return tx.workflow.update({
+          where: { id },
+          data,
+          select: SAFE_SELECT,
+        });
+      });
+    } else {
+      row = await this.prisma.workflow.update({
+        where: { id },
+        data,
+        select: SAFE_SELECT,
+      });
+    }
 
     await this.audit.log({
       userId,

@@ -6,10 +6,11 @@ import { useExecutionLiveStore, type ExecutionLiveStatus } from '@/stores/execut
 import { cn } from '@/utils/cn';
 import { InspectorRunPanel } from './InspectorRunPanel';
 import { ReplayScrubber } from './ReplayScrubber';
+import { VersionHistoryPanel } from './VersionHistoryPanel';
 
 export const INSPECTOR_DOCK_STORAGE_KEY = 'tietide-inspector-collapsed';
 
-type DockTab = 'overview' | 'run' | 'logs';
+type DockTab = 'overview' | 'run' | 'logs' | 'versions';
 
 const readCollapsed = (): boolean => {
   try {
@@ -74,7 +75,7 @@ export function InspectorDock(): JSX.Element {
       onWheel={(e) => e.stopPropagation()}
       className={cn(
         'absolute bottom-4 right-4 z-10 flex w-80 flex-col overflow-hidden rounded-md border border-white/5 bg-elevated shadow-lg',
-        collapsed ? 'h-9' : 'h-60',
+        collapsed ? 'h-9' : 'h-72',
       )}
     >
       <Tabs
@@ -87,6 +88,7 @@ export function InspectorDock(): JSX.Element {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="run">Run</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
+            <TabsTrigger value="versions">Versions</TabsTrigger>
           </TabsList>
           <button
             type="button"
@@ -120,6 +122,9 @@ export function InspectorDock(): JSX.Element {
             </TabsContent>
             <TabsContent value="logs" className="min-h-0 flex-1">
               <EmptyRunState message="No run yet" />
+            </TabsContent>
+            <TabsContent value="versions" className="min-h-0 flex-1">
+              <VersionHistoryPanel />
             </TabsContent>
           </>
         )}
