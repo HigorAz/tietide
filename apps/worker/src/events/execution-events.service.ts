@@ -1,8 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
-import { sanitizePayload } from '@tietide/shared';
-import { EXECUTION_EVENTS_PUBLISHER, executionChannel } from './execution-events.constants';
-import type { ExecutionEventEnvelope } from './execution-events.types';
+import { sanitizePayload, executionChannel, type ExecutionEventEnvelope } from '@tietide/shared';
+import { EXECUTION_EVENTS_PUBLISHER } from './execution-events.constants';
 
 export interface RedisPublisher {
   publish(channel: string, message: string): Promise<number>;
