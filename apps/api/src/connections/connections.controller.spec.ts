@@ -320,6 +320,49 @@ describe('ConnectionsController (integration)', () => {
     });
   });
 
+  describe('POST /connections/:id/test', () => {
+    it('should return 401 when the JwtAuthGuard rejects the request', async () => {
+      authedUser = null;
+
+      await request(app.getHttpServer()).post(`/connections/${uuid}/test`).expect(401);
+
+      expect(connectionsService.test).not.toHaveBeenCalled();
+    });
+
+    it('should return 200 with { ok, latencyMs } on success', async () => {
+      connectionsService.test.mockResolvedValue({ ok: true, latencyMs: 142 });
+
+      const res = await request(app.getHttpServer()).post(`/connections/${uuid}/test`).expect(200);
+
+      expect(res.body).toEqual({ ok: true, latencyMs: 142 });
+      expect(connectionsService.test).toHaveBeenCalledWith('owner-uuid', uuid);
+    });
+
+    it('should return 200 with { ok: false, message, latencyMs } on failed health check', async () => {
+      connectionsService.test.mockResolvedValue({
+        ok: false,
+        message: '401 Invalid API key',
+        latencyMs: 80,
+      });
+
+      const res = await request(app.getHttpServer()).post(`/connections/${uuid}/test`).expect(200);
+
+      expect(res.body).toEqual({ ok: false, message: '401 Invalid API key', latencyMs: 80 });
+    });
+
+    it('should return 404 when the connection belongs to another user (IDOR)', async () => {
+      connectionsService.test.mockRejectedValue(new NotFoundException('Connection not found'));
+
+      await request(app.getHttpServer()).post(`/connections/${uuid}/test`).expect(404);
+    });
+
+    it('should return 400 when the id is not a UUID', async () => {
+      await request(app.getHttpServer()).post('/connections/not-a-uuid/test').expect(400);
+
+      expect(connectionsService.test).not.toHaveBeenCalled();
+    });
+  });
+
   describe('DELETE /connections/:id', () => {
     it('should return 204 on success', async () => {
       connectionsService.remove.mockResolvedValue(undefined);

@@ -31,6 +31,7 @@ import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { ConnectionResponseDto } from './dto/connection-response.dto';
+import { TestConnectionResponseDto } from './dto/test-connection-response.dto';
 
 @ApiTags('connections')
 @ApiBearerAuth()
@@ -106,6 +107,20 @@ export class ConnectionsController {
       throw new BadRequestException('Provide at least one of: name, status');
     }
     return this.connections.update(user.id, id, dto);
+  }
+
+  @Post(':id/test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Run a provider-specific health check against the stored credentials',
+  })
+  @ApiOkResponse({ type: TestConnectionResponseDto })
+  @ApiNotFoundResponse({ description: 'Connection not found' })
+  async test(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<TestConnectionResponseDto> {
+    return this.connections.test(user.id, id);
   }
 
   @Delete(':id')

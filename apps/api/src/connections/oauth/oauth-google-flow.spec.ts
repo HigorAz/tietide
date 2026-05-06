@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CryptoService } from '../../crypto/crypto.service';
 import { AuditLogService } from '../../audit/audit-log.service';
 import { ConnectionsService } from '../connections.service';
+import { ProviderHealthRegistry } from '../health/provider-health.registry';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 import { OAuthStateService } from './oauth-state.service';
@@ -147,6 +148,10 @@ describe('OAuth Google flow (fixture token server)', () => {
         { provide: AuditLogService, useValue: audit },
         { provide: PrismaService, useValue: prisma },
         CryptoService,
+        {
+          provide: ProviderHealthRegistry,
+          useValue: new ProviderHealthRegistry(),
+        },
       ],
     }).compile();
 
