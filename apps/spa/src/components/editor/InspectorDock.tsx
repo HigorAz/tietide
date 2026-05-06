@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { useExecutionLiveStore, type ExecutionLiveStatus } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 import { InspectorRunPanel } from './InspectorRunPanel';
+import { ReplayScrubber } from './ReplayScrubber';
 
 export const INSPECTOR_DOCK_STORAGE_KEY = 'tietide-inspector-collapsed';
 
@@ -104,6 +105,7 @@ export function InspectorDock(): JSX.Element {
 
         {!collapsed && (
           <>
+            <ReplayScrubber />
             <TabsContent
               value="overview"
               forceMount
