@@ -429,7 +429,7 @@ describe('ExecutionsService', () => {
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { workflow: { userId } },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           skip: 0,
           take: 20,
         }),
@@ -543,6 +543,167 @@ describe('ExecutionsService', () => {
       );
       expect(result.items).toEqual([]);
       expect(result.total).toBe(0);
+    });
+
+    describe('cursor pagination', () => {
+      it('should emit nextCursor=null when offset page is the last page', async () => {
+        prisma.workflowExecution.findMany.mockResolvedValue([
+          exec('e1', 'wf-a'),
+          exec('e2', 'wf-a'),
+        ]);
+        prisma.workflowExecution.count.mockResolvedValue(2);
+
+        const result = await service.listAllForUser(userId, { pageSize: 5 });
+
+        expect(result.nextCursor).toBeNull();
+      });
+
+      it('should emit a non-null nextCursor when more rows remain on offset path', async () => {
+        prisma.workflowExecution.findMany.mockResolvedValue([
+          exec('e1', 'wf-a', 'SUCCESS', new Date('2026-04-20T10:00:00Z')),
+          exec('e2', 'wf-a', 'SUCCESS', new Date('2026-04-20T09:00:00Z')),
+        ]);
+        prisma.workflowExecution.count.mockResolvedValue(10);
+
+        const result = await service.listAllForUser(userId, { pageSize: 2 });
+
+        expect(typeof result.nextCursor).toBe('string');
+        expect(result.nextCursor).not.toBe('');
+      });
+
+      it('should switch to keyset where clause when cursor is provided', async () => {
+        const cursorCreatedAt = new Date('2026-04-20T10:00:00.000Z');
+        const cursorId = 'cursor-row-id';
+        const cursor = Buffer.from(
+          JSON.stringify({ createdAt: cursorCreatedAt.toISOString(), id: cursorId }),
+          'utf8',
+        ).toString('base64url');
+
+        prisma.workflowExecution.findMany.mockResolvedValue([
+          exec('e3', 'wf-a', 'SUCCESS', new Date('2026-04-20T09:00:00Z')),
+        ]);
+        prisma.workflowExecution.count.mockResolvedValue(5);
+
+        await service.listAllForUser(userId, { cursor, pageSize: 10 });
+
+        expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              AND: expect.arrayContaining([
+                expect.objectContaining({ workflow: { userId } }),
+                {
+                  OR: [
+                    { createdAt: { lt: cursorCreatedAt } },
+                    { AND: [{ createdAt: cursorCreatedAt }, { id: { lt: cursorId } }] },
+                  ],
+                },
+              ]),
+            }),
+            orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+            take: 11,
+          }),
+        );
+      });
+
+      it('should reject a malformed cursor with BadRequestException', async () => {
+        await expect(service.listAllForUser(userId, { cursor: 'not-base64!@#' })).rejects.toThrow();
+        expect(prisma.workflowExecution.findMany).not.toHaveBeenCalled();
+      });
+
+      it('should drop the peek row and emit nextCursor when more rows remain on cursor path', async () => {
+        const cursor = Buffer.from(
+          JSON.stringify({
+            createdAt: new Date('2026-04-20T10:00:00.000Z').toISOString(),
+            id: 'cursor-row-id',
+          }),
+          'utf8',
+        ).toString('base64url');
+
+        const peekRows = [
+          exec('e1', 'wf-a', 'SUCCESS', new Date('2026-04-20T09:50:00Z')),
+          exec('e2', 'wf-a', 'SUCCESS', new Date('2026-04-20T09:40:00Z')),
+          exec('e3', 'wf-a', 'SUCCESS', new Date('2026-04-20T09:30:00Z')),
+        ];
+        prisma.workflowExecution.findMany.mockResolvedValue(peekRows);
+        prisma.workflowExecution.count.mockResolvedValue(50);
+
+        const result = await service.listAllForUser(userId, { cursor, pageSize: 2 });
+
+        expect(result.items).toHaveLength(2);
+        expect(result.items.map((i) => i.id)).toEqual(['e1', 'e2']);
+        expect(typeof result.nextCursor).toBe('string');
+      });
+
+      it('should emit nextCursor=null on the terminal page when no peek row returned', async () => {
+        const cursor = Buffer.from(
+          JSON.stringify({
+            createdAt: new Date('2026-04-20T10:00:00.000Z').toISOString(),
+            id: 'cursor-row-id',
+          }),
+          'utf8',
+        ).toString('base64url');
+
+        prisma.workflowExecution.findMany.mockResolvedValue([
+          exec('e1', 'wf-a', 'SUCCESS', new Date('2026-04-20T09:50:00Z')),
+        ]);
+        prisma.workflowExecution.count.mockResolvedValue(50);
+
+        const result = await service.listAllForUser(userId, { cursor, pageSize: 2 });
+
+        expect(result.items).toHaveLength(1);
+        expect(result.nextCursor).toBeNull();
+      });
+
+      it('should keep userId scoping when a cursor is provided (cross-tenant isolation)', async () => {
+        const cursor = Buffer.from(
+          JSON.stringify({
+            createdAt: new Date('2026-04-20T10:00:00.000Z').toISOString(),
+            id: 'other-user-execution-id',
+          }),
+          'utf8',
+        ).toString('base64url');
+
+        prisma.workflowExecution.findMany.mockResolvedValue([]);
+        prisma.workflowExecution.count.mockResolvedValue(0);
+
+        await service.listAllForUser(userId, { cursor });
+
+        const call = prisma.workflowExecution.findMany.mock.calls[0][0] as {
+          where: { AND: Array<Record<string, unknown>> };
+        };
+        expect(call.where.AND).toEqual(
+          expect.arrayContaining([expect.objectContaining({ workflow: { userId } })]),
+        );
+      });
+
+      it('should walk all 25 rows in 3 cursor pages of size 10 with no duplicates', async () => {
+        const allRows = Array.from({ length: 25 }, (_, i) => {
+          const ts = new Date(2026, 3, 20, 10, 0, 0, 25 - i);
+          return exec(`e${String(i + 1).padStart(2, '0')}`, 'wf-a', 'SUCCESS', ts);
+        });
+
+        const collected: string[] = [];
+        let cursor: string | undefined;
+
+        for (let page = 0; page < 4; page += 1) {
+          const start = page * 10;
+          const take = page === 0 ? 10 : 11;
+          const end = Math.min(start + take, 25);
+          const slice = allRows.slice(start, end);
+          prisma.workflowExecution.findMany.mockResolvedValueOnce(slice);
+          prisma.workflowExecution.count.mockResolvedValueOnce(25);
+
+          const result = await service.listAllForUser(userId, { cursor, pageSize: 10 });
+          collected.push(...result.items.map((i) => i.id));
+          if (!result.nextCursor) break;
+          cursor = result.nextCursor;
+        }
+
+        expect(collected).toHaveLength(25);
+        expect(new Set(collected).size).toBe(25);
+        expect(collected[0]).toBe('e01');
+        expect(collected[24]).toBe('e25');
+      });
     });
   });
 
