@@ -260,6 +260,23 @@ Required headers (Helmet sets these on the API automatically — keep them on at
 - `Content-Security-Policy` — start permissive, tighten once stable
 - `X-Frame-Options: DENY`
 
+The SPA route specifically also needs:
+
+- `Cross-Origin-Opener-Policy: same-origin-allow-popups` — required for the OAuth popup → opener `postMessage` bridge on `/connections`. Google's consent screen sets `same-origin` COOP on its own response, which can sever `window.opener`; without `same-origin-allow-popups` on the SPA, the popup can't notify the opener and the connections list won't refresh after a successful OAuth flow.
+
+Example Nginx snippet for the SPA:
+
+```nginx
+location / {
+  add_header Cross-Origin-Opener-Policy "same-origin-allow-popups" always;
+  add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+  add_header X-Frame-Options "DENY" always;
+  try_files $uri /index.html;
+}
+```
+
+The Vite dev server already sets this header in development (`apps/spa/vite.config.ts`).
+
 ---
 
 ## 7. Operational scripts

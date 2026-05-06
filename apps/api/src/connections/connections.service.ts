@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { ConnectionStatus, ConnectionType } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService, type EncryptedPayload } from '../crypto/crypto.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { UpdateConnectionDto } from './dto/update-connection.dto';
 import type { ConnectionResponseDto } from './dto/connection-response.dto';
+import { ProviderHealthRegistry } from './health/provider-health.registry';
+import type { ProviderHealthResult } from './health/provider-health.types';
+
+const HEALTH_CHECK_TIMEOUT_MS = 5000;
 
 const SAFE_SELECT = {
   id: true,
@@ -29,10 +33,13 @@ export interface CreateConnectionInput {
 
 @Injectable()
 export class ConnectionsService {
+  private readonly log = new Logger(ConnectionsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
     private readonly audit: AuditLogService,
+    private readonly health: ProviderHealthRegistry,
   ) {}
 
   async list(userId: string): Promise<ConnectionResponseDto[]> {
@@ -136,6 +143,41 @@ export class ConnectionsService {
     });
 
     return row;
+  }
+
+  async test(userId: string, connectionId: string): Promise<ProviderHealthResult> {
+    const row = await this.prisma.connection.findFirst({
+      where: { id: connectionId, userId },
+    });
+    if (!row) {
+      throw new NotFoundException('Connection not found');
+    }
+
+    const config = this.decryptConfig(row.configEncrypted, row.configNonce);
+    const checker = this.health.get(row.provider);
+
+    const signal = AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS);
+    const result = await checker.check(config, signal);
+
+    if (result.ok) {
+      await this.prisma.connection.update({
+        where: { id: connectionId },
+        data: { lastUsedAt: new Date() },
+      });
+    }
+
+    this.log.log(
+      {
+        userId,
+        connectionId,
+        provider: row.provider,
+        ok: result.ok,
+        latencyMs: result.latencyMs,
+      },
+      'Connection health check completed',
+    );
+
+    return result;
   }
 
   encryptConfig(config: object): EncryptedPayload {
