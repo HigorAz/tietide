@@ -1,19 +1,28 @@
 import type { ExecutionContext, NodeInput } from '@tietide/sdk';
 import { Conditional } from './conditional';
 
-const makeContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext => ({
-  executionId: 'exec-1',
-  workflowId: 'wf-1',
-  nodeId: 'node-1',
-  logger: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-  getSecret: jest.fn(async () => 'secret-value'),
-  ...overrides,
-});
+const makeContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContext =>
+  ({
+    executionId: 'exec-1',
+    workflowId: 'wf-1',
+    nodeId: 'node-1',
+    isDryRun: false,
+    logger: {
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    },
+    getSecret: jest.fn(async () => 'secret-value'),
+    getConnection: jest.fn(async () => ({
+      id: 'conn-stub',
+      type: 'OAUTH2',
+      provider: 'stub',
+      config: {},
+    })),
+    markConnectionForRefresh: jest.fn(async () => undefined),
+    ...overrides,
+  }) as unknown as ExecutionContext;
 
 const makeInput = (
   params: Record<string, unknown>,

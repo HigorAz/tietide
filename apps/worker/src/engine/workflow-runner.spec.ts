@@ -6,6 +6,7 @@ import { NodeRegistry } from '../nodes/registry';
 import { ExecutionEventsService } from '../events/execution-events.service';
 import { WorkflowRunner } from './workflow-runner';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
+import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
 
 type CallableExecutor = INodeExecutor & {
   execute: jest.Mock<Promise<NodeOutput>, [NodeInput, ExecutionContext]>;
@@ -62,6 +63,11 @@ describe('WorkflowRunner', () => {
   let registry: NodeRegistry;
   let prisma: PrismaMock;
   let secretResolver: SecretResolver;
+  let connectionResolver: ConnectionResolver & {
+    getConnection: jest.Mock;
+    markForRefresh: jest.Mock;
+    releaseExecution: jest.Mock;
+  };
   let events: EventsMock;
 
   beforeEach(async () => {
@@ -82,6 +88,21 @@ describe('WorkflowRunner', () => {
       releaseExecution: jest.fn(),
     };
 
+    connectionResolver = {
+      getConnection: jest.fn(async () => ({
+        id: 'conn-default',
+        type: 'OAUTH2',
+        provider: 'google',
+        config: {},
+      })),
+      markForRefresh: jest.fn(async () => undefined),
+      releaseExecution: jest.fn(),
+    } as unknown as ConnectionResolver & {
+      getConnection: jest.Mock;
+      markForRefresh: jest.Mock;
+      releaseExecution: jest.Mock;
+    };
+
     events = {
       publishStepStarted: jest.fn(async () => undefined),
       publishStepCompleted: jest.fn(async () => undefined),
@@ -96,6 +117,7 @@ describe('WorkflowRunner', () => {
         { provide: NodeRegistry, useValue: registry },
         { provide: PrismaService, useValue: prisma },
         { provide: SECRET_RESOLVER, useValue: secretResolver },
+        { provide: CONNECTION_RESOLVER, useValue: connectionResolver },
         { provide: ExecutionEventsService, useValue: events },
       ],
     }).compile();
@@ -407,6 +429,109 @@ describe('WorkflowRunner', () => {
       await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
 
       expect(secretResolver.getSecret).toHaveBeenCalledWith('exec-1', 'api-key');
+    });
+
+    it('should delegate context.getConnection to ConnectionResolver with executionId', async () => {
+      const exec = makeExecutor('a', async (_input, ctx) => {
+        const conn = await ctx.getConnection('conn-1');
+        return { data: { provider: conn.provider } };
+      });
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      expect(connectionResolver.getConnection).toHaveBeenCalledWith('exec-1', 'conn-1');
+    });
+
+    it('should delegate context.markConnectionForRefresh to ConnectionResolver with executionId', async () => {
+      const exec = makeExecutor('a', async (_input, ctx) => {
+        await ctx.markConnectionForRefresh('conn-1');
+        return { data: {} };
+      });
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      expect(connectionResolver.markForRefresh).toHaveBeenCalledWith('exec-1', 'conn-1');
+    });
+
+    it('should expose isDryRun=false on ExecutionContext by default', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      const ctx = exec.execute.mock.calls[0][1];
+      expect(ctx.isDryRun).toBe(false);
+    });
+
+    it('should expose isDryRun=true on ExecutionContext when run() is called with isDryRun:true', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        definition: def,
+        isDryRun: true,
+      });
+
+      const ctx = exec.execute.mock.calls[0][1];
+      expect(ctx.isDryRun).toBe(true);
+    });
+
+    it('should call ConnectionResolver.releaseExecution exactly once after a successful run', async () => {
+      registry.register(makeExecutor('a'));
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({ executionId: 'exec-conn-ok', workflowId: 'wf-1', definition: def });
+
+      expect(connectionResolver.releaseExecution).toHaveBeenCalledTimes(1);
+      expect(connectionResolver.releaseExecution).toHaveBeenCalledWith('exec-conn-ok');
+    });
+
+    it('should lift node.config.connectionId to top-level input.connectionId', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'A',
+            type: 'a',
+            name: 'A',
+            position: { x: 0, y: 0 },
+            config: { connectionId: 'conn-xyz', other: 'value' },
+          },
+        ],
+        edges: [],
+      };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      const input = exec.execute.mock.calls[0][0];
+      expect(input.connectionId).toBe('conn-xyz');
+      expect(input.params).toEqual({ connectionId: 'conn-xyz', other: 'value' });
+    });
+
+    it('should leave input.connectionId undefined when node has no connectionId in config', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      const input = exec.execute.mock.calls[0][0];
+      expect(input.connectionId).toBeUndefined();
     });
 
     it('should call SecretResolver.releaseExecution exactly once after a successful run', async () => {

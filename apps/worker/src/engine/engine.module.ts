@@ -10,6 +10,8 @@ import { EngineService } from './engine.service';
 import { WorkflowRunner } from './workflow-runner';
 import { SECRET_RESOLVER } from './secret-resolver';
 import { PrismaSecretResolver } from './prisma-secret-resolver';
+import { CONNECTION_RESOLVER } from '../connections/connection-resolver';
+import { PrismaConnectionResolver } from '../connections/prisma-connection-resolver';
 
 @Module({
   imports: [ExecutionEventsModule],
@@ -23,6 +25,7 @@ import { PrismaSecretResolver } from './prisma-secret-resolver';
     HttpRequestAction,
     Conditional,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
+    { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
   ],
   exports: [EngineService, NodeRegistry],
 })
