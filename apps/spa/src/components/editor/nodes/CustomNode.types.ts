@@ -2,6 +2,8 @@ import type { NodeType } from '@tietide/shared';
 
 export type NodeStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 
+export type NodeVersionState = 'added' | 'removed' | 'modified';
+
 export interface CustomNodeData {
   label: string;
   description?: string;
@@ -9,4 +11,5 @@ export interface CustomNodeData {
   status?: NodeStatus;
   config?: Record<string, unknown>;
   skipped?: boolean;
+  versionState?: NodeVersionState;
 }
