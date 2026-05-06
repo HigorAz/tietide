@@ -34,7 +34,7 @@ export function VersionHistoryPanel(): JSX.Element {
     setRestoring(version);
     try {
       const { definition } = await restore(workflowId, version);
-      loadWorkflow({ id: workflowId, definition: definition as WorkflowDefinition });
+      loadWorkflow({ id: workflowId, definition: definition as unknown as WorkflowDefinition });
     } finally {
       setRestoring(null);
     }

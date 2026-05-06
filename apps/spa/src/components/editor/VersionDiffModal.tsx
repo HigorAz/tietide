@@ -21,7 +21,6 @@ export interface VersionDiffModalProps {
 const diffPatcher = createDiffPatcher({
   // Compare arrays as ordered (no LCS) — fine for our small node/edge lists.
   arrays: { detectMove: false },
-  textDiff: { minLength: 9999 }, // disable text diff; show full string changes
 });
 
 export function VersionDiffModal({
@@ -45,7 +44,7 @@ export function VersionDiffModal({
     let cancelled = false;
     getVersion(workflowId, fromVersion)
       .then((row) => {
-        if (!cancelled) setFromDefinition(row.definition as WorkflowDefinition);
+        if (!cancelled) setFromDefinition(row.definition as unknown as WorkflowDefinition);
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load version');
