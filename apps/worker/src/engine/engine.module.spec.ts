@@ -1,5 +1,8 @@
 import { HttpRequestAction } from '../nodes/actions/http-request';
 import { Conditional } from '../nodes/logic/conditional';
+import { IteratorNode } from '../nodes/logic/iterator';
+import { ReturnNode } from '../nodes/logic/return';
+import { SubworkflowAction } from '../nodes/logic/subworkflow';
 import { NodeRegistry } from '../nodes/registry';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { CronTrigger } from '../nodes/triggers/cron-trigger';
@@ -14,6 +17,12 @@ describe('EngineModule', () => {
     const webhookTrigger = new WebhookTrigger();
     const httpRequest = new HttpRequestAction();
     const conditional = new Conditional();
+    const returnNode = new ReturnNode();
+    const iteratorNode = new IteratorNode();
+    // SubworkflowAction needs PrismaService + EngineService; for the registry-
+    // wiring assertions in this spec they're not invoked, so undefined casts
+    // are sufficient.
+    const subworkflowAction = new SubworkflowAction(undefined as never, undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -21,6 +30,9 @@ describe('EngineModule', () => {
       webhookTrigger,
       httpRequest,
       conditional,
+      returnNode,
+      iteratorNode,
+      subworkflowAction,
     );
     return {
       registry,
@@ -29,6 +41,9 @@ describe('EngineModule', () => {
       webhookTrigger,
       httpRequest,
       conditional,
+      returnNode,
+      iteratorNode,
+      subworkflowAction,
       module,
     };
   };
@@ -79,6 +94,33 @@ describe('EngineModule', () => {
       expect(registry.resolve('conditional')).toBe(conditional);
     });
 
+    it('should register ReturnNode in the NodeRegistry', () => {
+      const { registry, returnNode, module } = build();
+
+      module.onModuleInit();
+
+      expect(registry.has('return')).toBe(true);
+      expect(registry.resolve('return')).toBe(returnNode);
+    });
+
+    it('should register IteratorNode in the NodeRegistry', () => {
+      const { registry, iteratorNode, module } = build();
+
+      module.onModuleInit();
+
+      expect(registry.has('iterator')).toBe(true);
+      expect(registry.resolve('iterator')).toBe(iteratorNode);
+    });
+
+    it('should register SubworkflowAction in the NodeRegistry', () => {
+      const { registry, subworkflowAction, module } = build();
+
+      module.onModuleInit();
+
+      expect(registry.has('subworkflow')).toBe(true);
+      expect(registry.resolve('subworkflow')).toBe(subworkflowAction);
+    });
+
     it('should expose trigger, action, and logic executors after init', () => {
       const { registry, module } = build();
 
@@ -88,7 +130,16 @@ describe('EngineModule', () => {
         .getAll()
         .map((e) => e.category)
         .sort();
-      expect(categories).toEqual(['action', 'logic', 'trigger', 'trigger', 'trigger']);
+      expect(categories).toEqual([
+        'action',
+        'logic',
+        'logic',
+        'logic',
+        'logic',
+        'trigger',
+        'trigger',
+        'trigger',
+      ]);
     });
   });
 });

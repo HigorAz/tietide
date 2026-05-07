@@ -19,6 +19,10 @@ export interface ExecutionContext {
   nodeId: string;
   logger: Logger;
   isDryRun: boolean;
+  // Recursion depth in the parent->child execution tree. 0 for top-level
+  // executions started by the API/cron/webhook. Set by the runner so
+  // iterator/subworkflow nodes can enforce a recursion-depth limit.
+  depth?: number;
   getSecret(name: string): Promise<string>;
   getConnection<TConfig = Record<string, unknown>>(
     connectionId: string,

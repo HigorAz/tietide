@@ -425,4 +425,175 @@ describe('executionLiveStore', () => {
       expect(initialExecutionLiveState.viewAtTime).toBeNull();
     });
   });
+
+  describe('iteration events', () => {
+    it('should append a running IterationState on iteration.started', () => {
+      const { applyEvent } = useExecutionLiveStore.getState();
+      applyEvent(
+        baseEvent({
+          type: 'iteration.started',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'RUNNING',
+          iterationIndex: 0,
+          iterationTotal: 3,
+          childExecutionId: 'child-1',
+        }),
+      );
+
+      const node = useExecutionLiveStore.getState().nodes.get('iter1');
+      expect(node?.iterations).toEqual([
+        {
+          index: 0,
+          total: 3,
+          childExecutionId: 'child-1',
+          status: 'running',
+          durationMs: null,
+          error: null,
+        },
+      ]);
+    });
+
+    it('should upgrade an existing iteration to success on iteration.completed', () => {
+      const { applyEvent } = useExecutionLiveStore.getState();
+      applyEvent(
+        baseEvent({
+          type: 'iteration.started',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'RUNNING',
+          iterationIndex: 0,
+          iterationTotal: 2,
+          childExecutionId: 'child-1',
+        }),
+      );
+      applyEvent(
+        baseEvent({
+          type: 'iteration.completed',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'SUCCESS',
+          iterationIndex: 0,
+          iterationTotal: 2,
+          childExecutionId: 'child-1',
+          durationMs: 42,
+          finishedAt: '2026-05-06T10:00:01.000Z',
+        }),
+      );
+
+      const node = useExecutionLiveStore.getState().nodes.get('iter1');
+      expect(node?.iterations).toHaveLength(1);
+      expect(node?.iterations?.[0]).toEqual(
+        expect.objectContaining({ index: 0, status: 'success', durationMs: 42 }),
+      );
+    });
+
+    it('should keep iterations sorted by index even when events arrive out of order', () => {
+      const { applyEvent } = useExecutionLiveStore.getState();
+      applyEvent(
+        baseEvent({
+          type: 'iteration.started',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'RUNNING',
+          iterationIndex: 2,
+          iterationTotal: 3,
+          childExecutionId: 'child-3',
+        }),
+      );
+      applyEvent(
+        baseEvent({
+          type: 'iteration.started',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'RUNNING',
+          iterationIndex: 0,
+          iterationTotal: 3,
+          childExecutionId: 'child-1',
+        }),
+      );
+      applyEvent(
+        baseEvent({
+          type: 'iteration.started',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'RUNNING',
+          iterationIndex: 1,
+          iterationTotal: 3,
+          childExecutionId: 'child-2',
+        }),
+      );
+
+      const indexes = useExecutionLiveStore
+        .getState()
+        .nodes.get('iter1')
+        ?.iterations?.map((it) => it.index);
+      expect(indexes).toEqual([0, 1, 2]);
+    });
+
+    it('should record failed iterations with the error envelope', () => {
+      const { applyEvent } = useExecutionLiveStore.getState();
+      applyEvent(
+        baseEvent({
+          type: 'iteration.completed',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'FAILED',
+          iterationIndex: 1,
+          iterationTotal: 3,
+          childExecutionId: 'child-2',
+          error: { message: 'iteration boom', code: null },
+          durationMs: 7,
+        }),
+      );
+
+      const it = useExecutionLiveStore.getState().nodes.get('iter1')?.iterations?.[0];
+      expect(it?.status).toBe('failed');
+      expect(it?.error).toEqual({ message: 'iteration boom', code: null });
+    });
+
+    it('should ignore iteration events that lack required iteration fields', () => {
+      const { applyEvent } = useExecutionLiveStore.getState();
+      applyEvent(
+        baseEvent({
+          type: 'iteration.started',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'RUNNING',
+          // iterationIndex / iterationTotal / childExecutionId all missing
+        }),
+      );
+      expect(useExecutionLiveStore.getState().nodes.has('iter1')).toBe(false);
+    });
+
+    it('should preserve existing iterations when a step.* event is later applied to the same node', () => {
+      const { applyEvent } = useExecutionLiveStore.getState();
+      applyEvent(
+        baseEvent({
+          type: 'iteration.completed',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'SUCCESS',
+          iterationIndex: 0,
+          iterationTotal: 1,
+          childExecutionId: 'child-1',
+          durationMs: 10,
+        }),
+      );
+      applyEvent(
+        baseEvent({
+          type: 'step.completed',
+          nodeId: 'iter1',
+          nodeType: 'iterator',
+          status: 'SUCCESS',
+          finishedAt: '2026-05-06T10:00:02.000Z',
+          durationMs: 50,
+          output: { total: 1, succeeded: 1, failed: 0 },
+        }),
+      );
+      const node = useExecutionLiveStore.getState().nodes.get('iter1');
+      expect(node?.status).toBe('success');
+      expect(node?.iterations).toHaveLength(1);
+    });
+  });
 });

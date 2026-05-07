@@ -13,6 +13,9 @@ export const NodeType = {
   HTTP_REQUEST: 'http-request',
   CODE: 'code',
   CONDITIONAL: 'conditional',
+  ITERATOR: 'iterator',
+  SUBWORKFLOW: 'subworkflow',
+  RETURN: 'return',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -104,6 +107,24 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     type: NodeType.CONDITIONAL,
     name: 'Conditional (IF)',
     description: 'Branch based on a condition',
+    category: NodeCategory.LOGIC,
+  },
+  {
+    type: NodeType.ITERATOR,
+    name: 'Iterator (For Each)',
+    description: 'Run downstream subgraph once per item in an array',
+    category: NodeCategory.LOGIC,
+  },
+  {
+    type: NodeType.SUBWORKFLOW,
+    name: 'Subworkflow',
+    description: 'Invoke another workflow synchronously and use its return value',
+    category: NodeCategory.LOGIC,
+  },
+  {
+    type: NodeType.RETURN,
+    name: 'Return',
+    description: 'Mark the value to forward to a parent subworkflow caller',
     category: NodeCategory.LOGIC,
   },
 ];

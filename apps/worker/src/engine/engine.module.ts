@@ -1,6 +1,9 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { HttpRequestAction } from '../nodes/actions/http-request';
 import { Conditional } from '../nodes/logic/conditional';
+import { IteratorNode } from '../nodes/logic/iterator';
+import { ReturnNode } from '../nodes/logic/return';
+import { SubworkflowAction } from '../nodes/logic/subworkflow';
 import { NodeRegistry } from '../nodes/registry';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { CronTrigger } from '../nodes/triggers/cron-trigger';
@@ -26,6 +29,9 @@ import { PrismaConnectionResolver } from '../connections/prisma-connection-resol
     WebhookTrigger,
     HttpRequestAction,
     Conditional,
+    ReturnNode,
+    IteratorNode,
+    SubworkflowAction,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -40,6 +46,9 @@ export class EngineModule implements OnModuleInit {
     private readonly webhookTrigger: WebhookTrigger,
     private readonly httpRequest: HttpRequestAction,
     private readonly conditional: Conditional,
+    private readonly returnNode: ReturnNode,
+    private readonly iteratorNode: IteratorNode,
+    private readonly subworkflowAction: SubworkflowAction,
   ) {}
 
   onModuleInit(): void {
@@ -48,5 +57,8 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.webhookTrigger);
     this.registry.register(this.httpRequest);
     this.registry.register(this.conditional);
+    this.registry.register(this.returnNode);
+    this.registry.register(this.iteratorNode);
+    this.registry.register(this.subworkflowAction);
   }
 }

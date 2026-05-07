@@ -4,6 +4,8 @@ export const EXECUTION_EVENT_TYPES = [
   'step.failed',
   'step.skipped',
   'execution.completed',
+  'iteration.started',
+  'iteration.completed',
 ] as const;
 
 export type ExecutionEventType = (typeof EXECUTION_EVENT_TYPES)[number];
@@ -22,6 +24,13 @@ export interface ExecutionEventEnvelope {
   input: unknown;
   output: unknown;
   error: { message: string; code: string | null } | null;
+  // Iteration metadata. Present only on `iteration.started` / `iteration.completed`
+  // events emitted by the iterator node so subscribers can render per-iteration
+  // progress and link out to each child execution. Optional + nullable to keep
+  // existing event shapes backwards compatible.
+  iterationIndex?: number | null;
+  iterationTotal?: number | null;
+  childExecutionId?: string | null;
 }
 
 export const EXECUTION_CHANNEL_PREFIX = 'exec:';

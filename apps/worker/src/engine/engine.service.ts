@@ -14,6 +14,10 @@ export interface ExecutePayload {
   userId?: string;
   isDryRun?: boolean;
   definitionOverride?: WorkflowDefinition;
+  // Set by iterator/subworkflow nodes when they spawn a child execution.
+  // Top-level executions started by the API/cron/webhook leave both unset.
+  parentExecutionId?: string;
+  depth?: number;
 }
 
 @Injectable()
@@ -28,6 +32,8 @@ export class EngineService {
   async execute(payload: ExecutePayload): Promise<void> {
     const { executionId, workflowId, triggerData, requestId, definitionOverride } = payload;
     const isDryRun = payload.isDryRun ?? false;
+    const parentExecutionId = payload.parentExecutionId;
+    const depth = payload.depth ?? 0;
 
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
@@ -53,6 +59,8 @@ export class EngineService {
         definition,
         triggerData,
         isDryRun,
+        parentExecutionId,
+        depth,
       });
 
       const finishedAt = new Date();
