@@ -97,7 +97,7 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   {
     id: 'test',
     category: 'Run',
-    description: 'Test workflow (coming soon)',
+    description: 'Test workflow without saving',
     displayKeys: 'Ctrl/⌘ + T',
     hotkey: 'mod+t',
     preventDefault: true,

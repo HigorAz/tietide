@@ -36,7 +36,7 @@ export class UsageService {
     const baseWhere: Prisma.WorkflowExecutionWhereInput = {
       workflow: { userId },
       createdAt: { gte: since },
-      // TODO(F2): add `isDryRun: false` once the column lands so analytics excludes test runs.
+      isDryRun: false,
     };
 
     const [executions, activeWorkflows] = await Promise.all([

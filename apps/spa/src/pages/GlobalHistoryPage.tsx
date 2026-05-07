@@ -213,6 +213,14 @@ export function GlobalHistoryPage(): JSX.Element {
                       </td>
                       <td className="px-4 py-3">
                         <StatusBadge status={row.status} />
+                        {row.isDryRun === true && (
+                          <span
+                            data-testid="dry-run-badge"
+                            className="ml-2 inline-block rounded-full bg-accent-teal/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-teal"
+                          >
+                            Test
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{row.triggerType}</td>
                       <td className="px-4 py-3 text-text-secondary">

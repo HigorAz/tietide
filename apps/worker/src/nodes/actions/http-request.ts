@@ -11,6 +11,7 @@ interface ParsedParams {
   headers: Record<string, string>;
   body: unknown;
   timeoutMs: number;
+  mockOnDryRun: boolean;
 }
 
 @Injectable()
@@ -31,6 +32,21 @@ export class HttpRequestAction implements INodeExecutor {
     const hasBody = this.shouldSendBody(params);
     const headers = this.buildHeaders(params, hasBody);
     const body = hasBody ? this.serializeBody(params.body) : undefined;
+
+    if (context.isDryRun && params.mockOnDryRun) {
+      return {
+        data: {
+          mocked: true,
+          wouldHaveSent: {
+            method: params.method,
+            url: params.url,
+            headers,
+            body: hasBody ? params.body : undefined,
+          },
+        },
+        metadata: { mocked: true },
+      };
+    }
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), params.timeoutMs);
@@ -103,7 +119,9 @@ export class HttpRequestAction implements INodeExecutor {
         ? raw.timeout
         : DEFAULT_TIMEOUT_MS;
 
-    return { method, url, headers, body: raw.body, timeoutMs };
+    const mockOnDryRun = raw.mockOnDryRun === true;
+
+    return { method, url, headers, body: raw.body, timeoutMs, mockOnDryRun };
   }
 
   private shouldSendBody(params: ParsedParams): boolean {

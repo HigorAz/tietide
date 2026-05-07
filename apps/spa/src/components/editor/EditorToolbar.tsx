@@ -1,12 +1,13 @@
 import { useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Play, Redo2, Save, Undo2 } from 'lucide-react';
+import { ArrowLeft, FlaskConical, Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
-import { executeWorkflow } from '@/api/executions';
+import { executeWorkflow, testWorkflow } from '@/api/executions';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { saveWorkflow } from './saveWorkflow';
+import { toWorkflowDefinition } from './serialization';
 
 interface EditorToolbarProps {
   workflowId: string;
@@ -15,6 +16,7 @@ interface EditorToolbarProps {
 
 export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const isDirty = useEditorStore((s) => s.isDirty);
+  const nodeCount = useEditorStore((s) => s.nodes.length);
   const past = useEditorStore((s) => s.past);
   const future = useEditorStore((s) => s.future);
   const undo = useEditorStore((s) => s.undo);
@@ -25,6 +27,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
@@ -56,8 +59,25 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
     }
   }, [isRunning, isSaving, setSearchParams, toast, workflowId]);
 
+  const handleTest = useCallback(async () => {
+    if (isTesting || isSaving) return;
+    setIsTesting(true);
+    try {
+      const { nodes, edges } = useEditorStore.getState();
+      const definition = toWorkflowDefinition(nodes, edges);
+      const execution = await testWorkflow(workflowId, definition);
+      toast({ tone: 'success', message: 'Test started' });
+      setSearchParams({ execution: execution.id });
+    } catch {
+      toast({ tone: 'error', message: 'Test failed. Please try again.' });
+    } finally {
+      setIsTesting(false);
+    }
+  }, [isSaving, isTesting, setSearchParams, toast, workflowId]);
+
   const saveDisabled = !isDirty || isSaving;
   const runDisabled = isRunning || isSaving;
+  const testDisabled = isTesting || isSaving || nodeCount === 0;
   const undoDisabled = past.length === 0;
   const redoDisabled = future.length === 0;
 
@@ -102,6 +122,19 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           disabled={runDisabled}
           icon={isRunning ? <Spinner size="sm" label="Running" /> : <Play size={16} aria-hidden />}
           dataTour="editor-run"
+        />
+        <ToolbarButton
+          label={isTesting ? 'Testing…' : 'Test'}
+          onClick={handleTest}
+          disabled={testDisabled}
+          icon={
+            isTesting ? (
+              <Spinner size="sm" label="Testing" />
+            ) : (
+              <FlaskConical size={16} aria-hidden />
+            )
+          }
+          dataTour="editor-test"
         />
         <ToolbarButton
           label={isSaving ? 'Saving…' : 'Save'}

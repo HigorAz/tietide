@@ -242,4 +242,50 @@ describe('GlobalHistoryPage', () => {
 
     expect(await screen.findByText(/no executions yet/i)).toBeInTheDocument();
   });
+
+  describe('TEST badge for dry-run executions', () => {
+    it('renders a TEST chip on rows where isDryRun=true', async () => {
+      mockedListAll.mockResolvedValueOnce({
+        items: [
+          makeExecution({
+            id: 'e-test',
+            workflowId: 'wf-1',
+            triggerType: 'test',
+            isDryRun: true,
+          }),
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      renderPage();
+
+      const row = await screen.findByTestId('execution-row-e-test');
+      expect(within(row).getByTestId('dry-run-badge')).toHaveTextContent(/test/i);
+    });
+
+    it('omits the TEST chip on regular execution rows', async () => {
+      mockedListAll.mockResolvedValueOnce({
+        items: [
+          makeExecution({
+            id: 'e-real',
+            workflowId: 'wf-1',
+            triggerType: 'manual',
+            isDryRun: false,
+          }),
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      renderPage();
+
+      const row = await screen.findByTestId('execution-row-e-real');
+      expect(within(row).queryByTestId('dry-run-badge')).not.toBeInTheDocument();
+    });
+  });
 });

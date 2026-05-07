@@ -12,6 +12,7 @@ vi.mock('@/api/workflows', () => ({
 
 vi.mock('@/api/executions', () => ({
   executeWorkflow: vi.fn(),
+  testWorkflow: vi.fn(),
 }));
 
 const mockNavigate = vi.fn();
@@ -22,11 +23,12 @@ vi.mock('react-router-dom', () => ({
 }));
 
 import { updateWorkflow } from '@/api/workflows';
-import { executeWorkflow } from '@/api/executions';
+import { executeWorkflow, testWorkflow } from '@/api/executions';
 import { EditorToolbar } from './EditorToolbar';
 
 const mockedUpdate = vi.mocked(updateWorkflow);
 const mockedExecute = vi.mocked(executeWorkflow);
+const mockedTest = vi.mocked(testWorkflow);
 
 const savedResponse: Workflow = {
   id: 'wf-1',
@@ -48,18 +50,20 @@ describe('EditorToolbar', () => {
     useToastStore.setState({ ...initialToastState });
     mockedUpdate.mockReset();
     mockedExecute.mockReset();
+    mockedTest.mockReset();
     mockNavigate.mockReset();
     mockSetSearchParams.mockReset();
   });
 
   describe('rendering', () => {
-    it('should render Save, Undo, Redo, and Run buttons', () => {
+    it('should render Save, Undo, Redo, Run, and Test buttons', () => {
       render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /undo/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /redo/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /run/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^test$/i })).toBeInTheDocument();
     });
 
     it('should render a Back button (issue #104)', () => {
@@ -262,6 +266,83 @@ describe('EditorToolbar', () => {
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
       await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
+      expect(mockSetSearchParams).not.toHaveBeenCalled();
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0]).toMatchObject({ tone: 'error' });
+    });
+  });
+
+  describe('Test', () => {
+    const testResponse = {
+      id: 'exec-test-1',
+      workflowId: 'wf-1',
+      status: 'PENDING' as const,
+      triggerType: 'test',
+      triggerData: null,
+      idempotencyKey: null,
+      isDryRun: true,
+      createdAt: '2026-05-07T00:00:00.000Z',
+    };
+
+    it('should be disabled when the canvas is empty (no nodes to test)', () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      expect(screen.getByRole('button', { name: /^test$/i })).toBeDisabled();
+    });
+
+    it('should be enabled once at least one node is on the canvas', () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      expect(screen.getByRole('button', { name: /^test$/i })).toBeEnabled();
+    });
+
+    it('should call testWorkflow with the in-memory definition (without saving)', async () => {
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 12, y: 24 });
+      mockedTest.mockResolvedValueOnce(testResponse);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /^test$/i }));
+
+      await waitFor(() => expect(mockedTest).toHaveBeenCalledTimes(1));
+      const [calledId, calledDef] = mockedTest.mock.calls[0];
+      expect(calledId).toBe('wf-1');
+      expect(calledDef).toEqual(
+        expect.objectContaining({
+          nodes: [
+            expect.objectContaining({
+              type: NodeType.HTTP_REQUEST,
+              position: { x: 12, y: 24 },
+            }),
+          ],
+          edges: [],
+        }),
+      );
+      expect(mockedUpdate).not.toHaveBeenCalled();
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+
+    it('should set ?execution=<id> on the URL on success', async () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      mockedTest.mockResolvedValueOnce(testResponse);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /^test$/i }));
+
+      await waitFor(() =>
+        expect(mockSetSearchParams).toHaveBeenCalledWith({ execution: 'exec-test-1' }),
+      );
+    });
+
+    it('should show an error toast when the test request fails', async () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      mockedTest.mockRejectedValueOnce(new Error('boom'));
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /^test$/i }));
+
+      await waitFor(() => expect(mockedTest).toHaveBeenCalledTimes(1));
       expect(mockSetSearchParams).not.toHaveBeenCalled();
       const toasts = useToastStore.getState().toasts;
       expect(toasts).toHaveLength(1);

@@ -429,4 +429,20 @@ describe('UsageService', () => {
       expect(result.topWorkflows).toEqual([]);
     });
   });
+
+  describe('getSummary — dry-run exclusion', () => {
+    it('passes isDryRun: false to Prisma so test-mode executions are excluded from analytics', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.getSummary(userId, UsageRange.D7);
+
+      expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ isDryRun: false }),
+        }),
+      );
+    });
+  });
 });

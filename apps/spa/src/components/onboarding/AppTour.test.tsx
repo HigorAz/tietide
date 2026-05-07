@@ -242,7 +242,7 @@ describe('AppTour', () => {
         useOnboardingStore.getState().startTour({ scope: 'currentPage' });
       });
       await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
-      expect(lastJoyrideProps?.steps).toHaveLength(2);
+      expect(lastJoyrideProps?.steps).toHaveLength(3);
     });
 
     it('should not run when scope is currentPage on a route without a tour', async () => {
