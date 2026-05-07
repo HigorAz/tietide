@@ -17,11 +17,56 @@ export const NodeType = {
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
 
+export const NodeGroup = {
+  TRIGGERS: 'triggers',
+  ACTIONS: 'actions',
+  LOGIC: 'logic',
+  DATA: 'data',
+  AI: 'ai',
+  COMMUNICATION: 'communication',
+  PRODUCTIVITY: 'productivity',
+  COMMERCE: 'commerce',
+  CUSTOM: 'custom',
+} as const;
+
+export type NodeGroup = (typeof NodeGroup)[keyof typeof NodeGroup];
+
+// Stable display order for the SPA's node-library palette.
+export const NODE_GROUP_ORDER: readonly NodeGroup[] = [
+  NodeGroup.TRIGGERS,
+  NodeGroup.ACTIONS,
+  NodeGroup.LOGIC,
+  NodeGroup.DATA,
+  NodeGroup.AI,
+  NodeGroup.COMMUNICATION,
+  NodeGroup.PRODUCTIVITY,
+  NodeGroup.COMMERCE,
+  NodeGroup.CUSTOM,
+];
+
+export const NODE_GROUP_LABELS: Record<NodeGroup, string> = {
+  [NodeGroup.TRIGGERS]: 'Triggers',
+  [NodeGroup.ACTIONS]: 'Actions',
+  [NodeGroup.LOGIC]: 'Logic',
+  [NodeGroup.DATA]: 'Data',
+  [NodeGroup.AI]: 'AI',
+  [NodeGroup.COMMUNICATION]: 'Communication',
+  [NodeGroup.PRODUCTIVITY]: 'Productivity',
+  [NodeGroup.COMMERCE]: 'Commerce',
+  [NodeGroup.CUSTOM]: 'Custom',
+};
+
 export interface NodeTypeDefinition {
   type: NodeType;
   name: string;
   description: string;
   category: NodeCategory;
+  // Optional palette-display group. When omitted, the SPA infers from `category`
+  // (trigger → triggers, action → actions, logic → logic). Domain-specific groups
+  // (data/ai/communication/...) are reserved for future connector nodes.
+  group?: NodeGroup;
+  // Optional provider tag used for palette filtering (e.g. 'slack', 'openai').
+  provider?: string;
 }
 
 export const NODE_CATALOG: NodeTypeDefinition[] = [

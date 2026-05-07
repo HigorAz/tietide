@@ -19,7 +19,14 @@ export type { Connection } from './types/connections.types.js';
 // Constants
 export { Role } from './types/user.types.js';
 export { ExecutionStatus, TriggerType } from './types/execution.types.js';
-export { NodeType, NodeCategory, NODE_CATALOG } from './types/node.types.js';
+export {
+  NodeType,
+  NodeCategory,
+  NodeGroup,
+  NODE_CATALOG,
+  NODE_GROUP_ORDER,
+  NODE_GROUP_LABELS,
+} from './types/node.types.js';
 export { ConnectionType, ConnectionStatus, ConnectionProvider } from './types/connections.types.js';
 
 // Schemas
