@@ -7,48 +7,14 @@ import { ProviderPicker } from '@/components/connections/ProviderPicker';
 import { ConnectionRow } from '@/components/connections/ConnectionRow';
 import { ApiKeyConnectionModal } from '@/components/connections/ApiKeyConnectionModal';
 import { DeleteConnectionDialog } from '@/components/connections/DeleteConnectionDialog';
-import {
-  PROVIDER_CATALOG,
-  getProviderEntry,
-  type ProviderEntry,
-} from '@/components/connections/providerCatalog';
+import { PROVIDER_CATALOG, type ProviderEntry } from '@/components/connections/providerCatalog';
 import type { ConnectionView } from '@/api/connections';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
+import { readBridgeFromUrl, readDeepLinkFromUrl } from './connectionsPageUrl';
 
 const errorMessage = (err: unknown, fallback: string): string =>
   err instanceof Error && err.message ? err.message : fallback;
-
-interface BridgeOutcome {
-  status: 'success' | 'error';
-  connectionId?: string;
-  message?: string;
-}
-
-const readBridgeFromUrl = (search: string): BridgeOutcome | null => {
-  const params = new URLSearchParams(search);
-  const status = params.get('status');
-  if (status !== 'success' && status !== 'error') return null;
-  return {
-    status,
-    connectionId: params.get('id') ?? undefined,
-    message: params.get('message') ?? undefined,
-  };
-};
-
-interface DeepLinkRequest {
-  provider: ProviderEntry;
-}
-
-const readDeepLinkFromUrl = (search: string): DeepLinkRequest | null => {
-  const params = new URLSearchParams(search);
-  if (params.get('connect') !== 'true') return null;
-  const providerId = params.get('provider');
-  if (!providerId) return null;
-  const provider = getProviderEntry(providerId);
-  if (!provider) return null;
-  return { provider };
-};
 
 export function ConnectionsPage(): JSX.Element {
   // ----- Bridge: if we're inside an OAuth popup, postMessage and close. -----
@@ -130,9 +96,6 @@ export function ConnectionsPage(): JSX.Element {
     deepLinkHandledRef.current = true;
     window.history.replaceState({}, '', window.location.pathname);
     void handlePick(request.provider);
-    // handlePick is defined inside the component so its identity changes per
-    // render; the ref guard ensures we only fire once regardless.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [closing]);
 
   const handlePick = async (provider: ProviderEntry): Promise<void> => {
