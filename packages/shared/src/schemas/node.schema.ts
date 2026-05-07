@@ -27,3 +27,20 @@ export const cronConfigSchema = z.object({
 export const webhookConfigSchema = z.object({
   path: z.string().min(1).max(255).optional(),
 });
+
+export const ITERATOR_MAX_ITEMS_DEFAULT = 1000;
+
+export const iteratorConfigSchema = z.object({
+  arrayPath: z.string().min(1),
+  continueOnError: z.boolean().default(false),
+  maxItems: z.number().int().positive().max(ITERATOR_MAX_ITEMS_DEFAULT).optional(),
+});
+
+export const subworkflowConfigSchema = z.object({
+  workflowId: z.string().uuid(),
+  inputMapping: z.record(z.string()).default({}),
+});
+
+export const returnConfigSchema = z.object({
+  value: z.string().optional(),
+});
