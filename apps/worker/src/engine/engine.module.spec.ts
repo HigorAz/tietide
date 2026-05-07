@@ -1,5 +1,6 @@
 import { HttpRequestAction } from '../nodes/actions/http-request';
 import { Conditional } from '../nodes/logic/conditional';
+import { ReturnNode } from '../nodes/logic/return';
 import { NodeRegistry } from '../nodes/registry';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { CronTrigger } from '../nodes/triggers/cron-trigger';
@@ -14,6 +15,7 @@ describe('EngineModule', () => {
     const webhookTrigger = new WebhookTrigger();
     const httpRequest = new HttpRequestAction();
     const conditional = new Conditional();
+    const returnNode = new ReturnNode();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -21,6 +23,7 @@ describe('EngineModule', () => {
       webhookTrigger,
       httpRequest,
       conditional,
+      returnNode,
     );
     return {
       registry,
@@ -29,6 +32,7 @@ describe('EngineModule', () => {
       webhookTrigger,
       httpRequest,
       conditional,
+      returnNode,
       module,
     };
   };
@@ -79,6 +83,15 @@ describe('EngineModule', () => {
       expect(registry.resolve('conditional')).toBe(conditional);
     });
 
+    it('should register ReturnNode in the NodeRegistry', () => {
+      const { registry, returnNode, module } = build();
+
+      module.onModuleInit();
+
+      expect(registry.has('return')).toBe(true);
+      expect(registry.resolve('return')).toBe(returnNode);
+    });
+
     it('should expose trigger, action, and logic executors after init', () => {
       const { registry, module } = build();
 
@@ -88,7 +101,7 @@ describe('EngineModule', () => {
         .getAll()
         .map((e) => e.category)
         .sort();
-      expect(categories).toEqual(['action', 'logic', 'trigger', 'trigger', 'trigger']);
+      expect(categories).toEqual(['action', 'logic', 'logic', 'trigger', 'trigger', 'trigger']);
     });
   });
 });
