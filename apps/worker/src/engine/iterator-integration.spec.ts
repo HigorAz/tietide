@@ -435,4 +435,128 @@ describe('WorkflowRunner — iterator integration', () => {
     expect(result.status).toBe('FAILED');
     expect(bodyExecutor.execute).toHaveBeenCalledTimes(2);
   });
+
+  describe('continueOnError', () => {
+    it('should keep iterating after a failed iteration when continueOnError is true and report partial counts', async () => {
+      bodyExecutor.execute.mockImplementationOnce(async () => ({ data: { ok: 1 } }));
+      bodyExecutor.execute.mockImplementationOnce(async () => {
+        throw new Error('iteration 1 oops');
+      });
+      bodyExecutor.execute.mockImplementationOnce(async () => ({ data: { ok: 3 } }));
+
+      const def: WorkflowDefinition = {
+        nodes: [
+          node('t1', 'manual-trigger'),
+          node('iter1', 'iterator', 'iter1', {
+            arrayPath: '{{t1.items}}',
+            continueOnError: true,
+          }),
+          node('bodyA', 'body-action'),
+        ],
+        edges: [edge('e1', 't1', 'iter1'), edge('e2', 'iter1', 'bodyA', 'body')],
+      };
+
+      const result = await runner.run({
+        executionId: 'parent-exec',
+        workflowId: 'wf-1',
+        definition: def,
+        triggerData: { items: [1, 2, 3] },
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      expect(bodyExecutor.execute).toHaveBeenCalledTimes(3);
+      const iterStep = steps.find(
+        (s) => s.executionId === 'parent-exec' && s.nodeId === 'iter1' && s.status === 'SUCCESS',
+      );
+      expect(iterStep).toBeDefined();
+      expect(iterStep?.outputData).toEqual({ total: 3, succeeded: 2, failed: 1 });
+    });
+
+    it('should still fire the done-handle node when continueOnError surfaced partial failures', async () => {
+      bodyExecutor.execute.mockImplementationOnce(async () => ({ data: {} }));
+      bodyExecutor.execute.mockImplementationOnce(async () => {
+        throw new Error('boom');
+      });
+
+      const def: WorkflowDefinition = {
+        nodes: [
+          node('t1', 'manual-trigger'),
+          node('iter1', 'iterator', 'iter1', {
+            arrayPath: '{{t1.items}}',
+            continueOnError: true,
+          }),
+          node('bodyA', 'body-action'),
+          node('postX', 'post-action'),
+        ],
+        edges: [
+          edge('e1', 't1', 'iter1'),
+          edge('e2', 'iter1', 'bodyA', 'body'),
+          edge('e3', 'iter1', 'postX', 'done'),
+        ],
+      };
+
+      const result = await runner.run({
+        executionId: 'parent-exec',
+        workflowId: 'wf-1',
+        definition: def,
+        triggerData: { items: [1, 2] },
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      expect(postIteratorExecutor.execute).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('maxItems', () => {
+    it('should cap the iteration count at maxItems even when the resolved array is larger', async () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          node('t1', 'manual-trigger'),
+          node('iter1', 'iterator', 'iter1', {
+            arrayPath: '{{t1.items}}',
+            maxItems: 2,
+          }),
+          node('bodyA', 'body-action'),
+        ],
+        edges: [edge('e1', 't1', 'iter1'), edge('e2', 'iter1', 'bodyA', 'body')],
+      };
+
+      await runner.run({
+        executionId: 'parent-exec',
+        workflowId: 'wf-1',
+        definition: def,
+        triggerData: { items: [1, 2, 3, 4, 5] },
+      });
+
+      const children = workflowExecutions.filter((r) => r.parentExecutionId === 'parent-exec');
+      expect(children).toHaveLength(2);
+      expect(bodyExecutor.execute).toHaveBeenCalledTimes(2);
+      const triggerData = children.map((c) => c.triggerData) as Array<{
+        item: number;
+        index: number;
+        total: number;
+      }>;
+      // total reflects the capped count, not the original array length.
+      expect(triggerData.every((td) => td.total === 2)).toBe(true);
+    });
+  });
+
+  describe('recursion depth', () => {
+    it('should fail with RecursionDepthExceededError when invoked beyond MAX_RECURSION_DEPTH', async () => {
+      const def: WorkflowDefinition = {
+        nodes: [node('t1', 'manual-trigger')],
+        edges: [],
+      };
+
+      const result = await runner.run({
+        executionId: 'parent-exec',
+        workflowId: 'wf-1',
+        definition: def,
+        depth: 6,
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(result.error).toMatch(/Recursion depth limit/);
+    });
+  });
 });
