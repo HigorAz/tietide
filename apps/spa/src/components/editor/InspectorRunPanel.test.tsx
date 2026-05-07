@@ -189,4 +189,61 @@ describe('InspectorRunPanel', () => {
     render(<InspectorRunPanel />);
     expect(screen.getByTestId('run-node-tab-orphan-1')).toHaveTextContent('orphan-1');
   });
+
+  describe('iterator iterations view', () => {
+    it('should render the iterations list when the selected node has iterations', () => {
+      useEditorStore.setState({
+        ...initialEditorState,
+        nodes: [editorNode('iter-1', 'Loop')],
+      });
+      useExecutionLiveStore.setState({
+        ...initialExecutionLiveState,
+        nodes: new Map([
+          [
+            'iter-1',
+            runState({
+              status: 'success',
+              iterations: [
+                {
+                  index: 0,
+                  total: 2,
+                  childExecutionId: 'child-1',
+                  status: 'success',
+                  durationMs: 12,
+                  error: null,
+                },
+                {
+                  index: 1,
+                  total: 2,
+                  childExecutionId: 'child-2',
+                  status: 'failed',
+                  durationMs: 9,
+                  error: { message: 'boom', code: null },
+                },
+              ],
+            }),
+          ],
+        ]),
+      });
+
+      render(<InspectorRunPanel />);
+      expect(screen.getByTestId('run-node-iterations')).toBeInTheDocument();
+      expect(screen.getByTestId('run-iteration-0')).toHaveAttribute('data-status', 'success');
+      expect(screen.getByTestId('run-iteration-1')).toHaveAttribute('data-status', 'failed');
+    });
+
+    it('should not render the iterations block for non-iterator nodes (no iterations field)', () => {
+      useEditorStore.setState({
+        ...initialEditorState,
+        nodes: [editorNode('http-1', 'Fetch')],
+      });
+      useExecutionLiveStore.setState({
+        ...initialExecutionLiveState,
+        nodes: new Map([['http-1', runState()]]),
+      });
+
+      render(<InspectorRunPanel />);
+      expect(screen.queryByTestId('run-node-iterations')).not.toBeInTheDocument();
+    });
+  });
 });
