@@ -177,6 +177,38 @@ describe('LivingInkEdge', () => {
     });
   });
 
+  describe('error variant (kind=error)', () => {
+    it('should use the red error gradient and red stroke when data.kind is "error"', () => {
+      const { container } = renderEdge({ data: { kind: 'error' } });
+
+      const errorGradient = container.querySelector('linearGradient#livingInkErrorGradient');
+      expect(errorGradient).not.toBeNull();
+
+      const colors = Array.from(errorGradient?.querySelectorAll('stop') ?? []).map((s) =>
+        (s.getAttribute('stop-color') ?? '').toUpperCase(),
+      );
+      expect(colors.some((c) => c.startsWith('#'))).toBe(true);
+
+      const path = container.querySelector('path.react-flow__edge-path');
+      expect(path?.getAttribute('stroke')).toBe('url(#livingInkErrorGradient)');
+      expect(path).toHaveAttribute('data-kind', 'error');
+    });
+
+    it('should keep the teal gradient when data.kind is missing or "success"', () => {
+      const { container } = renderEdge({ data: { kind: 'success' } });
+      const path = container.querySelector('path.react-flow__edge-path');
+      expect(path?.getAttribute('stroke')).toBe('url(#livingInkGradient)');
+      expect(path).toHaveAttribute('data-kind', 'success');
+    });
+
+    it('should still render a dashed stroke for error edges', () => {
+      const { container } = renderEdge({ data: { kind: 'error' } });
+      const path = container.querySelector('path.react-flow__edge-path');
+      const dash = path?.getAttribute('stroke-dasharray') ?? '';
+      expect(dash.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('memoization', () => {
     it('should be wrapped in React.memo with a displayName of "LivingInkEdge"', () => {
       const memoSymbol = Symbol.for('react.memo');

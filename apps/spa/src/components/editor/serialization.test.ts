@@ -227,6 +227,108 @@ describe('serialization', () => {
     });
   });
 
+  describe('edge kind (error path)', () => {
+    it('should write kind:"error" onto the WorkflowEdge when edge.data.kind is "error"', () => {
+      const edge: Edge = {
+        id: 'edge-err',
+        source: 'a',
+        target: 'b',
+        type: 'livingInk',
+        sourceHandle: 'error',
+        data: { kind: 'error' },
+      };
+
+      const def = toWorkflowDefinition([], [edge]);
+
+      expect(def.edges[0]).toEqual({
+        id: 'edge-err',
+        source: 'a',
+        target: 'b',
+        sourceHandle: 'error',
+        kind: 'error',
+      });
+    });
+
+    it('should not include kind when edge.data.kind is missing or "success"', () => {
+      const plain: Edge = { id: 'e-plain', source: 'a', target: 'b', type: 'livingInk' };
+      const succ: Edge = {
+        id: 'e-succ',
+        source: 'a',
+        target: 'b',
+        type: 'livingInk',
+        data: { kind: 'success' },
+      };
+
+      const def = toWorkflowDefinition([], [plain, succ]);
+
+      expect('kind' in def.edges[0]).toBe(false);
+      expect('kind' in def.edges[1]).toBe(false);
+    });
+
+    it('should hydrate kind:"error" from a WorkflowEdge onto edge.data.kind', () => {
+      const def: WorkflowDefinition = {
+        nodes: [],
+        edges: [
+          {
+            id: 'e-err',
+            source: 'a',
+            target: 'b',
+            sourceHandle: 'error',
+            kind: 'error',
+          },
+        ],
+      };
+
+      const { edges } = fromWorkflowDefinition(def);
+
+      expect(edges[0]).toMatchObject({
+        id: 'e-err',
+        source: 'a',
+        target: 'b',
+        sourceHandle: 'error',
+        type: 'livingInk',
+        data: { kind: 'error' },
+      });
+    });
+
+    it('should round-trip a workflow with both success and error edges', () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'A',
+            type: NodeType.HTTP_REQUEST,
+            name: 'A',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+          {
+            id: 'B',
+            type: NodeType.HTTP_REQUEST,
+            name: 'B',
+            position: { x: 100, y: 0 },
+            config: {},
+          },
+          {
+            id: 'C',
+            type: NodeType.HTTP_REQUEST,
+            name: 'C',
+            position: { x: 100, y: 100 },
+            config: {},
+          },
+        ],
+        edges: [
+          { id: 'e-ok', source: 'A', target: 'B' },
+          { id: 'e-err', source: 'A', target: 'C', sourceHandle: 'error', kind: 'error' },
+        ],
+      };
+
+      const hydrated = fromWorkflowDefinition(def);
+      const roundTripped = toWorkflowDefinition(hydrated.nodes, hydrated.edges);
+
+      expect(roundTripped).toEqual(def);
+    });
+  });
+
   describe('round-trip', () => {
     it('should preserve a canonical WorkflowDefinition through from→to', () => {
       const def: WorkflowDefinition = {

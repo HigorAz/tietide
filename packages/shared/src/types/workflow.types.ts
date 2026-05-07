@@ -13,6 +13,7 @@ export interface WorkflowEdge {
   target: string;
   sourceHandle?: string;
   targetHandle?: string;
+  kind?: 'success' | 'error';
 }
 
 export interface WorkflowDefinition {

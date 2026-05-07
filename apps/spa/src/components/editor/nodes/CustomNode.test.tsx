@@ -223,6 +223,27 @@ describe('CustomNode', () => {
       expect(target?.className).toContain('target');
       expect(source?.className).toContain('source');
     });
+
+    it('should NOT render the error handle by default', () => {
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+      expect(screen.queryByTestId('custom-node-handle-error')).not.toBeInTheDocument();
+    });
+
+    it('should render the error handle when data.config.hasErrorHandler is true', () => {
+      renderNode({
+        data: {
+          label: 'n',
+          nodeType: NodeType.HTTP_REQUEST,
+          status: 'idle',
+          config: { hasErrorHandler: true },
+        },
+      });
+      const errorHandle = screen.getByTestId('custom-node-handle-error');
+      expect(errorHandle).toBeInTheDocument();
+      expect(errorHandle.getAttribute('data-handleid')).toBe('error');
+    });
   });
 
   describe('skip toggle', () => {

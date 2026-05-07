@@ -28,6 +28,8 @@ export function toWorkflowDefinition(
       const base: WorkflowEdge = { id: e.id, source: e.source, target: e.target };
       if (e.sourceHandle != null) base.sourceHandle = e.sourceHandle;
       if (e.targetHandle != null) base.targetHandle = e.targetHandle;
+      const kind = (e.data as { kind?: 'success' | 'error' } | undefined)?.kind;
+      if (kind === 'error') base.kind = 'error';
       return base;
     }),
   };
@@ -64,6 +66,7 @@ export function fromWorkflowDefinition(def: WorkflowDefinition): {
     };
     if (e.sourceHandle != null) base.sourceHandle = e.sourceHandle;
     if (e.targetHandle != null) base.targetHandle = e.targetHandle;
+    if (e.kind === 'error') base.data = { kind: 'error' };
     return base;
   });
 
