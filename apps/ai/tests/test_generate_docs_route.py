@@ -20,7 +20,6 @@ from src.services.prompt import PromptBuilder
 from src.services.retriever import Retriever
 from tests.fakes import FakeEmbedder, FakeLlmClient, FakeVectorStore
 
-
 SECTIONS = {
     "objective": "Manually call a health endpoint and surface the response.",
     "triggers": "Manual trigger started by a user.",
