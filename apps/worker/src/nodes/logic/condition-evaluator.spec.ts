@@ -1,47 +1,6 @@
-import { evaluateCondition, resolveTemplates } from './condition-evaluator';
+import { evaluateCondition } from './condition-evaluator';
 
 describe('condition-evaluator', () => {
-  describe('resolveTemplates', () => {
-    it('should replace a single {{key}} placeholder with a primitive value', () => {
-      expect(resolveTemplates('{{statusCode}} === 200', { statusCode: 200 })).toBe('200 === 200');
-    });
-
-    it('should resolve a nested dot-path', () => {
-      const data = { response: { status: 'ok' } };
-      expect(resolveTemplates('{{response.status}} === "ok"', data)).toBe('"ok" === "ok"');
-    });
-
-    it('should render a missing path as the literal "undefined"', () => {
-      expect(resolveTemplates('{{missing.path}} === null', {})).toBe('undefined === null');
-    });
-
-    it('should refuse to walk through __proto__ / constructor / prototype', () => {
-      const data = { a: { b: 1 } };
-      expect(resolveTemplates('{{a.__proto__.toString}} === null', data)).toBe(
-        'undefined === null',
-      );
-      expect(resolveTemplates('{{a.constructor}} === null', data)).toBe('undefined === null');
-      expect(resolveTemplates('{{a.prototype}} === null', data)).toBe('undefined === null');
-    });
-
-    it('should JSON-stringify object and array values for round-trip safety', () => {
-      const data = { obj: { a: 1 }, arr: [1, 2] };
-      expect(resolveTemplates('{{obj}} === null', data)).toBe('{"a":1} === null');
-      expect(resolveTemplates('{{arr}} === null', data)).toBe('[1,2] === null');
-    });
-
-    it('should escape strings as JSON literals so they are valid operands', () => {
-      const data = { msg: 'hello world' };
-      expect(resolveTemplates('{{msg}} === "hello world"', data)).toBe(
-        '"hello world" === "hello world"',
-      );
-    });
-
-    it('should leave unmatched braces alone', () => {
-      expect(resolveTemplates('plain string', {})).toBe('plain string');
-    });
-  });
-
   describe('evaluateCondition', () => {
     it('should return true for a satisfied strict equality', () => {
       expect(evaluateCondition('200 === 200')).toBe(true);

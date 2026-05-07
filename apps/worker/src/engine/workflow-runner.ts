@@ -2,11 +2,12 @@ import { Inject, Injectable, Logger as NestLogger } from '@nestjs/common';
 import {
   NODE_CATALOG,
   NodeCategory,
+  resolveTemplate,
   type WorkflowDefinition,
   type WorkflowNode,
   type WorkflowEdge,
 } from '@tietide/shared';
-import type { ExecutionContext, Logger, NodeOutput } from '@tietide/sdk';
+import type { ExecutionContext, Logger, NodeInput, NodeOutput } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
 import { ExecutionEventsService } from '../events/execution-events.service';
@@ -133,7 +134,8 @@ export class WorkflowRunner {
       try {
         const executor = this.registry.resolve(n.type)!;
         const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun);
-        const output = await executor.execute(input, ctx);
+        const resolvedInput = this.resolveInputTemplates(input, executionOrder, outputs);
+        const output = await executor.execute(resolvedInput, ctx);
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
 
@@ -200,6 +202,20 @@ export class WorkflowRunner {
       return { status: 'FAILED', error: failure.error, failedNodeId: failure.nodeId };
     }
     return { status: 'SUCCESS' };
+  }
+
+  private resolveInputTemplates(
+    input: NodeInput,
+    executionOrder: string[],
+    outputs: Map<string, NodeOutput>,
+  ): NodeInput {
+    const scope: Record<string, unknown> = {};
+    for (const id of executionOrder) {
+      const out = outputs.get(id);
+      if (out) scope[id] = out.data;
+    }
+    const resolvedParams = resolveTemplate(input.params, scope) as Record<string, unknown>;
+    return { ...input, params: resolvedParams };
   }
 
   private buildInput(

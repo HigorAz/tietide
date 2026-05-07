@@ -1,8 +1,8 @@
 import { useId } from 'react';
 import { conditionalConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from './formRegistry';
+import { DataPillInput } from './DataPillInput';
 
 export function ConditionalForm({ nodeId, config }: NodeConfigFormProps) {
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
@@ -22,22 +22,18 @@ export function ConditionalForm({ nodeId, config }: NodeConfigFormProps) {
         >
           Condition
         </label>
-        <input
+        <DataPillInput
           id={inputId}
-          type="text"
+          nodeId={nodeId}
           value={condition}
-          placeholder="input.amount > 100"
+          placeholder="{{trigger.amount}} > 100"
           aria-invalid={error !== null}
           aria-describedby={error ? errorId : undefined}
-          onChange={(e) => updateNodeConfig(nodeId, { condition: e.target.value })}
-          className={cn(
-            'w-full rounded-md border border-white/5 bg-elevated px-3 py-2 font-mono',
-            'text-sm text-text-primary placeholder:text-text-muted',
-            'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-          )}
+          onChange={(next) => updateNodeConfig(nodeId, { condition: next })}
         />
         <p className="text-xs text-text-muted">
-          JavaScript expression. Branches true when it evaluates to a truthy value.
+          JavaScript expression. Type <span className="font-mono">{'{{'}</span> to reference
+          upstream node output.
         </p>
         {error && (
           <p id={errorId} role="alert" className="text-xs text-red-400">
