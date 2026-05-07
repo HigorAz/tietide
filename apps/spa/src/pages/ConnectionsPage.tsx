@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConnectionType } from '@tietide/shared';
 import { useConnectionsStore } from '@/stores/connectionsStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -7,7 +7,11 @@ import { ProviderPicker } from '@/components/connections/ProviderPicker';
 import { ConnectionRow } from '@/components/connections/ConnectionRow';
 import { ApiKeyConnectionModal } from '@/components/connections/ApiKeyConnectionModal';
 import { DeleteConnectionDialog } from '@/components/connections/DeleteConnectionDialog';
-import { PROVIDER_CATALOG, type ProviderEntry } from '@/components/connections/providerCatalog';
+import {
+  PROVIDER_CATALOG,
+  getProviderEntry,
+  type ProviderEntry,
+} from '@/components/connections/providerCatalog';
 import type { ConnectionView } from '@/api/connections';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
@@ -30,6 +34,20 @@ const readBridgeFromUrl = (search: string): BridgeOutcome | null => {
     connectionId: params.get('id') ?? undefined,
     message: params.get('message') ?? undefined,
   };
+};
+
+interface DeepLinkRequest {
+  provider: ProviderEntry;
+}
+
+const readDeepLinkFromUrl = (search: string): DeepLinkRequest | null => {
+  const params = new URLSearchParams(search);
+  if (params.get('connect') !== 'true') return null;
+  const providerId = params.get('provider');
+  if (!providerId) return null;
+  const provider = getProviderEntry(providerId);
+  if (!provider) return null;
+  return { provider };
 };
 
 export function ConnectionsPage(): JSX.Element {
@@ -78,6 +96,7 @@ export function ConnectionsPage(): JSX.Element {
   const [apiKeyProvider, setApiKeyProvider] = useState<ProviderEntry | null>(null);
   const [toRevoke, setToRevoke] = useState<ConnectionView | null>(null);
   const [oauthInflight, setOauthInflight] = useState<string | null>(null);
+  const deepLinkHandledRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (closing) return;
@@ -97,6 +116,24 @@ export function ConnectionsPage(): JSX.Element {
     }
     window.history.replaceState({}, '', window.location.pathname);
   }, [closing, toast]);
+
+  // Deep-link: ConnectionPicker's empty-state CTA opens us at
+  // /connections?provider=X&connect=true to auto-fire the connect flow.
+  // Guard with a ref so React.StrictMode's double-invoke effect pass
+  // doesn't open the popup twice; strip the query so a refresh is idempotent.
+  useEffect(() => {
+    if (closing) return;
+    if (typeof window === 'undefined') return;
+    if (deepLinkHandledRef.current) return;
+    const request = readDeepLinkFromUrl(window.location.search);
+    if (!request) return;
+    deepLinkHandledRef.current = true;
+    window.history.replaceState({}, '', window.location.pathname);
+    void handlePick(request.provider);
+    // handlePick is defined inside the component so its identity changes per
+    // render; the ref guard ensures we only fire once regardless.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closing]);
 
   const handlePick = async (provider: ProviderEntry): Promise<void> => {
     if (provider.type === ConnectionType.API_KEY) {
