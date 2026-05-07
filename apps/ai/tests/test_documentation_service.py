@@ -7,14 +7,13 @@ import json
 import pytest
 
 from src.services.documentation import (
-    DocumentationService,
     DocumentationGenerationError,
+    DocumentationService,
 )
 from src.services.ollama_client import OllamaTimeoutError, OllamaUnavailableError
 from src.services.prompt import PromptBuilder
 from src.services.retriever import Retriever
 from tests.fakes import FakeEmbedder, FakeLlmClient, FakeVectorStore
-
 
 WORKFLOW = {
     "workflow_id": "wf-1",
