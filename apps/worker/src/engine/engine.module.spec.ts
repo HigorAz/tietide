@@ -1,5 +1,6 @@
 import { HttpRequestAction } from '../nodes/actions/http-request';
 import { Conditional } from '../nodes/logic/conditional';
+import { IteratorNode } from '../nodes/logic/iterator';
 import { ReturnNode } from '../nodes/logic/return';
 import { NodeRegistry } from '../nodes/registry';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
@@ -16,6 +17,7 @@ describe('EngineModule', () => {
     const httpRequest = new HttpRequestAction();
     const conditional = new Conditional();
     const returnNode = new ReturnNode();
+    const iteratorNode = new IteratorNode();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -24,6 +26,7 @@ describe('EngineModule', () => {
       httpRequest,
       conditional,
       returnNode,
+      iteratorNode,
     );
     return {
       registry,
@@ -33,6 +36,7 @@ describe('EngineModule', () => {
       httpRequest,
       conditional,
       returnNode,
+      iteratorNode,
       module,
     };
   };
@@ -92,6 +96,15 @@ describe('EngineModule', () => {
       expect(registry.resolve('return')).toBe(returnNode);
     });
 
+    it('should register IteratorNode in the NodeRegistry', () => {
+      const { registry, iteratorNode, module } = build();
+
+      module.onModuleInit();
+
+      expect(registry.has('iterator')).toBe(true);
+      expect(registry.resolve('iterator')).toBe(iteratorNode);
+    });
+
     it('should expose trigger, action, and logic executors after init', () => {
       const { registry, module } = build();
 
@@ -101,7 +114,15 @@ describe('EngineModule', () => {
         .getAll()
         .map((e) => e.category)
         .sort();
-      expect(categories).toEqual(['action', 'logic', 'logic', 'trigger', 'trigger', 'trigger']);
+      expect(categories).toEqual([
+        'action',
+        'logic',
+        'logic',
+        'logic',
+        'trigger',
+        'trigger',
+        'trigger',
+      ]);
     });
   });
 });

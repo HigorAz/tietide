@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger as NestLogger } from '@nestjs/common';
 import {
+  ITERATOR_MAX_ITEMS_DEFAULT,
   NODE_CATALOG,
   NodeCategory,
+  iteratorConfigSchema,
   resolveTemplate,
   type EnvScope,
   type WorkflowDefinition,
@@ -16,6 +18,20 @@ import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
 import { CircularDependencyError, topologicalSort } from './topological-sort';
+import { buildBodyDefinition, extractBodySubgraph, validateBodySubgraph } from './iterator-runner';
+import { ITERATOR_NODE_TYPE } from '../nodes/logic/iterator';
+
+export const MAX_RECURSION_DEPTH = 5;
+
+export class RecursionDepthExceededError extends Error {
+  constructor(depth: number) {
+    super(
+      `Recursion depth limit (${MAX_RECURSION_DEPTH}) exceeded at depth ${depth}. ` +
+        `Iterator and subworkflow nodes may not nest more than ${MAX_RECURSION_DEPTH} levels deep.`,
+    );
+    this.name = 'RecursionDepthExceededError';
+  }
+}
 
 function extractErrorCode(err: unknown): string | undefined {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -31,6 +47,12 @@ export interface RunArgs {
   definition: WorkflowDefinition;
   triggerData?: Record<string, unknown>;
   isDryRun?: boolean;
+  // Identity of the WorkflowExecution that spawned this run (iterator/subworkflow).
+  // null/undefined for top-level runs started by API/cron/webhook.
+  parentExecutionId?: string;
+  // Depth in the parent->child execution tree. 0 for top-level. The runner
+  // propagates depth+1 to any iterator/subworkflow children it spawns.
+  depth?: number;
 }
 
 export interface RunResult {
@@ -64,6 +86,11 @@ export class WorkflowRunner {
 
   private async runInner(args: RunArgs): Promise<RunResult> {
     const { executionId, workflowId, definition, triggerData, isDryRun = false } = args;
+    const depth = args.depth ?? 0;
+
+    if (depth > MAX_RECURSION_DEPTH) {
+      return { status: 'FAILED', error: new RecursionDepthExceededError(depth).message };
+    }
 
     let order: string[];
     try {
@@ -131,6 +158,28 @@ export class WorkflowRunner {
           reachable,
           'success',
         );
+        continue;
+      }
+
+      if (n.type === ITERATOR_NODE_TYPE) {
+        const iterResult = await this.runIteratorNode({
+          iteratorNode: n,
+          rootDefinition: definition,
+          parentExecutionId: executionId,
+          workflowId,
+          depth,
+          triggerData,
+          incoming: incomingEdges.get(n.id) ?? [],
+          outgoing: outgoingEdges.get(n.id) ?? [],
+          executionOrder,
+          outputs,
+          reachable,
+          isDryRun,
+          envScope,
+        });
+        if (iterResult.status === 'FAILED') {
+          failure = { nodeId: n.id, error: iterResult.error ?? 'Iterator failed' };
+        }
         continue;
       }
 
@@ -365,6 +414,279 @@ export class WorkflowRunner {
       input: forwardedInput,
       output: passthroughOutput,
     });
+  }
+
+  private async runIteratorNode(opts: {
+    iteratorNode: WorkflowNode;
+    rootDefinition: WorkflowDefinition;
+    parentExecutionId: string;
+    workflowId: string;
+    depth: number;
+    triggerData: Record<string, unknown> | undefined;
+    incoming: WorkflowEdge[];
+    outgoing: WorkflowEdge[];
+    executionOrder: string[];
+    outputs: Map<string, NodeOutput>;
+    reachable: Set<string>;
+    isDryRun: boolean;
+    envScope: EnvScope;
+  }): Promise<{ status: 'SUCCESS' | 'FAILED'; error?: string }> {
+    const {
+      iteratorNode: n,
+      rootDefinition,
+      parentExecutionId,
+      workflowId,
+      depth,
+      triggerData,
+      incoming,
+      outgoing,
+      executionOrder,
+      outputs,
+      reachable,
+      isDryRun,
+      envScope,
+    } = opts;
+
+    const startedAt = new Date();
+    const step = await this.prisma.executionStep.create({
+      data: {
+        executionId: parentExecutionId,
+        nodeId: n.id,
+        nodeType: n.type,
+        nodeName: n.name,
+        status: 'RUNNING',
+        startedAt,
+      },
+    });
+    await this.events.publishStepStarted({
+      executionId: parentExecutionId,
+      nodeId: n.id,
+      nodeType: n.type,
+      startedAt,
+    });
+
+    const builtInput = this.buildInput(n, executionOrder, incoming, outputs, triggerData);
+
+    const fail = async (error: string): Promise<{ status: 'FAILED'; error: string }> => {
+      const finishedAt = new Date();
+      const durationMs = finishedAt.getTime() - startedAt.getTime();
+      await this.prisma.executionStep.update({
+        where: { id: step.id },
+        data: {
+          nodeId: n.id,
+          status: 'FAILED',
+          inputData: builtInput.data as object,
+          error,
+          finishedAt,
+          durationMs,
+        },
+      });
+      await this.events.publishStepFailed({
+        executionId: parentExecutionId,
+        nodeId: n.id,
+        nodeType: n.type,
+        startedAt,
+        finishedAt,
+        durationMs,
+        input: builtInput.data,
+        error: { message: error },
+      });
+      return { status: 'FAILED', error };
+    };
+
+    let parsedConfig: ReturnType<typeof iteratorConfigSchema.parse>;
+    try {
+      parsedConfig = iteratorConfigSchema.parse(n.config);
+    } catch (err) {
+      return await fail(`Invalid iterator config: ${(err as Error).message}`);
+    }
+
+    let resolvedItems: unknown;
+    try {
+      const resolvedInput = this.resolveInputTemplates(
+        builtInput,
+        executionOrder,
+        outputs,
+        envScope,
+      );
+      resolvedItems = (resolvedInput.params as Record<string, unknown>).arrayPath;
+    } catch (err) {
+      return await fail(`Failed to resolve iterator arrayPath: ${(err as Error).message}`);
+    }
+
+    if (!Array.isArray(resolvedItems)) {
+      return await fail(
+        `Iterator arrayPath did not resolve to an array (got ${typeof resolvedItems}). ` +
+          `Use a data pill that points at an array, e.g. {{http_1.response.body.items}}.`,
+      );
+    }
+
+    const items = resolvedItems;
+    const cap = parsedConfig.maxItems ?? ITERATOR_MAX_ITEMS_DEFAULT;
+    const total = Math.min(items.length, cap);
+
+    let bodyInfo: ReturnType<typeof extractBodySubgraph>;
+    try {
+      bodyInfo = extractBodySubgraph(rootDefinition, n.id);
+      validateBodySubgraph(rootDefinition, n.id, bodyInfo.bodyNodeIds);
+    } catch (err) {
+      return await fail((err as Error).message);
+    }
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let index = 0; index < total; index++) {
+      const item = items[index];
+      const iterStartedAt = new Date();
+      const child = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId,
+          parentExecutionId,
+          status: 'RUNNING',
+          triggerType: 'iterator',
+          triggerData: { item, index, total } as object,
+          isDryRun,
+          startedAt: iterStartedAt,
+        },
+        select: { id: true },
+      });
+      const childExecutionId = child.id;
+
+      await this.events.publishIterationStarted({
+        executionId: parentExecutionId,
+        nodeId: n.id,
+        iterationIndex: index,
+        iterationTotal: total,
+        childExecutionId,
+        startedAt: iterStartedAt,
+      });
+
+      let iterStatus: 'SUCCESS' | 'FAILED' = 'SUCCESS';
+      let iterError: string | undefined;
+
+      if (bodyInfo.bodyNodeIds.size === 0) {
+        // No body — nothing to run for this iteration. The child execution
+        // remains a record of the iteration scope for traceability.
+        iterStatus = 'SUCCESS';
+      } else {
+        const bodyDef = buildBodyDefinition({
+          definition: rootDefinition,
+          iteratorNodeId: n.id,
+          bodyNodeIds: bodyInfo.bodyNodeIds,
+          bodyEntryNodeIds: bodyInfo.bodyEntryNodeIds,
+          syntheticTriggerId: n.id,
+        });
+        const childResult = await this.run({
+          executionId: childExecutionId,
+          workflowId,
+          definition: bodyDef,
+          triggerData: { item, index, total },
+          isDryRun,
+          parentExecutionId,
+          depth: depth + 1,
+        });
+        iterStatus = childResult.status;
+        iterError = childResult.error;
+      }
+
+      const iterFinishedAt = new Date();
+      const iterDuration = iterFinishedAt.getTime() - iterStartedAt.getTime();
+
+      await this.prisma.workflowExecution.update({
+        where: { id: childExecutionId },
+        data: {
+          status: iterStatus,
+          finishedAt: iterFinishedAt,
+          error: iterError ?? null,
+        },
+      });
+      await this.events.publishIterationCompleted({
+        executionId: parentExecutionId,
+        nodeId: n.id,
+        iterationIndex: index,
+        iterationTotal: total,
+        childExecutionId,
+        startedAt: iterStartedAt,
+        finishedAt: iterFinishedAt,
+        durationMs: iterDuration,
+        status: iterStatus,
+        ...(iterError ? { error: { message: iterError } } : {}),
+      });
+
+      if (iterStatus === 'SUCCESS') {
+        succeeded += 1;
+      } else {
+        failed += 1;
+        if (!parsedConfig.continueOnError) break;
+      }
+    }
+
+    const finishedAt = new Date();
+    const durationMs = finishedAt.getTime() - startedAt.getTime();
+
+    if (failed > 0 && !parsedConfig.continueOnError) {
+      const message = `Iterator failed: iteration ${succeeded} of ${total} reported FAILED`;
+      await this.prisma.executionStep.update({
+        where: { id: step.id },
+        data: {
+          nodeId: n.id,
+          status: 'FAILED',
+          inputData: builtInput.data as object,
+          error: message,
+          finishedAt,
+          durationMs,
+        },
+      });
+      await this.events.publishStepFailed({
+        executionId: parentExecutionId,
+        nodeId: n.id,
+        nodeType: n.type,
+        startedAt,
+        finishedAt,
+        durationMs,
+        input: builtInput.data,
+        error: { message },
+      });
+      return { status: 'FAILED', error: message };
+    }
+
+    const iteratorOutputData = { total, succeeded, failed };
+    const iteratorOutput: NodeOutput = {
+      data: iteratorOutputData,
+      // 'done' branch: only edges leaving the iterator's `done` source-handle
+      // propagate. Body-handle edges have already been consumed via child
+      // executions and must NOT fire again in the parent loop.
+      metadata: { branch: 'done' },
+    };
+
+    await this.prisma.executionStep.update({
+      where: { id: step.id },
+      data: {
+        nodeId: n.id,
+        status: 'SUCCESS',
+        inputData: builtInput.data as object,
+        outputData: iteratorOutputData as object,
+        finishedAt,
+        durationMs,
+      },
+    });
+    await this.events.publishStepCompleted({
+      executionId: parentExecutionId,
+      nodeId: n.id,
+      nodeType: n.type,
+      startedAt,
+      finishedAt,
+      durationMs,
+      input: builtInput.data,
+      output: iteratorOutputData,
+    });
+
+    outputs.set(n.id, iteratorOutput);
+    executionOrder.push(n.id);
+    this.propagateReachability(iteratorOutput, outgoing, reachable, 'success');
+
+    return { status: 'SUCCESS' };
   }
 
   private buildContext(
