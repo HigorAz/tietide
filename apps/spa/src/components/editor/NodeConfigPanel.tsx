@@ -11,6 +11,7 @@ export function NodeConfigPanel() {
     s.selectedNodeId ? (s.nodes.find((n) => n.id === s.selectedNodeId) ?? null) : null,
   );
   const selectNode = useEditorStore((s) => s.selectNode);
+  const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
 
   if (selectedNodeId === null) {
     return null;
@@ -32,6 +33,7 @@ export function NodeConfigPanel() {
   const catalogEntry = NODE_CATALOG.find((d) => d.type === data.nodeType);
   const Form = FORM_REGISTRY[data.nodeType];
   const config = data.config ?? {};
+  const hasErrorHandler = config.hasErrorHandler === true;
 
   return (
     <aside
@@ -73,6 +75,29 @@ export function NodeConfigPanel() {
         ) : (
           <p className="text-sm text-text-muted">No configuration available for this node.</p>
         )}
+
+        <div className="mt-4 flex items-start gap-2 border-t border-white/5 pt-3">
+          <input
+            type="checkbox"
+            id={`error-handler-${selectedNodeId}`}
+            data-testid="node-config-error-handler-toggle"
+            checked={hasErrorHandler}
+            onChange={(e) =>
+              updateNodeConfig(selectedNodeId, { hasErrorHandler: e.target.checked })
+            }
+            className="mt-0.5 h-4 w-4 cursor-pointer accent-red-500"
+          />
+          <label
+            htmlFor={`error-handler-${selectedNodeId}`}
+            className="cursor-pointer text-xs leading-snug text-text-secondary"
+          >
+            <span className="font-medium text-text-primary">Add error handler</span>
+            <span className="block text-text-muted">
+              Reveals a red output handle. Connect it to route execution down an error path when
+              this node fails.
+            </span>
+          </label>
+        </div>
       </div>
 
       <footer className="border-t border-white/5 pt-3">

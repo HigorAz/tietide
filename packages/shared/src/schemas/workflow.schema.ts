@@ -25,6 +25,7 @@ export const workflowEdgeSchema = z.object({
   target: z.string().min(1),
   sourceHandle: z.string().optional(),
   targetHandle: z.string().optional(),
+  kind: z.enum(['success', 'error']).optional(),
 });
 
 export const workflowDefinitionSchema = z.object({

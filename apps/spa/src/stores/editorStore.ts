@@ -178,7 +178,13 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     onConnect: (connection) => {
       const prev = get();
-      commit({ edges: addEdge({ ...connection, type: 'livingInk' }, prev.edges) });
+      const isErrorEdge = connection.sourceHandle === 'error';
+      const newEdge: Edge = {
+        ...connection,
+        type: 'livingInk',
+        ...(isErrorEdge ? { data: { kind: 'error' as const } } : {}),
+      } as Edge;
+      commit({ edges: addEdge(newEdge, prev.edges) });
     },
 
     selectNode: (id) => set({ selectedNodeId: id }),
