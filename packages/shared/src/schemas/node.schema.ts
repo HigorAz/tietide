@@ -38,7 +38,12 @@ export const iteratorConfigSchema = z.object({
 
 export const subworkflowConfigSchema = z.object({
   workflowId: z.string().uuid(),
-  inputMapping: z.record(z.string()).default({}),
+  // Map of trigger-input keys to data-pill expressions. The runner template-
+  // resolves the whole config before the node executes, so at execution time
+  // the resolved value of any single-token data pill could be any JSON type
+  // (string / number / object / array). Validation is permissive on the
+  // value side; the SPA enforces string templates at save time.
+  inputMapping: z.record(z.unknown()).default({}),
 });
 
 export const returnConfigSchema = z.object({

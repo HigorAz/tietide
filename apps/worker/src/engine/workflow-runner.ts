@@ -204,7 +204,7 @@ export class WorkflowRunner {
       const started = Date.now();
       try {
         const executor = this.registry.resolve(n.type)!;
-        const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun);
+        const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun, depth);
         const resolvedInput = this.resolveInputTemplates(input, executionOrder, outputs, envScope);
         const output = await executor.execute(resolvedInput, ctx);
         const durationMs = Date.now() - started;
@@ -694,6 +694,7 @@ export class WorkflowRunner {
     workflowId: string,
     nodeId: string,
     isDryRun: boolean,
+    depth: number,
   ): ExecutionContext {
     const secrets = this.secretResolver;
     const connections = this.connectionResolver;
@@ -709,6 +710,7 @@ export class WorkflowRunner {
       nodeId,
       logger,
       isDryRun,
+      depth,
       getSecret: (name: string) => secrets.getSecret(executionId, name),
       getConnection: <TConfig = Record<string, unknown>>(connectionId: string) =>
         connections.getConnection<TConfig>(executionId, connectionId),
