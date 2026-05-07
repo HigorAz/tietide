@@ -21,8 +21,10 @@ vi.mock('@/components/editor/saveWorkflow', () => ({
 }));
 
 const executeWorkflowMock = vi.fn().mockResolvedValue({ id: 'exec-1' });
+const testWorkflowMock = vi.fn().mockResolvedValue({ id: 'exec-test-1' });
 vi.mock('@/api/executions', () => ({
   executeWorkflow: (id: string) => executeWorkflowMock(id),
+  testWorkflow: (id: string, definition: unknown) => testWorkflowMock(id, definition),
 }));
 
 interface HostProps {
@@ -88,6 +90,7 @@ describe('useEditorHotkeys', () => {
     useToastStore.setState({ ...initialToastState });
     saveWorkflowMock.mockClear();
     executeWorkflowMock.mockClear();
+    testWorkflowMock.mockClear();
     navigateMock.mockClear();
   });
 
@@ -186,16 +189,44 @@ describe('useEditorHotkeys', () => {
     expect(executeWorkflowMock).toHaveBeenCalledWith('wf-1');
   });
 
-  it('Cmd+T is a no-op that warns instead of opening a new tab', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  it('Cmd+T calls testWorkflow with the in-memory definition (without saving)', async () => {
+    useEditorStore.setState({
+      nodes: [
+        {
+          id: 'n1',
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Start',
+            description: '',
+            nodeType: 'manual-trigger',
+            status: 'idle',
+            config: {},
+          },
+        },
+      ],
+      edges: [],
+    });
     renderHost();
 
     const event = fireKey('t', { ctrlKey: true, useDispatch: true });
+    await Promise.resolve();
+    await Promise.resolve();
 
-    expect(warnSpy).toHaveBeenCalled();
-    expect(executeWorkflowMock).not.toHaveBeenCalled();
+    expect(testWorkflowMock).toHaveBeenCalledTimes(1);
+    expect(testWorkflowMock).toHaveBeenCalledWith('wf-1', expect.any(Object));
     expect(saveWorkflowMock).not.toHaveBeenCalled();
     expect(event?.defaultPrevented).toBe(true);
+  });
+
+  it('Cmd+T is a no-op when the canvas is empty', async () => {
+    useEditorStore.setState({ nodes: [], edges: [] });
+    renderHost();
+
+    fireKey('t', { ctrlKey: true, useDispatch: true });
+    await Promise.resolve();
+
+    expect(testWorkflowMock).not.toHaveBeenCalled();
   });
 
   it('? (Shift+/) calls onShowCheatsheet', () => {

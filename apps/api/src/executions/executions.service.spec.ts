@@ -293,6 +293,174 @@ describe('ExecutionsService', () => {
     });
   });
 
+  describe('triggerTest', () => {
+    const definition = {
+      nodes: [
+        {
+          id: 'n1',
+          type: 'manual-trigger',
+          name: 'Start',
+          position: { x: 0, y: 0 },
+          config: {},
+        },
+      ],
+      edges: [],
+    };
+
+    it('should create a PENDING dry-run execution and enqueue a job with the override definition', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'test',
+        triggerData: null,
+        idempotencyKey: null,
+        isDryRun: true,
+        createdAt: new Date('2026-05-07T00:00:00Z'),
+      });
+
+      const result = await service.triggerTest(userId, workflowId, { definition });
+
+      expect(prisma.workflow.findUnique).toHaveBeenCalledWith({
+        where: { id: workflowId },
+        select: { id: true, userId: true },
+      });
+      expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            workflowId,
+            status: 'PENDING',
+            triggerType: 'test',
+            isDryRun: true,
+            idempotencyKey: null,
+          }),
+        }),
+      );
+      expect(queue.add).toHaveBeenCalledWith(
+        'execute',
+        expect.objectContaining({
+          executionId,
+          workflowId,
+          triggerType: 'test',
+          userId,
+          isDryRun: true,
+          definitionOverride: definition,
+        }),
+        expect.any(Object),
+      );
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: executionId,
+          status: 'PENDING',
+          workflowId,
+          triggerType: 'test',
+          isDryRun: true,
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when the workflow does not exist', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(null);
+
+      await expect(service.triggerTest(userId, workflowId, { definition })).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when the workflow belongs to another user', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId: otherUserId });
+
+      await expect(service.triggerTest(userId, workflowId, { definition })).rejects.toThrow(
+        ForbiddenException,
+      );
+
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should never check or persist an idempotency key (test runs are exploratory)', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'test',
+        triggerData: null,
+        idempotencyKey: null,
+        isDryRun: true,
+        createdAt: new Date(),
+      });
+
+      await service.triggerTest(userId, workflowId, { definition });
+
+      expect(prisma.workflowExecution.findFirst).not.toHaveBeenCalled();
+      expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ idempotencyKey: null }),
+        }),
+      );
+    });
+
+    it('should record an audit log entry with action "execution.test"', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'test',
+        triggerData: null,
+        idempotencyKey: null,
+        isDryRun: true,
+        createdAt: new Date(),
+      });
+
+      await service.triggerTest(userId, workflowId, { definition });
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'execution.test',
+          resource: 'workflow',
+          resourceId: workflowId,
+          metadata: expect.objectContaining({ executionId, triggerType: 'test' }),
+        }),
+      );
+    });
+
+    it('should propagate triggerData and requestId into the BullMQ job payload', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'test',
+        triggerData: { foo: 'bar' },
+        idempotencyKey: null,
+        isDryRun: true,
+        createdAt: new Date(),
+      });
+
+      await service.triggerTest(userId, workflowId, {
+        definition,
+        triggerData: { foo: 'bar' },
+        requestId: 'req-test-1',
+      });
+
+      expect(queue.add).toHaveBeenCalledWith(
+        'execute',
+        expect.objectContaining({
+          triggerData: { foo: 'bar' },
+          requestId: 'req-test-1',
+        }),
+        expect.any(Object),
+      );
+    });
+  });
+
   describe('list', () => {
     const exec = (
       id: string,

@@ -12,6 +12,8 @@ export interface ExecutePayload {
   triggerData?: Record<string, unknown>;
   requestId?: string;
   userId?: string;
+  isDryRun?: boolean;
+  definitionOverride?: WorkflowDefinition;
 }
 
 @Injectable()
@@ -24,7 +26,8 @@ export class EngineService {
   ) {}
 
   async execute(payload: ExecutePayload): Promise<void> {
-    const { executionId, workflowId, triggerData, requestId } = payload;
+    const { executionId, workflowId, triggerData, requestId, definitionOverride } = payload;
+    const isDryRun = payload.isDryRun ?? false;
 
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
@@ -42,11 +45,14 @@ export class EngineService {
     });
 
     try {
+      const definition =
+        definitionOverride ?? (workflow.definition as unknown as WorkflowDefinition);
       const result = await this.runner.run({
         executionId,
         workflowId,
-        definition: workflow.definition as unknown as WorkflowDefinition,
+        definition,
         triggerData,
+        isDryRun,
       });
 
       const finishedAt = new Date();

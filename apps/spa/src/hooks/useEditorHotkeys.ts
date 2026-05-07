@@ -2,7 +2,8 @@ import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { saveWorkflow } from '@/components/editor/saveWorkflow';
-import { executeWorkflow } from '@/api/executions';
+import { toWorkflowDefinition } from '@/components/editor/serialization';
+import { executeWorkflow, testWorkflow } from '@/api/executions';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
 import { SHORTCUTS_BY_ID } from '@/components/editor/shortcutDefinitions';
@@ -36,6 +37,19 @@ export function useEditorHotkeys({ workflowId, onShowCheatsheet }: UseEditorHotk
       setSearchParams({ execution: execution.id });
     } catch {
       toast({ tone: 'error', message: 'Failed to start execution. Please try again.' });
+    }
+  }, [setSearchParams, toast, workflowId]);
+
+  const handleTest = useCallback(async (): Promise<void> => {
+    const { nodes, edges } = useEditorStore.getState();
+    if (nodes.length === 0) return;
+    try {
+      const definition = toWorkflowDefinition(nodes, edges);
+      const execution = await testWorkflow(workflowId, definition);
+      toast({ tone: 'success', message: 'Test started' });
+      setSearchParams({ execution: execution.id });
+    } catch {
+      toast({ tone: 'error', message: 'Test failed. Please try again.' });
     }
   }, [setSearchParams, toast, workflowId]);
 
@@ -100,11 +114,10 @@ export function useEditorHotkeys({ workflowId, onShowCheatsheet }: UseEditorHotk
   useHotkeys(
     SHORTCUTS_BY_ID.test.hotkey as string,
     () => {
-      console.warn(
-        '[TieTide] Cmd/Ctrl+T is bound but the Test workflow feature is not yet implemented.',
-      );
+      void handleTest();
     },
     { preventDefault: true, enableOnFormTags: false },
+    [handleTest],
   );
 
   useHotkeys(

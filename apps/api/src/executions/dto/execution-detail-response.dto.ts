@@ -19,6 +19,12 @@ export class ExecutionDetailResponseDto {
   @ApiProperty({ type: String, nullable: true })
   idempotencyKey!: string | null;
 
+  @ApiProperty({
+    type: Boolean,
+    description: 'True when this execution was created via POST /workflows/:id/test.',
+  })
+  isDryRun!: boolean;
+
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   startedAt!: Date | null;
 

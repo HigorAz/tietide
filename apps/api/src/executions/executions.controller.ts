@@ -22,22 +22,24 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import type { WorkflowDefinition } from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ExecutionsService } from './executions.service';
 import { TriggerExecutionDto } from './dto/trigger-execution.dto';
+import { TestExecutionDto } from './dto/test-execution.dto';
 import { ExecutionResponseDto } from './dto/execution-response.dto';
 
 @ApiTags('executions')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
 @UseGuards(JwtAuthGuard)
-@Controller('workflows/:id/execute')
+@Controller('workflows/:id')
 export class ExecutionsController {
   constructor(private readonly executions: ExecutionsService) {}
 
-  @Post()
+  @Post('execute')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Manually trigger a workflow execution' })
   @ApiAcceptedResponse({
@@ -62,6 +64,33 @@ export class ExecutionsController {
     return this.executions.triggerManual(user.id, id, {
       triggerData: dto.triggerData,
       idempotencyKey: idempotencyKey?.trim() || undefined,
+      requestId: extractRequestId(req),
+    });
+  }
+
+  @Post('test')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Run an in-memory workflow definition without persisting changes',
+    description:
+      'Creates a dry-run execution against the supplied definition. Side-effecting nodes still fire by default; opt into mocking per-node with `mockOnDryRun: true`.',
+  })
+  @ApiAcceptedResponse({
+    type: ExecutionResponseDto,
+    description: 'Dry-run execution accepted and enqueued',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid input' })
+  @ApiNotFoundResponse({ description: 'Workflow not found' })
+  @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
+  async runTest(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: TestExecutionDto,
+    @Req() req: Request & { id?: string },
+  ): Promise<ExecutionResponseDto> {
+    return this.executions.triggerTest(user.id, id, {
+      definition: dto.definition as unknown as WorkflowDefinition,
+      triggerData: dto.triggerData,
       requestId: extractRequestId(req),
     });
   }

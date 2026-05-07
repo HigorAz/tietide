@@ -1,4 +1,4 @@
-import type { ExecutionStep, WorkflowExecution } from '@tietide/shared';
+import type { ExecutionStep, WorkflowDefinition, WorkflowExecution } from '@tietide/shared';
 import { api } from './client';
 
 export type ExecutionStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'CANCELLED';
@@ -69,10 +69,24 @@ export interface ExecuteWorkflowResponse {
   triggerType: string;
   triggerData: unknown;
   idempotencyKey: string | null;
+  isDryRun?: boolean;
   createdAt: string;
 }
 
 export async function executeWorkflow(workflowId: string): Promise<ExecuteWorkflowResponse> {
   const { data } = await api.post<ExecuteWorkflowResponse>(`/workflows/${workflowId}/execute`, {});
+  return data;
+}
+
+export async function testWorkflow(
+  workflowId: string,
+  definition: WorkflowDefinition,
+  triggerData?: Record<string, unknown>,
+): Promise<ExecuteWorkflowResponse> {
+  const body: { definition: WorkflowDefinition; triggerData?: Record<string, unknown> } = {
+    definition,
+  };
+  if (triggerData !== undefined) body.triggerData = triggerData;
+  const { data } = await api.post<ExecuteWorkflowResponse>(`/workflows/${workflowId}/test`, body);
   return data;
 }

@@ -49,6 +49,13 @@ export const EDITOR_TOUR_STEPS: TourStep[] = [
     content: 'Click to execute and watch the live results.',
     placement: 'bottom',
   },
+  {
+    target: tourSelector(TOUR_TARGET.editorTest),
+    title: 'Test',
+    content:
+      'Run the current canvas without saving. Side effects (API calls, emails) fire by default — set `mockOnDryRun: true` on a node to mock it instead.',
+    placement: 'bottom',
+  },
 ];
 
 export const FIRST_ACCESS_STEPS: TourStep[] = [...DASHBOARD_TOUR_STEPS, ...EDITOR_TOUR_STEPS];

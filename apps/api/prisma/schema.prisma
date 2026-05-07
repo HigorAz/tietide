@@ -89,6 +89,7 @@ model WorkflowExecution {
   triggerType    String          @map("trigger_type")
   triggerData    Json?           @map("trigger_data")
   idempotencyKey String?         @map("idempotency_key")
+  isDryRun       Boolean         @default(false) @map("is_dry_run")
   startedAt      DateTime?       @map("started_at")
   finishedAt     DateTime?       @map("finished_at")
   error          String?

@@ -25,22 +25,33 @@ describe('tours', () => {
   });
 
   describe('EDITOR_TOUR_STEPS', () => {
-    it('should expose 2 steps (canvas, run)', () => {
-      expect(EDITOR_TOUR_STEPS).toHaveLength(2);
+    it('should expose 3 steps (canvas, run, test)', () => {
+      expect(EDITOR_TOUR_STEPS).toHaveLength(3);
     });
 
-    it('should target the editor canvas and the run button', () => {
+    it('should target the editor canvas, the run button, and the test button', () => {
       const targets = EDITOR_TOUR_STEPS.map((step) => step.target);
       expect(targets).toEqual([
         tourSelector(TOUR_TARGET.editorCanvas),
         tourSelector(TOUR_TARGET.editorRun),
+        tourSelector(TOUR_TARGET.editorTest),
       ]);
+    });
+
+    it('should warn that side effects fire on Test by default', () => {
+      const testStep = EDITOR_TOUR_STEPS.find(
+        (step) => step.target === tourSelector(TOUR_TARGET.editorTest),
+      );
+      expect(testStep).toBeDefined();
+      const content = String(testStep?.content ?? '');
+      expect(content).toMatch(/side effect/i);
+      expect(content).toMatch(/mockOnDryRun/);
     });
   });
 
   describe('FIRST_ACCESS_STEPS', () => {
-    it('should be the 5 onboarding steps from the issue (3 dashboard + 2 editor)', () => {
-      expect(FIRST_ACCESS_STEPS).toHaveLength(5);
+    it('should be the 6 onboarding steps (3 dashboard + 3 editor)', () => {
+      expect(FIRST_ACCESS_STEPS).toHaveLength(6);
       expect(FIRST_ACCESS_STEPS).toEqual([...DASHBOARD_TOUR_STEPS, ...EDITOR_TOUR_STEPS]);
     });
   });
