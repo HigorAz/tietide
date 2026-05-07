@@ -109,23 +109,27 @@ model WorkflowDocumentation {
 }
 
 model WorkflowExecution {
-  id             String          @id @default(uuid())
-  workflowId     String          @map("workflow_id")
-  status         ExecutionStatus @default(PENDING)
-  triggerType    String          @map("trigger_type")
-  triggerData    Json?           @map("trigger_data")
-  idempotencyKey String?         @map("idempotency_key")
-  isDryRun       Boolean         @default(false) @map("is_dry_run")
-  startedAt      DateTime?       @map("started_at")
-  finishedAt     DateTime?       @map("finished_at")
-  error          String?
-  createdAt      DateTime        @default(now()) @map("created_at")
+  id                String          @id @default(uuid())
+  workflowId        String          @map("workflow_id")
+  parentExecutionId String?         @map("parent_execution_id")
+  status            ExecutionStatus @default(PENDING)
+  triggerType       String          @map("trigger_type")
+  triggerData       Json?           @map("trigger_data")
+  idempotencyKey    String?         @map("idempotency_key")
+  isDryRun          Boolean         @default(false) @map("is_dry_run")
+  startedAt         DateTime?       @map("started_at")
+  finishedAt        DateTime?       @map("finished_at")
+  error             String?
+  createdAt         DateTime        @default(now()) @map("created_at")
 
-  workflow Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  steps    ExecutionStep[]
+  workflow        Workflow            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  parentExecution WorkflowExecution?  @relation("ParentChild", fields: [parentExecutionId], references: [id], onDelete: SetNull)
+  childExecutions WorkflowExecution[] @relation("ParentChild")
+  steps           ExecutionStep[]
 
   @@unique([workflowId, idempotencyKey], name: "workflow_idempotency_key")
   @@index([workflowId, createdAt(sort: Desc)])
+  @@index([parentExecutionId])
   @@map("workflow_executions")
 }
 
