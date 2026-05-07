@@ -11,12 +11,18 @@ import type {
   ExecutionListResponseDto,
 } from './dto/execution-detail-response.dto';
 import type { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
-import { sanitizePayload } from '@tietide/shared';
+import { sanitizePayload, type WorkflowDefinition } from '@tietide/shared';
 import { decodeCursor, encodeCursor } from './cursor';
 
 export interface TriggerOptions {
   triggerData?: Record<string, unknown>;
   idempotencyKey?: string;
+  requestId?: string;
+}
+
+export interface TestTriggerOptions {
+  definition: WorkflowDefinition;
+  triggerData?: Record<string, unknown>;
   requestId?: string;
 }
 
@@ -40,6 +46,8 @@ export interface WorkflowExecutionJobPayload {
   triggerData?: Record<string, unknown>;
   userId: string;
   requestId?: string;
+  isDryRun?: boolean;
+  definitionOverride?: WorkflowDefinition;
 }
 
 const MAX_ATTEMPTS = 3;
@@ -122,6 +130,68 @@ export class ExecutionsService {
       resource: 'workflow',
       resourceId: workflowId,
       metadata: { executionId: created.id, triggerType: 'manual' },
+    });
+
+    return this.toResponse(created);
+  }
+
+  async triggerTest(
+    userId: string,
+    workflowId: string,
+    options: TestTriggerOptions,
+  ): Promise<ExecutionResponseDto> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: { id: true, userId: true },
+    });
+    if (!workflow) {
+      throw new NotFoundException('Workflow not found');
+    }
+    if (workflow.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this workflow');
+    }
+
+    const triggerDataJson =
+      options.triggerData !== undefined
+        ? (options.triggerData as Prisma.InputJsonValue)
+        : undefined;
+
+    const created = await this.prisma.workflowExecution.create({
+      data: {
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'test',
+        triggerData: triggerDataJson,
+        idempotencyKey: null,
+        isDryRun: true,
+      },
+    });
+
+    const payload: WorkflowExecutionJobPayload = {
+      executionId: created.id,
+      workflowId,
+      triggerType: 'test',
+      triggerData: options.triggerData,
+      userId,
+      requestId: options.requestId,
+      isDryRun: true,
+      definitionOverride: options.definition,
+    };
+
+    await this.queue.add(EXECUTION_JOB_NAME, payload, {
+      jobId: created.id,
+      attempts: MAX_ATTEMPTS,
+      backoff: { type: 'exponential', delay: BACKOFF_DELAY_MS },
+      removeOnComplete: { age: 3600, count: 1000 },
+      removeOnFail: { age: 24 * 3600 },
+    });
+
+    await this.audit.log({
+      userId,
+      action: 'execution.test',
+      resource: 'workflow',
+      resourceId: workflowId,
+      metadata: { executionId: created.id, triggerType: 'test' },
     });
 
     return this.toResponse(created);
@@ -298,6 +368,7 @@ export class ExecutionsService {
     triggerType: string;
     triggerData: unknown;
     idempotencyKey: string | null;
+    isDryRun?: boolean;
     createdAt: Date;
   }): ExecutionResponseDto {
     return {
@@ -307,6 +378,7 @@ export class ExecutionsService {
       triggerType: row.triggerType,
       triggerData: (row.triggerData as Record<string, unknown> | null) ?? null,
       idempotencyKey: row.idempotencyKey,
+      isDryRun: row.isDryRun ?? false,
       createdAt: row.createdAt,
     };
   }
@@ -318,6 +390,7 @@ export class ExecutionsService {
     triggerType: string;
     triggerData: unknown;
     idempotencyKey: string | null;
+    isDryRun?: boolean;
     startedAt?: Date | null;
     finishedAt?: Date | null;
     error?: string | null;
@@ -330,6 +403,7 @@ export class ExecutionsService {
       triggerType: row.triggerType,
       triggerData: sanitizePayload(row.triggerData) as Record<string, unknown> | null,
       idempotencyKey: row.idempotencyKey,
+      isDryRun: row.isDryRun ?? false,
       startedAt: row.startedAt ?? null,
       finishedAt: row.finishedAt ?? null,
       error: row.error ?? null,

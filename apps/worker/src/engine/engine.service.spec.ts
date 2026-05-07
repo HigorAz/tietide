@@ -232,5 +232,72 @@ describe('EngineService', () => {
         expect(args.error?.message).toContain('unexpected');
       });
     });
+
+    describe('dry-run mode', () => {
+      const overrideDefinition: WorkflowDefinition = {
+        nodes: [{ id: 'X', type: 'stub', name: 'X', position: { x: 0, y: 0 }, config: {} }],
+        edges: [],
+      };
+
+      it('should run definitionOverride instead of the saved workflow definition when provided', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue({ status: 'SUCCESS' });
+
+        await engine.execute({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          triggerType: 'test',
+          isDryRun: true,
+          definitionOverride: overrideDefinition,
+        });
+
+        expect(runner.run).toHaveBeenCalledWith(
+          expect.objectContaining({
+            definition: overrideDefinition,
+            isDryRun: true,
+          }),
+        );
+      });
+
+      it('should pass isDryRun=true into runner.run when payload sets the flag', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue({ status: 'SUCCESS' });
+
+        await engine.execute({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          triggerType: 'test',
+          isDryRun: true,
+        });
+
+        expect(runner.run).toHaveBeenCalledWith(expect.objectContaining({ isDryRun: true }));
+      });
+
+      it('should default isDryRun to false on the runner when payload omits the flag', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue({ status: 'SUCCESS' });
+
+        await engine.execute({ executionId: 'exec-1', workflowId: 'wf-1', triggerType: 'manual' });
+
+        expect(runner.run).toHaveBeenCalledWith(expect.objectContaining({ isDryRun: false }));
+      });
+
+      it('should still mark execution FAILED when workflow row missing even if override is provided', async () => {
+        // Workflow row is the source of truth for ownership; override does not bypass it.
+        prisma.workflow.findUnique.mockResolvedValue(null);
+
+        await engine.execute({
+          executionId: 'exec-1',
+          workflowId: 'missing',
+          triggerType: 'test',
+          isDryRun: true,
+          definitionOverride: overrideDefinition,
+        });
+
+        expect(runner.run).not.toHaveBeenCalled();
+        const lastCall = prisma.workflowExecution.update.mock.calls.pop();
+        expect(lastCall![0].data.status).toBe('FAILED');
+      });
+    });
   });
 });

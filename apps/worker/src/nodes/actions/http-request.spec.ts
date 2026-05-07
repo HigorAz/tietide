@@ -305,4 +305,62 @@ describe('HttpRequestAction', () => {
       ).rejects.toThrow(/url/i);
     });
   });
+
+  describe('execute — dry-run mocking', () => {
+    it('should return a mock response without invoking fetch when isDryRun + mockOnDryRun', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock);
+
+      const result = await action.execute(
+        makeInput({
+          method: 'POST',
+          url: 'https://api.real-side-effect.test/orders',
+          body: { sku: 'SKU-1' },
+          mockOnDryRun: true,
+        }),
+        makeContext({ isDryRun: true }),
+      );
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.data).toEqual(
+        expect.objectContaining({
+          mocked: true,
+          wouldHaveSent: expect.objectContaining({
+            method: 'POST',
+            url: 'https://api.real-side-effect.test/orders',
+            body: { sku: 'SKU-1' },
+          }),
+        }),
+      );
+      expect(result.metadata).toEqual(expect.objectContaining({ mocked: true }));
+    });
+
+    it('should still call fetch on dry-run when mockOnDryRun is absent (matches Zapier/n8n)', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock);
+
+      const result = await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/ping' }),
+        makeContext({ isDryRun: true }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.data.statusCode).toBe(200);
+      expect(result.data).not.toHaveProperty('mocked');
+    });
+
+    it('should call fetch normally when mockOnDryRun is set but isDryRun is false (regular run)', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock);
+
+      const result = await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/ping', mockOnDryRun: true }),
+        makeContext({ isDryRun: false }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.data.statusCode).toBe(200);
+      expect(result.data).not.toHaveProperty('mocked');
+    });
+  });
 });

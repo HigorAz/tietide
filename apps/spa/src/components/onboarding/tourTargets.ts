@@ -10,6 +10,7 @@ export const TOUR_TARGET = {
   libraryNav: 'nav-library',
   editorCanvas: 'editor-canvas',
   editorRun: 'editor-run',
+  editorTest: 'editor-test',
 } as const;
 
 export type TourTargetName = (typeof TOUR_TARGET)[keyof typeof TOUR_TARGET];

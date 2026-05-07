@@ -13,6 +13,7 @@ export const TriggerType = {
   MANUAL: 'manual',
   CRON: 'cron',
   WEBHOOK: 'webhook',
+  TEST: 'test',
 } as const;
 
 export type TriggerType = (typeof TriggerType)[keyof typeof TriggerType];
@@ -23,6 +24,7 @@ export interface WorkflowExecution {
   status: ExecutionStatus;
   triggerType: string;
   triggerData: Record<string, unknown> | null;
+  isDryRun?: boolean;
   startedAt: Date | null;
   finishedAt: Date | null;
   error: string | null;
