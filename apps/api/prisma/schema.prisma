@@ -16,11 +16,12 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  workflows        Workflow[]
-  secrets          Secret[]
-  connections      Connection[]
-  auditLogs        AuditLog[]
-  workflowVersions WorkflowVersion[]
+  workflows            Workflow[]
+  secrets              Secret[]
+  connections          Connection[]
+  auditLogs            AuditLog[]
+  workflowVersions     WorkflowVersion[]
+  environmentVariables EnvironmentVariable[]
 
   @@map("users")
 }
@@ -28,6 +29,31 @@ model User {
 enum Role {
   USER
   ADMIN
+}
+
+enum EnvVarScope {
+  GLOBAL
+  USER
+}
+
+model EnvironmentVariable {
+  id         String      @id @default(uuid())
+  scope      EnvVarScope
+  userId     String?     @map("user_id")
+  key        String
+  valueEnc   String      @map("value_enc")
+  valueNonce String      @map("value_nonce")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Uniqueness is enforced by two partial unique indexes (scope-specific) in the
+  // migration. Postgres treats NULL as distinct in standard unique indexes, so a
+  // composite @@unique([scope, userId, key]) here would NOT prevent duplicate
+  // GLOBAL rows (where user_id is NULL).
+  @@index([scope])
+  @@map("environment_variables")
 }
 
 model Workflow {

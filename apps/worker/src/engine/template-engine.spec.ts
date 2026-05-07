@@ -1,4 +1,4 @@
-import { resolveTemplate, TemplatePathNotFoundError } from '@tietide/shared';
+import { EnvVarNotFoundError, resolveTemplate, TemplatePathNotFoundError } from '@tietide/shared';
 
 describe('resolveTemplate', () => {
   describe('strings', () => {
@@ -26,7 +26,7 @@ describe('resolveTemplate', () => {
       expect(resolveTemplate('plain text', {})).toBe('plain text');
     });
 
-    it('should leave UPPER_SNAKE tokens untouched (env var prefix reserved for F5)', () => {
+    it('should leave UPPER_SNAKE tokens untouched when no envScope is provided', () => {
       expect(resolveTemplate('Bearer {{API_KEY}}', { API_KEY: 'secret' })).toBe(
         'Bearer {{API_KEY}}',
       );
@@ -114,6 +114,70 @@ describe('resolveTemplate', () => {
       } catch (err) {
         expect((err as TemplatePathNotFoundError).path).toBe('a.missing');
       }
+    });
+  });
+
+  describe('env vars (envScope)', () => {
+    it('should substitute an UPPER_SNAKE token from envScope when provided', () => {
+      const envScope = new Map<string, string>([['API_KEY', 'sk-live-123']]);
+      expect(resolveTemplate('{{API_KEY}}', {}, envScope)).toBe('sk-live-123');
+    });
+
+    it('should substitute UPPER_SNAKE tokens mixed with literal text', () => {
+      const envScope = new Map<string, string>([['API_KEY', 'sk-live-123']]);
+      expect(resolveTemplate('Bearer {{API_KEY}}', {}, envScope)).toBe('Bearer sk-live-123');
+    });
+
+    it('should resolve env tokens AND data tokens in the same string', () => {
+      const envScope = new Map<string, string>([['BASE_URL', 'https://api.example.com']]);
+      const scope = { trigger: { id: 'abc' } };
+      expect(resolveTemplate('{{BASE_URL}}/x/{{trigger.id}}', scope, envScope)).toBe(
+        'https://api.example.com/x/abc',
+      );
+    });
+
+    it('should throw EnvVarNotFoundError with the issue-specified message when missing', () => {
+      const envScope = new Map<string, string>();
+      try {
+        resolveTemplate('{{SLACK_WEBHOOK_URL}}', {}, envScope);
+        fail('expected throw');
+      } catch (err) {
+        expect(err).toBeInstanceOf(EnvVarNotFoundError);
+        expect((err as Error).message).toBe(
+          'Env var SLACK_WEBHOOK_URL not found in user or global scope',
+        );
+        expect((err as EnvVarNotFoundError).key).toBe('SLACK_WEBHOOK_URL');
+      }
+    });
+
+    it('should leave UPPER_SNAKE tokens untouched when envScope is undefined (back-compat)', () => {
+      expect(resolveTemplate('{{API_KEY}}', {})).toBe('{{API_KEY}}');
+    });
+
+    it('should preserve recursion into nested objects', () => {
+      const envScope = new Map<string, string>([['BASE_URL', 'https://api']]);
+      const value = { url: '{{BASE_URL}}/v1', headers: { auth: 'Bearer {{TOKEN}}' } };
+      const envWithToken = new Map<string, string>([
+        ['BASE_URL', 'https://api'],
+        ['TOKEN', 't-1'],
+      ]);
+      expect(resolveTemplate(value, {}, envWithToken)).toEqual({
+        url: 'https://api/v1',
+        headers: { auth: 'Bearer t-1' },
+      });
+      // sanity: missing TOKEN throws even when nested
+      expect(() => resolveTemplate(value, {}, envScope)).toThrow(EnvVarNotFoundError);
+    });
+
+    it('should NOT use envScope for lowercase tokens (those still resolve via data scope)', () => {
+      const envScope = new Map<string, string>([['FOO', 'env-value']]);
+      // lowercase 'foo' is a data path, not an env var
+      expect(resolveTemplate('{{foo}}', { foo: 'data-value' }, envScope)).toBe('data-value');
+    });
+
+    it('should preserve the env value type when single-token (always a string)', () => {
+      const envScope = new Map<string, string>([['TOKEN', 'plain-string']]);
+      expect(resolveTemplate('{{TOKEN}}', {}, envScope)).toBe('plain-string');
     });
   });
 });

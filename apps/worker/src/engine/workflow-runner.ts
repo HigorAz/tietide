@@ -3,6 +3,7 @@ import {
   NODE_CATALOG,
   NodeCategory,
   resolveTemplate,
+  type EnvScope,
   type WorkflowDefinition,
   type WorkflowNode,
   type WorkflowEdge,
@@ -12,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
 import { ExecutionEventsService } from '../events/execution-events.service';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
+import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
 import { CircularDependencyError, topologicalSort } from './topological-sort';
 
@@ -37,6 +39,7 @@ export class WorkflowRunner {
     private readonly registry: NodeRegistry,
     private readonly prisma: PrismaService,
     @Inject(SECRET_RESOLVER) private readonly secretResolver: SecretResolver,
+    @Inject(ENV_VAR_RESOLVER) private readonly envVarResolver: EnvVarResolver,
     @Inject(CONNECTION_RESOLVER) private readonly connectionResolver: ConnectionResolver,
     private readonly events: ExecutionEventsService,
   ) {}
@@ -46,6 +49,7 @@ export class WorkflowRunner {
       return await this.runInner(args);
     } finally {
       this.secretResolver.releaseExecution(args.executionId);
+      this.envVarResolver.releaseExecution(args.executionId);
       this.connectionResolver.releaseExecution(args.executionId);
     }
   }
@@ -62,6 +66,11 @@ export class WorkflowRunner {
       }
       return { status: 'FAILED', error: (err as Error).message };
     }
+
+    // Load merged env-var scope once per execution. The resolver caches by
+    // executionId so any later call hits the cache; we fetch eagerly so a
+    // missing-execution failure surfaces before nodes start running.
+    const envScope = await this.envVarResolver.getEnvScope(executionId);
 
     for (const nodeId of order) {
       const n = definition.nodes.find((x) => x.id === nodeId)!;
@@ -134,7 +143,7 @@ export class WorkflowRunner {
       try {
         const executor = this.registry.resolve(n.type)!;
         const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun);
-        const resolvedInput = this.resolveInputTemplates(input, executionOrder, outputs);
+        const resolvedInput = this.resolveInputTemplates(input, executionOrder, outputs, envScope);
         const output = await executor.execute(resolvedInput, ctx);
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
@@ -208,13 +217,17 @@ export class WorkflowRunner {
     input: NodeInput,
     executionOrder: string[],
     outputs: Map<string, NodeOutput>,
+    envScope: EnvScope,
   ): NodeInput {
     const scope: Record<string, unknown> = {};
     for (const id of executionOrder) {
       const out = outputs.get(id);
       if (out) scope[id] = out.data;
     }
-    const resolvedParams = resolveTemplate(input.params, scope) as Record<string, unknown>;
+    const resolvedParams = resolveTemplate(input.params, scope, envScope) as Record<
+      string,
+      unknown
+    >;
     return { ...input, params: resolvedParams };
   }
 
