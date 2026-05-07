@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-
 SYSTEM_INSTRUCTION = (
     "You are a technical writer documenting integration workflows for the TieTide iPaaS platform. "
     "Your job is to read a workflow definition (a JSON graph of nodes and edges) and produce "

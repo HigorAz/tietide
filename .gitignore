@@ -25,6 +25,8 @@ Thumbs.db
 # Test & Coverage
 coverage/
 .nyc_output/
+.coverage
+htmlcov/
 
 # Logs
 *.log

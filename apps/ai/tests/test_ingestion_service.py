@@ -9,7 +9,6 @@ import pytest
 from src.services.ingestion import IngestionService
 from tests.fakes import FakeEmbedder, FakeVectorStore
 
-
 DATA_DIR = Path(__file__).resolve().parents[1] / "src" / "data"
 
 

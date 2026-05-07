@@ -6,7 +6,6 @@ import json
 
 from src.services.prompt import PromptBuilder
 
-
 WORKFLOW = {
     "name": "Daily Sync",
     "definition": {

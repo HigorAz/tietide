@@ -1,0 +1,11 @@
+{
+  "name": "@tietide/ai",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "python -m pytest",
+    "test:coverage": "python -m pytest --cov=src --cov-report=term --cov-report=html",
+    "lint": "ruff check .",
+    "typecheck": "mypy src"
+  }
+}

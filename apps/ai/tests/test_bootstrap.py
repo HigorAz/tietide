@@ -18,7 +18,6 @@ from src.services.retriever import Retriever
 from src.state import ServiceState
 from tests.fakes import FakeEmbedder, FakeLlmClient, FakeVectorStore
 
-
 SECTIONS_JSON = json.dumps(
     {
         "objective": "o",

@@ -40,10 +40,10 @@ jobs:
         run: pnpm --filter @tietide/shared --filter @tietide/sdk --filter @tietide/crypto run build
 
       - name: Lint
-        run: pnpm -r --if-present run lint
+        run: pnpm -r --if-present --filter '!@tietide/ai' --filter '!tietide' run lint
 
       - name: Typecheck
-        run: pnpm run typecheck
+        run: pnpm -r --if-present --filter '!@tietide/ai' --filter '!tietide' run typecheck
 
   test:
     name: Test (Node) with coverage
@@ -96,7 +96,7 @@ jobs:
         run: pnpm run build
 
       - name: Run tests with coverage
-        run: pnpm -r --if-present run test:coverage
+        run: pnpm -r --if-present --filter '!@tietide/ai' --filter '!tietide' run test:coverage
         env:
           DATABASE_URL: postgresql://tietide:tietide_secret@localhost:5432/tietide?schema=public
           REDIS_HOST: localhost
@@ -141,6 +141,12 @@ jobs:
 
       - name: Run pytest
         run: pytest
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Typecheck (mypy)
+        run: mypy src
 
   build-images:
     name: Build Docker images
