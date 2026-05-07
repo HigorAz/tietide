@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -211,5 +212,81 @@ describe('ConnectionsPage', () => {
       expect(screen.getByText(/Could not load connections/i)).toBeInTheDocument(),
     );
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+
+  describe('deep-link auto-connect (?provider=X&connect=true)', () => {
+    it('should auto-open the connect flow for the provider in the query string', async () => {
+      mockedList.mockResolvedValue([]);
+      mockedStartOAuth.mockReturnValueOnce(new Promise(() => {}));
+      const fakePopup = { closed: false, location: { href: '' }, close: vi.fn() };
+      openMock.mockReturnValueOnce(fakePopup as unknown as Window);
+
+      window.history.replaceState({}, '', '/connections?provider=google&connect=true');
+
+      render(<ConnectionsPage />);
+
+      await waitFor(() => expect(mockedStartOAuth).toHaveBeenCalledTimes(1));
+      expect(mockedStartOAuth.mock.calls[0][0]).toMatchObject({ provider: 'google' });
+      // Query params should be stripped after handling so a refresh doesn't re-fire.
+      expect(window.location.search).toBe('');
+    });
+
+    it('should NOT auto-open when the provider is unknown', async () => {
+      mockedList.mockResolvedValue([]);
+
+      window.history.replaceState({}, '', '/connections?provider=bogus&connect=true');
+
+      render(<ConnectionsPage />);
+
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+      expect(mockedStartOAuth).not.toHaveBeenCalled();
+      expect(openMock).not.toHaveBeenCalled();
+    });
+
+    it('should NOT auto-open without connect=true', async () => {
+      mockedList.mockResolvedValue([]);
+
+      window.history.replaceState({}, '', '/connections?provider=google');
+
+      render(<ConnectionsPage />);
+
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+      expect(mockedStartOAuth).not.toHaveBeenCalled();
+      expect(openMock).not.toHaveBeenCalled();
+    });
+
+    it('should fire exactly once even under React.StrictMode', async () => {
+      mockedList.mockResolvedValue([]);
+      mockedStartOAuth.mockReturnValueOnce(new Promise(() => {}));
+      const fakePopup = { closed: false, location: { href: '' }, close: vi.fn() };
+      openMock.mockReturnValueOnce(fakePopup as unknown as Window);
+
+      window.history.replaceState({}, '', '/connections?provider=google&connect=true');
+
+      render(
+        <StrictMode>
+          <ConnectionsPage />
+        </StrictMode>,
+      );
+
+      await waitFor(() => expect(mockedStartOAuth).toHaveBeenCalledTimes(1));
+      // Give StrictMode's second effect pass a chance to misfire.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(mockedStartOAuth).toHaveBeenCalledTimes(1);
+    });
+
+    it('should auto-open the API-key modal when the provider is API_KEY-typed', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValue([]);
+
+      window.history.replaceState({}, '', '/connections?provider=openai&connect=true');
+
+      render(<ConnectionsPage />);
+
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+      expect(await screen.findByLabelText(/api key/i)).toBeInTheDocument();
+      // Cleanup: close modal so subsequent state remains tidy.
+      await user.click(screen.getByRole('button', { name: /cancel/i }));
+    });
   });
 });

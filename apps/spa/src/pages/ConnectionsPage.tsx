@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConnectionType } from '@tietide/shared';
 import { useConnectionsStore } from '@/stores/connectionsStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -11,26 +11,10 @@ import { PROVIDER_CATALOG, type ProviderEntry } from '@/components/connections/p
 import type { ConnectionView } from '@/api/connections';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
+import { readBridgeFromUrl, readDeepLinkFromUrl } from './connectionsPageUrl';
 
 const errorMessage = (err: unknown, fallback: string): string =>
   err instanceof Error && err.message ? err.message : fallback;
-
-interface BridgeOutcome {
-  status: 'success' | 'error';
-  connectionId?: string;
-  message?: string;
-}
-
-const readBridgeFromUrl = (search: string): BridgeOutcome | null => {
-  const params = new URLSearchParams(search);
-  const status = params.get('status');
-  if (status !== 'success' && status !== 'error') return null;
-  return {
-    status,
-    connectionId: params.get('id') ?? undefined,
-    message: params.get('message') ?? undefined,
-  };
-};
 
 export function ConnectionsPage(): JSX.Element {
   // ----- Bridge: if we're inside an OAuth popup, postMessage and close. -----
@@ -78,6 +62,7 @@ export function ConnectionsPage(): JSX.Element {
   const [apiKeyProvider, setApiKeyProvider] = useState<ProviderEntry | null>(null);
   const [toRevoke, setToRevoke] = useState<ConnectionView | null>(null);
   const [oauthInflight, setOauthInflight] = useState<string | null>(null);
+  const deepLinkHandledRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (closing) return;
@@ -97,6 +82,21 @@ export function ConnectionsPage(): JSX.Element {
     }
     window.history.replaceState({}, '', window.location.pathname);
   }, [closing, toast]);
+
+  // Deep-link: ConnectionPicker's empty-state CTA opens us at
+  // /connections?provider=X&connect=true to auto-fire the connect flow.
+  // Guard with a ref so React.StrictMode's double-invoke effect pass
+  // doesn't open the popup twice; strip the query so a refresh is idempotent.
+  useEffect(() => {
+    if (closing) return;
+    if (typeof window === 'undefined') return;
+    if (deepLinkHandledRef.current) return;
+    const request = readDeepLinkFromUrl(window.location.search);
+    if (!request) return;
+    deepLinkHandledRef.current = true;
+    window.history.replaceState({}, '', window.location.pathname);
+    void handlePick(request.provider);
+  }, [closing]);
 
   const handlePick = async (provider: ProviderEntry): Promise<void> => {
     if (provider.type === ConnectionType.API_KEY) {

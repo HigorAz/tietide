@@ -1,0 +1,161 @@
+import { useEffect, useMemo } from 'react';
+import * as Select from '@radix-ui/react-select';
+import { Check, ChevronDown, ExternalLink } from 'lucide-react';
+import type { ConnectionView } from '@/api/connections';
+import { ConnectionStatusBadge } from '@/components/connections/ConnectionStatusBadge';
+import { getProviderLabel } from '@/components/connections/providerCatalog';
+import { useConnectionsStore } from '@/stores/connectionsStore';
+import { cn } from '@/utils/cn';
+
+export interface ConnectionPickerProps {
+  provider: string;
+  providerLabel?: string;
+  value: string | null;
+  onChange: (id: string | null) => void;
+  disabled?: boolean;
+}
+
+const formatLastUsed = (iso: string | null): string => {
+  if (!iso) return 'Never used';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'Never used';
+  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (seconds < 60) return `Last used ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `Last used ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Last used ${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `Last used ${days}d ago`;
+  return `Last used ${new Date(iso).toLocaleDateString()}`;
+};
+
+export function ConnectionPicker({
+  provider,
+  providerLabel,
+  value,
+  onChange,
+  disabled = false,
+}: ConnectionPickerProps): JSX.Element {
+  const connections = useConnectionsStore((s) => s.connections);
+  const status = useConnectionsStore((s) => s.status);
+  const fetch = useConnectionsStore((s) => s.fetch);
+
+  useEffect(() => {
+    if (status === 'idle') {
+      void fetch();
+    }
+  }, [status, fetch]);
+
+  const label = providerLabel ?? getProviderLabel(provider);
+  const compatible = useMemo(
+    () => connections.filter((c) => c.provider === provider),
+    [connections, provider],
+  );
+  const selected = useMemo(
+    () => compatible.find((c) => c.id === value) ?? null,
+    [compatible, value],
+  );
+
+  if (compatible.length === 0) {
+    const addHref = `/connections?provider=${encodeURIComponent(provider)}&connect=true`;
+    return (
+      <div
+        className="rounded-lg border border-dashed border-white/10 bg-surface p-4 text-sm"
+        data-testid="connection-picker-empty"
+      >
+        <p className="text-text-secondary">No {label} connections yet.</p>
+        <a
+          href={addHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            'mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-accent-teal',
+            'hover:underline focus:outline-none focus:ring-1 focus:ring-accent-teal',
+          )}
+        >
+          <span>Add a {label} connection</span>
+          <ExternalLink aria-hidden className="h-3 w-3" />
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <Select.Root
+      value={value ?? ''}
+      onValueChange={(next) => onChange(next || null)}
+      disabled={disabled}
+    >
+      <Select.Trigger
+        aria-label="Connection"
+        className={cn(
+          'inline-flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-elevated px-3 py-2 text-sm text-text-primary transition',
+          'hover:border-white/20 focus:outline-none focus:ring-1 focus:ring-accent-teal',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+        )}
+      >
+        <Select.Value
+          placeholder={`Select a ${label} connection…`}
+          aria-label={selected ? selected.name : undefined}
+        >
+          {selected ? <ConnectionTriggerContent connection={selected} /> : undefined}
+        </Select.Value>
+        <Select.Icon>
+          <ChevronDown aria-hidden className="h-4 w-4 text-text-secondary" />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        <Select.Content
+          position="popper"
+          sideOffset={4}
+          className={cn(
+            'z-50 min-w-[--radix-select-trigger-width] overflow-hidden rounded-md border border-white/10 bg-surface shadow-lg',
+          )}
+        >
+          <Select.Viewport className="p-1">
+            {compatible.map((conn) => (
+              <ConnectionPickerOption key={conn.id} connection={conn} />
+            ))}
+          </Select.Viewport>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
+  );
+}
+
+function ConnectionTriggerContent({ connection }: { connection: ConnectionView }): JSX.Element {
+  return (
+    <span className="flex min-w-0 items-center gap-2">
+      <span className="truncate">{connection.name}</span>
+      <ConnectionStatusBadge status={connection.status} />
+    </span>
+  );
+}
+
+function ConnectionPickerOption({ connection }: { connection: ConnectionView }): JSX.Element {
+  return (
+    <Select.Item
+      value={connection.id}
+      className={cn(
+        'relative flex cursor-pointer select-none items-start gap-2 rounded-md px-2 py-2 text-sm text-text-primary outline-none',
+        'data-[highlighted]:bg-white/5 data-[state=checked]:bg-white/10',
+      )}
+    >
+      <span className="mt-0.5 w-4 flex-shrink-0">
+        <Select.ItemIndicator>
+          <Check aria-hidden className="h-4 w-4 text-accent-teal" />
+        </Select.ItemIndicator>
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-center gap-2">
+          <Select.ItemText asChild>
+            <span className="truncate font-medium">{connection.name}</span>
+          </Select.ItemText>
+          <ConnectionStatusBadge status={connection.status} />
+        </span>
+        <span className="text-xs text-text-secondary">{formatLastUsed(connection.lastUsedAt)}</span>
+      </span>
+    </Select.Item>
+  );
+}
