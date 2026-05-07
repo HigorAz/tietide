@@ -12,6 +12,7 @@ import { ExecutionsModule } from './executions/executions.module';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { SecretsModule } from './secrets/secrets.module';
+import { EnvVarsModule } from './env-vars/env-vars.module';
 import { ConnectionsModule } from './connections/connections.module';
 import { CryptoModule } from './crypto/crypto.module';
 import { AiModule } from './ai/ai.module';
@@ -37,6 +38,7 @@ import { LibraryModule } from './library/library.module';
     UsageModule,
     WebhooksModule,
     SecretsModule,
+    EnvVarsModule,
     ConnectionsModule,
     AiModule,
     DemoModule,

@@ -83,5 +83,7 @@ export { sanitizePayload } from './utils/sanitize-payload.js';
 export {
   resolveTemplate,
   TemplatePathNotFoundError,
+  EnvVarNotFoundError,
   TEMPLATE_TOKEN_REGEX,
+  type EnvScope,
 } from './template-engine/template-engine.js';

@@ -9,6 +9,8 @@ import { GlobalHistoryPage } from '@/pages/GlobalHistoryPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { ConnectionsPage } from '@/pages/ConnectionsPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
+import { SettingsEnvVarsPage } from '@/pages/settings/EnvVarsPage';
+import { AdminEnvVarsPage } from '@/pages/admin/EnvVarsPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
 import { RootLayout } from '@/components/layout/RootLayout';
@@ -34,6 +36,8 @@ const router = createBrowserRouter([
           { path: '/library', element: <LibraryPage /> },
           { path: '/connections', element: <ConnectionsPage /> },
           { path: '/settings', element: <PlaceholderPage title="Account settings" /> },
+          { path: '/settings/env-vars', element: <SettingsEnvVarsPage /> },
+          { path: '/admin/env-vars', element: <AdminEnvVarsPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/login" replace /> },

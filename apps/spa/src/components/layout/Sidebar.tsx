@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { navItems } from './navItems';
+import { useAuthStore } from '@/stores/authStore';
+import { visibleNavItems } from './navItems';
 import { SidebarItem } from './SidebarItem';
 import { SidebarFooter } from './SidebarFooter';
 
@@ -28,6 +29,8 @@ const writeCollapsed = (value: boolean): void => {
 
 export function Sidebar(): JSX.Element {
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
+  const userRole = useAuthStore((s) => s.user?.role);
+  const items = visibleNavItems(userRole);
 
   useEffect(() => {
     writeCollapsed(collapsed);
@@ -70,7 +73,7 @@ export function Sidebar(): JSX.Element {
       </div>
 
       <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-2">
-        {navItems.map((item) => (
+        {items.map((item) => (
           <SidebarItem
             key={item.to}
             to={item.to}
