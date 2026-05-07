@@ -4,7 +4,10 @@ import { CodeForm } from './CodeForm';
 import { ConditionalForm } from './ConditionalForm';
 import { CronForm } from './CronForm';
 import { HttpRequestForm } from './HttpRequestForm';
+import { IteratorForm } from './IteratorForm';
 import { ManualTriggerForm } from './ManualTriggerForm';
+import { ReturnForm } from './ReturnForm';
+import { SubworkflowForm } from './SubworkflowForm';
 import { WebhookForm } from './WebhookForm';
 
 export interface NodeConfigFormProps {
@@ -19,4 +22,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.HTTP_REQUEST]: HttpRequestForm,
   [NodeType.CODE]: CodeForm,
   [NodeType.CONDITIONAL]: ConditionalForm,
+  [NodeType.ITERATOR]: IteratorForm,
+  [NodeType.SUBWORKFLOW]: SubworkflowForm,
+  [NodeType.RETURN]: ReturnForm,
 };

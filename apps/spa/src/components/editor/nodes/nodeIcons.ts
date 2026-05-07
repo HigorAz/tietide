@@ -1,4 +1,16 @@
-import { Box, Clock, Code2, GitBranch, Globe, Webhook, Zap, type LucideIcon } from 'lucide-react';
+import {
+  Box,
+  Clock,
+  Code2,
+  CornerDownLeft,
+  GitBranch,
+  Globe,
+  Repeat2,
+  Webhook,
+  Workflow,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react';
 import { NodeType } from '@tietide/shared';
 
 export const NODE_ICONS: Record<NodeType, LucideIcon> = {
@@ -8,6 +20,9 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.HTTP_REQUEST]: Globe,
   [NodeType.CODE]: Code2,
   [NodeType.CONDITIONAL]: GitBranch,
+  [NodeType.ITERATOR]: Repeat2,
+  [NodeType.SUBWORKFLOW]: Workflow,
+  [NodeType.RETURN]: CornerDownLeft,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;
