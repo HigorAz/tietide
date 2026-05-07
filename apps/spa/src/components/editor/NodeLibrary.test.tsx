@@ -56,7 +56,10 @@ describe('NodeLibrary', () => {
 
       const logic = screen.getByRole('region', { name: /^logic$/i });
       expect(within(logic).getByText('Conditional (IF)')).toBeInTheDocument();
-      expect(within(logic).queryAllByTestId('node-library-item')).toHaveLength(1);
+      expect(within(logic).getByText('Iterator (For Each)')).toBeInTheDocument();
+      expect(within(logic).getByText('Subworkflow')).toBeInTheDocument();
+      expect(within(logic).getByText('Return')).toBeInTheDocument();
+      expect(within(logic).queryAllByTestId('node-library-item')).toHaveLength(4);
     });
 
     it('should not expose forbidden node types (Code) in the palette', async () => {
@@ -69,7 +72,7 @@ describe('NodeLibrary', () => {
       const { NodeLibrary } = await importComponent();
       render(<NodeLibrary />);
       const items = screen.getAllByTestId('node-library-item');
-      expect(items).toHaveLength(5);
+      expect(items).toHaveLength(8);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -115,8 +118,11 @@ describe('NodeLibrary', () => {
       await user.type(screen.getByPlaceholderText(/search/i), 'logic');
 
       const items = screen.getAllByTestId('node-library-item');
-      expect(items).toHaveLength(1);
+      expect(items).toHaveLength(4);
       expect(screen.getByText('Conditional (IF)')).toBeInTheDocument();
+      expect(screen.getByText('Iterator (For Each)')).toBeInTheDocument();
+      expect(screen.getByText('Subworkflow')).toBeInTheDocument();
+      expect(screen.getByText('Return')).toBeInTheDocument();
     });
 
     it('should show an empty state when no items match', async () => {
@@ -139,7 +145,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(5);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(8);
     });
   });
 

@@ -10,9 +10,12 @@ const wf = (overrides: Partial<Workflow>): Workflow => ({
   description: null,
   isActive: false,
   version: 1,
+  userId: 'user-test',
   definition: { nodes: [], edges: [] },
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  executionCount: 0,
+  documentation: null,
   ...overrides,
 });
 
