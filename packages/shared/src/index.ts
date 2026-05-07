@@ -46,6 +46,10 @@ export {
   codeConfigSchema,
   cronConfigSchema,
   webhookConfigSchema,
+  iteratorConfigSchema,
+  subworkflowConfigSchema,
+  returnConfigSchema,
+  ITERATOR_MAX_ITEMS_DEFAULT,
 } from './schemas/node.schema.js';
 export {
   webhookTriggerOutputSchema,
@@ -53,6 +57,9 @@ export {
   manualTriggerOutputSchema,
   httpRequestOutputSchema,
   conditionalOutputSchema,
+  iteratorOutputSchema,
+  subworkflowOutputSchema,
+  returnOutputSchema,
   nodeOutputSchemas,
 } from './schemas/node-output.schema.js';
 export {

@@ -14,6 +14,15 @@ export type ExecutionLiveMode = 'live' | 'replay' | null;
 
 export type NodeRunStatus = 'idle' | 'running' | 'success' | 'failed' | 'skipped';
 
+export interface IterationState {
+  index: number;
+  total: number;
+  childExecutionId: string;
+  status: NodeRunStatus;
+  durationMs: number | null;
+  error: { message: string; code: string | null } | null;
+}
+
 export interface NodeRunState {
   status: NodeRunStatus;
   nodeType: string | null;
@@ -23,6 +32,9 @@ export interface NodeRunState {
   input: unknown;
   output: unknown;
   error: { message: string; code: string | null } | null;
+  // Populated only for iterator nodes by `iteration.started` / `iteration.completed`
+  // events. Indexed by iteration index for stable inspector ordering.
+  iterations?: IterationState[];
 }
 
 export interface ExecutionLiveState {
@@ -51,6 +63,17 @@ const EVENT_TO_NODE_STATUS: Record<ExecutionEventType, NodeRunStatus | null> = {
   'step.failed': 'failed',
   'step.skipped': 'skipped',
   'execution.completed': null,
+  // iteration.* events update the iterator node's iterations[] alongside its
+  // overall status; they don't drive the parent step status directly.
+  'iteration.started': null,
+  'iteration.completed': null,
+};
+
+const EVENT_STATUS_TO_NODE_STATUS: Record<string, NodeRunStatus> = {
+  RUNNING: 'running',
+  SUCCESS: 'success',
+  FAILED: 'failed',
+  SKIPPED: 'skipped',
 };
 
 const STEP_STATUS_TO_NODE_STATUS: Record<string, NodeRunStatus> = {
@@ -95,6 +118,57 @@ export const useExecutionLiveStore = create<ExecutionLiveStore>((set) => ({
         };
       }
 
+      if (envelope.type === 'iteration.started' || envelope.type === 'iteration.completed') {
+        if (
+          !envelope.nodeId ||
+          envelope.iterationIndex === null ||
+          envelope.iterationIndex === undefined ||
+          envelope.iterationTotal === null ||
+          envelope.iterationTotal === undefined ||
+          !envelope.childExecutionId
+        ) {
+          return state;
+        }
+
+        const existing = state.nodes.get(envelope.nodeId);
+        const iterations = existing?.iterations ? [...existing.iterations] : [];
+        const i = envelope.iterationIndex;
+        const childStatus =
+          envelope.type === 'iteration.completed'
+            ? (EVENT_STATUS_TO_NODE_STATUS[envelope.status] ?? 'failed')
+            : 'running';
+        const next: IterationState = {
+          index: i,
+          total: envelope.iterationTotal,
+          childExecutionId: envelope.childExecutionId,
+          status: childStatus,
+          durationMs: envelope.durationMs ?? null,
+          error: envelope.error ?? null,
+        };
+        const slot = iterations.findIndex((it) => it.index === i);
+        if (slot === -1) iterations.push(next);
+        else iterations[slot] = { ...iterations[slot], ...next };
+        iterations.sort((a, b) => a.index - b.index);
+
+        const nextNode: NodeRunState = {
+          status: existing?.status ?? 'running',
+          nodeType: envelope.nodeType ?? existing?.nodeType ?? 'iterator',
+          startedAt: existing?.startedAt ?? envelope.startedAt ?? null,
+          finishedAt: existing?.finishedAt ?? null,
+          durationMs: existing?.durationMs ?? null,
+          input: existing?.input ?? null,
+          output: existing?.output ?? null,
+          error: existing?.error ?? null,
+          iterations,
+        };
+        const nextNodes = new Map(state.nodes);
+        nextNodes.set(envelope.nodeId, nextNode);
+        return {
+          status: state.status === 'idle' ? 'running' : state.status,
+          nodes: nextNodes,
+        };
+      }
+
       const nodeStatus = EVENT_TO_NODE_STATUS[envelope.type];
       if (!nodeStatus || !envelope.nodeId) return state;
 
@@ -108,6 +182,7 @@ export const useExecutionLiveStore = create<ExecutionLiveStore>((set) => ({
         input: envelope.input !== null ? envelope.input : (existing?.input ?? null),
         output: envelope.output !== null ? envelope.output : (existing?.output ?? null),
         error: envelope.error ?? existing?.error ?? null,
+        ...(existing?.iterations ? { iterations: existing.iterations } : {}),
       };
 
       const nextNodes = new Map(state.nodes);

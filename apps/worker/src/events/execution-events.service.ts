@@ -54,6 +54,31 @@ export interface ExecutionCompletedArgs {
   error?: { message: string; code?: string };
 }
 
+export interface IterationStartedArgs {
+  // The execution that owns the iterator node — i.e. the parent execution.
+  // The child (per-iteration) execution publishes its own step.* events
+  // separately via its own channel.
+  executionId: string;
+  nodeId: string;
+  iterationIndex: number;
+  iterationTotal: number;
+  childExecutionId: string;
+  startedAt: Date;
+}
+
+export interface IterationCompletedArgs {
+  executionId: string;
+  nodeId: string;
+  iterationIndex: number;
+  iterationTotal: number;
+  childExecutionId: string;
+  startedAt: Date;
+  finishedAt: Date;
+  durationMs: number;
+  status: 'SUCCESS' | 'FAILED';
+  error?: { message: string; code?: string };
+}
+
 // Best-effort lifecycle event publisher. Not durable: subscribers connecting
 // after a step fired will miss it (consumer must seed initial state). The
 // pub/sub layer is NOT a security boundary — authorization happens at the
@@ -129,6 +154,46 @@ export class ExecutionEventsService {
       input: sanitizePayload(args.input),
       output: sanitizePayload(args.output),
       error: null,
+    };
+    await this.send(args.executionId, envelope);
+  }
+
+  async publishIterationStarted(args: IterationStartedArgs): Promise<void> {
+    const envelope: ExecutionEventEnvelope = {
+      type: 'iteration.started',
+      executionId: args.executionId,
+      nodeId: args.nodeId,
+      nodeType: 'iterator',
+      status: 'RUNNING',
+      startedAt: args.startedAt.toISOString(),
+      finishedAt: null,
+      durationMs: null,
+      input: null,
+      output: null,
+      error: null,
+      iterationIndex: args.iterationIndex,
+      iterationTotal: args.iterationTotal,
+      childExecutionId: args.childExecutionId,
+    };
+    await this.send(args.executionId, envelope);
+  }
+
+  async publishIterationCompleted(args: IterationCompletedArgs): Promise<void> {
+    const envelope: ExecutionEventEnvelope = {
+      type: 'iteration.completed',
+      executionId: args.executionId,
+      nodeId: args.nodeId,
+      nodeType: 'iterator',
+      status: args.status,
+      startedAt: args.startedAt.toISOString(),
+      finishedAt: args.finishedAt.toISOString(),
+      durationMs: args.durationMs,
+      input: null,
+      output: null,
+      error: args.error ? { message: args.error.message, code: args.error.code ?? null } : null,
+      iterationIndex: args.iterationIndex,
+      iterationTotal: args.iterationTotal,
+      childExecutionId: args.childExecutionId,
     };
     await this.send(args.executionId, envelope);
   }

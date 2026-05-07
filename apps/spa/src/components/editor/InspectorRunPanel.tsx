@@ -160,6 +160,45 @@ export function InspectorRunPanel(): JSX.Element {
         <JsonBlock label="Input" testId="run-node-input" value={selected.state.input} />
         <JsonBlock label="Output" testId="run-node-output" value={selected.state.output} />
 
+        {selected.state.iterations && selected.state.iterations.length > 0 && (
+          <div data-testid="run-node-iterations" className="space-y-1">
+            <div className="text-[11px] uppercase tracking-wide text-text-secondary">
+              Iterations ({selected.state.iterations.length})
+            </div>
+            <ul className="rounded border border-white/5 bg-deep-blue/40">
+              {selected.state.iterations.map((it) => (
+                <li
+                  key={it.index}
+                  data-testid={`run-iteration-${it.index}`}
+                  data-status={it.status}
+                  className="flex items-center justify-between gap-2 border-b border-white/5 px-2 py-1.5 text-[11px] last:border-b-0"
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        it.status === 'running' && 'bg-status-running/15 text-status-running',
+                        it.status === 'success' && 'bg-status-success/15 text-status-success',
+                        it.status === 'failed' && 'bg-status-failed/15 text-status-failed',
+                        it.status !== 'running' &&
+                          it.status !== 'success' &&
+                          it.status !== 'failed' &&
+                          'bg-white/5 text-text-secondary',
+                      )}
+                    >
+                      {it.status}
+                    </span>
+                    <span className="text-text-primary">
+                      Iteration {it.index + 1} / {it.total}
+                    </span>
+                  </span>
+                  <span className="text-text-secondary">{formatDuration(it.durationMs)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {selected.state.error && (
           <div data-testid="run-node-error" className="space-y-1">
             <div className="text-[11px] uppercase tracking-wide text-status-failed">Error</div>
