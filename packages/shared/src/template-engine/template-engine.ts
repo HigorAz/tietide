@@ -7,31 +7,54 @@ export class TemplatePathNotFoundError extends Error {
   }
 }
 
+export class EnvVarNotFoundError extends Error {
+  public readonly key: string;
+  constructor(key: string) {
+    super(`Env var ${key} not found in user or global scope`);
+    this.name = 'EnvVarNotFoundError';
+    this.key = key;
+  }
+}
+
+export type EnvScope = ReadonlyMap<string, string>;
+
 export const TEMPLATE_TOKEN_REGEX = /\{\{\s*([^{}]+?)\s*\}\}/g;
 
 const RESERVED_TOKEN_REGEX = /^[A-Z][A-Z0-9_]*$/;
 const FORBIDDEN_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
 
-export function resolveTemplate<T>(value: T, scope: Record<string, unknown>): T;
-export function resolveTemplate(value: unknown, scope: Record<string, unknown>): unknown {
+export function resolveTemplate<T>(
+  value: T,
+  scope: Record<string, unknown>,
+  envScope?: EnvScope,
+): T;
+export function resolveTemplate(
+  value: unknown,
+  scope: Record<string, unknown>,
+  envScope?: EnvScope,
+): unknown {
   if (typeof value === 'string') {
-    return resolveString(value, scope);
+    return resolveString(value, scope, envScope);
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => resolveTemplate(entry, scope));
+    return value.map((entry) => resolveTemplate(entry, scope, envScope));
   }
   if (isPlainObject(value)) {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) {
       if (FORBIDDEN_SEGMENTS.has(k)) continue;
-      out[k] = resolveTemplate(v, scope);
+      out[k] = resolveTemplate(v, scope, envScope);
     }
     return out;
   }
   return value;
 }
 
-function resolveString(input: string, scope: Record<string, unknown>): unknown {
+function resolveString(
+  input: string,
+  scope: Record<string, unknown>,
+  envScope: EnvScope | undefined,
+): unknown {
   const tokens: { match: string; path: string; index: number }[] = [];
   TEMPLATE_TOKEN_REGEX.lastIndex = 0;
   let m: RegExpExecArray | null;
@@ -45,12 +68,12 @@ function resolveString(input: string, scope: Record<string, unknown>): unknown {
   if (tokens.length === 0) return input;
 
   const firstToken = tokens[0];
-  if (
-    tokens.length === 1 &&
-    firstToken !== undefined &&
-    firstToken.match === input &&
-    !RESERVED_TOKEN_REGEX.test(firstToken.path)
-  ) {
+  if (tokens.length === 1 && firstToken !== undefined && firstToken.match === input) {
+    if (RESERVED_TOKEN_REGEX.test(firstToken.path)) {
+      // Single-token UPPER_SNAKE: substitute from envScope (or leave untouched if no scope).
+      if (envScope === undefined) return input;
+      return lookupEnv(envScope, firstToken.path);
+    }
     return lookup(scope, firstToken.path);
   }
 
@@ -59,7 +82,11 @@ function resolveString(input: string, scope: Record<string, unknown>): unknown {
   for (const tok of tokens) {
     result += input.slice(cursor, tok.index);
     if (RESERVED_TOKEN_REGEX.test(tok.path)) {
-      result += tok.match;
+      if (envScope === undefined) {
+        result += tok.match;
+      } else {
+        result += lookupEnv(envScope, tok.path);
+      }
     } else {
       const resolved = lookup(scope, tok.path);
       result += stringifyForInterpolation(resolved);
@@ -68,6 +95,14 @@ function resolveString(input: string, scope: Record<string, unknown>): unknown {
   }
   result += input.slice(cursor);
   return result;
+}
+
+function lookupEnv(envScope: EnvScope, key: string): string {
+  const value = envScope.get(key);
+  if (value === undefined) {
+    throw new EnvVarNotFoundError(key);
+  }
+  return value;
 }
 
 function lookup(scope: Record<string, unknown>, path: string): unknown {

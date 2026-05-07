@@ -1,4 +1,13 @@
-import { Home, LayoutDashboard, Workflow, History, Library, Plug } from 'lucide-react';
+import {
+  Home,
+  LayoutDashboard,
+  Workflow,
+  History,
+  Library,
+  Plug,
+  KeyRound,
+  ShieldCheck,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavItem {
@@ -6,6 +15,8 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   tourTarget?: string;
+  /** When set, the item is only visible if the authenticated user has this role. */
+  requiredRole?: 'ADMIN';
 }
 
 export const navItems: NavItem[] = [
@@ -15,4 +26,10 @@ export const navItems: NavItem[] = [
   { to: '/history', label: 'History', icon: History },
   { to: '/library', label: 'Library', icon: Library, tourTarget: 'nav-library' },
   { to: '/connections', label: 'Connections', icon: Plug },
+  { to: '/settings/env-vars', label: 'Env vars', icon: KeyRound },
+  { to: '/admin/env-vars', label: 'Admin · Env vars', icon: ShieldCheck, requiredRole: 'ADMIN' },
 ];
+
+export function visibleNavItems(role: string | undefined): NavItem[] {
+  return navItems.filter((item) => !item.requiredRole || item.requiredRole === role);
+}
