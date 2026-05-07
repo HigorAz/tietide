@@ -93,6 +93,43 @@ describe('editorStore', () => {
         type: 'livingInk',
       });
     });
+
+    it('should tag the edge data with kind:error when sourceHandle is "error"', () => {
+      const { addNode, onConnect } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 200, y: 0 });
+      const [source, target] = useEditorStore.getState().nodes;
+
+      onConnect({
+        source: source.id,
+        target: target.id,
+        sourceHandle: 'error',
+        targetHandle: null,
+      });
+
+      const { edges } = useEditorStore.getState();
+      expect(edges).toHaveLength(1);
+      expect(edges[0].sourceHandle).toBe('error');
+      expect(edges[0].data).toMatchObject({ kind: 'error' });
+    });
+
+    it('should not tag a kind on edges with no sourceHandle (default success)', () => {
+      const { addNode, onConnect } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 200, y: 0 });
+      const [source, target] = useEditorStore.getState().nodes;
+
+      onConnect({
+        source: source.id,
+        target: target.id,
+        sourceHandle: null,
+        targetHandle: null,
+      });
+
+      const { edges } = useEditorStore.getState();
+      const kind = (edges[0].data as { kind?: string } | undefined)?.kind;
+      expect(kind).toBeUndefined();
+    });
   });
 
   describe('selectNode', () => {

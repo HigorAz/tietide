@@ -108,6 +108,49 @@ describe('NodeConfigPanel', () => {
     });
   });
 
+  describe('error handler toggle', () => {
+    it('should render an "Add error handler" toggle in the panel', () => {
+      seedNodeOfType(NodeType.HTTP_REQUEST);
+      render(<NodeConfigPanel />);
+      expect(screen.getByTestId('node-config-error-handler-toggle')).toBeInTheDocument();
+    });
+
+    it('should reflect data.config.hasErrorHandler === true as a checked toggle', () => {
+      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
+      useEditorStore.getState().updateNodeConfig(nodeId, { hasErrorHandler: true });
+      render(<NodeConfigPanel />);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
+      expect(toggle.checked).toBe(true);
+    });
+
+    it('should call updateNodeConfig with hasErrorHandler:true when toggled on', () => {
+      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
+      render(<NodeConfigPanel />);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
+      expect(toggle.checked).toBe(false);
+
+      fireEvent.click(toggle);
+
+      const updatedConfig = useEditorStore.getState().nodes.find((n) => n.id === nodeId)
+        ?.data.config;
+      expect(updatedConfig).toMatchObject({ hasErrorHandler: true });
+    });
+
+    it('should call updateNodeConfig with hasErrorHandler:false when toggled off', () => {
+      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
+      useEditorStore.getState().updateNodeConfig(nodeId, { hasErrorHandler: true });
+      render(<NodeConfigPanel />);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
+      expect(toggle.checked).toBe(true);
+
+      fireEvent.click(toggle);
+
+      const updatedConfig = useEditorStore.getState().nodes.find((n) => n.id === nodeId)
+        ?.data.config;
+      expect(updatedConfig).toMatchObject({ hasErrorHandler: false });
+    });
+  });
+
   describe('fallback', () => {
     it('should render a fallback message when the selected node id does not match any node', () => {
       useEditorStore.setState({

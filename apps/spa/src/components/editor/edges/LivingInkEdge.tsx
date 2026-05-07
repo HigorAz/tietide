@@ -4,6 +4,7 @@ import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 
 const GRADIENT_ID = 'livingInkGradient';
+const ERROR_GRADIENT_ID = 'livingInkErrorGradient';
 const GLOW_ID = 'livingInkGlow';
 
 function LivingInkEdgeImpl({
@@ -16,11 +17,15 @@ function LivingInkEdgeImpl({
   targetY,
   sourcePosition,
   targetPosition,
+  data,
   markerEnd,
 }: EdgeProps) {
   const sourceStatus = useExecutionLiveStore((s) => s.nodes.get(source)?.status);
   const targetStatus = useExecutionLiveStore((s) => s.nodes.get(target)?.status);
   const active = sourceStatus === 'success' && targetStatus === 'running';
+  const kind = (data as { kind?: 'success' | 'error' } | undefined)?.kind ?? 'success';
+  const isError = kind === 'error';
+  const gradientId = isError ? ERROR_GRADIENT_ID : GRADIENT_ID;
 
   const [edgePath] = getBezierPath({
     sourceX,
@@ -38,6 +43,10 @@ function LivingInkEdgeImpl({
           <stop offset="0%" stopColor="#00D4B3" />
           <stop offset="100%" stopColor="#00E8C4" />
         </linearGradient>
+        <linearGradient id={ERROR_GRADIENT_ID} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#EF4444" />
+          <stop offset="100%" stopColor="#F87171" />
+        </linearGradient>
         <filter id={GLOW_ID} x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="2.5" result="blur" />
           <feMerge>
@@ -50,13 +59,14 @@ function LivingInkEdgeImpl({
         id={id}
         data-testid="living-ink-edge"
         data-active={active ? 'true' : 'false'}
+        data-kind={kind}
         d={edgePath}
         className={cn('react-flow__edge-path', active ? 'animate-living-ink' : 'opacity-40')}
         fill="none"
-        stroke={`url(#${GRADIENT_ID})`}
+        stroke={`url(#${gradientId})`}
         strokeWidth={2}
         strokeLinecap="round"
-        strokeDasharray="8 6"
+        strokeDasharray={isError ? '6 4' : '8 6'}
         filter={`url(#${GLOW_ID})`}
         markerEnd={markerEnd}
       />

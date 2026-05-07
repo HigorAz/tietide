@@ -17,6 +17,14 @@ import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
 import { CircularDependencyError, topologicalSort } from './topological-sort';
 
+function extractErrorCode(err: unknown): string | undefined {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code: unknown }).code;
+    if (typeof code === 'string') return code;
+  }
+  return undefined;
+}
+
 export interface RunArgs {
   executionId: string;
   workflowId: string;
@@ -117,7 +125,12 @@ export class WorkflowRunner {
         const passthroughOutput: NodeOutput = { data: input.data };
         outputs.set(n.id, passthroughOutput);
         executionOrder.push(n.id);
-        this.propagateReachability(passthroughOutput, outgoingEdges.get(n.id) ?? [], reachable);
+        this.propagateReachability(
+          passthroughOutput,
+          outgoingEdges.get(n.id) ?? [],
+          reachable,
+          'success',
+        );
         continue;
       }
 
@@ -173,7 +186,7 @@ export class WorkflowRunner {
           output: output.data,
         });
 
-        this.propagateReachability(output, outgoingEdges.get(n.id) ?? [], reachable);
+        this.propagateReachability(output, outgoingEdges.get(n.id) ?? [], reachable, 'success');
       } catch (err) {
         const message = (err as Error).message ?? 'Unknown error';
         const durationMs = Date.now() - started;
@@ -203,7 +216,23 @@ export class WorkflowRunner {
           input: input.data,
           error: { message },
         });
-        failure = { nodeId: n.id, error: message };
+
+        const outgoing = outgoingEdges.get(n.id) ?? [];
+        const hasErrorEdge = outgoing.some((e) => e.kind === 'error');
+        if (hasErrorEdge) {
+          const errorPayload: { message: string; code?: string; nodeId: string } = {
+            message,
+            nodeId: n.id,
+          };
+          const code = extractErrorCode(err);
+          if (code !== undefined) errorPayload.code = code;
+          const errorOutput: NodeOutput = { data: { error: errorPayload } };
+          outputs.set(n.id, errorOutput);
+          executionOrder.push(n.id);
+          this.propagateReachability(errorOutput, outgoing, reachable, 'error');
+        } else {
+          failure = { nodeId: n.id, error: message };
+        }
       }
     }
 
@@ -259,9 +288,16 @@ export class WorkflowRunner {
     output: NodeOutput,
     outgoing: WorkflowEdge[],
     reachable: Set<string>,
+    outcome: 'success' | 'error',
   ): void {
     const branch = output.metadata?.branch as string | undefined;
     for (const e of outgoing) {
+      const edgeKind = e.kind ?? 'success';
+      if (edgeKind !== outcome) continue;
+      if (outcome === 'error') {
+        reachable.add(e.target);
+        continue;
+      }
       if (e.sourceHandle === undefined) {
         reachable.add(e.target);
       } else if (branch !== undefined && e.sourceHandle === branch) {

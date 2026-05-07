@@ -30,6 +30,7 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
   const isTrigger =
     NODE_CATALOG.find((d) => d.type === data.nodeType)?.category === NodeCategory.TRIGGER;
   const toggleNodeSkip = useEditorStore((s) => s.toggleNodeSkip);
+  const hasErrorHandler = data.config?.hasErrorHandler === true;
 
   const onSkipClick = (e: MouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
@@ -124,6 +125,17 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
         position={Position.Bottom}
         className="!w-2 !h-2 !bg-accent-teal !border-0"
       />
+
+      {hasErrorHandler && (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          id="error"
+          data-testid="custom-node-handle-error"
+          className="!w-2 !h-2 !bg-red-500 !border-2 !border-red-400 !border-dashed"
+          style={{ left: '75%' }}
+        />
+      )}
     </div>
   );
 }
