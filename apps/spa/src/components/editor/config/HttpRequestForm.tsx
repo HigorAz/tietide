@@ -4,6 +4,7 @@ import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from './formRegistry';
 import { HeadersEditor } from './HeadersEditor';
+import { DataPillInput } from './DataPillInput';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
@@ -91,14 +92,13 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
         <label htmlFor={urlId} className={labelClass}>
           URL
         </label>
-        <input
+        <DataPillInput
           id={urlId}
-          type="url"
+          nodeId={nodeId}
           value={url}
           placeholder="https://api.example.com/v1/resource"
           aria-invalid={urlIssue !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { url: e.target.value })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { url: next })}
         />
         {urlIssue && (
           <p data-testid="http-url-error" role="alert" className="text-xs text-red-400">
@@ -110,6 +110,7 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
       <div className="flex flex-col gap-1.5">
         <span className={labelClass}>Headers</span>
         <HeadersEditor
+          nodeId={nodeId}
           value={headers}
           onChange={(next) => updateNodeConfig(nodeId, { headers: next })}
         />

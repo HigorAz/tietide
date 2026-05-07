@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
-import { evaluateCondition, resolveTemplates } from './condition-evaluator';
+import { conditionalOutputSchema } from '@tietide/shared';
+import { evaluateCondition } from './condition-evaluator';
 
 @Injectable()
 export class Conditional implements INodeExecutor {
@@ -9,10 +10,10 @@ export class Conditional implements INodeExecutor {
   readonly description =
     'Evaluates a condition against previous node output and routes execution to the true or false branch';
   readonly category = 'logic' as const;
+  readonly outputSchema = conditionalOutputSchema;
 
   async execute(input: NodeInput, _context: ExecutionContext): Promise<NodeOutput> {
-    const condition = this.parseCondition(input.params);
-    const evaluatedCondition = resolveTemplates(condition, input.data);
+    const evaluatedCondition = this.parseCondition(input.params);
     const branch = evaluateCondition(evaluatedCondition);
 
     return {

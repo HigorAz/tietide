@@ -928,4 +928,143 @@ describe('WorkflowRunner', () => {
       );
     });
   });
+
+  describe('template resolution', () => {
+    it('should resolve {{nodeId.path}} tokens in node config before invoking the executor', async () => {
+      const trigger = makeExecutor(
+        'webhook-trigger',
+        async () => ({ data: { email: 'alice@example.com', age: 30 } }),
+        'trigger',
+      );
+      const action = makeExecutor('http-request');
+      registry.register(trigger);
+      registry.register(action);
+
+      const httpNode = {
+        ...node('http', 'http-request'),
+        config: {
+          url: 'https://api.example.com/users/{{wh.email}}',
+          headers: { 'X-Age': 'age={{wh.age}}' },
+        },
+      };
+
+      const def: WorkflowDefinition = {
+        nodes: [node('wh', 'webhook-trigger'), httpNode],
+        edges: [edge('e1', 'wh', 'http')],
+      };
+
+      const result = await runner.run({
+        executionId: 'exec-tpl-1',
+        workflowId: 'wf-1',
+        definition: def,
+        triggerData: {},
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      expect(action.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: {
+            url: 'https://api.example.com/users/alice@example.com',
+            headers: { 'X-Age': 'age=30' },
+          },
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('should preserve resolved value type when the entire string is one token', async () => {
+      const trigger = makeExecutor(
+        'webhook-trigger',
+        async () => ({ data: { count: 42, payload: { ok: true } } }),
+        'trigger',
+      );
+      const action = makeExecutor('http-request');
+      registry.register(trigger);
+      registry.register(action);
+
+      const httpNode = {
+        ...node('http', 'http-request'),
+        config: { count: '{{wh.count}}', body: '{{wh.payload}}' },
+      };
+
+      const def: WorkflowDefinition = {
+        nodes: [node('wh', 'webhook-trigger'), httpNode],
+        edges: [edge('e1', 'wh', 'http')],
+      };
+
+      await runner.run({ executionId: 'exec-tpl-2', workflowId: 'wf-1', definition: def });
+
+      expect(action.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: { count: 42, body: { ok: true } },
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('should fail the step with TemplatePathNotFoundError message when a path is missing', async () => {
+      const trigger = makeExecutor(
+        'webhook-trigger',
+        async () => ({ data: { email: 'alice@example.com' } }),
+        'trigger',
+      );
+      const action = makeExecutor('http-request');
+      registry.register(trigger);
+      registry.register(action);
+
+      const httpNode = {
+        ...node('http', 'http-request'),
+        config: { url: 'https://api.example.com/{{wh.missing}}' },
+      };
+
+      const def: WorkflowDefinition = {
+        nodes: [node('wh', 'webhook-trigger'), httpNode],
+        edges: [edge('e1', 'wh', 'http')],
+      };
+
+      const result = await runner.run({
+        executionId: 'exec-tpl-3',
+        workflowId: 'wf-1',
+        definition: def,
+      });
+
+      expect(result.status).toBe('FAILED');
+      expect(result.failedNodeId).toBe('http');
+      expect(result.error).toMatch(/Template path not found.*wh\.missing/);
+      expect(action.execute).not.toHaveBeenCalled();
+      expect(prisma.executionStep.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            nodeId: 'http',
+            status: 'FAILED',
+            error: expect.stringContaining('wh.missing'),
+          }),
+        }),
+      );
+    });
+
+    it('should leave UPPER_SNAKE tokens untouched (reserved for env-var phase)', async () => {
+      const trigger = makeExecutor('webhook-trigger', async () => ({ data: {} }), 'trigger');
+      const action = makeExecutor('http-request');
+      registry.register(trigger);
+      registry.register(action);
+
+      const httpNode = {
+        ...node('http', 'http-request'),
+        config: { url: 'Bearer {{API_KEY}}' },
+      };
+
+      const def: WorkflowDefinition = {
+        nodes: [node('wh', 'webhook-trigger'), httpNode],
+        edges: [edge('e1', 'wh', 'http')],
+      };
+
+      await runner.run({ executionId: 'exec-tpl-4', workflowId: 'wf-1', definition: def });
+
+      expect(action.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ params: { url: 'Bearer {{API_KEY}}' } }),
+        expect.any(Object),
+      );
+    });
+  });
 });

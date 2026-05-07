@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Plus, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { DataPillInput } from './DataPillInput';
 
 interface HeadersEditorProps {
   value: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
+  nodeId?: string;
 }
 
 interface Row {
@@ -28,7 +30,7 @@ const rowsToRecord = (rows: Row[]): Record<string, string> => {
   return out;
 };
 
-export function HeadersEditor({ value, onChange }: HeadersEditorProps) {
+export function HeadersEditor({ value, onChange, nodeId }: HeadersEditorProps) {
   const [rows, setRows] = useState<Row[]>(() => recordToRows(value));
   const [nextId, setNextId] = useState(() => rows.length);
 
@@ -73,13 +75,24 @@ export function HeadersEditor({ value, onChange }: HeadersEditorProps) {
             onChange={(e) => handleKeyChange(row.id, e.target.value)}
             className={cn(inputClass, 'flex-1')}
           />
-          <input
-            type="text"
-            placeholder="Value"
-            value={row.value}
-            onChange={(e) => handleValueChange(row.id, e.target.value)}
-            className={cn(inputClass, 'flex-1')}
-          />
+          {nodeId ? (
+            <div className="flex-1">
+              <DataPillInput
+                nodeId={nodeId}
+                placeholder="Value"
+                value={row.value}
+                onChange={(next) => handleValueChange(row.id, next)}
+              />
+            </div>
+          ) : (
+            <input
+              type="text"
+              placeholder="Value"
+              value={row.value}
+              onChange={(e) => handleValueChange(row.id, e.target.value)}
+              className={cn(inputClass, 'flex-1')}
+            />
+          )}
           <button
             type="button"
             aria-label="Remove header"

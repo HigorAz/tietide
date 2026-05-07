@@ -62,10 +62,7 @@ describe('Conditional', () => {
     });
 
     it('should route to the true branch when a simple equality holds', async () => {
-      const result = await node.execute(
-        makeInput({ condition: '{{statusCode}} === 200' }, { statusCode: 200 }),
-        makeContext(),
-      );
+      const result = await node.execute(makeInput({ condition: '200 === 200' }), makeContext());
 
       expect(result.metadata?.branch).toBe('true');
       expect(result.data.branch).toBe(true);
@@ -73,32 +70,23 @@ describe('Conditional', () => {
     });
 
     it('should route to the false branch when the condition is not satisfied', async () => {
-      const result = await node.execute(
-        makeInput({ condition: '{{statusCode}} === 200' }, { statusCode: 500 }),
-        makeContext(),
-      );
+      const result = await node.execute(makeInput({ condition: '500 === 200' }), makeContext());
 
       expect(result.metadata?.branch).toBe('false');
       expect(result.data.branch).toBe(false);
       expect(result.data.evaluatedCondition).toBe('500 === 200');
     });
 
-    it('should resolve nested template paths against previous node output', async () => {
-      const result = await node.execute(
-        makeInput({ condition: '{{response.status}} === "ok"' }, { response: { status: 'ok' } }),
-        makeContext(),
-      );
+    it('should evaluate string equality against pre-resolved literals from the runner', async () => {
+      const result = await node.execute(makeInput({ condition: '"ok" === "ok"' }), makeContext());
 
       expect(result.metadata?.branch).toBe('true');
       expect(result.data.branch).toBe(true);
       expect(result.data.evaluatedCondition).toBe('"ok" === "ok"');
     });
 
-    it('should support relational operators against numeric data', async () => {
-      const result = await node.execute(
-        makeInput({ condition: '{{count}} > 10' }, { count: 42 }),
-        makeContext(),
-      );
+    it('should support relational operators against numeric literals', async () => {
+      const result = await node.execute(makeInput({ condition: '42 > 10' }), makeContext());
 
       expect(result.metadata?.branch).toBe('true');
       expect(result.data.branch).toBe(true);

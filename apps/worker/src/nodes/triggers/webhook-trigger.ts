@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
+import { webhookTriggerOutputSchema } from '@tietide/shared';
 
 @Injectable()
 export class WebhookTrigger implements INodeExecutor {
@@ -7,6 +8,7 @@ export class WebhookTrigger implements INodeExecutor {
   readonly name = 'Webhook Trigger';
   readonly description = 'Starts a workflow when an HTTP webhook is received';
   readonly category = 'trigger' as const;
+  readonly outputSchema = webhookTriggerOutputSchema;
 
   async execute(input: NodeInput, _context: ExecutionContext): Promise<NodeOutput> {
     return { data: { ...input.data } };
