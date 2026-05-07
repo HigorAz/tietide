@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ConnectionStatus } from '@tietide/shared';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import type { ConnectionView } from '@/api/connections';
+import { ConnectionStatusBadge } from './ConnectionStatusBadge';
 import { getProviderIcon, getProviderLabel } from './providerCatalog';
 
 export interface ConnectionRowProps {
@@ -12,25 +12,6 @@ export interface ConnectionRowProps {
   onTest: (id: string) => void;
   onRevoke: (connection: ConnectionView) => void;
 }
-
-const statusToTone: Record<ConnectionStatus, { label: string; classes: string }> = {
-  [ConnectionStatus.ACTIVE]: {
-    label: 'Active',
-    classes: 'bg-status-success/15 text-status-success',
-  },
-  [ConnectionStatus.EXPIRED]: {
-    label: 'Expired',
-    classes: 'bg-warning/15 text-warning',
-  },
-  [ConnectionStatus.ERROR]: {
-    label: 'Error',
-    classes: 'bg-error/15 text-error',
-  },
-  [ConnectionStatus.REVOKED]: {
-    label: 'Revoked',
-    classes: 'bg-text-muted/15 text-text-muted',
-  },
-};
 
 const formatRelative = (iso: string | null): string => {
   if (!iso) return 'never';
@@ -55,7 +36,6 @@ export function ConnectionRow({
   onRevoke,
 }: ConnectionRowProps): JSX.Element {
   const [iconError, setIconError] = useState(false);
-  const tone = statusToTone[connection.status];
   const iconUrl = getProviderIcon(connection.provider);
   const providerLabel = getProviderLabel(connection.provider);
 
@@ -83,14 +63,7 @@ export function ConnectionRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-semibold text-text-primary">{connection.name}</p>
-            <span
-              className={cn(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
-                tone.classes,
-              )}
-            >
-              {tone.label}
-            </span>
+            <ConnectionStatusBadge status={connection.status} />
           </div>
           <p className="mt-0.5 truncate text-xs text-text-secondary">
             {providerLabel} · last used {formatRelative(connection.lastUsedAt)}
