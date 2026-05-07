@@ -41,6 +41,14 @@ export {
   webhookConfigSchema,
 } from './schemas/node.schema.js';
 export {
+  webhookTriggerOutputSchema,
+  cronTriggerOutputSchema,
+  manualTriggerOutputSchema,
+  httpRequestOutputSchema,
+  conditionalOutputSchema,
+  nodeOutputSchemas,
+} from './schemas/node-output.schema.js';
+export {
   loginFormSchema,
   registerFormSchema,
   type LoginFormValues,
@@ -72,3 +80,8 @@ export {
 
 // Utilities
 export { sanitizePayload } from './utils/sanitize-payload.js';
+export {
+  resolveTemplate,
+  TemplatePathNotFoundError,
+  TEMPLATE_TOKEN_REGEX,
+} from './template-engine/template-engine.js';

@@ -1,0 +1,143 @@
+import { describe, it, expect } from 'vitest';
+import type { Edge, Node } from 'reactflow';
+import { z } from 'zod';
+import { NodeType } from '@tietide/shared';
+import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
+import { getUpstreamSchemas, walkSchema } from './upstream-schema';
+
+const mkNode = (id: string, nodeType: NodeType, label = id): Node<CustomNodeData> => ({
+  id,
+  type: 'custom',
+  position: { x: 0, y: 0 },
+  data: { label, nodeType },
+});
+
+const mkEdge = (source: string, target: string): Edge => ({
+  id: `${source}->${target}`,
+  source,
+  target,
+});
+
+describe('getUpstreamSchemas', () => {
+  it('returns no ancestors when the target has no incoming edges', () => {
+    const nodes = [mkNode('http', NodeType.HTTP_REQUEST)];
+    const edges: Edge[] = [];
+    const result = getUpstreamSchemas('http', nodes, edges);
+    expect(result.suggestions).toEqual([]);
+    expect(Object.keys(result.byNode)).toEqual([]);
+  });
+
+  it('lists upstream nodes from a linear A->B->C chain when called for C', () => {
+    const nodes = [
+      mkNode('A', NodeType.WEBHOOK_TRIGGER),
+      mkNode('B', NodeType.HTTP_REQUEST),
+      mkNode('C', NodeType.HTTP_REQUEST),
+    ];
+    const edges = [mkEdge('A', 'B'), mkEdge('B', 'C')];
+    const result = getUpstreamSchemas('C', nodes, edges);
+    const upstreamIds = new Set(result.suggestions.map((s) => s.nodeId));
+    expect(upstreamIds).toEqual(new Set(['A', 'B']));
+  });
+
+  it('orders suggestions by BFS distance — closest predecessors first', () => {
+    const nodes = [
+      mkNode('A', NodeType.WEBHOOK_TRIGGER),
+      mkNode('B', NodeType.HTTP_REQUEST),
+      mkNode('C', NodeType.HTTP_REQUEST),
+    ];
+    const edges = [mkEdge('A', 'B'), mkEdge('B', 'C')];
+    const result = getUpstreamSchemas('C', nodes, edges);
+    const firstId = result.suggestions[0]?.nodeId;
+    const lastId = result.suggestions[result.suggestions.length - 1]?.nodeId;
+    expect(firstId).toBe('B');
+    expect(lastId).toBe('A');
+  });
+
+  it('lists all ancestors of a diamond A->B,A->C,B->D,C->D when called for D', () => {
+    const nodes = [
+      mkNode('A', NodeType.WEBHOOK_TRIGGER),
+      mkNode('B', NodeType.HTTP_REQUEST),
+      mkNode('C', NodeType.HTTP_REQUEST),
+      mkNode('D', NodeType.HTTP_REQUEST),
+    ];
+    const edges = [mkEdge('A', 'B'), mkEdge('A', 'C'), mkEdge('B', 'D'), mkEdge('C', 'D')];
+    const result = getUpstreamSchemas('D', nodes, edges);
+    const upstreamIds = new Set(result.suggestions.map((s) => s.nodeId));
+    expect(upstreamIds).toEqual(new Set(['A', 'B', 'C']));
+  });
+
+  it('omits nodes whose type has no registered output schema (no throw)', () => {
+    const nodes = [
+      mkNode('U', 'unregistered-type' as NodeType),
+      mkNode('http', NodeType.HTTP_REQUEST),
+    ];
+    const edges = [mkEdge('U', 'http')];
+    const result = getUpstreamSchemas('http', nodes, edges);
+    expect(result.suggestions).toEqual([]);
+    expect(result.byNode).toEqual({});
+  });
+
+  it('expands httpRequestOutputSchema into nested paths for autocomplete', () => {
+    const nodes = [mkNode('http1', NodeType.HTTP_REQUEST), mkNode('http2', NodeType.HTTP_REQUEST)];
+    const edges = [mkEdge('http1', 'http2')];
+    const result = getUpstreamSchemas('http2', nodes, edges);
+    const paths = result.suggestions.map((s) => s.path);
+    expect(paths).toContain('statusCode');
+    expect(paths).toContain('headers');
+    expect(paths).toContain('body');
+    expect(paths).toContain('duration');
+  });
+
+  it('emits a single root entry for a record/passthrough schema (e.g., webhook trigger)', () => {
+    const nodes = [mkNode('wh', NodeType.WEBHOOK_TRIGGER), mkNode('http', NodeType.HTTP_REQUEST)];
+    const edges = [mkEdge('wh', 'http')];
+    const result = getUpstreamSchemas('http', nodes, edges);
+    const whSuggestions = result.suggestions.filter((s) => s.nodeId === 'wh');
+    expect(whSuggestions.length).toBeGreaterThan(0);
+  });
+
+  it('does not include the target node itself in suggestions', () => {
+    const nodes = [mkNode('A', NodeType.WEBHOOK_TRIGGER), mkNode('B', NodeType.HTTP_REQUEST)];
+    const edges = [mkEdge('A', 'B')];
+    const result = getUpstreamSchemas('B', nodes, edges);
+    expect(result.suggestions.some((s) => s.nodeId === 'B')).toBe(false);
+  });
+});
+
+describe('walkSchema', () => {
+  it('emits primitive paths for a flat object schema', () => {
+    const schema = z.object({ name: z.string(), age: z.number() });
+    const paths = walkSchema(schema).map((p) => p.path);
+    expect(paths.sort()).toEqual(['age', 'name']);
+  });
+
+  it('emits nested paths for nested objects', () => {
+    const schema = z.object({ user: z.object({ email: z.string() }) });
+    const paths = walkSchema(schema).map((p) => p.path);
+    expect(paths).toContain('user.email');
+  });
+
+  it('unwraps optional and nullable wrappers', () => {
+    const schema = z.object({ name: z.string().optional(), age: z.number().nullable() });
+    const paths = walkSchema(schema).map((p) => p.path);
+    expect(paths.sort()).toEqual(['age', 'name']);
+  });
+
+  it('emits an array index sample for arrays', () => {
+    const schema = z.object({ items: z.array(z.object({ id: z.string() })) });
+    const paths = walkSchema(schema).map((p) => p.path);
+    expect(paths.some((p) => p === 'items.0.id' || p === 'items.0')).toBe(true);
+  });
+
+  it('emits a single root entry when given a record/passthrough schema', () => {
+    const schema = z.record(z.unknown());
+    const paths = walkSchema(schema);
+    expect(paths.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('caps recursion depth defensively for cycles', () => {
+    type RecSchema = z.ZodType<unknown>;
+    const recursive: RecSchema = z.lazy(() => z.object({ next: recursive }));
+    expect(() => walkSchema(recursive as z.ZodTypeAny)).not.toThrow();
+  });
+});
