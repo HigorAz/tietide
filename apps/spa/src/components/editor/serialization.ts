@@ -1,7 +1,7 @@
 import type { Edge, Node } from 'reactflow';
 import {
   NODE_CATALOG,
-  type NodeType,
+  NodeType,
   type WorkflowDefinition,
   type WorkflowEdge,
   type WorkflowNode,
@@ -51,7 +51,7 @@ export function fromWorkflowDefinition(def: WorkflowDefinition): {
     if (n.skipped === true) data.skipped = true;
     return {
       id: n.id,
-      type: 'custom',
+      type: n.type === NodeType.STICKY ? 'sticky' : 'custom',
       position: { x: n.position.x, y: n.position.y },
       data,
     };
