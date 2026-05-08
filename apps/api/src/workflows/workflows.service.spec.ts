@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { ActivationService } from '../provider-triggers/activation.service';
 import { WorkflowsService } from './workflows.service';
 
 describe('WorkflowsService', () => {
@@ -102,11 +103,16 @@ describe('WorkflowsService', () => {
     });
     audit = { log: jest.fn().mockResolvedValue(undefined) };
 
+    const activation = {
+      activateForWorkflow: jest.fn().mockResolvedValue(undefined),
+      deactivateForWorkflow: jest.fn().mockResolvedValue(undefined),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowsService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogService, useValue: audit },
+        { provide: ActivationService, useValue: activation },
       ],
     }).compile();
 
