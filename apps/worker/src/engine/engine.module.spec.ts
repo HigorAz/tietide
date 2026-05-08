@@ -20,6 +20,7 @@ import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-searc
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { StripeEventReceivedPassthrough } from '../nodes/triggers/push/passthrough-push.executor';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -49,6 +50,7 @@ describe('EngineModule', () => {
     const excelAppend = new ExcelAppendAction(undefined as never);
     const excelRead = new ExcelReadAction(undefined as never);
     const onedriveCreate = new OnedriveCreateAction(undefined as never);
+    const stripeEventReceived = new StripeEventReceivedPassthrough();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -72,6 +74,7 @@ describe('EngineModule', () => {
       excelAppend,
       excelRead,
       onedriveCreate,
+      stripeEventReceived,
     );
     return {
       registry,
@@ -96,6 +99,7 @@ describe('EngineModule', () => {
       excelAppend,
       excelRead,
       onedriveCreate,
+      stripeEventReceived,
       module,
     };
   };
@@ -123,6 +127,7 @@ describe('EngineModule', () => {
       ['ExcelAppendAction', 'excel-append', 'excelAppend'],
       ['ExcelReadAction', 'excel-read', 'excelRead'],
       ['OnedriveCreateAction', 'onedrive-create', 'onedriveCreate'],
+      ['StripeEventReceivedPassthrough', 'stripe-event-received', 'stripeEventReceived'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -141,7 +146,7 @@ describe('EngineModule', () => {
         acc[e.category] = (acc[e.category] ?? 0) + 1;
         return acc;
       }, {});
-      expect(counts.trigger).toBe(3);
+      expect(counts.trigger).toBe(4);
       expect(counts.logic).toBe(4);
       // 1 generic action (http-request) + 8 Google connector actions
       // + 5 Microsoft connector actions = 14.

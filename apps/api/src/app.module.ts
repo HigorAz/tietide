@@ -11,6 +11,8 @@ import { WorkflowVersionsModule } from './workflow-versions/workflow-versions.mo
 import { ExecutionsModule } from './executions/executions.module';
 import { UsageModule } from './usage/usage.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { ProviderWebhooksModule } from './provider-webhooks/provider-webhooks.module';
+import { ProviderTriggerModule } from './provider-triggers/provider-trigger.module';
 import { SecretsModule } from './secrets/secrets.module';
 import { EnvVarsModule } from './env-vars/env-vars.module';
 import { ConnectionsModule } from './connections/connections.module';
@@ -39,6 +41,8 @@ import { TagsModule } from './tags/tags.module';
     ExecutionsModule,
     UsageModule,
     WebhooksModule,
+    ProviderTriggerModule,
+    ProviderWebhooksModule,
     SecretsModule,
     EnvVarsModule,
     ConnectionsModule,

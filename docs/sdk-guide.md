@@ -285,3 +285,136 @@ The `WorkflowDefinition` JSON is part of the public contract because saved workf
 - **Frontend rendering questions** — see `apps/spa/src/components/nodes/`.
 
 A new connector is small enough that one PR usually contains: the node + spec, the registry wiring, the icon, and the config form. Larger PRs are a smell — split them.
+
+---
+
+## 8. Building a `BasePushTrigger` (provider posts to us)
+
+Push triggers register a webhook with an external provider on workflow activation. Examples: Stripe payment events, GitHub issue updates, Slack messages.
+
+**Structure (3 pieces):**
+
+1. **The trigger class** in `apps/api/src/provider-triggers/triggers/<provider>-event-received.trigger.ts` — extends `BasePushTrigger`. Implements `onActivate`, `onDeactivate`, `verifySignature`. Lives in the API because all three lifecycle methods run there (activation when `isActive` flips, verification when the provider hits `/v1/provider-webhooks/...`).
+
+2. **A passthrough executor** in `apps/worker/src/nodes/triggers/push/passthrough-push.executor.ts` — registered for the same `node.type`. The worker only sees the trigger node during workflow execution; at that point the event payload is already in `input.data`, so the executor just forwards it to the next node.
+
+3. **The shared type registration** in `packages/shared/src/triggers/trigger-types.ts` — add the new `node.type` to `PUSH_TRIGGER_TYPES` and a `provider` slug entry to `TRIGGER_TYPE_TO_PROVIDER`. Both the API ingestion path and the worker NodeRegistry read these constants.
+
+**Skeleton:**
+
+```typescript
+// apps/api/src/provider-triggers/triggers/stripe-event-received.trigger.ts
+@Injectable()
+export class StripeEventReceivedTrigger extends BasePushTrigger {
+  readonly type = 'stripe-event-received';
+  readonly name = 'Stripe: Event Received';
+  readonly description = '...';
+
+  verifySignature(input: SignatureInput): boolean {
+    // 1. Extract provider's signature header (case-insensitive)
+    // 2. Parse it (Stripe: 't=...,v1=...'; GitHub: 'sha256=...'; Slack: 'v0=...')
+    // 3. Enforce timestamp replay window (5 minutes typical)
+    // 4. Recompute HMAC over `${ts}.${rawBody}` with input.signingSecret
+    // 5. crypto.timingSafeEqual against provided bytes — MUST be constant-time
+    // 6. Return false on any failure path
+  }
+
+  async onActivate(ctx: ActivationContext): Promise<ActivationResult> {
+    // 1. Pull credentials from ctx.connection.config (already decrypted)
+    // 2. Call the provider's "create webhook" API with ctx.callbackUrl
+    //    (callbackUrl already has /v1/provider-webhooks/<provider>/<subId> baked in)
+    // 3. Return { providerSubId, signingSecret, expiresAt? }
+    //    — providerSubId is whatever the provider needs to delete the subscription later
+    //    — signingSecret is what verifySignature will receive
+    //    — expiresAt is optional; renewer wakes for rows < now+24h
+  }
+
+  async onDeactivate(ctx: DeactivationContext): Promise<void> {
+    // Call the provider's "delete webhook" API with ctx.providerSubId.
+    // MUST be idempotent — handle the "already deleted" case gracefully
+    // (Stripe surfaces this as { code: 'resource_missing' }).
+  }
+}
+```
+
+**Security non-negotiables:**
+
+- `verifySignature` MUST use `crypto.timingSafeEqual` and reject early on length mismatch only — no early branching on byte content. See `webhooks/signature-helpers.ts` for the reference pattern.
+- The signing secret is encrypted at rest in `ProviderSubscription.secretEnc` via `CryptoService`. Never log it.
+- The provider API key (Stripe `sk_live_...`) lives in `Connection.configEncrypted`. Errors from provider SDK calls can include the URL with the bearer token — wrap or scrub before logging.
+- Activation runs inside `WorkflowsService.update`'s `$transaction`. If `onActivate` throws, the row is rolled back AND `isActive` stays false — the user sees the activation as failed.
+
+---
+
+## 9. Building a `BasePollTrigger` (we ask the provider periodically)
+
+Poll triggers run on a BullMQ repeatable in the worker. Examples: Google Sheets row added, Notion page updated, Trello card moved (any provider that doesn't push events).
+
+**Structure (2 pieces):**
+
+1. **The trigger class** in `apps/worker/src/nodes/triggers/poll/<thing>-<event>.ts` — extends `BasePollTrigger`. Implements `poll(ctx) → { items, newCursor }`. Lives in the worker because that's where the BullMQ tick fires. Reuses the same connection-decryption pipeline as `BaseConnectorAction`s.
+
+2. **The shared type registration** in `packages/shared/src/triggers/trigger-types.ts` — add the new `node.type` to `POLL_TRIGGER_TYPES`. Both the worker's `PollSchedulerService` (registers BullMQ repeatables) and the worker's `NodeRegistry` (resolves the executor) read this list.
+
+**Skeleton:**
+
+```typescript
+// apps/worker/src/nodes/triggers/poll/sheets-row-added.ts
+@Injectable()
+export class SheetsRowAddedTrigger extends BasePollTrigger {
+  readonly type = 'sheets-row-added';
+  readonly name = 'Sheets: Row Added';
+  readonly description = '...';
+  readonly defaultIntervalSeconds = 300; // user-overrideable via config.intervalSeconds
+
+  constructor(
+    private readonly authService: GoogleAuthService,
+    @Inject(GOOGLE_CLIENTS) private readonly clients: GoogleClientFactories,
+  ) {
+    super();
+  }
+
+  async poll(ctx: PollContext): Promise<PollResult> {
+    // 1. Cast ctx.config to your typed config interface; validate required fields.
+    // 2. Cast ctx.connection.config to the provider's typed config (zod-validated upstream).
+    // 3. Build the provider client (reuse existing GoogleAuthService / MicrosoftAuthService).
+    // 4. Call the provider's API with ctx.cursor as the "since" boundary.
+    // 5. Compute new items + new cursor. CRITICAL: never emit the same item twice.
+    //    - First tick (ctx.cursor === null): seed the cursor and emit nothing.
+    //      Otherwise activating a workflow on a 100-row sheet fires 100 executions instantly.
+    //    - Subsequent ticks: emit only items strictly past the cursor.
+    // 6. Return { items, newCursor }. The processor persists the cursor and creates one
+    //    WorkflowExecution per item, with idempotency keyed on hash(workflowId, nodeId, item).
+  }
+}
+```
+
+**Cursor strategies that work:**
+
+- **Last-seen ID** (when the provider exposes monotonically increasing IDs): cursor is the highest seen ID; query `?since=<cursor>`.
+- **Last-modified timestamp** (when the provider supports `?modifiedAfter=`): cursor is an ISO string; advance to the latest item's modified time.
+- **Last-seen row count** (Sheets, no row IDs available): cursor is the row count as a base-10 string; emit rows past `previousCount`. Holds steady on shrinkage.
+
+**The processor handles persistence and dedup** — your `poll()` is a pure-ish function over `(connection, config, cursor)` returning items + new cursor. The processor:
+
+- Reads the cursor from `TriggerCursor` before calling you.
+- Writes the new cursor on success.
+- Creates one `WorkflowExecution` per item with `idempotencyKey = poll:{workflowId}:{nodeId}:{sha256(item).slice(0,16)}`. If the key collides (worker crashed mid-batch and re-runs), the duplicate is skipped silently.
+
+---
+
+## 10. Wiring the trigger into the running system
+
+Both push and poll triggers need three small bits of wiring after the class exists:
+
+| Step                | Push trigger                                                                   | Poll trigger                                                        |
+| ------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Add to shared types | `PUSH_TRIGGER_TYPES` + `TRIGGER_TYPE_TO_PROVIDER`                              | `POLL_TRIGGER_TYPES`                                                |
+| Register in API     | `ProviderTriggerModule.onModuleInit` calls `registry.register(type, instance)` | n/a (no API-side registry)                                          |
+| Register in worker  | `EngineModule` adds a `Passthrough` executor for the `node.type`               | `PollModule.onModuleInit` calls `registry.register(type, instance)` |
+| Library palette     | Add to `apps/spa/src/lib/node-catalog.ts` (under "Triggers / Provider")        | Same                                                                |
+
+**Test what the framework expects you to test:**
+
+- Push: a happy-path `verifySignature`, a tampered-body rejection, a timestamp-replay rejection, an `onActivate` that asserts the provider SDK was called with the right callback URL, an `onDeactivate` that's idempotent under "already deleted".
+- Poll: `defaultIntervalSeconds` on the class, `poll()` reuse of the existing auth service, the empty/first-tick cursor seed behavior, growth-emits-per-item, no-growth-holds-cursor, and the shrink case.

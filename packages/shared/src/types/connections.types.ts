@@ -24,6 +24,7 @@ export const ConnectionProvider = {
   NOTION: 'notion',
   OPENAI: 'openai',
   ANTHROPIC: 'anthropic',
+  STRIPE: 'stripe',
 } as const;
 
 export type ConnectionProvider = (typeof ConnectionProvider)[keyof typeof ConnectionProvider];
