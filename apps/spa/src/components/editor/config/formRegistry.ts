@@ -9,6 +9,14 @@ import { ManualTriggerForm } from './ManualTriggerForm';
 import { ReturnForm } from './ReturnForm';
 import { SubworkflowForm } from './SubworkflowForm';
 import { WebhookForm } from './WebhookForm';
+import { GmailSendForm } from './google/GmailSendForm';
+import { GmailSearchForm } from './google/GmailSearchForm';
+import { DriveCreateForm } from './google/DriveCreateForm';
+import { DriveListForm } from './google/DriveListForm';
+import { SheetsAppendForm } from './google/SheetsAppendForm';
+import { SheetsReadForm } from './google/SheetsReadForm';
+import { DocsCreateForm } from './google/DocsCreateForm';
+import { CalendarCreateForm } from './google/CalendarCreateForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -25,4 +33,12 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.ITERATOR]: IteratorForm,
   [NodeType.SUBWORKFLOW]: SubworkflowForm,
   [NodeType.RETURN]: ReturnForm,
+  [NodeType.GMAIL_SEND]: GmailSendForm,
+  [NodeType.GMAIL_SEARCH]: GmailSearchForm,
+  [NodeType.DRIVE_CREATE]: DriveCreateForm,
+  [NodeType.DRIVE_LIST]: DriveListForm,
+  [NodeType.SHEETS_APPEND]: SheetsAppendForm,
+  [NodeType.SHEETS_READ]: SheetsReadForm,
+  [NodeType.DOCS_CREATE]: DocsCreateForm,
+  [NodeType.CALENDAR_CREATE]: CalendarCreateForm,
 };

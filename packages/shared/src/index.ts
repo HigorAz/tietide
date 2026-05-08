@@ -123,6 +123,26 @@ export {
   type AnthropicApiKeyConfig,
   type ProviderConfigMap,
 } from './schemas/connections.schema.js';
+export {
+  gmailSendConfigSchema,
+  gmailSearchConfigSchema,
+  driveCreateConfigSchema,
+  driveListConfigSchema,
+  sheetsAppendConfigSchema,
+  sheetsReadConfigSchema,
+  docsCreateConfigSchema,
+  calendarCreateConfigSchema,
+  GOOGLE_NODE_REQUIRED_SCOPES,
+  GOOGLE_NODE_TYPES,
+  type GmailSendConfig,
+  type GmailSearchConfig,
+  type DriveCreateConfig,
+  type DriveListConfig,
+  type SheetsAppendConfig,
+  type SheetsReadConfig,
+  type DocsCreateConfig,
+  type CalendarCreateConfig,
+} from './schemas/google.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,
