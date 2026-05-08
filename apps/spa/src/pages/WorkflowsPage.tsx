@@ -114,8 +114,7 @@ export function WorkflowsPage(): JSX.Element {
     setSelectedFolderId(folder);
     setSelectedTagIds(tagIds);
     void fetch({ folderId: folder, tagIds });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams.toString()]);
+  }, [searchParams, fetch, setSelectedFolderId, setSelectedTagIds]);
 
   useEffect(() => {
     void fetchFolders();
