@@ -25,6 +25,10 @@ export const ConnectionProvider = {
   OPENAI: 'openai',
   ANTHROPIC: 'anthropic',
   STRIPE: 'stripe',
+  DISCORD: 'discord',
+  DISCORD_BOT: 'discord-bot',
+  TWILIO: 'twilio',
+  TELEGRAM: 'telegram',
 } as const;
 
 export type ConnectionProvider = (typeof ConnectionProvider)[keyof typeof ConnectionProvider];

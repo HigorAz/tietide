@@ -99,7 +99,9 @@ export function ConnectionsPage(): JSX.Element {
   }, [closing]);
 
   const handlePick = async (provider: ProviderEntry): Promise<void> => {
-    if (provider.type === ConnectionType.API_KEY) {
+    // API_KEY and CUSTOM both render via the same form-from-schema modal.
+    // The modal sends back the right `type` because we now pass it through.
+    if (provider.type === ConnectionType.API_KEY || provider.type === ConnectionType.CUSTOM) {
       setApiKeyProvider(provider);
       return;
     }
@@ -250,6 +252,7 @@ export function ConnectionsPage(): JSX.Element {
       {apiKeyProvider && (
         <ApiKeyConnectionModal
           provider={apiKeyProvider.id}
+          type={apiKeyProvider.type}
           onClose={() => setApiKeyProvider(null)}
           onCreate={handleApiKeyCreate}
         />

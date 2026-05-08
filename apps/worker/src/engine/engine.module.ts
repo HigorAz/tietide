@@ -37,12 +37,27 @@ import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-searc
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { SlackClientFactory } from '../nodes/connectors/slack/slack-client.factory';
+import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
+import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
+import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
+import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
+import { TwilioClientFactory } from '../nodes/connectors/twilio/twilio-client.factory';
+import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
+import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
+import { TelegramClientFactory } from '../nodes/connectors/telegram/telegram-client.factory';
+import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
   OnedriveFileAddedPassthrough,
+  SlackMessageReceivedPassthrough,
+  SlackReactionAddedPassthrough,
+  DiscordMessageReceivedPassthrough,
+  TelegramMessageReceivedPassthrough,
+  TwilioSmsReceivedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -77,11 +92,26 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     ExcelAppendAction,
     ExcelReadAction,
     OnedriveCreateAction,
+    SlackClientFactory,
+    SlackPostMessageAction,
+    SlackPostToChannelAction,
+    SlackUploadFileAction,
+    DiscordPostWebhookAction,
+    TwilioClientFactory,
+    TwilioSendSmsAction,
+    TwilioSendWhatsAppAction,
+    TelegramClientFactory,
+    TelegramSendMessageAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
     OutlookMessageReceivedPassthrough,
     OutlookMessageFlaggedPassthrough,
     OnedriveFileAddedPassthrough,
+    SlackMessageReceivedPassthrough,
+    SlackReactionAddedPassthrough,
+    DiscordMessageReceivedPassthrough,
+    TelegramMessageReceivedPassthrough,
+    TwilioSmsReceivedPassthrough,
     GmailMessageReceivedExecutor,
     ExcelRowAddedTrigger,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
@@ -121,6 +151,18 @@ export class EngineModule implements OnModuleInit {
     private readonly outlookMessageFlagged: OutlookMessageFlaggedPassthrough,
     private readonly onedriveFileAdded: OnedriveFileAddedPassthrough,
     private readonly excelRowAdded: ExcelRowAddedTrigger,
+    private readonly slackPostMessage: SlackPostMessageAction,
+    private readonly slackPostToChannel: SlackPostToChannelAction,
+    private readonly slackUploadFile: SlackUploadFileAction,
+    private readonly discordPostWebhook: DiscordPostWebhookAction,
+    private readonly twilioSendSms: TwilioSendSmsAction,
+    private readonly twilioSendWhatsApp: TwilioSendWhatsAppAction,
+    private readonly telegramSendMessage: TelegramSendMessageAction,
+    private readonly slackMessageReceived: SlackMessageReceivedPassthrough,
+    private readonly slackReactionAdded: SlackReactionAddedPassthrough,
+    private readonly discordMessageReceived: DiscordMessageReceivedPassthrough,
+    private readonly telegramMessageReceived: TelegramMessageReceivedPassthrough,
+    private readonly twilioSmsReceived: TwilioSmsReceivedPassthrough,
   ) {}
 
   onModuleInit(): void {
@@ -152,5 +194,17 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.outlookMessageFlagged);
     this.registry.register(this.onedriveFileAdded);
     this.registry.register(this.excelRowAdded);
+    this.registry.register(this.slackPostMessage);
+    this.registry.register(this.slackPostToChannel);
+    this.registry.register(this.slackUploadFile);
+    this.registry.register(this.discordPostWebhook);
+    this.registry.register(this.twilioSendSms);
+    this.registry.register(this.twilioSendWhatsApp);
+    this.registry.register(this.telegramSendMessage);
+    this.registry.register(this.slackMessageReceived);
+    this.registry.register(this.slackReactionAdded);
+    this.registry.register(this.discordMessageReceived);
+    this.registry.register(this.telegramMessageReceived);
+    this.registry.register(this.twilioSmsReceived);
   }
 }

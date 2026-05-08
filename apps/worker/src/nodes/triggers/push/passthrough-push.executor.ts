@@ -76,3 +76,58 @@ export class OnedriveFileAddedPassthrough extends PassthroughPushExecutor {
     );
   }
 }
+
+@Injectable()
+export class SlackMessageReceivedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'slack-message-received',
+      'Slack: Message Received',
+      'Triggers when Slack delivers a message event to the workflow',
+    );
+  }
+}
+
+@Injectable()
+export class SlackReactionAddedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'slack-reaction-added',
+      'Slack: Reaction Added',
+      'Triggers when Slack delivers a reaction_added event to the workflow',
+    );
+  }
+}
+
+@Injectable()
+export class DiscordMessageReceivedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'discord-message-received',
+      'Discord: Slash Command Received',
+      'Triggers when a Discord slash command interaction is delivered to the workflow',
+    );
+  }
+}
+
+@Injectable()
+export class TelegramMessageReceivedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'telegram-message-received',
+      'Telegram: Message Received',
+      'Triggers when a Telegram bot receives a message',
+    );
+  }
+}
+
+@Injectable()
+export class TwilioSmsReceivedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'twilio-sms-received',
+      'Twilio: SMS Received',
+      'Triggers when a Twilio phone number receives an inbound SMS',
+    );
+  }
+}
