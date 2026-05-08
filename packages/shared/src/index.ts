@@ -157,6 +157,19 @@ export {
   type CalendarCreateConfig,
 } from './schemas/google.schema.js';
 export {
+  gmailMessageReceivedConfigSchema,
+  gmailLabelAddedConfigSchema,
+  driveFileAddedConfigSchema,
+  sheetsRowAddedConfigSchema,
+  calendarEventCreatedConfigSchema,
+  GOOGLE_TRIGGER_REQUIRED_SCOPES,
+  type GmailMessageReceivedConfig,
+  type GmailLabelAddedConfig,
+  type DriveFileAddedConfig,
+  type SheetsRowAddedConfig,
+  type CalendarEventCreatedConfig,
+} from './schemas/google-triggers.schema.js';
+export {
   outlookSendConfigSchema,
   outlookSearchConfigSchema,
   excelAppendConfigSchema,
