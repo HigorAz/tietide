@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
+import type { Workflow } from '@tietide/shared';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
 import { getNodeIcon } from '@/components/editor/nodes/nodeIcons';
+import { ImportWorkflowButton } from '@/components/dashboard/ImportWorkflowButton';
 import type { WorkflowTemplate } from '@/api/library';
 import { cn } from '@/utils/cn';
 
@@ -37,6 +39,10 @@ export function LibraryPage(): JSX.Element {
     });
   }, [templates, search, category]);
 
+  const handleImported = (created: Workflow): void => {
+    navigate(`/workflows/${created.id}`, { state: { from: '/library' } });
+  };
+
   const handleUseTemplate = async (slug: string): Promise<void> => {
     setBusySlugs((prev) => new Set(prev).add(slug));
     try {
@@ -56,13 +62,14 @@ export function LibraryPage(): JSX.Element {
   return (
     <div className="flex flex-col">
       <header className="border-b border-white/5 bg-surface">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-4">
           <div>
             <h1 className="text-lg font-semibold">Library</h1>
             <p className="text-xs text-text-secondary">
               Pre-built workflow templates — pick one and start customizing.
             </p>
           </div>
+          <ImportWorkflowButton variant="primary" onImported={handleImported} />
         </div>
       </header>
 

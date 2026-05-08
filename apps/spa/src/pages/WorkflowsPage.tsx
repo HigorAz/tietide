@@ -6,6 +6,7 @@ import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { WorkflowRow } from '@/components/dashboard/WorkflowRow';
 import { NewWorkflowModal } from '@/components/dashboard/NewWorkflowModal';
 import { DeleteWorkflowDialog } from '@/components/dashboard/DeleteWorkflowDialog';
+import { ImportWorkflowButton } from '@/components/dashboard/ImportWorkflowButton';
 import { useToastStore } from '@/stores/toastStore';
 import { getWorkflowDocs, regenerateWorkflowDocs } from '@/api/ai';
 import { cn } from '@/utils/cn';
@@ -87,6 +88,11 @@ export function WorkflowsPage(): JSX.Element {
       toast({ tone: 'error', message: errorMessage(err, 'Could not create workflow') });
       throw err;
     }
+  };
+
+  const handleImported = (created: Workflow): void => {
+    void fetch();
+    navigate(`/workflows/${created.id}`, { state: { from: '/workflows' } });
   };
 
   const handleDeleteConfirm = async (id: string): Promise<void> => {
@@ -212,6 +218,7 @@ export function WorkflowsPage(): JSX.Element {
               )}
             />
           </label>
+          <ImportWorkflowButton variant="secondary" onImported={handleImported} />
           <button
             type="button"
             onClick={() => setShowCreate(true)}

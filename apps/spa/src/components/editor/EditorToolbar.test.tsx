@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { NodeType, type Workflow } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { initialToastState, useToastStore } from '@/stores/toastStore';
+import { useWorkflowsStore } from '@/stores/workflowsStore';
 
 vi.mock('@/api/workflows', () => ({
   getWorkflow: vi.fn(),
@@ -15,6 +16,10 @@ vi.mock('@/api/executions', () => ({
   testWorkflow: vi.fn(),
 }));
 
+vi.mock('@/lib/downloadFile', () => ({
+  downloadJson: vi.fn(),
+}));
+
 const mockNavigate = vi.fn();
 const mockSetSearchParams = vi.fn();
 vi.mock('react-router-dom', () => ({
@@ -24,11 +29,13 @@ vi.mock('react-router-dom', () => ({
 
 import { updateWorkflow } from '@/api/workflows';
 import { executeWorkflow, testWorkflow } from '@/api/executions';
+import { downloadJson } from '@/lib/downloadFile';
 import { EditorToolbar } from './EditorToolbar';
 
 const mockedUpdate = vi.mocked(updateWorkflow);
 const mockedExecute = vi.mocked(executeWorkflow);
 const mockedTest = vi.mocked(testWorkflow);
+const mockedDownload = vi.mocked(downloadJson);
 
 const savedResponse: Workflow = {
   id: 'wf-1',
@@ -48,9 +55,11 @@ describe('EditorToolbar', () => {
   beforeEach(() => {
     useEditorStore.setState({ ...initialEditorState });
     useToastStore.setState({ ...initialToastState });
+    useWorkflowsStore.setState({ workflows: [], status: 'idle', error: null });
     mockedUpdate.mockReset();
     mockedExecute.mockReset();
     mockedTest.mockReset();
+    mockedDownload.mockReset();
     mockNavigate.mockReset();
     mockSetSearchParams.mockReset();
   });
@@ -420,6 +429,66 @@ describe('EditorToolbar', () => {
         expect(toast?.message).toBe('Execution started');
         expect(toast?.action).toBeUndefined();
       });
+    });
+  });
+
+  describe('Export (issue #134)', () => {
+    const seedWorkflow = (overrides: Partial<Workflow> = {}): void => {
+      const wf: Workflow = {
+        id: 'wf-1',
+        name: 'My Workflow',
+        description: null,
+        definition: { nodes: [], edges: [] },
+        isActive: false,
+        version: 1,
+        userId: 'user-1',
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-01T00:00:00Z'),
+        executionCount: 0,
+        documentation: null,
+        ...overrides,
+      };
+      useWorkflowsStore.setState({ workflows: [wf], status: 'ready', error: null });
+    };
+
+    it('should render an Export button', () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+      expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument();
+    });
+
+    it('should be disabled when the canvas is empty', () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+      expect(screen.getByRole('button', { name: /export/i })).toBeDisabled();
+    });
+
+    it('should call downloadJson with a filename derived from the workflow name and a valid envelope', async () => {
+      seedWorkflow({ name: 'Invoice Automation' });
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 10, y: 20 });
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /export/i }));
+
+      await waitFor(() => expect(mockedDownload).toHaveBeenCalledTimes(1));
+      const [filename, jsonString] = mockedDownload.mock.calls[0];
+      expect(filename).toBe('Invoice Automation.tietide.json');
+
+      const parsed = JSON.parse(jsonString) as Record<string, unknown>;
+      expect(parsed.tietideExportVersion).toBe(1);
+      expect(parsed.name).toBe('Invoice Automation');
+      const definition = parsed.definition as { nodes: Array<{ type: string }> };
+      expect(definition.nodes).toHaveLength(1);
+      expect(definition.nodes[0].type).toBe(NodeType.HTTP_REQUEST);
+    });
+
+    it('should fall back to "workflow" filename when the workflow is not found in the store', async () => {
+      useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      render(<EditorToolbar workflowId="wf-unknown" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /export/i }));
+
+      await waitFor(() => expect(mockedDownload).toHaveBeenCalledTimes(1));
+      const [filename] = mockedDownload.mock.calls[0];
+      expect(filename).toBe('workflow.tietide.json');
     });
   });
 
