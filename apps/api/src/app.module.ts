@@ -18,6 +18,7 @@ import { CryptoModule } from './crypto/crypto.module';
 import { AiModule } from './ai/ai.module';
 import { DemoModule } from './demo/demo.module';
 import { LibraryModule } from './library/library.module';
+import { FoldersModule } from './folders/folders.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { LibraryModule } from './library/library.module';
     AiModule,
     DemoModule,
     LibraryModule,
+    FoldersModule,
   ],
 })
 export class AppModule {}
