@@ -168,6 +168,116 @@ export class ActivationService {
     }
   }
 
+  async renewSubscription(subscriptionId: string): Promise<void> {
+    const baseUrl = this.requirePublicApiUrl();
+    const sub = await this.prisma.providerSubscription.findUnique({
+      where: { id: subscriptionId },
+      include: {
+        workflow: {
+          select: { id: true, userId: true, isActive: true, definition: true },
+        },
+      },
+    });
+    if (!sub) {
+      this.log.warn({ subscriptionId }, 'Renewal target missing; skipping');
+      return;
+    }
+    if (!sub.workflow.isActive) {
+      this.log.warn(
+        { subscriptionId, workflowId: sub.workflowId },
+        'Workflow is inactive; skipping renewal',
+      );
+      return;
+    }
+
+    const triggerNodes = this.extractPushTriggers(sub.workflow.definition);
+    const node = triggerNodes.find((t) => t.nodeId === sub.nodeId);
+    if (!node) {
+      this.log.warn(
+        { subscriptionId, nodeId: sub.nodeId },
+        'Trigger node no longer present in workflow definition; skipping renewal',
+      );
+      return;
+    }
+
+    const trigger = this.registry.getByProvider(sub.provider);
+    if (!trigger) {
+      this.log.warn(
+        { subscriptionId, provider: sub.provider },
+        'No trigger registered for provider; skipping renewal',
+      );
+      return;
+    }
+
+    const connectionIdRaw = node.config['connectionId'];
+    if (typeof connectionIdRaw !== 'string' || connectionIdRaw.length === 0) {
+      this.log.warn({ subscriptionId }, 'Trigger node has no connectionId; skipping renewal');
+      return;
+    }
+    const connRow = await this.prisma.connection.findFirst({
+      where: { id: connectionIdRaw, userId: sub.workflow.userId },
+    });
+    if (!connRow) {
+      this.log.warn(
+        { subscriptionId, connectionId: connectionIdRaw },
+        'Connection no longer exists for owner; skipping renewal',
+      );
+      return;
+    }
+    const decryptedConnection = this.toDecryptedConnection(connRow);
+
+    try {
+      await trigger.onDeactivate({
+        workflowId: sub.workflowId,
+        nodeId: sub.nodeId,
+        providerSubId: sub.providerSubId,
+        connection: decryptedConnection,
+        config: node.config,
+        logger: this.scopedLogger('renew.onDeactivate', sub.workflowId, sub.nodeId),
+      });
+    } catch (err) {
+      this.log.warn(
+        {
+          subscriptionId,
+          providerSubId: sub.providerSubId,
+          error: (err as Error).message,
+        },
+        'Best-effort onDeactivate failed during renewal',
+      );
+    }
+
+    const callbackUrl = `${baseUrl.replace(/\/+$/, '')}/v1/provider-webhooks/${sub.provider}/${sub.id}`;
+    const result = await trigger.onActivate({
+      workflowId: sub.workflowId,
+      nodeId: sub.nodeId,
+      callbackUrl,
+      connection: decryptedConnection,
+      config: node.config,
+      logger: this.scopedLogger('renew.onActivate', sub.workflowId, sub.nodeId),
+    });
+
+    const enc = this.crypto.encrypt(result.signingSecret);
+    await this.prisma.providerSubscription.update({
+      where: { id: sub.id },
+      data: {
+        providerSubId: result.providerSubId,
+        secretEnc: enc.ciphertext,
+        secretNonce: enc.nonce,
+        expiresAt: result.expiresAt ?? null,
+      },
+    });
+
+    this.log.log(
+      {
+        subscriptionId,
+        workflowId: sub.workflowId,
+        oldProviderSubId: sub.providerSubId,
+        newProviderSubId: result.providerSubId,
+      },
+      'Subscription renewed',
+    );
+  }
+
   private extractPushTriggers(definition: Prisma.JsonValue | null | undefined): PushTriggerNode[] {
     if (!definition || typeof definition !== 'object' || Array.isArray(definition)) return [];
     const def = definition as unknown as WorkflowDefinition;
