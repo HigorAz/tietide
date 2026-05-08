@@ -10,7 +10,9 @@ import { ActivationService, PUBLIC_API_URL_TOKEN } from './activation.service';
 interface PrismaMock {
   providerSubscription: {
     findMany: jest.Mock;
+    findUnique: jest.Mock;
     create: jest.Mock;
+    update: jest.Mock;
     delete: jest.Mock;
     deleteMany: jest.Mock;
   };
@@ -73,8 +75,13 @@ describe('ActivationService', () => {
     prisma = {
       providerSubscription: {
         findMany: jest.fn(async () => []),
+        findUnique: jest.fn(async () => null),
         create: jest.fn(async (args: { data: { id?: string } }) => ({
           id: 'new-sub',
+          ...args.data,
+        })),
+        update: jest.fn(async (args: { data: Record<string, unknown> }) => ({
+          id: 'sub-1',
           ...args.data,
         })),
         delete: jest.fn(async () => undefined),
@@ -260,6 +267,132 @@ describe('ActivationService', () => {
 
       expect(pushTrigger.onDeactivate).not.toHaveBeenCalled();
       expect(prisma.providerSubscription.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('renewSubscription — Microsoft Graph rotation', () => {
+    // Microsoft Graph caps mail subscriptions at ~70 hours; the renewer needs
+    // to call onDeactivate + onActivate well before that and update the row.
+    // We register a Microsoft trigger here and assert the full rotation path.
+
+    const microsoftDefinition = {
+      nodes: [
+        {
+          id: 'trigger-node-1',
+          type: 'outlook-message-received',
+          name: 'Outlook',
+          position: { x: 0, y: 0 },
+          config: { connectionId },
+        },
+      ],
+      edges: [],
+    } as unknown as Prisma.JsonValue;
+
+    let microsoftTrigger: {
+      onActivate: jest.Mock;
+      onDeactivate: jest.Mock;
+      verifySignature: jest.Mock;
+    };
+
+    beforeEach(() => {
+      microsoftTrigger = {
+        onActivate: jest.fn(async () => ({
+          providerSubId: 'graph-sub-NEW',
+          signingSecret: 'cs-new',
+          expiresAt: new Date('2026-05-11T00:00:00Z'),
+        })),
+        onDeactivate: jest.fn(async () => undefined),
+        verifySignature: jest.fn(),
+      };
+      registry.register('outlook-message-received', microsoftTrigger as never);
+
+      prisma.connection.findFirst.mockResolvedValue({
+        id: connectionId,
+        userId,
+        type: 'OAUTH2',
+        provider: 'microsoft',
+        configEncrypted: 'cfg-enc',
+        configNonce: 'cfg-nonce',
+        refreshTokenEncrypted: null,
+        refreshTokenNonce: null,
+      });
+      connections.decryptConfig.mockReturnValue({
+        accessToken: 'at',
+        refreshToken: 'rt',
+        scope: 'Mail.Read',
+        tokenType: 'Bearer',
+      });
+    });
+
+    it('rotates a Microsoft subscription nearing expiry: deactivate → activate → update', async () => {
+      prisma.providerSubscription.findUnique.mockResolvedValueOnce({
+        id: 'sub-1',
+        workflowId,
+        nodeId: 'trigger-node-1',
+        provider: 'microsoft',
+        providerSubId: 'graph-sub-OLD',
+        secretEnc: 'old-cipher',
+        secretNonce: 'old-nonce',
+        expiresAt: new Date('2026-05-09T00:00:00Z'),
+        workflow: {
+          id: workflowId,
+          userId,
+          isActive: true,
+          definition: microsoftDefinition,
+        },
+      });
+
+      await service.renewSubscription('sub-1');
+
+      expect(microsoftTrigger.onDeactivate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowId,
+          nodeId: 'trigger-node-1',
+          providerSubId: 'graph-sub-OLD',
+        }),
+      );
+      expect(microsoftTrigger.onActivate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowId,
+          nodeId: 'trigger-node-1',
+          callbackUrl: expect.stringContaining('/v1/provider-webhooks/microsoft/sub-1'),
+        }),
+      );
+      expect(crypto.encrypt).toHaveBeenCalledWith('cs-new');
+      expect(prisma.providerSubscription.update).toHaveBeenCalledWith({
+        where: { id: 'sub-1' },
+        data: expect.objectContaining({
+          providerSubId: 'graph-sub-NEW',
+          secretEnc: 'sig-cipher',
+          secretNonce: 'sig-nonce',
+          expiresAt: new Date('2026-05-11T00:00:00Z'),
+        }),
+      });
+    });
+
+    it('continues with onActivate even when onDeactivate throws (best-effort cleanup)', async () => {
+      prisma.providerSubscription.findUnique.mockResolvedValueOnce({
+        id: 'sub-1',
+        workflowId,
+        nodeId: 'trigger-node-1',
+        provider: 'microsoft',
+        providerSubId: 'graph-sub-OLD',
+        secretEnc: 'old-cipher',
+        secretNonce: 'old-nonce',
+        expiresAt: new Date('2026-05-09T00:00:00Z'),
+        workflow: {
+          id: workflowId,
+          userId,
+          isActive: true,
+          definition: microsoftDefinition,
+        },
+      });
+      microsoftTrigger.onDeactivate.mockRejectedValueOnce(new Error('graph 502'));
+
+      await service.renewSubscription('sub-1');
+
+      expect(microsoftTrigger.onActivate).toHaveBeenCalled();
+      expect(prisma.providerSubscription.update).toHaveBeenCalled();
     });
   });
 });
