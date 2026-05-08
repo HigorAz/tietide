@@ -41,6 +41,7 @@ import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
+import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -74,6 +75,7 @@ import {
     OnedriveCreateAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
+    GmailMessageReceivedExecutor,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -106,6 +108,7 @@ export class EngineModule implements OnModuleInit {
     private readonly onedriveCreate: OnedriveCreateAction,
     private readonly stripeEventReceived: StripeEventReceivedPassthrough,
     private readonly driveFileAdded: DriveFileAddedPassthrough,
+    private readonly gmailMessageReceived: GmailMessageReceivedExecutor,
   ) {}
 
   onModuleInit(): void {
@@ -132,5 +135,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.onedriveCreate);
     this.registry.register(this.stripeEventReceived);
     this.registry.register(this.driveFileAdded);
+    this.registry.register(this.gmailMessageReceived);
   }
 }

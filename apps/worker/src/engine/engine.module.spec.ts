@@ -24,6 +24,7 @@ import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
+import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -55,6 +56,10 @@ describe('EngineModule', () => {
     const onedriveCreate = new OnedriveCreateAction(undefined as never);
     const stripeEventReceived = new StripeEventReceivedPassthrough();
     const driveFileAdded = new DriveFileAddedPassthrough();
+    const gmailMessageReceived = new GmailMessageReceivedExecutor(
+      undefined as never,
+      undefined as never,
+    );
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -80,6 +85,7 @@ describe('EngineModule', () => {
       onedriveCreate,
       stripeEventReceived,
       driveFileAdded,
+      gmailMessageReceived,
     );
     return {
       registry,
@@ -106,6 +112,7 @@ describe('EngineModule', () => {
       onedriveCreate,
       stripeEventReceived,
       driveFileAdded,
+      gmailMessageReceived,
       module,
     };
   };
@@ -135,6 +142,7 @@ describe('EngineModule', () => {
       ['OnedriveCreateAction', 'onedrive-create', 'onedriveCreate'],
       ['StripeEventReceivedPassthrough', 'stripe-event-received', 'stripeEventReceived'],
       ['DriveFileAddedPassthrough', 'drive-file-added', 'driveFileAdded'],
+      ['GmailMessageReceivedExecutor', 'gmail-message-received', 'gmailMessageReceived'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -153,7 +161,7 @@ describe('EngineModule', () => {
         acc[e.category] = (acc[e.category] ?? 0) + 1;
         return acc;
       }, {});
-      expect(counts.trigger).toBe(5);
+      expect(counts.trigger).toBe(6);
       expect(counts.logic).toBe(4);
       // 1 generic action (http-request) + 8 Google connector actions
       // + 5 Microsoft connector actions = 14.
