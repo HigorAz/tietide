@@ -62,4 +62,6 @@ export const updateWorkflowSchema = z.object({
   description: z.string().max(1000).nullable().optional(),
   definition: workflowDefinitionSchema.optional(),
   isActive: z.boolean().optional(),
+  folderId: z.string().uuid().nullable().optional(),
+  tagIds: z.array(z.string().uuid()).max(20).optional(),
 });
