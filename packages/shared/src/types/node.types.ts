@@ -36,6 +36,10 @@ export const NodeType = {
   EXCEL_APPEND: 'excel-append',
   EXCEL_READ: 'excel-read',
   ONEDRIVE_CREATE: 'onedrive-create',
+  OUTLOOK_MESSAGE_RECEIVED: 'outlook-message-received',
+  OUTLOOK_MESSAGE_FLAGGED: 'outlook-message-flagged',
+  ONEDRIVE_FILE_ADDED: 'onedrive-file-added',
+  EXCEL_ROW_ADDED: 'excel-row-added',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -43,6 +47,7 @@ export type NodeType = (typeof NodeType)[keyof typeof NodeType];
 export const NodeGroup = {
   TRIGGERS: 'triggers',
   GOOGLE_TRIGGERS: 'google-triggers',
+  MICROSOFT_TRIGGERS: 'microsoft-triggers',
   ACTIONS: 'actions',
   LOGIC: 'logic',
   DATA: 'data',
@@ -59,6 +64,7 @@ export type NodeGroup = (typeof NodeGroup)[keyof typeof NodeGroup];
 export const NODE_GROUP_ORDER: readonly NodeGroup[] = [
   NodeGroup.TRIGGERS,
   NodeGroup.GOOGLE_TRIGGERS,
+  NodeGroup.MICROSOFT_TRIGGERS,
   NodeGroup.ACTIONS,
   NodeGroup.LOGIC,
   NodeGroup.DATA,
@@ -72,6 +78,7 @@ export const NODE_GROUP_ORDER: readonly NodeGroup[] = [
 export const NODE_GROUP_LABELS: Record<NodeGroup, string> = {
   [NodeGroup.TRIGGERS]: 'Triggers',
   [NodeGroup.GOOGLE_TRIGGERS]: 'Google Triggers',
+  [NodeGroup.MICROSOFT_TRIGGERS]: 'Microsoft Triggers',
   [NodeGroup.ACTIONS]: 'Actions',
   [NodeGroup.LOGIC]: 'Logic',
   [NodeGroup.DATA]: 'Data',
@@ -301,5 +308,39 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.TRIGGER,
     group: NodeGroup.GOOGLE_TRIGGERS,
     provider: 'google',
+  },
+  {
+    type: NodeType.OUTLOOK_MESSAGE_RECEIVED,
+    name: 'Outlook: Message Received',
+    description:
+      'Trigger when a new email arrives in the Outlook inbox (push, MS Graph subscription)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.MICROSOFT_TRIGGERS,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.OUTLOOK_MESSAGE_FLAGGED,
+    name: 'Outlook: Message Flagged',
+    description: 'Trigger when an Outlook message is flagged for follow-up (push, MS Graph)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.MICROSOFT_TRIGGERS,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.ONEDRIVE_FILE_ADDED,
+    name: 'OneDrive: File Added',
+    description: 'Trigger when a file is added to OneDrive (push, MS Graph drive subscription)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.MICROSOFT_TRIGGERS,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.EXCEL_ROW_ADDED,
+    name: 'Excel: Row Added',
+    description:
+      'Trigger when a new row is added to an Excel Online table (poll, row-index cursor)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.MICROSOFT_TRIGGERS,
+    provider: 'microsoft',
   },
 ];
