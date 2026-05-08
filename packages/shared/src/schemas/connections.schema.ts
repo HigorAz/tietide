@@ -39,12 +39,18 @@ export const anthropicApiKeyConfigSchema = z.object({
   apiKey: z.string().min(1),
 });
 
+export const stripeApiKeyConfigSchema = z.object({
+  apiKey: z.string().min(1),
+  accountId: z.string().optional(),
+});
+
 export type GoogleOAuth2Config = z.infer<typeof googleOAuth2ConfigSchema>;
 export type MicrosoftOAuth2Config = z.infer<typeof microsoftOAuth2ConfigSchema>;
 export type SlackOAuth2Config = z.infer<typeof slackOAuth2ConfigSchema>;
 export type NotionOAuth2Config = z.infer<typeof notionOAuth2ConfigSchema>;
 export type OpenAIApiKeyConfig = z.infer<typeof openAIApiKeyConfigSchema>;
 export type AnthropicApiKeyConfig = z.infer<typeof anthropicApiKeyConfigSchema>;
+export type StripeApiKeyConfig = z.infer<typeof stripeApiKeyConfigSchema>;
 
 export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.GOOGLE]: googleOAuth2ConfigSchema,
@@ -53,6 +59,7 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.NOTION]: notionOAuth2ConfigSchema,
   [ConnectionProvider.OPENAI]: openAIApiKeyConfigSchema,
   [ConnectionProvider.ANTHROPIC]: anthropicApiKeyConfigSchema,
+  [ConnectionProvider.STRIPE]: stripeApiKeyConfigSchema,
 } as const;
 
 export type ProviderConfigMap = {
@@ -62,4 +69,5 @@ export type ProviderConfigMap = {
   notion: NotionOAuth2Config;
   openai: OpenAIApiKeyConfig;
   anthropic: AnthropicApiKeyConfig;
+  stripe: StripeApiKeyConfig;
 };

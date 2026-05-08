@@ -114,6 +114,7 @@ export {
   notionOAuth2ConfigSchema,
   openAIApiKeyConfigSchema,
   anthropicApiKeyConfigSchema,
+  stripeApiKeyConfigSchema,
   PROVIDER_CONFIG_SCHEMAS,
   type GoogleOAuth2Config,
   type MicrosoftOAuth2Config,
@@ -121,8 +122,20 @@ export {
   type NotionOAuth2Config,
   type OpenAIApiKeyConfig,
   type AnthropicApiKeyConfig,
+  type StripeApiKeyConfig,
   type ProviderConfigMap,
 } from './schemas/connections.schema.js';
+export {
+  PUSH_TRIGGER_TYPES,
+  POLL_TRIGGER_TYPES,
+  PROVIDER_TRIGGER_PROVIDERS,
+  TRIGGER_TYPE_TO_PROVIDER,
+  isPushTriggerType,
+  isPollTriggerType,
+  type PushTriggerType,
+  type PollTriggerType,
+  type ProviderTriggerProvider,
+} from './triggers/trigger-types.js';
 export {
   gmailSendConfigSchema,
   gmailSearchConfigSchema,
