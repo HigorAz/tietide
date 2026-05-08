@@ -31,6 +31,12 @@ import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
 import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
+import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
+import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
+import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
+import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
+import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
+import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -56,6 +62,12 @@ import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create
     SheetsReadAction,
     DocsCreateAction,
     CalendarCreateAction,
+    MicrosoftAuthService,
+    OutlookSendAction,
+    OutlookSearchAction,
+    ExcelAppendAction,
+    ExcelReadAction,
+    OnedriveCreateAction,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -81,6 +93,11 @@ export class EngineModule implements OnModuleInit {
     private readonly sheetsRead: SheetsReadAction,
     private readonly docsCreate: DocsCreateAction,
     private readonly calendarCreate: CalendarCreateAction,
+    private readonly outlookSend: OutlookSendAction,
+    private readonly outlookSearch: OutlookSearchAction,
+    private readonly excelAppend: ExcelAppendAction,
+    private readonly excelRead: ExcelReadAction,
+    private readonly onedriveCreate: OnedriveCreateAction,
   ) {}
 
   onModuleInit(): void {
@@ -100,5 +117,10 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.sheetsRead);
     this.registry.register(this.docsCreate);
     this.registry.register(this.calendarCreate);
+    this.registry.register(this.outlookSend);
+    this.registry.register(this.outlookSearch);
+    this.registry.register(this.excelAppend);
+    this.registry.register(this.excelRead);
+    this.registry.register(this.onedriveCreate);
   }
 }
