@@ -77,10 +77,12 @@ export class LibraryService {
       definition: created.definition as Record<string, unknown>,
       isActive: created.isActive,
       version: created.version,
+      folderId: null,
       createdAt: created.createdAt,
       updatedAt: created.updatedAt,
       executionCount: 0,
       documentation: null,
+      tags: [],
     };
   }
 }

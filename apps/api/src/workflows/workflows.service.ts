@@ -19,11 +19,22 @@ const SAFE_SELECT = {
   definition: true,
   isActive: true,
   version: true,
+  folderId: true,
   createdAt: true,
   updatedAt: true,
   _count: { select: { executions: true } },
   documentation: { select: { updatedAt: true, version: true } },
+  tags: {
+    select: {
+      tag: { select: { id: true, name: true, color: true } },
+    },
+  },
 } as const;
+
+export interface WorkflowListFilter {
+  folderId?: string | null;
+  tagIds?: string[];
+}
 
 function assertExecutableDefinition(definition: unknown): void {
   try {
@@ -87,9 +98,17 @@ export class WorkflowsService {
     return this.toResponse(row);
   }
 
-  async list(userId: string): Promise<WorkflowResponseDto[]> {
+  async list(userId: string, filter: WorkflowListFilter = {}): Promise<WorkflowResponseDto[]> {
+    const where: Prisma.WorkflowWhereInput = { userId };
+    if (filter.folderId !== undefined) {
+      where.folderId = filter.folderId;
+    }
+    if (filter.tagIds && filter.tagIds.length > 0) {
+      where.tags = { some: { tagId: { in: filter.tagIds } } };
+    }
+
     const rows = await this.prisma.workflow.findMany({
-      where: { userId },
+      where,
       select: SAFE_SELECT,
       orderBy: { createdAt: 'desc' },
     });
@@ -119,11 +138,13 @@ export class WorkflowsService {
       dto.name !== undefined ||
       dto.description !== undefined ||
       dto.definition !== undefined ||
-      dto.isActive !== undefined;
+      dto.isActive !== undefined ||
+      dto.folderId !== undefined ||
+      dto.tagIds !== undefined;
 
     if (!hasAnyField) {
       throw new BadRequestException(
-        'Provide at least one of: name, description, definition, isActive',
+        'Provide at least one of: name, description, definition, isActive, folderId, tagIds',
       );
     }
 
@@ -142,6 +163,14 @@ export class WorkflowsService {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
+    if (dto.folderId !== undefined && dto.folderId !== null) {
+      await this.assertFolderOwnedByUser(userId, dto.folderId);
+    }
+
+    if (dto.tagIds !== undefined && dto.tagIds.length > 0) {
+      await this.assertTagsOwnedByUser(userId, dto.tagIds);
+    }
+
     const data: Prisma.WorkflowUpdateInput = {};
     if (dto.name !== undefined) {
       data.name = dto.name;
@@ -155,6 +184,16 @@ export class WorkflowsService {
     }
     if (dto.isActive !== undefined) {
       data.isActive = dto.isActive;
+    }
+    if (dto.folderId !== undefined) {
+      data.folder =
+        dto.folderId === null ? { disconnect: true } : { connect: { id: dto.folderId } };
+    }
+    if (dto.tagIds !== undefined) {
+      data.tags = {
+        deleteMany: {},
+        create: dto.tagIds.map((tagId) => ({ tag: { connect: { id: tagId } } })),
+      };
     }
 
     let row;
@@ -225,6 +264,26 @@ export class WorkflowsService {
     });
   }
 
+  private async assertFolderOwnedByUser(userId: string, folderId: string): Promise<void> {
+    const owned = await this.prisma.folder.findFirst({
+      where: { id: folderId, userId },
+      select: { id: true },
+    });
+    if (!owned) {
+      throw new NotFoundException('Folder not found');
+    }
+  }
+
+  private async assertTagsOwnedByUser(userId: string, tagIds: string[]): Promise<void> {
+    const owned = await this.prisma.tag.findMany({
+      where: { id: { in: tagIds }, userId },
+      select: { id: true },
+    });
+    if (owned.length !== tagIds.length) {
+      throw new NotFoundException('One or more tags not found');
+    }
+  }
+
   private toResponse(row: {
     id: string;
     name: string;
@@ -232,10 +291,12 @@ export class WorkflowsService {
     definition: unknown;
     isActive: boolean;
     version: number;
+    folderId?: string | null;
     createdAt: Date;
     updatedAt: Date;
     _count?: { executions: number };
     documentation?: { updatedAt: Date; version: number } | null;
+    tags?: { tag: { id: string; name: string; color: string | null } }[];
   }): WorkflowResponseDto {
     return {
       id: row.id,
@@ -244,12 +305,14 @@ export class WorkflowsService {
       definition: row.definition as Record<string, unknown>,
       isActive: row.isActive,
       version: row.version,
+      folderId: row.folderId ?? null,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
       executionCount: row._count?.executions ?? 0,
       documentation: row.documentation
         ? { generatedAt: row.documentation.updatedAt, version: row.documentation.version }
         : null,
+      tags: (row.tags ?? []).map((t) => t.tag),
     };
   }
 }

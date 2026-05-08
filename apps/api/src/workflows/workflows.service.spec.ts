@@ -19,6 +19,12 @@ describe('WorkflowsService', () => {
     workflowVersion: {
       create: jest.Mock;
     };
+    folder: {
+      findFirst: jest.Mock;
+    };
+    tag: {
+      findMany: jest.Mock;
+    };
     $transaction: jest.Mock;
   };
 
@@ -46,17 +52,25 @@ describe('WorkflowsService', () => {
     definition: validDefinition,
     isActive: false,
     version: 1,
+    folderId: null as string | null,
     createdAt: new Date('2026-04-17T00:00:00Z'),
     updatedAt: new Date('2026-04-17T00:00:00Z'),
     _count: { executions: 0 },
-    documentation: null,
+    documentation: null as { updatedAt: Date; version: number } | null,
+    tags: [] as { tag: { id: string; name: string; color: string | null } }[],
   };
 
-  const { _count: _persistedCount, documentation: _persistedDoc, ...persistedFields } = persisted;
+  const {
+    _count: _persistedCount,
+    documentation: _persistedDoc,
+    tags: _persistedTags,
+    ...persistedFields
+  } = persisted;
   const persistedResponse = {
     ...persistedFields,
     executionCount: _persistedCount.executions,
     documentation: _persistedDoc,
+    tags: _persistedTags.map((t) => t.tag),
   };
 
   beforeEach(async () => {
@@ -70,6 +84,12 @@ describe('WorkflowsService', () => {
       },
       workflowVersion: {
         create: jest.fn().mockResolvedValue({}),
+      },
+      folder: {
+        findFirst: jest.fn(),
+      },
+      tag: {
+        findMany: jest.fn(),
       },
       $transaction: jest.fn(),
     };
@@ -523,6 +543,172 @@ describe('WorkflowsService', () => {
 
       expect(prisma.workflow.update).not.toHaveBeenCalled();
       expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('list — filters', () => {
+    const folderUuid = '550e8400-e29b-41d4-a716-446655440010';
+    const tagUuidA = '550e8400-e29b-41d4-a716-446655440020';
+    const tagUuidB = '550e8400-e29b-41d4-a716-446655440021';
+
+    it('passes folderId=null to where when filter.folderId === null', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId, { folderId: null });
+
+      expect(prisma.workflow.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId, folderId: null } }),
+      );
+    });
+
+    it('passes folderId=<uuid> to where when filter.folderId is a uuid', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId, { folderId: folderUuid });
+
+      expect(prisma.workflow.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { userId, folderId: folderUuid } }),
+      );
+    });
+
+    it('omits folderId from where when filter.folderId is undefined', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId, {});
+
+      const call = prisma.workflow.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+      expect(call.where).toEqual({ userId });
+    });
+
+    it('builds tags.some filter when tagIds provided', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId, { tagIds: [tagUuidA, tagUuidB] });
+
+      expect(prisma.workflow.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId, tags: { some: { tagId: { in: [tagUuidA, tagUuidB] } } } },
+        }),
+      );
+    });
+
+    it('skips tags filter when tagIds is empty', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId, { tagIds: [] });
+
+      const call = prisma.workflow.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
+      expect(call.where).toEqual({ userId });
+    });
+
+    it('combines folderId and tagIds filters', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId, { folderId: folderUuid, tagIds: [tagUuidA] });
+
+      expect(prisma.workflow.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId,
+            folderId: folderUuid,
+            tags: { some: { tagId: { in: [tagUuidA] } } },
+          },
+        }),
+      );
+    });
+
+    it('maps nested tags to flat WorkflowTagSummary array in response', async () => {
+      const tagRow = { tag: { id: tagUuidA, name: 'client-a', color: '#3366cc' } };
+      prisma.workflow.findMany.mockResolvedValue([{ ...persisted, tags: [tagRow] }]);
+
+      const [row] = await service.list(userId);
+
+      expect(row.tags).toEqual([{ id: tagUuidA, name: 'client-a', color: '#3366cc' }]);
+    });
+  });
+
+  describe('update — folderId and tagIds', () => {
+    const folderUuid = '550e8400-e29b-41d4-a716-446655440010';
+    const tagUuidA = '550e8400-e29b-41d4-a716-446655440020';
+
+    beforeEach(() => {
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.update.mockResolvedValue({ ...persisted, version: 1 });
+    });
+
+    it('connects folder when folderId is a uuid the user owns', async () => {
+      prisma.folder.findFirst.mockResolvedValue({ id: folderUuid });
+
+      await service.update(userId, workflowId, { folderId: folderUuid });
+
+      expect(prisma.folder.findFirst).toHaveBeenCalledWith({
+        where: { id: folderUuid, userId },
+        select: { id: true },
+      });
+      expect(prisma.workflow.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ folder: { connect: { id: folderUuid } } }),
+        }),
+      );
+    });
+
+    it('rejects folderId belonging to another user (NotFoundException)', async () => {
+      prisma.folder.findFirst.mockResolvedValue(null);
+
+      await expect(service.update(userId, workflowId, { folderId: folderUuid })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.workflow.update).not.toHaveBeenCalled();
+    });
+
+    it('disconnects folder when folderId is null', async () => {
+      await service.update(userId, workflowId, { folderId: null });
+
+      expect(prisma.workflow.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ folder: { disconnect: true } }),
+        }),
+      );
+    });
+
+    it('replaces tag set with deleteMany + create when tagIds provided', async () => {
+      prisma.tag.findMany.mockResolvedValue([{ id: tagUuidA }]);
+
+      await service.update(userId, workflowId, { tagIds: [tagUuidA] });
+
+      expect(prisma.workflow.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tags: {
+              deleteMany: {},
+              create: [{ tag: { connect: { id: tagUuidA } } }],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('rejects when any tagId belongs to another user (NotFoundException)', async () => {
+      prisma.tag.findMany.mockResolvedValue([]); // none owned
+
+      await expect(service.update(userId, workflowId, { tagIds: [tagUuidA] })).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.workflow.update).not.toHaveBeenCalled();
+    });
+
+    it('clears tags when tagIds is an empty array', async () => {
+      await service.update(userId, workflowId, { tagIds: [] });
+
+      expect(prisma.workflow.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tags: { deleteMany: {}, create: [] },
+          }),
+        }),
+      );
+      // No need to validate tags when array is empty
+      expect(prisma.tag.findMany).not.toHaveBeenCalled();
     });
   });
 
