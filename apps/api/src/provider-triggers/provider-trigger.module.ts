@@ -17,6 +17,19 @@ import {
   GMAIL_MESSAGE_RECEIVED_TYPE,
 } from './triggers/gmail-message-received.trigger';
 import { GoogleClientFactory } from './triggers/google/google-client.factory';
+import { MicrosoftGraphFactory } from './triggers/microsoft/microsoft-graph.factory';
+import {
+  OutlookMessageReceivedTrigger,
+  OUTLOOK_MESSAGE_RECEIVED_TYPE,
+} from './triggers/outlook-message-received.trigger';
+import {
+  OutlookMessageFlaggedTrigger,
+  OUTLOOK_MESSAGE_FLAGGED_TYPE,
+} from './triggers/outlook-message-flagged.trigger';
+import {
+  OnedriveFileAddedTrigger,
+  ONEDRIVE_FILE_ADDED_TYPE,
+} from './triggers/onedrive-file-added.trigger';
 import { RENEWAL_QUEUE_NAME } from './renewal/subscription-renewer.constants';
 import { SubscriptionRenewerProcessor } from './renewal/subscription-renewer.processor';
 import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-bootstrap.service';
@@ -35,6 +48,10 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     GoogleClientFactory,
     DriveFileAddedTrigger,
     GmailMessageReceivedTrigger,
+    MicrosoftGraphFactory,
+    OutlookMessageReceivedTrigger,
+    OutlookMessageFlaggedTrigger,
+    OnedriveFileAddedTrigger,
     ActivationService,
     SubscriptionRenewerProcessor,
     SubscriptionRenewerBootstrap,
@@ -53,11 +70,17 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly stripeTrigger: StripeEventReceivedTrigger,
     private readonly driveFileAdded: DriveFileAddedTrigger,
     private readonly gmailMessageReceived: GmailMessageReceivedTrigger,
+    private readonly outlookMessageReceived: OutlookMessageReceivedTrigger,
+    private readonly outlookMessageFlagged: OutlookMessageFlaggedTrigger,
+    private readonly onedriveFileAdded: OnedriveFileAddedTrigger,
   ) {}
 
   onModuleInit(): void {
     this.registry.register(STRIPE_EVENT_RECEIVED_TYPE, this.stripeTrigger);
     this.registry.register(DRIVE_FILE_ADDED_TYPE, this.driveFileAdded);
     this.registry.register(GMAIL_MESSAGE_RECEIVED_TYPE, this.gmailMessageReceived);
+    this.registry.register(OUTLOOK_MESSAGE_RECEIVED_TYPE, this.outlookMessageReceived);
+    this.registry.register(OUTLOOK_MESSAGE_FLAGGED_TYPE, this.outlookMessageFlagged);
+    this.registry.register(ONEDRIVE_FILE_ADDED_TYPE, this.onedriveFileAdded);
   }
 }
