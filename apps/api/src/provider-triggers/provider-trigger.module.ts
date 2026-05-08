@@ -12,6 +12,10 @@ import {
 } from './triggers/stripe-event-received.trigger';
 import { StripeClientFactory } from './triggers/stripe-client.factory';
 import { DriveFileAddedTrigger, DRIVE_FILE_ADDED_TYPE } from './triggers/drive-file-added.trigger';
+import {
+  GmailMessageReceivedTrigger,
+  GMAIL_MESSAGE_RECEIVED_TYPE,
+} from './triggers/gmail-message-received.trigger';
 import { GoogleClientFactory } from './triggers/google/google-client.factory';
 import { RENEWAL_QUEUE_NAME } from './renewal/subscription-renewer.constants';
 import { SubscriptionRenewerProcessor } from './renewal/subscription-renewer.processor';
@@ -30,6 +34,7 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     StripeEventReceivedTrigger,
     GoogleClientFactory,
     DriveFileAddedTrigger,
+    GmailMessageReceivedTrigger,
     ActivationService,
     SubscriptionRenewerProcessor,
     SubscriptionRenewerBootstrap,
@@ -47,10 +52,12 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly registry: ProviderTriggerRegistry,
     private readonly stripeTrigger: StripeEventReceivedTrigger,
     private readonly driveFileAdded: DriveFileAddedTrigger,
+    private readonly gmailMessageReceived: GmailMessageReceivedTrigger,
   ) {}
 
   onModuleInit(): void {
     this.registry.register(STRIPE_EVENT_RECEIVED_TYPE, this.stripeTrigger);
     this.registry.register(DRIVE_FILE_ADDED_TYPE, this.driveFileAdded);
+    this.registry.register(GMAIL_MESSAGE_RECEIVED_TYPE, this.gmailMessageReceived);
   }
 }

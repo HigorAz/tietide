@@ -5,6 +5,17 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] — 2026-05-08
+
+### Changed (covariant)
+
+- `BasePushTrigger.verifySignature` return type widened from `boolean` to
+  `boolean | Promise<boolean>`. Existing sync impls (Stripe, Drive HMAC-style
+  verifiers) still satisfy the new signature unchanged. Required so triggers
+  that need an async verification path — e.g. Gmail Pub/Sub OIDC ID token
+  verification against Google's JWKS — can return a Promise. Callers must
+  `await Promise.resolve(trigger.verifySignature(...))`.
+
 ## [2.1.0] — 2026-05-08
 
 ### Added

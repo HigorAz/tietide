@@ -39,7 +39,7 @@ export class ProviderWebhooksService {
     const subscription = await this.prisma.providerSubscription.findUnique({
       where: { id: input.subscriptionId },
       include: {
-        workflow: { select: { id: true, userId: true, isActive: true } },
+        workflow: { select: { id: true, userId: true, isActive: true, definition: true } },
       },
     });
 
@@ -51,30 +51,42 @@ export class ProviderWebhooksService {
       throw new NotFoundException('Provider webhook not found');
     }
 
-    const trigger = this.registry.getByProvider(input.provider);
+    // The trigger TYPE is required to dispatch verifySignature/onActivate. We
+    // resolve it via the workflow definition (a single provider can map to
+    // multiple types — Google has both drive-file-added and gmail-message-received).
+    const triggerType = this.findTriggerTypeInDefinition(
+      subscription.workflow.definition,
+      subscription.nodeId,
+    );
+    const trigger = triggerType ? this.registry.getByType(triggerType) : null;
     if (!trigger) {
       throw new NotFoundException('Provider webhook not found');
     }
 
     const signingSecret = this.crypto.decrypt(subscription.secretEnc, subscription.secretNonce);
 
-    const verified = trigger.verifySignature({
-      rawBody: input.rawBody,
-      headers: input.headers,
-      signingSecret,
-    });
+    // BasePushTrigger.verifySignature returns boolean | Promise<boolean> (sync
+    // for HMAC-style triggers like Stripe/Drive; async for triggers that need
+    // to verify an OIDC ID token like Gmail Pub/Sub).
+    const verified = await Promise.resolve(
+      trigger.verifySignature({
+        rawBody: input.rawBody,
+        headers: input.headers,
+        signingSecret,
+      }),
+    );
     if (!verified) {
       throw new UnauthorizedException('Invalid signature');
     }
 
     const triggerData = this.parseBody(input.rawBody);
-    const triggerType = `provider:${subscription.provider}`;
+    const executionTriggerType = `provider:${subscription.provider}`;
 
     const created = await this.prisma.workflowExecution.create({
       data: {
         workflowId: subscription.workflow.id,
         status: 'PENDING',
-        triggerType,
+        triggerType: executionTriggerType,
         triggerData: triggerData as Prisma.InputJsonValue,
       },
     });
@@ -82,7 +94,7 @@ export class ProviderWebhooksService {
     const payload: WorkflowExecutionJobPayload = {
       executionId: created.id,
       workflowId: subscription.workflow.id,
-      triggerType,
+      triggerType: executionTriggerType,
       triggerData,
       userId: subscription.workflow.userId,
       requestId: input.requestId,
@@ -122,5 +134,22 @@ export class ProviderWebhooksService {
     } catch {
       return { raw: rawBody.toString('utf8') };
     }
+  }
+
+  private findTriggerTypeInDefinition(
+    definition: Prisma.JsonValue | null,
+    nodeId: string,
+  ): string | null {
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) return null;
+    const def = definition as { nodes?: unknown };
+    if (!Array.isArray(def.nodes)) return null;
+    for (const n of def.nodes) {
+      if (!n || typeof n !== 'object' || Array.isArray(n)) continue;
+      const node = n as { id?: unknown; type?: unknown };
+      if (node.id === nodeId && typeof node.type === 'string') {
+        return node.type;
+      }
+    }
+    return null;
   }
 }
