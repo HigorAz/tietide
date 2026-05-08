@@ -24,6 +24,7 @@ import {
   GoogleAuthService,
 } from '../nodes/connectors/google/google-auth';
 import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
+import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -42,6 +43,7 @@ import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
     GoogleAuthService,
     { provide: GOOGLE_CLIENTS, useValue: DEFAULT_GOOGLE_CLIENTS },
     GmailSendAction,
+    GmailSearchAction,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -60,6 +62,7 @@ export class EngineModule implements OnModuleInit {
     private readonly iteratorNode: IteratorNode,
     private readonly subworkflowAction: SubworkflowAction,
     private readonly gmailSend: GmailSendAction,
+    private readonly gmailSearch: GmailSearchAction,
   ) {}
 
   onModuleInit(): void {
@@ -72,5 +75,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.iteratorNode);
     this.registry.register(this.subworkflowAction);
     this.registry.register(this.gmailSend);
+    this.registry.register(this.gmailSearch);
   }
 }

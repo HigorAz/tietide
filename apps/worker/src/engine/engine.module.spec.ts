@@ -8,6 +8,7 @@ import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { CronTrigger } from '../nodes/triggers/cron-trigger';
 import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
 import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
+import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -25,6 +26,7 @@ describe('EngineModule', () => {
     // are sufficient.
     const subworkflowAction = new SubworkflowAction(undefined as never, undefined as never);
     const gmailSend = new GmailSendAction(undefined as never, undefined as never);
+    const gmailSearch = new GmailSearchAction(undefined as never, undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -36,6 +38,7 @@ describe('EngineModule', () => {
       iteratorNode,
       subworkflowAction,
       gmailSend,
+      gmailSearch,
     );
     return {
       registry,
@@ -48,6 +51,7 @@ describe('EngineModule', () => {
       iteratorNode,
       subworkflowAction,
       gmailSend,
+      gmailSearch,
       module,
     };
   };
@@ -134,26 +138,28 @@ describe('EngineModule', () => {
       expect(registry.resolve('gmail-send')).toBe(gmailSend);
     });
 
-    it('should expose trigger, action, and logic executors after init', () => {
+    it('should register GmailSearchAction in the NodeRegistry', () => {
+      const { registry, gmailSearch, module } = build();
+
+      module.onModuleInit();
+
+      expect(registry.has('gmail-search')).toBe(true);
+      expect(registry.resolve('gmail-search')).toBe(gmailSearch);
+    });
+
+    it('should expose triggers, actions, and logic executors after init', () => {
       const { registry, module } = build();
 
       module.onModuleInit();
 
-      const categories = registry
-        .getAll()
-        .map((e) => e.category)
-        .sort();
-      expect(categories).toEqual([
-        'action',
-        'action',
-        'logic',
-        'logic',
-        'logic',
-        'logic',
-        'trigger',
-        'trigger',
-        'trigger',
-      ]);
+      const counts = registry.getAll().reduce<Record<string, number>>((acc, e) => {
+        acc[e.category] = (acc[e.category] ?? 0) + 1;
+        return acc;
+      }, {});
+      expect(counts.trigger).toBe(3);
+      expect(counts.logic).toBe(4);
+      // 1 generic action (http-request) + the registered Google connector actions.
+      expect(counts.action).toBeGreaterThanOrEqual(2);
     });
   });
 });

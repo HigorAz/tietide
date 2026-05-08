@@ -10,6 +10,7 @@ import { ReturnForm } from './ReturnForm';
 import { SubworkflowForm } from './SubworkflowForm';
 import { WebhookForm } from './WebhookForm';
 import { GmailSendForm } from './google/GmailSendForm';
+import { GmailSearchForm } from './google/GmailSearchForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -27,4 +28,5 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.SUBWORKFLOW]: SubworkflowForm,
   [NodeType.RETURN]: ReturnForm,
   [NodeType.GMAIL_SEND]: GmailSendForm,
+  [NodeType.GMAIL_SEARCH]: GmailSearchForm,
 };
