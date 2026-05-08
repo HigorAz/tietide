@@ -307,4 +307,46 @@ describe('workflowsStore', () => {
       expect(row?.tags).toEqual([{ id: 't1', name: 'foo', color: null }]);
     });
   });
+
+  describe('rename', () => {
+    it('optimistically updates name and replaces with server response', async () => {
+      useWorkflowsStore.setState({
+        workflows: [makeWorkflow({ id: 'a', name: 'Old' })],
+        status: 'ready',
+      });
+      const updated = makeWorkflow({ id: 'a', name: 'New', version: 2 });
+      mockedUpdate.mockResolvedValueOnce(updated);
+
+      await useWorkflowsStore.getState().rename('a', 'New');
+
+      expect(mockedUpdate).toHaveBeenCalledWith('a', { name: 'New' });
+      const row = useWorkflowsStore.getState().workflows.find((w) => w.id === 'a');
+      expect(row?.name).toBe('New');
+      expect(row?.version).toBe(2);
+    });
+
+    it('reverts the optimistic name change when the API rejects', async () => {
+      useWorkflowsStore.setState({
+        workflows: [makeWorkflow({ id: 'a', name: 'Old' })],
+        status: 'ready',
+      });
+      mockedUpdate.mockRejectedValueOnce(new Error('forbidden'));
+
+      await expect(useWorkflowsStore.getState().rename('a', 'New')).rejects.toThrow('forbidden');
+
+      const row = useWorkflowsStore.getState().workflows.find((w) => w.id === 'a');
+      expect(row?.name).toBe('Old');
+    });
+
+    it('does nothing when the id is not in the list', async () => {
+      useWorkflowsStore.setState({
+        workflows: [makeWorkflow({ id: 'a' })],
+        status: 'ready',
+      });
+
+      await useWorkflowsStore.getState().rename('missing', 'X');
+
+      expect(mockedUpdate).not.toHaveBeenCalled();
+    });
+  });
 });
