@@ -10,7 +10,7 @@ import type {
 export abstract class BasePushTrigger extends BaseTrigger {
   abstract onActivate(ctx: ActivationContext): Promise<ActivationResult>;
   abstract onDeactivate(ctx: DeactivationContext): Promise<void>;
-  abstract verifySignature(input: SignatureInput): boolean;
+  abstract verifySignature(input: SignatureInput): boolean | Promise<boolean>;
 
   protected async run(input: NodeInput): Promise<Record<string, unknown>> {
     const triggerData = input.data ?? {};

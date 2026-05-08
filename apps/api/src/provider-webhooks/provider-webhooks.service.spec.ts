@@ -20,6 +20,7 @@ interface CryptoMock {
 }
 interface RegistryMock {
   getByProvider: jest.Mock;
+  getByType: jest.Mock;
 }
 
 describe('ProviderWebhooksService', () => {
@@ -46,7 +47,15 @@ describe('ProviderWebhooksService', () => {
       secretEnc: 'cipher',
       secretNonce: 'nonce',
       expiresAt: null,
-      workflow: { id: workflowId, userId, isActive: active },
+      workflow: {
+        id: workflowId,
+        userId,
+        isActive: active,
+        definition: {
+          nodes: [{ id: 'trigger-node', type: 'stripe-event-received', config: {} }],
+          edges: [],
+        },
+      },
     };
   }
 
@@ -58,7 +67,10 @@ describe('ProviderWebhooksService', () => {
     queue = { add: jest.fn(async () => undefined) };
     crypto = { decrypt: jest.fn(() => signingSecret) };
     trigger = { verifySignature: jest.fn(() => true), type: 'stripe-event-received' };
-    registry = { getByProvider: jest.fn(() => trigger) };
+    registry = {
+      getByProvider: jest.fn(() => trigger),
+      getByType: jest.fn(() => trigger),
+    };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -161,9 +173,9 @@ describe('ProviderWebhooksService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw NotFoundException when no trigger is registered for the provider', async () => {
+    it('should throw NotFoundException when no trigger is registered for the type in the workflow definition', async () => {
       prisma.providerSubscription.findUnique.mockResolvedValue(activeSubscription());
-      registry.getByProvider.mockReturnValue(null);
+      registry.getByType.mockReturnValue(null);
 
       await expect(
         service.trigger({

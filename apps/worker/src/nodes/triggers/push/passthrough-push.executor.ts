@@ -32,3 +32,14 @@ export class StripeEventReceivedPassthrough extends PassthroughPushExecutor {
     );
   }
 }
+
+@Injectable()
+export class DriveFileAddedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'drive-file-added',
+      'Drive: File Added',
+      'Triggers when Google Drive notifies that a watched folder changed',
+    );
+  }
+}

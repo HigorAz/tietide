@@ -488,3 +488,52 @@ The redirect URI in the env var **must exactly match** one of the URIs registere
 4. Build a workflow with a Manual trigger → Outlook Send (recipient = your own address). Run it. Email arrives, no `Bearer` tokens leak in `apps/worker/logs/*`.
 
 If users need additional scopes (e.g., a connection was created for `Mail.Send` only and they later add an Excel node), have them create a new Microsoft connection from `/connections` with the broader scope set; the editor's `ConnectionPicker` filters by `provider=microsoft` and lists all of the user's Microsoft connections.
+
+## 13. Optional: Gmail Pub/Sub setup (for the `gmail-message-received` push trigger)
+
+The `gmail-message-received` trigger uses [Gmail's `users.watch`](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users/watch) feature, which requires Cloud Pub/Sub. **Most users should skip this section and pick `gmail-label-added` instead** — it's a simpler poll-based alternative that needs no extra GCP plumbing.
+
+If you do want push:
+
+1. **Create a Pub/Sub topic** in your GCP project:
+   - Console: <https://console.cloud.google.com/cloudpubsub/topic/create>
+   - Name: `gmail-watch` (or whatever you prefer). Full path is `projects/<project-id>/topics/gmail-watch`.
+
+2. **Grant Gmail's push service account permission to publish to the topic**:
+   - On the topic page, click **Permissions → Add Principal**.
+   - Principal: `gmail-api-push@system.gserviceaccount.com`
+   - Role: `Pub/Sub Publisher`
+   - Save.
+
+3. **Create a Pub/Sub subscription with HTTPS push delivery** to your TieTide API:
+   - Subscription name: anything (e.g., `gmail-to-tietide`).
+   - Delivery type: **Push**.
+   - Endpoint URL: `https://tietide.example.com/v1/provider-webhooks/google/<subscription-id>` — TieTide generates the `<subscription-id>` when the workflow is activated, so this URL must be templated. The simplest setup is one Pub/Sub subscription per workflow, configured after the workflow's `ProviderSubscription` row is created.
+   - Authentication: **Enable authentication**, service account: any identity (Pub/Sub will sign the OIDC token; TieTide verifies that `email = gmail-api-push@system.gserviceaccount.com`).
+   - Audience: leave blank (TieTide derives it from the callback URL).
+
+4. **Configure the trigger** in the SPA:
+   - Add a `Gmail: Message Received` node.
+   - Pick a Google connection that has the `gmail.readonly` scope.
+   - Pub/Sub topic name: `projects/<project-id>/topics/gmail-watch`.
+   - Optional: filter by Gmail label IDs (`INBOX`, `STARRED`, custom).
+   - Activate the workflow.
+
+5. **Renewal**: Gmail watch channels expire after ~7 days. The hourly `subscription-renewer` job rotates them automatically (24-hour lookahead). No manual action needed.
+
+If `users.watch` returns an error during activation, check that:
+
+- The topic name is correct (`projects/<project-id>/topics/<topic-name>`).
+- The `gmail-api-push@system.gserviceaccount.com` principal has the **Publisher** role on the topic.
+- The Google connection's OAuth scope includes `https://www.googleapis.com/auth/gmail.readonly`.
+
+## 14. Drive watch (`drive-file-added`)
+
+The Drive trigger needs no extra setup — TieTide creates the watch channel via Drive's `files.watch` endpoint when the workflow is activated, and the renewer rotates it automatically before the 7-day cap. Inbound notifications are verified via `X-Goog-Channel-Token` (a 32-byte URL-safe random generated server-side and stored encrypted in `ProviderSubscription.secretEnc`).
+
+For local development the public webhook URL needs to be reachable by Google — use [ngrok](https://ngrok.com/) or a similar tunnel:
+
+```bash
+ngrok http 3030
+# Then set PUBLIC_API_URL=https://<ngrok-id>.ngrok-free.app in .env and restart
+```
