@@ -44,11 +44,20 @@ describe('NodeLibrary', () => {
       const { NodeLibrary } = await importComponent();
       render(<NodeLibrary />);
 
-      const triggers = screen.getByRole('region', { name: /triggers/i });
+      // Anchored regex so /triggers/i doesn't also match "Google Triggers".
+      const triggers = screen.getByRole('region', { name: /^triggers$/i });
       expect(within(triggers).getByText('Manual Trigger')).toBeInTheDocument();
       expect(within(triggers).getByText('Cron Trigger')).toBeInTheDocument();
       expect(within(triggers).getByText('Webhook Trigger')).toBeInTheDocument();
       expect(within(triggers).queryAllByTestId('node-library-item')).toHaveLength(3);
+
+      const googleTriggers = screen.getByRole('region', { name: /google triggers/i });
+      expect(within(googleTriggers).getByText('Gmail: Message Received')).toBeInTheDocument();
+      expect(within(googleTriggers).getByText('Gmail: Label Added')).toBeInTheDocument();
+      expect(within(googleTriggers).getByText('Drive: File Added')).toBeInTheDocument();
+      expect(within(googleTriggers).getByText('Sheets: Row Added')).toBeInTheDocument();
+      expect(within(googleTriggers).getByText('Calendar: Event Created')).toBeInTheDocument();
+      expect(within(googleTriggers).queryAllByTestId('node-library-item')).toHaveLength(5);
 
       const actions = screen.getByRole('region', { name: /actions/i });
       expect(within(actions).getByText('HTTP Request')).toBeInTheDocument();
@@ -76,11 +85,13 @@ describe('NodeLibrary', () => {
       const { NodeLibrary } = await importComponent();
       render(<NodeLibrary />);
       const items = screen.getAllByTestId('node-library-item');
-      // 3 triggers + 1 generic action (http-request, code forbidden) + 4 logic
+      // 3 triggers + 5 google triggers (gmail-message-received, gmail-label-added,
+      // drive-file-added, sheets-row-added, calendar-event-created)
+      // + 1 generic action (http-request, code forbidden) + 4 logic
       // + 4 Communication (Gmail × 2 + Outlook × 2)
       // + 9 Productivity (Drive × 2 / Sheets × 2 / Docs / Calendar / Excel × 2 / OneDrive)
-      // + 1 Custom (Sticky) = 22.
-      expect(items).toHaveLength(22);
+      // + 1 Custom (Sticky) = 27.
+      expect(items).toHaveLength(27);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -153,7 +164,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(22);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(27);
     });
   });
 
@@ -249,10 +260,10 @@ describe('NodeLibrary', () => {
       const user = userEvent.setup();
       render(<NodeLibrary />);
 
-      const triggers = screen.getByRole('region', { name: /triggers/i });
+      const triggers = screen.getByRole('region', { name: /^triggers$/i });
       expect(within(triggers).queryAllByTestId('node-library-item')).toHaveLength(3);
 
-      const header = within(triggers).getByRole('button', { name: /triggers/i });
+      const header = within(triggers).getByRole('button', { name: /^triggers$/i });
       expect(header).toHaveAttribute('aria-expanded', 'true');
 
       await user.click(header);
@@ -267,8 +278,8 @@ describe('NodeLibrary', () => {
       const user = userEvent.setup();
       render(<NodeLibrary />);
 
-      const triggers = screen.getByRole('region', { name: /triggers/i });
-      const header = within(triggers).getByRole('button', { name: /triggers/i });
+      const triggers = screen.getByRole('region', { name: /^triggers$/i });
+      const header = within(triggers).getByRole('button', { name: /^triggers$/i });
 
       await user.click(header);
       await user.click(header);
@@ -281,8 +292,8 @@ describe('NodeLibrary', () => {
       const user = userEvent.setup();
       render(<NodeLibrary />);
 
-      const triggers = screen.getByRole('region', { name: /triggers/i });
-      await user.click(within(triggers).getByRole('button', { name: /triggers/i }));
+      const triggers = screen.getByRole('region', { name: /^triggers$/i });
+      await user.click(within(triggers).getByRole('button', { name: /^triggers$/i }));
 
       const stored = localStorage.getItem(NODE_LIBRARY_COLLAPSE_KEY);
       expect(stored).not.toBeNull();

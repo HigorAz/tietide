@@ -81,4 +81,37 @@ describe('SubscriptionRenewerProcessor', () => {
     await processor.process({ data: {} } as never);
     expect(activation.renewSubscription).not.toHaveBeenCalled();
   });
+
+  it('renews a Drive watch channel that expires within the 24h lookahead window', async () => {
+    // Drive channels are created with 6.5d lifetime; the renewer fires hourly
+    // and picks up a row when expiresAt <= now+24h. Six days after activation,
+    // expiresAt is now + 12h — well within the window.
+    prisma.providerSubscription.findMany.mockResolvedValueOnce([
+      {
+        id: 'drive-sub-1',
+        workflowId: 'wf-drive',
+        provider: 'google',
+        expiresAt: new Date(fixedNow + 1000 * 60 * 60 * 12),
+      },
+    ]);
+
+    await processor.process({ data: {} } as never);
+
+    expect(activation.renewSubscription).toHaveBeenCalledWith('drive-sub-1');
+  });
+
+  it('renews a Gmail Pub/Sub watch that expires within the 24h lookahead window', async () => {
+    prisma.providerSubscription.findMany.mockResolvedValueOnce([
+      {
+        id: 'gmail-sub-1',
+        workflowId: 'wf-gmail',
+        provider: 'google',
+        expiresAt: new Date(fixedNow + 1000 * 60 * 60 * 6),
+      },
+    ]);
+
+    await processor.process({ data: {} } as never);
+
+    expect(activation.renewSubscription).toHaveBeenCalledWith('gmail-sub-1');
+  });
 });

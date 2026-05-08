@@ -26,6 +26,11 @@ export const NodeType = {
   SHEETS_READ: 'sheets-read',
   DOCS_CREATE: 'docs-create',
   CALENDAR_CREATE: 'calendar-create',
+  GMAIL_MESSAGE_RECEIVED: 'gmail-message-received',
+  GMAIL_LABEL_ADDED: 'gmail-label-added',
+  DRIVE_FILE_ADDED: 'drive-file-added',
+  SHEETS_ROW_ADDED: 'sheets-row-added',
+  CALENDAR_EVENT_CREATED: 'calendar-event-created',
   OUTLOOK_SEND: 'outlook-send',
   OUTLOOK_SEARCH: 'outlook-search',
   EXCEL_APPEND: 'excel-append',
@@ -37,6 +42,7 @@ export type NodeType = (typeof NodeType)[keyof typeof NodeType];
 
 export const NodeGroup = {
   TRIGGERS: 'triggers',
+  GOOGLE_TRIGGERS: 'google-triggers',
   ACTIONS: 'actions',
   LOGIC: 'logic',
   DATA: 'data',
@@ -52,6 +58,7 @@ export type NodeGroup = (typeof NodeGroup)[keyof typeof NodeGroup];
 // Stable display order for the SPA's node-library palette.
 export const NODE_GROUP_ORDER: readonly NodeGroup[] = [
   NodeGroup.TRIGGERS,
+  NodeGroup.GOOGLE_TRIGGERS,
   NodeGroup.ACTIONS,
   NodeGroup.LOGIC,
   NodeGroup.DATA,
@@ -64,6 +71,7 @@ export const NODE_GROUP_ORDER: readonly NodeGroup[] = [
 
 export const NODE_GROUP_LABELS: Record<NodeGroup, string> = {
   [NodeGroup.TRIGGERS]: 'Triggers',
+  [NodeGroup.GOOGLE_TRIGGERS]: 'Google Triggers',
   [NodeGroup.ACTIONS]: 'Actions',
   [NodeGroup.LOGIC]: 'Logic',
   [NodeGroup.DATA]: 'Data',
@@ -252,5 +260,46 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.PRODUCTIVITY,
     provider: 'microsoft',
+  },
+  {
+    type: NodeType.GMAIL_MESSAGE_RECEIVED,
+    name: 'Gmail: Message Received',
+    description:
+      'Trigger when a new Gmail message arrives (poll by default; push via Cloud Pub/Sub when configured)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.GOOGLE_TRIGGERS,
+    provider: 'google',
+  },
+  {
+    type: NodeType.GMAIL_LABEL_ADDED,
+    name: 'Gmail: Label Added',
+    description: 'Trigger when a label is added to a Gmail message (poll, historyId-based)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.GOOGLE_TRIGGERS,
+    provider: 'google',
+  },
+  {
+    type: NodeType.DRIVE_FILE_ADDED,
+    name: 'Drive: File Added',
+    description: 'Trigger when a file is added to a Google Drive folder (push, watch channel)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.GOOGLE_TRIGGERS,
+    provider: 'google',
+  },
+  {
+    type: NodeType.SHEETS_ROW_ADDED,
+    name: 'Sheets: Row Added',
+    description: 'Trigger when a new row is appended to a Google Sheet (poll, row-count cursor)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.GOOGLE_TRIGGERS,
+    provider: 'google',
+  },
+  {
+    type: NodeType.CALENDAR_EVENT_CREATED,
+    name: 'Calendar: Event Created',
+    description: 'Trigger when a new event is created in a Google Calendar (poll, updatedMin)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.GOOGLE_TRIGGERS,
+    provider: 'google',
   },
 ];
