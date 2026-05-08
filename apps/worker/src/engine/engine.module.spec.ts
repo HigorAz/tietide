@@ -9,6 +9,12 @@ import { CronTrigger } from '../nodes/triggers/cron-trigger';
 import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
 import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
 import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
+import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
+import { DriveListAction } from '../nodes/connectors/google/drive-list';
+import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
+import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
+import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
+import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -27,6 +33,12 @@ describe('EngineModule', () => {
     const subworkflowAction = new SubworkflowAction(undefined as never, undefined as never);
     const gmailSend = new GmailSendAction(undefined as never, undefined as never);
     const gmailSearch = new GmailSearchAction(undefined as never, undefined as never);
+    const driveCreate = new DriveCreateAction(undefined as never, undefined as never);
+    const driveList = new DriveListAction(undefined as never, undefined as never);
+    const sheetsAppend = new SheetsAppendAction(undefined as never, undefined as never);
+    const sheetsRead = new SheetsReadAction(undefined as never, undefined as never);
+    const docsCreate = new DocsCreateAction(undefined as never, undefined as never);
+    const calendarCreate = new CalendarCreateAction(undefined as never, undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -39,6 +51,12 @@ describe('EngineModule', () => {
       subworkflowAction,
       gmailSend,
       gmailSearch,
+      driveCreate,
+      driveList,
+      sheetsAppend,
+      sheetsRead,
+      docsCreate,
+      calendarCreate,
     );
     return {
       registry,
@@ -52,99 +70,41 @@ describe('EngineModule', () => {
       subworkflowAction,
       gmailSend,
       gmailSearch,
+      driveCreate,
+      driveList,
+      sheetsAppend,
+      sheetsRead,
+      docsCreate,
+      calendarCreate,
       module,
     };
   };
 
   describe('onModuleInit', () => {
-    it('should register ManualTrigger in the NodeRegistry', () => {
-      const { registry, manualTrigger, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('manual-trigger')).toBe(true);
-      expect(registry.resolve('manual-trigger')).toBe(manualTrigger);
-    });
-
-    it('should register CronTrigger in the NodeRegistry', () => {
-      const { registry, cronTrigger, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('cron-trigger')).toBe(true);
-      expect(registry.resolve('cron-trigger')).toBe(cronTrigger);
-    });
-
-    it('should register WebhookTrigger in the NodeRegistry', () => {
-      const { registry, webhookTrigger, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('webhook-trigger')).toBe(true);
-      expect(registry.resolve('webhook-trigger')).toBe(webhookTrigger);
-    });
-
-    it('should register HttpRequestAction in the NodeRegistry', () => {
-      const { registry, httpRequest, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('http-request')).toBe(true);
-      expect(registry.resolve('http-request')).toBe(httpRequest);
-    });
-
-    it('should register Conditional in the NodeRegistry', () => {
-      const { registry, conditional, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('conditional')).toBe(true);
-      expect(registry.resolve('conditional')).toBe(conditional);
-    });
-
-    it('should register ReturnNode in the NodeRegistry', () => {
-      const { registry, returnNode, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('return')).toBe(true);
-      expect(registry.resolve('return')).toBe(returnNode);
-    });
-
-    it('should register IteratorNode in the NodeRegistry', () => {
-      const { registry, iteratorNode, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('iterator')).toBe(true);
-      expect(registry.resolve('iterator')).toBe(iteratorNode);
-    });
-
-    it('should register SubworkflowAction in the NodeRegistry', () => {
-      const { registry, subworkflowAction, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('subworkflow')).toBe(true);
-      expect(registry.resolve('subworkflow')).toBe(subworkflowAction);
-    });
-
-    it('should register GmailSendAction in the NodeRegistry', () => {
-      const { registry, gmailSend, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('gmail-send')).toBe(true);
-      expect(registry.resolve('gmail-send')).toBe(gmailSend);
-    });
-
-    it('should register GmailSearchAction in the NodeRegistry', () => {
-      const { registry, gmailSearch, module } = build();
-
-      module.onModuleInit();
-
-      expect(registry.has('gmail-search')).toBe(true);
-      expect(registry.resolve('gmail-search')).toBe(gmailSearch);
+    it.each([
+      ['ManualTrigger', 'manual-trigger', 'manualTrigger'],
+      ['CronTrigger', 'cron-trigger', 'cronTrigger'],
+      ['WebhookTrigger', 'webhook-trigger', 'webhookTrigger'],
+      ['HttpRequestAction', 'http-request', 'httpRequest'],
+      ['Conditional', 'conditional', 'conditional'],
+      ['ReturnNode', 'return', 'returnNode'],
+      ['IteratorNode', 'iterator', 'iteratorNode'],
+      ['SubworkflowAction', 'subworkflow', 'subworkflowAction'],
+      ['GmailSendAction', 'gmail-send', 'gmailSend'],
+      ['GmailSearchAction', 'gmail-search', 'gmailSearch'],
+      ['DriveCreateAction', 'drive-create', 'driveCreate'],
+      ['DriveListAction', 'drive-list', 'driveList'],
+      ['SheetsAppendAction', 'sheets-append', 'sheetsAppend'],
+      ['SheetsReadAction', 'sheets-read', 'sheetsRead'],
+      ['DocsCreateAction', 'docs-create', 'docsCreate'],
+      ['CalendarCreateAction', 'calendar-create', 'calendarCreate'],
+    ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
+      const built = build();
+      built.module.onModuleInit();
+      expect(built.registry.has(type)).toBe(true);
+      expect(built.registry.resolve(type)).toBe(
+        (built as unknown as Record<string, unknown>)[instanceKey],
+      );
     });
 
     it('should expose triggers, actions, and logic executors after init', () => {
@@ -158,8 +118,8 @@ describe('EngineModule', () => {
       }, {});
       expect(counts.trigger).toBe(3);
       expect(counts.logic).toBe(4);
-      // 1 generic action (http-request) + the registered Google connector actions.
-      expect(counts.action).toBeGreaterThanOrEqual(2);
+      // 1 generic action (http-request) + 8 Google connector actions.
+      expect(counts.action).toBe(9);
     });
   });
 });
