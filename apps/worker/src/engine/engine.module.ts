@@ -37,6 +37,7 @@ import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-searc
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { StripeEventReceivedPassthrough } from '../nodes/triggers/push/passthrough-push.executor';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -68,6 +69,7 @@ import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-cre
     ExcelAppendAction,
     ExcelReadAction,
     OnedriveCreateAction,
+    StripeEventReceivedPassthrough,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -98,6 +100,7 @@ export class EngineModule implements OnModuleInit {
     private readonly excelAppend: ExcelAppendAction,
     private readonly excelRead: ExcelReadAction,
     private readonly onedriveCreate: OnedriveCreateAction,
+    private readonly stripeEventReceived: StripeEventReceivedPassthrough,
   ) {}
 
   onModuleInit(): void {
@@ -122,5 +125,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.excelAppend);
     this.registry.register(this.excelRead);
     this.registry.register(this.onedriveCreate);
+    this.registry.register(this.stripeEventReceived);
   }
 }

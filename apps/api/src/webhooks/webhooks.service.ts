@@ -1,11 +1,11 @@
-import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
-import { createHmac, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import type { WorkflowExecutionJobPayload } from '../executions/executions.service';
+import { assertFreshTimestamp, assertValidHexHmac } from './signature-helpers';
 
 export interface WebhookTriggerInput {
   path: string;
@@ -20,8 +20,6 @@ export interface WebhookTriggerResult {
   status: string;
 }
 
-const REPLAY_WINDOW_SECONDS = 300;
-const HMAC_HEX_LENGTH = 64;
 const MAX_ATTEMPTS = 3;
 const BACKOFF_DELAY_MS = 1000;
 
@@ -44,8 +42,8 @@ export class WebhooksService {
       throw new NotFoundException('Webhook not found');
     }
 
-    this.assertFreshTimestamp(input.timestamp);
-    this.assertValidSignature(webhook.hmacSecret, input.timestamp!, input.rawBody, input.signature);
+    assertFreshTimestamp(input.timestamp);
+    assertValidHexHmac(webhook.hmacSecret, input.timestamp!, input.rawBody, input.signature);
 
     const triggerData = this.parseBody(input.rawBody);
 
@@ -82,47 +80,6 @@ export class WebhooksService {
     );
 
     return { executionId: created.id, status: 'PENDING' };
-  }
-
-  private assertFreshTimestamp(timestamp: string | undefined): void {
-    if (!timestamp) {
-      throw new UnauthorizedException('Invalid signature');
-    }
-    const parsed = Number.parseInt(timestamp, 10);
-    if (!Number.isFinite(parsed) || String(parsed) !== timestamp.trim()) {
-      throw new UnauthorizedException('Invalid signature');
-    }
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    if (Math.abs(nowSeconds - parsed) > REPLAY_WINDOW_SECONDS) {
-      throw new UnauthorizedException('Invalid signature');
-    }
-  }
-
-  private assertValidSignature(
-    secret: string,
-    timestamp: string,
-    rawBody: Buffer,
-    signature: string | undefined,
-  ): void {
-    if (!signature || signature.length !== HMAC_HEX_LENGTH) {
-      throw new UnauthorizedException('Invalid signature');
-    }
-
-    const expected = createHmac('sha256', secret)
-      .update(`${timestamp}.${rawBody.toString('utf8')}`)
-      .digest('hex');
-
-    const expectedBuf = Buffer.from(expected, 'hex');
-    let providedBuf: Buffer;
-    try {
-      providedBuf = Buffer.from(signature, 'hex');
-    } catch {
-      throw new UnauthorizedException('Invalid signature');
-    }
-
-    if (providedBuf.length !== expectedBuf.length || !timingSafeEqual(providedBuf, expectedBuf)) {
-      throw new UnauthorizedException('Invalid signature');
-    }
   }
 
   private parseBody(rawBody: Buffer): Record<string, unknown> {

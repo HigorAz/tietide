@@ -8,6 +8,7 @@ import type { Prisma } from '@prisma/client';
 import { executableWorkflowDefinitionSchema, ZodError } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { ActivationService } from '../provider-triggers/activation.service';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import type { WorkflowResponseDto } from './dto/workflow-response.dto';
@@ -58,6 +59,7 @@ export class WorkflowsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
+    private readonly activation: ActivationService,
   ) {}
 
   async create(userId: string, dto: CreateWorkflowDto): Promise<WorkflowResponseDto> {
@@ -154,7 +156,7 @@ export class WorkflowsService {
 
     const existing = await this.prisma.workflow.findUnique({
       where: { id },
-      select: { userId: true },
+      select: { userId: true, isActive: true, definition: true },
     });
     if (!existing) {
       throw new NotFoundException('Workflow not found');
@@ -170,6 +172,11 @@ export class WorkflowsService {
     if (dto.tagIds !== undefined && dto.tagIds.length > 0) {
       await this.assertTagsOwnedByUser(userId, dto.tagIds);
     }
+
+    const willActivate = dto.isActive === true && existing.isActive === false;
+    const willDeactivate = dto.isActive === false && existing.isActive === true;
+    const definitionForActivation =
+      (dto.definition as unknown as Prisma.JsonValue | undefined) ?? existing.definition;
 
     const data: Prisma.WorkflowUpdateInput = {};
     if (dto.name !== undefined) {
@@ -196,26 +203,48 @@ export class WorkflowsService {
       };
     }
 
+    const needsTransaction = dto.definition !== undefined || willActivate || willDeactivate;
+
     let row;
-    if (dto.definition !== undefined) {
+    if (needsTransaction) {
       row = await this.prisma.$transaction(async (tx) => {
-        const prior = await tx.workflow.findUnique({
-          where: { id },
-          select: { definition: true, version: true },
-        });
-        if (!prior) {
-          throw new NotFoundException('Workflow not found');
+        if (dto.definition !== undefined) {
+          const prior = await tx.workflow.findUnique({
+            where: { id },
+            select: { definition: true, version: true },
+          });
+          if (!prior) {
+            throw new NotFoundException('Workflow not found');
+          }
+
+          await tx.workflowVersion.create({
+            data: {
+              workflowId: id,
+              version: prior.version,
+              definition: prior.definition as Prisma.InputJsonValue,
+              createdById: userId,
+              message: dto.versionMessage ?? null,
+            },
+          });
         }
 
-        await tx.workflowVersion.create({
-          data: {
+        if (willDeactivate) {
+          await this.activation.deactivateForWorkflow({
             workflowId: id,
-            version: prior.version,
-            definition: prior.definition as Prisma.InputJsonValue,
-            createdById: userId,
-            message: dto.versionMessage ?? null,
-          },
-        });
+            userId,
+            definition: existing.definition,
+            tx,
+          });
+        }
+
+        if (willActivate) {
+          await this.activation.activateForWorkflow({
+            workflowId: id,
+            userId,
+            definition: definitionForActivation,
+            tx,
+          });
+        }
 
         return tx.workflow.update({
           where: { id },
@@ -245,13 +274,21 @@ export class WorkflowsService {
   async remove(userId: string, id: string): Promise<void> {
     const existing = await this.prisma.workflow.findUnique({
       where: { id },
-      select: { userId: true },
+      select: { userId: true, isActive: true, definition: true },
     });
     if (!existing) {
       throw new NotFoundException('Workflow not found');
     }
     if (existing.userId !== userId) {
       throw new ForbiddenException('You do not have access to this workflow');
+    }
+
+    if (existing.isActive) {
+      await this.activation.deactivateForWorkflow({
+        workflowId: id,
+        userId,
+        definition: existing.definition,
+      });
     }
 
     await this.prisma.workflow.deleteMany({ where: { id, userId } });
