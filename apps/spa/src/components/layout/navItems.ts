@@ -7,6 +7,7 @@ import {
   Plug,
   KeyRound,
   ShieldCheck,
+  ScrollText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -28,6 +29,7 @@ export const navItems: NavItem[] = [
   { to: '/connections', label: 'Connections', icon: Plug },
   { to: '/settings/env-vars', label: 'Env vars', icon: KeyRound },
   { to: '/admin/env-vars', label: 'Admin · Env vars', icon: ShieldCheck, requiredRole: 'ADMIN' },
+  { to: '/admin/audit', label: 'Admin · Audit log', icon: ScrollText, requiredRole: 'ADMIN' },
 ];
 
 export function visibleNavItems(role: string | undefined): NavItem[] {
