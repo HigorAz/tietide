@@ -8,6 +8,7 @@ import { OAuthRefreshScanProcessor } from './oauth-refresh-scan.processor';
 import { OAuthRefreshOneProcessor } from './oauth-refresh-one.processor';
 import { OAuthRefreshClient } from './oauth-refresh.client';
 import { OAuthRefreshDlqService } from './oauth-refresh-dlq.service';
+import { InProcessRefreshService } from './in-process-refresh.service';
 
 @Module({
   imports: [
@@ -21,6 +22,8 @@ import { OAuthRefreshDlqService } from './oauth-refresh-dlq.service';
     OAuthRefreshOneProcessor,
     OAuthRefreshClient,
     OAuthRefreshDlqService,
+    InProcessRefreshService,
   ],
+  exports: [InProcessRefreshService],
 })
 export class OAuthRefreshModule {}
