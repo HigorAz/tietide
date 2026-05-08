@@ -9,6 +9,7 @@ import { ManualTriggerForm } from './ManualTriggerForm';
 import { ReturnForm } from './ReturnForm';
 import { SubworkflowForm } from './SubworkflowForm';
 import { WebhookForm } from './WebhookForm';
+import { GmailSendForm } from './google/GmailSendForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -25,4 +26,5 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.ITERATOR]: IteratorForm,
   [NodeType.SUBWORKFLOW]: SubworkflowForm,
   [NodeType.RETURN]: ReturnForm,
+  [NodeType.GMAIL_SEND]: GmailSendForm,
 };

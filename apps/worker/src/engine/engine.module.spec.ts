@@ -7,6 +7,7 @@ import { NodeRegistry } from '../nodes/registry';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { CronTrigger } from '../nodes/triggers/cron-trigger';
 import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
+import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -23,6 +24,7 @@ describe('EngineModule', () => {
     // wiring assertions in this spec they're not invoked, so undefined casts
     // are sufficient.
     const subworkflowAction = new SubworkflowAction(undefined as never, undefined as never);
+    const gmailSend = new GmailSendAction(undefined as never, undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -33,6 +35,7 @@ describe('EngineModule', () => {
       returnNode,
       iteratorNode,
       subworkflowAction,
+      gmailSend,
     );
     return {
       registry,
@@ -44,6 +47,7 @@ describe('EngineModule', () => {
       returnNode,
       iteratorNode,
       subworkflowAction,
+      gmailSend,
       module,
     };
   };
@@ -121,6 +125,15 @@ describe('EngineModule', () => {
       expect(registry.resolve('subworkflow')).toBe(subworkflowAction);
     });
 
+    it('should register GmailSendAction in the NodeRegistry', () => {
+      const { registry, gmailSend, module } = build();
+
+      module.onModuleInit();
+
+      expect(registry.has('gmail-send')).toBe(true);
+      expect(registry.resolve('gmail-send')).toBe(gmailSend);
+    });
+
     it('should expose trigger, action, and logic executors after init', () => {
       const { registry, module } = build();
 
@@ -131,6 +144,7 @@ describe('EngineModule', () => {
         .map((e) => e.category)
         .sort();
       expect(categories).toEqual([
+        'action',
         'action',
         'logic',
         'logic',

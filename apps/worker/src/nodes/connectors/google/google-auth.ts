@@ -26,6 +26,8 @@ export const DEFAULT_GOOGLE_CLIENTS: GoogleClientFactories = {
   calendar: ({ auth }) => calendar({ version: 'v3', auth }),
 };
 
+export const GOOGLE_CLIENTS = Symbol('GOOGLE_CLIENTS');
+
 @Injectable()
 export class GoogleAuthService {
   private readonly log = new Logger(GoogleAuthService.name);

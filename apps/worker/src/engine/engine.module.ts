@@ -17,9 +17,16 @@ import { ENV_VAR_RESOLVER } from './env-var-resolver';
 import { PrismaEnvVarResolver } from './prisma-env-var-resolver';
 import { CONNECTION_RESOLVER } from '../connections/connection-resolver';
 import { PrismaConnectionResolver } from '../connections/prisma-connection-resolver';
+import { OAuthRefreshModule } from '../connections/refresh/oauth-refresh.module';
+import {
+  DEFAULT_GOOGLE_CLIENTS,
+  GOOGLE_CLIENTS,
+  GoogleAuthService,
+} from '../nodes/connectors/google/google-auth';
+import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
 
 @Module({
-  imports: [ExecutionEventsModule],
+  imports: [ExecutionEventsModule, OAuthRefreshModule],
   providers: [
     NodeRegistry,
     WorkflowRunner,
@@ -32,6 +39,9 @@ import { PrismaConnectionResolver } from '../connections/prisma-connection-resol
     ReturnNode,
     IteratorNode,
     SubworkflowAction,
+    GoogleAuthService,
+    { provide: GOOGLE_CLIENTS, useValue: DEFAULT_GOOGLE_CLIENTS },
+    GmailSendAction,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -49,6 +59,7 @@ export class EngineModule implements OnModuleInit {
     private readonly returnNode: ReturnNode,
     private readonly iteratorNode: IteratorNode,
     private readonly subworkflowAction: SubworkflowAction,
+    private readonly gmailSend: GmailSendAction,
   ) {}
 
   onModuleInit(): void {
@@ -60,5 +71,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.returnNode);
     this.registry.register(this.iteratorNode);
     this.registry.register(this.subworkflowAction);
+    this.registry.register(this.gmailSend);
   }
 }
