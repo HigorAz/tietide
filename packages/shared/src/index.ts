@@ -65,6 +65,12 @@ export {
   type StickyConfig,
 } from './schemas/sticky.schema.js';
 export {
+  workflowExportSchema,
+  WORKFLOW_EXPORT_VERSION,
+  WorkflowExportFormatError,
+  type WorkflowExport,
+} from './schemas/export.schema.js';
+export {
   webhookTriggerOutputSchema,
   cronTriggerOutputSchema,
   manualTriggerOutputSchema,
