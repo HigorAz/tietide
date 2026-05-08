@@ -26,6 +26,11 @@ export const NodeType = {
   SHEETS_READ: 'sheets-read',
   DOCS_CREATE: 'docs-create',
   CALENDAR_CREATE: 'calendar-create',
+  OUTLOOK_SEND: 'outlook-send',
+  OUTLOOK_SEARCH: 'outlook-search',
+  EXCEL_APPEND: 'excel-append',
+  EXCEL_READ: 'excel-read',
+  ONEDRIVE_CREATE: 'onedrive-create',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -207,5 +212,45 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.PRODUCTIVITY,
     provider: 'google',
+  },
+  {
+    type: NodeType.OUTLOOK_SEND,
+    name: 'Outlook: Send Email',
+    description: 'Send an email via Outlook (Microsoft 365)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMUNICATION,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.OUTLOOK_SEARCH,
+    name: 'Outlook: Search Inbox',
+    description: 'Search Outlook messages with Microsoft Search syntax',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMUNICATION,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.EXCEL_APPEND,
+    name: 'Excel: Append Row',
+    description: 'Append rows of values to an Excel Online worksheet',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.EXCEL_READ,
+    name: 'Excel: Read Range',
+    description: 'Read a range from an Excel Online worksheet (A1 notation)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.ONEDRIVE_CREATE,
+    name: 'OneDrive: Create File',
+    description: 'Create a file in OneDrive',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'microsoft',
   },
 ];

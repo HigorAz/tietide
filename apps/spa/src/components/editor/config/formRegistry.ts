@@ -17,6 +17,11 @@ import { SheetsAppendForm } from './google/SheetsAppendForm';
 import { SheetsReadForm } from './google/SheetsReadForm';
 import { DocsCreateForm } from './google/DocsCreateForm';
 import { CalendarCreateForm } from './google/CalendarCreateForm';
+import { OutlookSendForm } from './microsoft/OutlookSendForm';
+import { OutlookSearchForm } from './microsoft/OutlookSearchForm';
+import { ExcelAppendForm } from './microsoft/ExcelAppendForm';
+import { ExcelReadForm } from './microsoft/ExcelReadForm';
+import { OneDriveCreateForm } from './microsoft/OneDriveCreateForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -41,4 +46,9 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.SHEETS_READ]: SheetsReadForm,
   [NodeType.DOCS_CREATE]: DocsCreateForm,
   [NodeType.CALENDAR_CREATE]: CalendarCreateForm,
+  [NodeType.OUTLOOK_SEND]: OutlookSendForm,
+  [NodeType.OUTLOOK_SEARCH]: OutlookSearchForm,
+  [NodeType.EXCEL_APPEND]: ExcelAppendForm,
+  [NodeType.EXCEL_READ]: ExcelReadForm,
+  [NodeType.ONEDRIVE_CREATE]: OneDriveCreateForm,
 };

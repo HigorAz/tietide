@@ -15,6 +15,11 @@ import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
 import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
+import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
+import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
+import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
+import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
+import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -39,6 +44,11 @@ describe('EngineModule', () => {
     const sheetsRead = new SheetsReadAction(undefined as never, undefined as never);
     const docsCreate = new DocsCreateAction(undefined as never, undefined as never);
     const calendarCreate = new CalendarCreateAction(undefined as never, undefined as never);
+    const outlookSend = new OutlookSendAction(undefined as never);
+    const outlookSearch = new OutlookSearchAction(undefined as never);
+    const excelAppend = new ExcelAppendAction(undefined as never);
+    const excelRead = new ExcelReadAction(undefined as never);
+    const onedriveCreate = new OnedriveCreateAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -57,6 +67,11 @@ describe('EngineModule', () => {
       sheetsRead,
       docsCreate,
       calendarCreate,
+      outlookSend,
+      outlookSearch,
+      excelAppend,
+      excelRead,
+      onedriveCreate,
     );
     return {
       registry,
@@ -76,6 +91,11 @@ describe('EngineModule', () => {
       sheetsRead,
       docsCreate,
       calendarCreate,
+      outlookSend,
+      outlookSearch,
+      excelAppend,
+      excelRead,
+      onedriveCreate,
       module,
     };
   };
@@ -98,6 +118,11 @@ describe('EngineModule', () => {
       ['SheetsReadAction', 'sheets-read', 'sheetsRead'],
       ['DocsCreateAction', 'docs-create', 'docsCreate'],
       ['CalendarCreateAction', 'calendar-create', 'calendarCreate'],
+      ['OutlookSendAction', 'outlook-send', 'outlookSend'],
+      ['OutlookSearchAction', 'outlook-search', 'outlookSearch'],
+      ['ExcelAppendAction', 'excel-append', 'excelAppend'],
+      ['ExcelReadAction', 'excel-read', 'excelRead'],
+      ['OnedriveCreateAction', 'onedrive-create', 'onedriveCreate'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -118,8 +143,9 @@ describe('EngineModule', () => {
       }, {});
       expect(counts.trigger).toBe(3);
       expect(counts.logic).toBe(4);
-      // 1 generic action (http-request) + 8 Google connector actions.
-      expect(counts.action).toBe(9);
+      // 1 generic action (http-request) + 8 Google connector actions
+      // + 5 Microsoft connector actions = 14.
+      expect(counts.action).toBe(14);
     });
   });
 });
