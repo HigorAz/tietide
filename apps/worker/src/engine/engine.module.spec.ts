@@ -23,8 +23,12 @@ import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-cre
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
+  OutlookMessageReceivedPassthrough,
+  OutlookMessageFlaggedPassthrough,
+  OnedriveFileAddedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
+import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -60,6 +64,10 @@ describe('EngineModule', () => {
       undefined as never,
       undefined as never,
     );
+    const outlookMessageReceived = new OutlookMessageReceivedPassthrough();
+    const outlookMessageFlagged = new OutlookMessageFlaggedPassthrough();
+    const onedriveFileAdded = new OnedriveFileAddedPassthrough();
+    const excelRowAdded = new ExcelRowAddedTrigger(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -86,6 +94,10 @@ describe('EngineModule', () => {
       stripeEventReceived,
       driveFileAdded,
       gmailMessageReceived,
+      outlookMessageReceived,
+      outlookMessageFlagged,
+      onedriveFileAdded,
+      excelRowAdded,
     );
     return {
       registry,
@@ -113,6 +125,10 @@ describe('EngineModule', () => {
       stripeEventReceived,
       driveFileAdded,
       gmailMessageReceived,
+      outlookMessageReceived,
+      outlookMessageFlagged,
+      onedriveFileAdded,
+      excelRowAdded,
       module,
     };
   };
@@ -143,6 +159,10 @@ describe('EngineModule', () => {
       ['StripeEventReceivedPassthrough', 'stripe-event-received', 'stripeEventReceived'],
       ['DriveFileAddedPassthrough', 'drive-file-added', 'driveFileAdded'],
       ['GmailMessageReceivedExecutor', 'gmail-message-received', 'gmailMessageReceived'],
+      ['OutlookMessageReceivedPassthrough', 'outlook-message-received', 'outlookMessageReceived'],
+      ['OutlookMessageFlaggedPassthrough', 'outlook-message-flagged', 'outlookMessageFlagged'],
+      ['OnedriveFileAddedPassthrough', 'onedrive-file-added', 'onedriveFileAdded'],
+      ['ExcelRowAddedTrigger', 'excel-row-added', 'excelRowAdded'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -161,7 +181,10 @@ describe('EngineModule', () => {
         acc[e.category] = (acc[e.category] ?? 0) + 1;
         return acc;
       }, {});
-      expect(counts.trigger).toBe(6);
+      // 6 baseline triggers (manual, cron, webhook, stripe, drive, gmail) +
+      // 4 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
+      // onedrive-file-added, excel-row-added) = 10.
+      expect(counts.trigger).toBe(10);
       expect(counts.logic).toBe(4);
       // 1 generic action (http-request) + 8 Google connector actions
       // + 5 Microsoft connector actions = 14.
