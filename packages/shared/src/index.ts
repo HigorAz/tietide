@@ -52,6 +52,19 @@ export {
   ITERATOR_MAX_ITEMS_DEFAULT,
 } from './schemas/node.schema.js';
 export {
+  stickyConfigSchema,
+  STICKY_COLORS,
+  STICKY_DEFAULT_WIDTH,
+  STICKY_DEFAULT_HEIGHT,
+  STICKY_MIN_WIDTH,
+  STICKY_MIN_HEIGHT,
+  STICKY_MAX_WIDTH,
+  STICKY_MAX_HEIGHT,
+  STICKY_MAX_TEXT_LENGTH,
+  type StickyColor,
+  type StickyConfig,
+} from './schemas/sticky.schema.js';
+export {
   webhookTriggerOutputSchema,
   cronTriggerOutputSchema,
   manualTriggerOutputSchema,

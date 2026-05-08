@@ -55,6 +55,26 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().nodes).toHaveLength(0);
       expect(useEditorStore.getState().isDirty).toBe(false);
     });
+
+    it('should create a sticky node with React Flow type="sticky" and default config', () => {
+      useEditorStore.getState().addNode(NodeType.STICKY, { x: 50, y: 60 });
+
+      const { nodes } = useEditorStore.getState();
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        type: 'sticky',
+        position: { x: 50, y: 60 },
+        data: {
+          nodeType: NodeType.STICKY,
+          config: {
+            text: '',
+            color: 'yellow',
+            width: 220,
+            height: 140,
+          },
+        },
+      });
+    });
   });
 
   describe('onNodesChange', () => {
