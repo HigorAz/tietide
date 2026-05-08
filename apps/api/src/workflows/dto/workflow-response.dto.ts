@@ -43,4 +43,26 @@ export class WorkflowResponseDto {
     },
   })
   documentation!: { generatedAt: Date; version: number } | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'Folder this workflow belongs to. Null for root.',
+  })
+  folderId!: string | null;
+
+  @ApiProperty({
+    type: 'array',
+    description: 'Tags applied to this workflow.',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', format: 'uuid' },
+        name: { type: 'string' },
+        color: { type: 'string', nullable: true },
+      },
+    },
+  })
+  tags!: { id: string; name: string; color: string | null }[];
 }

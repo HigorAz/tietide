@@ -16,6 +16,8 @@ const wf = (overrides: Partial<Workflow>): Workflow => ({
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
   executionCount: 0,
   documentation: null,
+  folderId: null,
+  tags: [],
   ...overrides,
 });
 

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -20,6 +22,7 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
@@ -42,8 +45,48 @@ export class WorkflowsController {
   @Get()
   @ApiOperation({ summary: "List the authenticated user's workflows" })
   @ApiOkResponse({ type: WorkflowResponseDto, isArray: true })
-  async list(@CurrentUser() user: AuthenticatedUser): Promise<WorkflowResponseDto[]> {
-    return this.workflows.list(user.id);
+  @ApiQuery({
+    name: 'folderId',
+    required: false,
+    description: 'UUID of a folder, the literal string "null" for root, or omitted for no filter.',
+  })
+  @ApiQuery({
+    name: 'tagIds',
+    required: false,
+    description: 'Comma-separated UUIDs. Returns workflows tagged with ANY of the given tags.',
+  })
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('folderId') folderId?: string,
+    @Query('tagIds') tagIds?: string,
+  ): Promise<WorkflowResponseDto[]> {
+    const filter: { folderId?: string | null; tagIds?: string[] } = {};
+    if (folderId !== undefined) {
+      if (folderId === 'null') {
+        filter.folderId = null;
+      } else if (
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(
+          folderId,
+        )
+      ) {
+        filter.folderId = folderId;
+      } else {
+        throw new BadRequestException('folderId must be a UUID v4 or "null"');
+      }
+    }
+    if (tagIds !== undefined && tagIds.length > 0) {
+      const ids = tagIds
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const uuid =
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
+      if (!ids.every((id) => uuid.test(id))) {
+        throw new BadRequestException('tagIds must be a comma-separated list of UUID v4');
+      }
+      filter.tagIds = ids;
+    }
+    return this.workflows.list(user.id, filter);
   }
 
   @Post()

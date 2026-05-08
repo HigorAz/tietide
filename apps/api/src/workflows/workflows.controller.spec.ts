@@ -43,9 +43,11 @@ describe('WorkflowsController (integration)', () => {
     definition: validDefinition,
     isActive: false,
     version: 1,
+    folderId: null,
     createdAt: new Date('2026-04-17T00:00:00Z').toISOString(),
     updatedAt: new Date('2026-04-17T00:00:00Z').toISOString(),
     executionCount: 0,
+    tags: [],
   };
 
   beforeEach(async () => {
@@ -156,7 +158,36 @@ describe('WorkflowsController (integration)', () => {
       const res = await request(app.getHttpServer()).get('/workflows').expect(200);
 
       expect(res.body).toEqual([persisted]);
-      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid');
+      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', {});
+    });
+
+    it('passes folderId="null" sentinel as filter.folderId=null', async () => {
+      workflowsService.list.mockResolvedValue([]);
+      await request(app.getHttpServer()).get('/workflows?folderId=null').expect(200);
+      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', { folderId: null });
+    });
+
+    it('passes folderId=<uuid> as filter.folderId=<uuid>', async () => {
+      const uuid = '550e8400-e29b-41d4-a716-446655440099';
+      workflowsService.list.mockResolvedValue([]);
+      await request(app.getHttpServer()).get(`/workflows?folderId=${uuid}`).expect(200);
+      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', { folderId: uuid });
+    });
+
+    it('returns 400 on invalid folderId', async () => {
+      await request(app.getHttpServer()).get('/workflows?folderId=not-uuid').expect(400);
+    });
+
+    it('parses tagIds CSV into an array', async () => {
+      const a = '550e8400-e29b-41d4-a716-446655440011';
+      const b = '550e8400-e29b-41d4-a716-446655440012';
+      workflowsService.list.mockResolvedValue([]);
+      await request(app.getHttpServer()).get(`/workflows?tagIds=${a},${b}`).expect(200);
+      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', { tagIds: [a, b] });
+    });
+
+    it('returns 400 when tagIds contains non-UUID', async () => {
+      await request(app.getHttpServer()).get('/workflows?tagIds=not-uuid').expect(400);
     });
 
     it('should return 401 when the guard rejects', async () => {
