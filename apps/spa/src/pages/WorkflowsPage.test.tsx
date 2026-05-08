@@ -596,4 +596,256 @@ describe('WorkflowsPage', () => {
       expect(dialog).toHaveTextContent('2');
     });
   });
+
+  describe('inline rename (issue #137)', () => {
+    it('clicking the workflow name swaps it for an input field', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+
+      renderWorkflows();
+
+      await user.click(await screen.findByText('Alpha'));
+
+      const input = await screen.findByLabelText(/rename alpha/i);
+      expect(input).toHaveValue('Alpha');
+    });
+
+    it('Enter saves the new name (PATCH /v1/workflows/:id with name)', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+      mockedUpdate.mockResolvedValueOnce(makeWorkflow({ id: 'a', name: 'Alpha Renamed' }));
+
+      renderWorkflows();
+
+      await user.click(await screen.findByText('Alpha'));
+      const input = await screen.findByLabelText(/rename alpha/i);
+      await user.clear(input);
+      await user.type(input, 'Alpha Renamed{Enter}');
+
+      await waitFor(() =>
+        expect(mockedUpdate).toHaveBeenCalledWith('a', { name: 'Alpha Renamed' }),
+      );
+    });
+
+    it('Escape reverts and cancels edit mode', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+
+      renderWorkflows();
+
+      await user.click(await screen.findByText('Alpha'));
+      const input = await screen.findByLabelText(/rename alpha/i);
+      await user.clear(input);
+      await user.type(input, 'Other{Escape}');
+
+      await waitFor(() => expect(screen.queryByLabelText(/rename alpha/i)).not.toBeInTheDocument());
+      expect(screen.getByText('Alpha')).toBeInTheDocument();
+      expect(mockedUpdate).not.toHaveBeenCalled();
+    });
+
+    it('blur saves the new name', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+      mockedUpdate.mockResolvedValueOnce(makeWorkflow({ id: 'a', name: 'Alpha Blurred' }));
+
+      renderWorkflows();
+
+      await user.click(await screen.findByText('Alpha'));
+      const input = await screen.findByLabelText(/rename alpha/i);
+      await user.clear(input);
+      await user.type(input, 'Alpha Blurred');
+      (input as HTMLInputElement).blur();
+
+      await waitFor(() =>
+        expect(mockedUpdate).toHaveBeenCalledWith('a', { name: 'Alpha Blurred' }),
+      );
+    });
+
+    it('empty name shows error toast and stays in edit mode (no PATCH)', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+
+      renderWorkflows();
+
+      await user.click(await screen.findByText('Alpha'));
+      const input = await screen.findByLabelText(/rename alpha/i);
+      await user.clear(input);
+      await user.type(input, '   {Enter}');
+
+      // Stays in edit mode
+      expect(await screen.findByLabelText(/rename alpha/i)).toBeInTheDocument();
+      // Error toast emitted
+      await waitFor(() => {
+        const toasts = useToastStore.getState().toasts;
+        expect(toasts.length).toBeGreaterThan(0);
+        expect(toasts[0].tone).toBe('error');
+      });
+      // No API call
+      expect(mockedUpdate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('bulk actions (issue #137)', () => {
+    const seedTwo = (): void => {
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Alpha', isActive: false }),
+        makeWorkflow({ id: 'b', name: 'Beta', isActive: false }),
+      ]);
+    };
+
+    it('row checkbox toggles selection', async () => {
+      const user = userEvent.setup();
+      seedTwo();
+      renderWorkflows();
+
+      const cb = await screen.findByRole('checkbox', { name: /select Alpha/i });
+      expect(cb).not.toBeChecked();
+      await user.click(cb);
+      expect(cb).toBeChecked();
+      await user.click(cb);
+      expect(cb).not.toBeChecked();
+    });
+
+    it('select-all header checkbox toggles all rows', async () => {
+      const user = userEvent.setup();
+      seedTwo();
+      renderWorkflows();
+
+      await screen.findByText('Alpha');
+      const headerCb = screen.getByRole('checkbox', { name: /select all workflows/i });
+      await user.click(headerCb);
+
+      expect(screen.getByRole('checkbox', { name: /select Alpha/i })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: /select Beta/i })).toBeChecked();
+
+      await user.click(headerCb);
+      expect(screen.getByRole('checkbox', { name: /select Alpha/i })).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: /select Beta/i })).not.toBeChecked();
+    });
+
+    it('bulk toolbar is hidden when nothing is selected', async () => {
+      seedTwo();
+      renderWorkflows();
+      await screen.findByText('Alpha');
+
+      expect(screen.queryByRole('toolbar', { name: /bulk actions/i })).not.toBeInTheDocument();
+    });
+
+    it('bulk toolbar appears when 1+ selected', async () => {
+      const user = userEvent.setup();
+      seedTwo();
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('checkbox', { name: /select Alpha/i }));
+
+      expect(await screen.findByRole('toolbar', { name: /bulk actions/i })).toBeInTheDocument();
+      expect(screen.getByText(/1 selected/i)).toBeInTheDocument();
+    });
+
+    it('bulk Activate calls toggleActive for each selected', async () => {
+      const user = userEvent.setup();
+      seedTwo();
+      mockedToggle.mockResolvedValue(makeWorkflow({ id: 'a', isActive: true }));
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('checkbox', { name: /select Alpha/i }));
+      await user.click(screen.getByRole('checkbox', { name: /select Beta/i }));
+      await user.click(screen.getByRole('button', { name: /^activate selected/i }));
+
+      await waitFor(() => {
+        expect(mockedToggle).toHaveBeenCalledWith('a', true);
+        expect(mockedToggle).toHaveBeenCalledWith('b', true);
+      });
+    });
+
+    it('bulk Deactivate calls toggleActive(false) for each selected', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Alpha', isActive: true }),
+        makeWorkflow({ id: 'b', name: 'Beta', isActive: true }),
+      ]);
+      mockedToggle.mockResolvedValue(makeWorkflow({ id: 'a', isActive: false }));
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('checkbox', { name: /select all workflows/i }));
+      await user.click(screen.getByRole('button', { name: /deactivate selected/i }));
+
+      await waitFor(() => {
+        expect(mockedToggle).toHaveBeenCalledWith('a', false);
+        expect(mockedToggle).toHaveBeenCalledWith('b', false);
+      });
+    });
+
+    it('bulk Delete shows a single confirm modal then deletes all selected', async () => {
+      const user = userEvent.setup();
+      seedTwo();
+      mockedDelete.mockResolvedValue();
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('checkbox', { name: /select all workflows/i }));
+      await user.click(screen.getByRole('button', { name: /delete selected/i }));
+
+      // Confirm modal appears (heading reads "Delete 2 workflows").
+      const dialog = await screen.findByRole('dialog', { name: /delete 2 workflows/i });
+      expect(dialog).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /^delete workflows$/i }));
+
+      await waitFor(() => {
+        expect(mockedDelete).toHaveBeenCalledWith('a');
+        expect(mockedDelete).toHaveBeenCalledWith('b');
+      });
+    });
+
+    it('aggregates partial bulk-delete failures into a single error toast listing failed names', async () => {
+      const user = userEvent.setup();
+      seedTwo();
+      mockedDelete.mockImplementation(async (id: string) => {
+        if (id === 'b') throw new Error('boom');
+      });
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('checkbox', { name: /select all workflows/i }));
+      await user.click(screen.getByRole('button', { name: /delete selected/i }));
+      await user.click(await screen.findByRole('button', { name: /^delete workflows$/i }));
+
+      await waitFor(() => {
+        const errors = useToastStore.getState().toasts.filter((t) => t.tone === 'error');
+        expect(errors.length).toBeGreaterThan(0);
+        expect(errors[0].message).toMatch(/Beta/);
+      });
+    });
+
+    it('selection prunes when filter changes hide previously selected workflows', async () => {
+      const user = userEvent.setup();
+      // First render: two workflows, no folder filter.
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Alpha' }),
+        makeWorkflow({ id: 'b', name: 'Beta' }),
+      ]);
+      // After folder filter switch: only Alpha is in the new view.
+      mockedList.mockResolvedValueOnce([makeWorkflow({ id: 'a', name: 'Alpha' })]);
+      mockedListFolders.mockResolvedValue([
+        { id: 'f1', name: 'Inbox', parentFolderId: null, createdAt: new Date() },
+      ]);
+
+      renderWorkflows();
+
+      // Select Beta.
+      await user.click(await screen.findByRole('checkbox', { name: /select Beta/i }));
+      expect(await screen.findByText(/1 selected/i)).toBeInTheDocument();
+
+      // Switch folder filter to Inbox — Beta is no longer in view.
+      await user.click(await screen.findByRole('button', { name: /^Inbox$/i }));
+
+      await waitFor(() => {
+        // Selection pruned to zero, toolbar hidden.
+        expect(screen.queryByRole('toolbar', { name: /bulk actions/i })).not.toBeInTheDocument();
+      });
+    });
+  });
 });
