@@ -11,6 +11,7 @@ import { ConnectionsPage } from '@/pages/ConnectionsPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { SettingsEnvVarsPage } from '@/pages/settings/EnvVarsPage';
 import { AdminEnvVarsPage } from '@/pages/admin/EnvVarsPage';
+import { AuditLogPage } from '@/pages/admin/AuditLogPage';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
 import { RootLayout } from '@/components/layout/RootLayout';
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
           { path: '/settings', element: <PlaceholderPage title="Account settings" /> },
           { path: '/settings/env-vars', element: <SettingsEnvVarsPage /> },
           { path: '/admin/env-vars', element: <AdminEnvVarsPage /> },
+          { path: '/admin/audit', element: <AuditLogPage /> },
         ],
       },
       { path: '*', element: <Navigate to="/login" replace /> },
