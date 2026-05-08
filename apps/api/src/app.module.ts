@@ -19,6 +19,7 @@ import { AiModule } from './ai/ai.module';
 import { DemoModule } from './demo/demo.module';
 import { LibraryModule } from './library/library.module';
 import { FoldersModule } from './folders/folders.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { FoldersModule } from './folders/folders.module';
     DemoModule,
     LibraryModule,
     FoldersModule,
+    TagsModule,
   ],
 })
 export class AppModule {}
