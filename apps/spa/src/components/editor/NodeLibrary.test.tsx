@@ -76,7 +76,10 @@ describe('NodeLibrary', () => {
       const { NodeLibrary } = await importComponent();
       render(<NodeLibrary />);
       const items = screen.getAllByTestId('node-library-item');
-      expect(items).toHaveLength(9);
+      // 3 triggers + 1 generic action (http-request, code forbidden) + 4 logic
+      // + 2 Communication (Gmail) + 6 Productivity (Drive/Sheets/Docs/Calendar)
+      // + 1 Custom (Sticky) = 17.
+      expect(items).toHaveLength(17);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -149,7 +152,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(9);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(17);
     });
   });
 

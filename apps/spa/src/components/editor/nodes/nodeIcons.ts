@@ -1,11 +1,16 @@
 import {
   Box,
+  Calendar,
   Clock,
   Code2,
   CornerDownLeft,
+  FileText,
   GitBranch,
   Globe,
+  HardDrive,
+  Mail,
   Repeat2,
+  Sheet,
   StickyNote,
   Webhook,
   Workflow,
@@ -25,6 +30,14 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.SUBWORKFLOW]: Workflow,
   [NodeType.RETURN]: CornerDownLeft,
   [NodeType.STICKY]: StickyNote,
+  [NodeType.GMAIL_SEND]: Mail,
+  [NodeType.GMAIL_SEARCH]: Mail,
+  [NodeType.DRIVE_CREATE]: HardDrive,
+  [NodeType.DRIVE_LIST]: HardDrive,
+  [NodeType.SHEETS_APPEND]: Sheet,
+  [NodeType.SHEETS_READ]: Sheet,
+  [NodeType.DOCS_CREATE]: FileText,
+  [NodeType.CALENDAR_CREATE]: Calendar,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

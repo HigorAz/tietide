@@ -1,0 +1,133 @@
+import { z } from 'zod';
+import { NodeType } from '../types/node.types.js';
+
+// CR/LF in any header value enables RFC 822 header injection. Reject upstream.
+const noControlChars = (s: string) => !/[\r\n]/.test(s);
+const headerString = (max = 998) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine(noControlChars, { message: 'Must not contain newline characters' });
+
+const optionalHeaderString = (max = 998) =>
+  z
+    .string()
+    .max(max)
+    .refine(noControlChars, { message: 'Must not contain newline characters' })
+    .optional();
+
+const mockOnDryRun = z.boolean().optional();
+
+// ~10 MB base64 ≈ 13.3 MB string. Capped at the boundary.
+const DRIVE_CONTENT_MAX_LENGTH = 14_000_000;
+
+export const gmailSendConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  to: headerString(),
+  subject: headerString(),
+  body: z.string().min(1).max(1_000_000),
+  cc: optionalHeaderString(),
+  bcc: optionalHeaderString(),
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string().min(1).max(255).refine(noControlChars, {
+          message: 'filename must not contain newlines',
+        }),
+        contentBase64: z.string().min(1).max(DRIVE_CONTENT_MAX_LENGTH),
+        mimeType: z.string().min(1).max(255).refine(noControlChars, {
+          message: 'mimeType must not contain newlines',
+        }),
+      }),
+    )
+    .max(10)
+    .optional(),
+  mockOnDryRun,
+});
+export type GmailSendConfig = z.infer<typeof gmailSendConfigSchema>;
+
+export const gmailSearchConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  query: z.string().min(1).max(2048),
+  maxResults: z.number().int().positive().max(500).optional(),
+  mockOnDryRun,
+});
+export type GmailSearchConfig = z.infer<typeof gmailSearchConfigSchema>;
+
+export const driveCreateConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  name: z.string().min(1).max(255),
+  mimeType: z.string().min(1).max(255),
+  content: z.string().max(DRIVE_CONTENT_MAX_LENGTH),
+  parentFolderId: z.string().min(1).max(128).optional(),
+  mockOnDryRun,
+});
+export type DriveCreateConfig = z.infer<typeof driveCreateConfigSchema>;
+
+export const driveListConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  folderId: z.string().min(1).max(128),
+  query: z.string().max(2048).optional(),
+  maxResults: z.number().int().positive().max(1000).optional(),
+  mockOnDryRun,
+});
+export type DriveListConfig = z.infer<typeof driveListConfigSchema>;
+
+export const sheetsAppendConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  spreadsheetId: z.string().min(1).max(128),
+  sheet: z.string().min(1).max(255),
+  values: z.array(z.array(z.unknown())).min(1),
+  mockOnDryRun,
+});
+export type SheetsAppendConfig = z.infer<typeof sheetsAppendConfigSchema>;
+
+export const sheetsReadConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  spreadsheetId: z.string().min(1).max(128),
+  range: z.string().min(1).max(255),
+  mockOnDryRun,
+});
+export type SheetsReadConfig = z.infer<typeof sheetsReadConfigSchema>;
+
+export const docsCreateConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  templateId: z.string().min(1).max(128),
+  replacements: z.record(z.string(), z.string().max(10_000)),
+  mockOnDryRun,
+});
+export type DocsCreateConfig = z.infer<typeof docsCreateConfigSchema>;
+
+export const calendarCreateConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    calendarId: z.string().min(1).max(255).default('primary'),
+    summary: headerString(255),
+    description: z.string().max(8192).optional(),
+    start: z.string().datetime(),
+    end: z.string().datetime(),
+    attendees: z.array(z.string().email()).max(100).optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => new Date(v.start).getTime() < new Date(v.end).getTime(), {
+    message: 'end must be after start',
+    path: ['end'],
+  });
+export type CalendarCreateConfig = z.infer<typeof calendarCreateConfigSchema>;
+
+// Map of Google node types to the OAuth scope each requires. Consumed by the
+// SPA's ScopeReauthBanner and by `BaseConnectorAction.run()` validation if the
+// worker wants to short-circuit before hitting the API.
+export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
+  [NodeType.GMAIL_SEND]: 'https://www.googleapis.com/auth/gmail.send',
+  [NodeType.GMAIL_SEARCH]: 'https://www.googleapis.com/auth/gmail.readonly',
+  [NodeType.DRIVE_CREATE]: 'https://www.googleapis.com/auth/drive.file',
+  [NodeType.DRIVE_LIST]: 'https://www.googleapis.com/auth/drive.readonly',
+  [NodeType.SHEETS_APPEND]: 'https://www.googleapis.com/auth/spreadsheets',
+  [NodeType.SHEETS_READ]: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+  [NodeType.DOCS_CREATE]: 'https://www.googleapis.com/auth/documents',
+  [NodeType.CALENDAR_CREATE]: 'https://www.googleapis.com/auth/calendar.events',
+};
+
+export const GOOGLE_NODE_TYPES: ReadonlyArray<string> = Object.keys(GOOGLE_NODE_REQUIRED_SCOPES);
