@@ -431,3 +431,60 @@ The redirect URI in the env var **must exactly match** one of the URIs registere
 4. Build a workflow with a Manual trigger → Gmail Send (recipient = your own address). Run it. Email arrives, no `Bearer` tokens leak in `apps/worker/logs/*`.
 
 If users need additional scopes (e.g., a connection was created for `gmail.send` only and they later add a Drive node), have them create a new Google connection from `/connections` with the broader scope set; the editor's `ConnectionPicker` filters by `provider=google` and lists all of the user's Google connections.
+
+---
+
+## 12. Azure AD / Entra ID OAuth app setup (for the Microsoft 365 connector pack)
+
+The 5 Microsoft 365 connector nodes (Outlook send/search, Excel append/read, OneDrive create) share a single Microsoft Graph OAuth 2.0 application. Each user creates their own Microsoft `Connection` through the SPA, which redirects them through the Microsoft consent screen and stores the granted access + refresh tokens encrypted at rest.
+
+### 12.1. Register an app in Microsoft Entra
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com/) → **Applications → App registrations → New registration**.
+2. **Name**: e.g., "TieTide".
+3. **Supported account types**: choose `Accounts in any organizational directory and personal Microsoft accounts (multitenant)`. Use a single-tenant option only if you control every account that will connect.
+4. **Redirect URI**: select `Web` and enter `https://tietide.example.com/v1/connections/oauth/callback?provider=microsoft` (replace with your real public hostname; for local development add `http://localhost:3030/v1/connections/oauth/callback?provider=microsoft` as a second redirect URI under **Authentication → Web → Add URI** after creation).
+5. Click **Register** and copy the **Application (client) ID** from the overview page.
+
+### 12.2. Create a client secret
+
+1. **Certificates & secrets → Client secrets → New client secret**.
+2. Set a description and expiry (24 months is reasonable).
+3. Copy the **Value** (shown once) — this is the client secret. The **Secret ID** is not the secret.
+
+### 12.3. Grant Microsoft Graph delegated permissions
+
+1. **API permissions → Add a permission → Microsoft Graph → Delegated permissions**.
+2. Add the scopes the connector pack requests. The current allow-list lives in `apps/api/src/connections/oauth/providers/microsoft.provider.ts` (`ALLOWED_SCOPES`), and the per-node requirements are:
+   - `User.Read` (always granted; used by the connection-test health check)
+   - `offline_access` (always granted; required to receive a refresh token)
+   - `Mail.Send` — Outlook Send
+   - `Mail.Read` — Outlook Search
+   - `Files.ReadWrite` — Excel Append, OneDrive Create
+   - `Files.Read` — Excel Read
+   - `Calendars.Read` / `Calendars.ReadWrite` — reserved for future calendar nodes (safe to skip if you only use the S14 pack)
+3. Click **Grant admin consent** if your tenant requires it (otherwise the first end user to connect will be prompted for consent on the popup).
+
+### 12.4. Wire the credentials into the deployment
+
+Add (or update) these variables in your deployment's `.env`:
+
+```bash
+MS_OAUTH_CLIENT_ID=<the application (client) id from 12.1>
+MS_OAUTH_CLIENT_SECRET=<the client secret value from 12.2>
+MS_OAUTH_REDIRECT_URI=https://tietide.example.com/v1/connections/oauth/callback?provider=microsoft
+# 'common' lets both work and personal Microsoft accounts connect; set to your
+# directory's tenant id for a single-tenant deployment.
+MS_OAUTH_TENANT=common
+```
+
+The redirect URI in the env var **must exactly match** one of the URIs registered on the app's **Authentication** blade; Microsoft rejects mismatches with `AADSTS50011`. Recreate the API and worker containers after editing `.env` so the new values are loaded.
+
+### 12.5. Verify
+
+1. Open `https://tietide.example.com/connections` in the SPA.
+2. Click "Connect Microsoft", complete consent in the popup.
+3. The connection appears with status `ACTIVE` and the granted scope string.
+4. Build a workflow with a Manual trigger → Outlook Send (recipient = your own address). Run it. Email arrives, no `Bearer` tokens leak in `apps/worker/logs/*`.
+
+If users need additional scopes (e.g., a connection was created for `Mail.Send` only and they later add an Excel node), have them create a new Microsoft connection from `/connections` with the broader scope set; the editor's `ConnectionPicker` filters by `provider=microsoft` and lists all of the user's Microsoft connections.
