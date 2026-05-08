@@ -115,6 +115,11 @@ export {
   openAIApiKeyConfigSchema,
   anthropicApiKeyConfigSchema,
   stripeApiKeyConfigSchema,
+  discordWebhookConfigSchema,
+  discordBotConfigSchema,
+  twilioApiKeyConfigSchema,
+  telegramBotTokenConfigSchema,
+  DISCORD_WEBHOOK_URL_REGEX,
   PROVIDER_CONFIG_SCHEMAS,
   type GoogleOAuth2Config,
   type MicrosoftOAuth2Config,
@@ -123,6 +128,10 @@ export {
   type OpenAIApiKeyConfig,
   type AnthropicApiKeyConfig,
   type StripeApiKeyConfig,
+  type DiscordWebhookConfig,
+  type DiscordBotConfig,
+  type TwilioApiKeyConfig,
+  type TelegramBotTokenConfig,
   type ProviderConfigMap,
 } from './schemas/connections.schema.js';
 export {
@@ -194,6 +203,44 @@ export {
   type OnedriveFileAddedConfig,
   type ExcelRowAddedConfig,
 } from './schemas/microsoft-triggers.schema.js';
+export {
+  slackPostMessageConfigSchema,
+  slackPostToChannelConfigSchema,
+  slackUploadFileConfigSchema,
+  slackMessageReceivedConfigSchema,
+  slackReactionAddedConfigSchema,
+  SLACK_MESSAGE_EVENT_TYPES,
+  type SlackPostMessageConfig,
+  type SlackPostToChannelConfig,
+  type SlackUploadFileConfig,
+  type SlackMessageReceivedConfig,
+  type SlackReactionAddedConfig,
+  type SlackMessageEventType,
+} from './schemas/slack.schema.js';
+export {
+  discordPostWebhookConfigSchema,
+  discordMessageReceivedConfigSchema,
+  type DiscordPostWebhookConfig,
+  type DiscordMessageReceivedConfig,
+} from './schemas/discord.schema.js';
+export {
+  twilioSendSmsConfigSchema,
+  twilioSendWhatsAppConfigSchema,
+  twilioSmsReceivedConfigSchema,
+  E164_REGEX,
+  WHATSAPP_NUMBER_REGEX,
+  type TwilioSendSmsConfig,
+  type TwilioSendWhatsAppConfig,
+  type TwilioSmsReceivedConfig,
+} from './schemas/twilio.schema.js';
+export {
+  telegramSendMessageConfigSchema,
+  telegramMessageReceivedConfigSchema,
+  TELEGRAM_PARSE_MODES,
+  type TelegramSendMessageConfig,
+  type TelegramMessageReceivedConfig,
+  type TelegramParseMode,
+} from './schemas/telegram.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,

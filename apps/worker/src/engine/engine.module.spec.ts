@@ -20,12 +20,24 @@ import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-searc
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
+import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
+import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
+import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
+import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
+import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
+import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
   OnedriveFileAddedPassthrough,
+  SlackMessageReceivedPassthrough,
+  SlackReactionAddedPassthrough,
+  DiscordMessageReceivedPassthrough,
+  TelegramMessageReceivedPassthrough,
+  TwilioSmsReceivedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -68,6 +80,18 @@ describe('EngineModule', () => {
     const outlookMessageFlagged = new OutlookMessageFlaggedPassthrough();
     const onedriveFileAdded = new OnedriveFileAddedPassthrough();
     const excelRowAdded = new ExcelRowAddedTrigger(undefined as never);
+    const slackPostMessage = new SlackPostMessageAction(undefined as never);
+    const slackPostToChannel = new SlackPostToChannelAction(undefined as never);
+    const slackUploadFile = new SlackUploadFileAction(undefined as never);
+    const discordPostWebhook = new DiscordPostWebhookAction();
+    const twilioSendSms = new TwilioSendSmsAction(undefined as never);
+    const twilioSendWhatsApp = new TwilioSendWhatsAppAction(undefined as never);
+    const telegramSendMessage = new TelegramSendMessageAction(undefined as never);
+    const slackMessageReceived = new SlackMessageReceivedPassthrough();
+    const slackReactionAdded = new SlackReactionAddedPassthrough();
+    const discordMessageReceived = new DiscordMessageReceivedPassthrough();
+    const telegramMessageReceived = new TelegramMessageReceivedPassthrough();
+    const twilioSmsReceived = new TwilioSmsReceivedPassthrough();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -98,6 +122,18 @@ describe('EngineModule', () => {
       outlookMessageFlagged,
       onedriveFileAdded,
       excelRowAdded,
+      slackPostMessage,
+      slackPostToChannel,
+      slackUploadFile,
+      discordPostWebhook,
+      twilioSendSms,
+      twilioSendWhatsApp,
+      telegramSendMessage,
+      slackMessageReceived,
+      slackReactionAdded,
+      discordMessageReceived,
+      telegramMessageReceived,
+      twilioSmsReceived,
     );
     return {
       registry,
@@ -129,6 +165,18 @@ describe('EngineModule', () => {
       outlookMessageFlagged,
       onedriveFileAdded,
       excelRowAdded,
+      slackPostMessage,
+      slackPostToChannel,
+      slackUploadFile,
+      discordPostWebhook,
+      twilioSendSms,
+      twilioSendWhatsApp,
+      telegramSendMessage,
+      slackMessageReceived,
+      slackReactionAdded,
+      discordMessageReceived,
+      telegramMessageReceived,
+      twilioSmsReceived,
       module,
     };
   };
@@ -163,6 +211,22 @@ describe('EngineModule', () => {
       ['OutlookMessageFlaggedPassthrough', 'outlook-message-flagged', 'outlookMessageFlagged'],
       ['OnedriveFileAddedPassthrough', 'onedrive-file-added', 'onedriveFileAdded'],
       ['ExcelRowAddedTrigger', 'excel-row-added', 'excelRowAdded'],
+      ['SlackPostMessageAction', 'slack-post-message', 'slackPostMessage'],
+      ['SlackPostToChannelAction', 'slack-post-to-channel', 'slackPostToChannel'],
+      ['SlackUploadFileAction', 'slack-upload-file', 'slackUploadFile'],
+      ['DiscordPostWebhookAction', 'discord-post-webhook', 'discordPostWebhook'],
+      ['TwilioSendSmsAction', 'twilio-send-sms', 'twilioSendSms'],
+      ['TwilioSendWhatsAppAction', 'twilio-send-whatsapp', 'twilioSendWhatsApp'],
+      ['TelegramSendMessageAction', 'telegram-send-message', 'telegramSendMessage'],
+      ['SlackMessageReceivedPassthrough', 'slack-message-received', 'slackMessageReceived'],
+      ['SlackReactionAddedPassthrough', 'slack-reaction-added', 'slackReactionAdded'],
+      ['DiscordMessageReceivedPassthrough', 'discord-message-received', 'discordMessageReceived'],
+      [
+        'TelegramMessageReceivedPassthrough',
+        'telegram-message-received',
+        'telegramMessageReceived',
+      ],
+      ['TwilioSmsReceivedPassthrough', 'twilio-sms-received', 'twilioSmsReceived'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -183,12 +247,14 @@ describe('EngineModule', () => {
       }, {});
       // 6 baseline triggers (manual, cron, webhook, stripe, drive, gmail) +
       // 4 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
-      // onedrive-file-added, excel-row-added) = 10.
-      expect(counts.trigger).toBe(10);
+      // onedrive-file-added, excel-row-added) +
+      // 5 communication push triggers (slack ×2, discord, telegram, twilio) = 15.
+      expect(counts.trigger).toBe(15);
       expect(counts.logic).toBe(4);
-      // 1 generic action (http-request) + 8 Google connector actions
-      // + 5 Microsoft connector actions = 14.
-      expect(counts.action).toBe(14);
+      // 1 generic action (http-request) + 8 Google connector actions +
+      // 5 Microsoft connector actions +
+      // 7 communication actions (slack ×3, discord, twilio ×2, telegram) = 21.
+      expect(counts.action).toBe(21);
     });
   });
 });

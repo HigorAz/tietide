@@ -30,6 +30,29 @@ import {
   OnedriveFileAddedTrigger,
   ONEDRIVE_FILE_ADDED_TYPE,
 } from './triggers/onedrive-file-added.trigger';
+import { TwilioApiFactory } from './triggers/twilio/twilio-client.factory';
+import {
+  TwilioSmsReceivedTrigger,
+  TWILIO_SMS_RECEIVED_TYPE,
+} from './triggers/twilio/twilio-sms-received.trigger';
+import { TelegramApiFactory } from './triggers/telegram/telegram-client.factory';
+import {
+  TelegramMessageReceivedTrigger,
+  TELEGRAM_MESSAGE_RECEIVED_TYPE,
+} from './triggers/telegram/telegram-message-received.trigger';
+import {
+  SlackMessageReceivedTrigger,
+  SLACK_MESSAGE_RECEIVED_TYPE,
+} from './triggers/slack/slack-message-received.trigger';
+import {
+  SlackReactionAddedTrigger,
+  SLACK_REACTION_ADDED_TYPE,
+} from './triggers/slack/slack-reaction-added.trigger';
+import { DiscordBotClientFactory } from './triggers/discord/discord-bot-client.factory';
+import {
+  DiscordMessageReceivedTrigger,
+  DISCORD_MESSAGE_RECEIVED_TYPE,
+} from './triggers/discord/discord-message-received.trigger';
 import { RENEWAL_QUEUE_NAME } from './renewal/subscription-renewer.constants';
 import { SubscriptionRenewerProcessor } from './renewal/subscription-renewer.processor';
 import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-bootstrap.service';
@@ -52,6 +75,14 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     OutlookMessageReceivedTrigger,
     OutlookMessageFlaggedTrigger,
     OnedriveFileAddedTrigger,
+    TwilioApiFactory,
+    TwilioSmsReceivedTrigger,
+    TelegramApiFactory,
+    TelegramMessageReceivedTrigger,
+    SlackMessageReceivedTrigger,
+    SlackReactionAddedTrigger,
+    DiscordBotClientFactory,
+    DiscordMessageReceivedTrigger,
     ActivationService,
     SubscriptionRenewerProcessor,
     SubscriptionRenewerBootstrap,
@@ -73,6 +104,11 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly outlookMessageReceived: OutlookMessageReceivedTrigger,
     private readonly outlookMessageFlagged: OutlookMessageFlaggedTrigger,
     private readonly onedriveFileAdded: OnedriveFileAddedTrigger,
+    private readonly twilioSmsReceived: TwilioSmsReceivedTrigger,
+    private readonly telegramMessageReceived: TelegramMessageReceivedTrigger,
+    private readonly slackMessageReceived: SlackMessageReceivedTrigger,
+    private readonly slackReactionAdded: SlackReactionAddedTrigger,
+    private readonly discordMessageReceived: DiscordMessageReceivedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -82,5 +118,10 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(OUTLOOK_MESSAGE_RECEIVED_TYPE, this.outlookMessageReceived);
     this.registry.register(OUTLOOK_MESSAGE_FLAGGED_TYPE, this.outlookMessageFlagged);
     this.registry.register(ONEDRIVE_FILE_ADDED_TYPE, this.onedriveFileAdded);
+    this.registry.register(TWILIO_SMS_RECEIVED_TYPE, this.twilioSmsReceived);
+    this.registry.register(TELEGRAM_MESSAGE_RECEIVED_TYPE, this.telegramMessageReceived);
+    this.registry.register(SLACK_MESSAGE_RECEIVED_TYPE, this.slackMessageReceived);
+    this.registry.register(SLACK_REACTION_ADDED_TYPE, this.slackReactionAdded);
+    this.registry.register(DISCORD_MESSAGE_RECEIVED_TYPE, this.discordMessageReceived);
   }
 }

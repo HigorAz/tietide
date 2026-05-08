@@ -92,15 +92,14 @@ describe('NodeLibrary', () => {
       const { NodeLibrary } = await importComponent();
       render(<NodeLibrary />);
       const items = screen.getAllByTestId('node-library-item');
-      // 3 triggers + 5 google triggers (gmail-message-received, gmail-label-added,
-      // drive-file-added, sheets-row-added, calendar-event-created)
-      // + 4 microsoft triggers (outlook-message-received, outlook-message-flagged,
-      // onedrive-file-added, excel-row-added)
+      // 3 triggers + 5 google triggers + 4 microsoft triggers
+      // + 5 communication push triggers (slack ×2, discord, telegram, twilio)
       // + 1 generic action (http-request, code forbidden) + 4 logic
-      // + 4 Communication (Gmail × 2 + Outlook × 2)
+      // + 4 Communication actions (Gmail × 2 + Outlook × 2)
+      // + 7 Communication-pack actions (slack ×3, discord, twilio ×2, telegram)
       // + 9 Productivity (Drive × 2 / Sheets × 2 / Docs / Calendar / Excel × 2 / OneDrive)
-      // + 1 Custom (Sticky) = 31.
-      expect(items).toHaveLength(31);
+      // + 1 Custom (Sticky) = 43.
+      expect(items).toHaveLength(43);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -173,7 +172,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(31);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(43);
     });
   });
 
