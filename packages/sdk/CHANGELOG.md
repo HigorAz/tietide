@@ -5,6 +5,23 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] — 2026-05-08
+
+### Added
+
+- `BasePushTrigger.handleValidation?(input)` — optional method for providers
+  whose subscription create flow demands an out-of-band URL ownership echo
+  (e.g. Microsoft Graph posts `?validationToken=<token>` to the notification
+  URL during `POST /v1.0/subscriptions` and expects a 200 text/plain echo
+  within ~10 s, before any provider-subscription DB row exists). Returning a
+  `ValidationResponse` tells the webhook controller to short-circuit and
+  reply with the echoed body; returning null means "not a challenge —
+  proceed with the normal signed-event flow."
+- `ValidationInput` / `ValidationResponse` interfaces.
+
+Purely additive — existing 2.2.0 implementations continue to compile and run
+unchanged because the new method is optional.
+
 ## [2.2.0] — 2026-05-08
 
 ### Changed (covariant)

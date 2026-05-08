@@ -43,3 +43,36 @@ export class DriveFileAddedPassthrough extends PassthroughPushExecutor {
     );
   }
 }
+
+@Injectable()
+export class OutlookMessageReceivedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'outlook-message-received',
+      'Outlook: Message Received',
+      'Triggers when Microsoft Graph notifies that a new Outlook message arrived',
+    );
+  }
+}
+
+@Injectable()
+export class OutlookMessageFlaggedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'outlook-message-flagged',
+      'Outlook: Message Flagged',
+      'Triggers when Microsoft Graph notifies that an Outlook message was flagged',
+    );
+  }
+}
+
+@Injectable()
+export class OnedriveFileAddedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'onedrive-file-added',
+      'OneDrive: File Added',
+      'Triggers when Microsoft Graph notifies that the user OneDrive root changed',
+    );
+  }
+}

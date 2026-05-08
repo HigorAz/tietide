@@ -27,6 +27,10 @@ import { OutlookSearchForm } from './microsoft/OutlookSearchForm';
 import { ExcelAppendForm } from './microsoft/ExcelAppendForm';
 import { ExcelReadForm } from './microsoft/ExcelReadForm';
 import { OneDriveCreateForm } from './microsoft/OneDriveCreateForm';
+import { OutlookMessageReceivedForm } from './microsoft/OutlookMessageReceivedForm';
+import { OutlookMessageFlaggedForm } from './microsoft/OutlookMessageFlaggedForm';
+import { OneDriveFileAddedForm } from './microsoft/OneDriveFileAddedForm';
+import { ExcelRowAddedForm } from './microsoft/ExcelRowAddedForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -61,4 +65,8 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.EXCEL_APPEND]: ExcelAppendForm,
   [NodeType.EXCEL_READ]: ExcelReadForm,
   [NodeType.ONEDRIVE_CREATE]: OneDriveCreateForm,
+  [NodeType.OUTLOOK_MESSAGE_RECEIVED]: OutlookMessageReceivedForm,
+  [NodeType.OUTLOOK_MESSAGE_FLAGGED]: OutlookMessageFlaggedForm,
+  [NodeType.ONEDRIVE_FILE_ADDED]: OneDriveFileAddedForm,
+  [NodeType.EXCEL_ROW_ADDED]: ExcelRowAddedForm,
 };

@@ -48,6 +48,10 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.EXCEL_APPEND]: Sheet,
   [NodeType.EXCEL_READ]: Sheet,
   [NodeType.ONEDRIVE_CREATE]: HardDrive,
+  [NodeType.OUTLOOK_MESSAGE_RECEIVED]: Mail,
+  [NodeType.OUTLOOK_MESSAGE_FLAGGED]: Mail,
+  [NodeType.ONEDRIVE_FILE_ADDED]: HardDrive,
+  [NodeType.EXCEL_ROW_ADDED]: Sheet,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

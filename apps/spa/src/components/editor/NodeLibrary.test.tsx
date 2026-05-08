@@ -59,6 +59,13 @@ describe('NodeLibrary', () => {
       expect(within(googleTriggers).getByText('Calendar: Event Created')).toBeInTheDocument();
       expect(within(googleTriggers).queryAllByTestId('node-library-item')).toHaveLength(5);
 
+      const microsoftTriggers = screen.getByRole('region', { name: /microsoft triggers/i });
+      expect(within(microsoftTriggers).getByText('Outlook: Message Received')).toBeInTheDocument();
+      expect(within(microsoftTriggers).getByText('Outlook: Message Flagged')).toBeInTheDocument();
+      expect(within(microsoftTriggers).getByText('OneDrive: File Added')).toBeInTheDocument();
+      expect(within(microsoftTriggers).getByText('Excel: Row Added')).toBeInTheDocument();
+      expect(within(microsoftTriggers).queryAllByTestId('node-library-item')).toHaveLength(4);
+
       const actions = screen.getByRole('region', { name: /actions/i });
       expect(within(actions).getByText('HTTP Request')).toBeInTheDocument();
       expect(within(actions).queryAllByTestId('node-library-item')).toHaveLength(1);
@@ -87,11 +94,13 @@ describe('NodeLibrary', () => {
       const items = screen.getAllByTestId('node-library-item');
       // 3 triggers + 5 google triggers (gmail-message-received, gmail-label-added,
       // drive-file-added, sheets-row-added, calendar-event-created)
+      // + 4 microsoft triggers (outlook-message-received, outlook-message-flagged,
+      // onedrive-file-added, excel-row-added)
       // + 1 generic action (http-request, code forbidden) + 4 logic
       // + 4 Communication (Gmail × 2 + Outlook × 2)
       // + 9 Productivity (Drive × 2 / Sheets × 2 / Docs / Calendar / Excel × 2 / OneDrive)
-      // + 1 Custom (Sticky) = 27.
-      expect(items).toHaveLength(27);
+      // + 1 Custom (Sticky) = 31.
+      expect(items).toHaveLength(31);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -164,7 +173,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(27);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(31);
     });
   });
 

@@ -40,8 +40,12 @@ import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-cre
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
+  OutlookMessageReceivedPassthrough,
+  OutlookMessageFlaggedPassthrough,
+  OnedriveFileAddedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
+import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -75,7 +79,11 @@ import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-messa
     OnedriveCreateAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
+    OutlookMessageReceivedPassthrough,
+    OutlookMessageFlaggedPassthrough,
+    OnedriveFileAddedPassthrough,
     GmailMessageReceivedExecutor,
+    ExcelRowAddedTrigger,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -109,6 +117,10 @@ export class EngineModule implements OnModuleInit {
     private readonly stripeEventReceived: StripeEventReceivedPassthrough,
     private readonly driveFileAdded: DriveFileAddedPassthrough,
     private readonly gmailMessageReceived: GmailMessageReceivedExecutor,
+    private readonly outlookMessageReceived: OutlookMessageReceivedPassthrough,
+    private readonly outlookMessageFlagged: OutlookMessageFlaggedPassthrough,
+    private readonly onedriveFileAdded: OnedriveFileAddedPassthrough,
+    private readonly excelRowAdded: ExcelRowAddedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -136,5 +148,9 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.stripeEventReceived);
     this.registry.register(this.driveFileAdded);
     this.registry.register(this.gmailMessageReceived);
+    this.registry.register(this.outlookMessageReceived);
+    this.registry.register(this.outlookMessageFlagged);
+    this.registry.register(this.onedriveFileAdded);
+    this.registry.register(this.excelRowAdded);
   }
 }

@@ -20,6 +20,8 @@ import {
   GmailLabelAddedTrigger,
   GMAIL_LABEL_ADDED_TYPE,
 } from '../nodes/triggers/poll/gmail-label-added';
+import { ExcelRowAddedTrigger, EXCEL_ROW_ADDED_TYPE } from '../nodes/triggers/poll/excel-row-added';
+import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import { PollSchedulerService } from './poll-scheduler.service';
 import { PollProcessor } from './poll-processor';
@@ -43,6 +45,8 @@ import { PollConnectionLoader } from './poll-connection-loader';
     SheetsRowAddedTrigger,
     CalendarEventCreatedTrigger,
     GmailLabelAddedTrigger,
+    MicrosoftAuthService,
+    ExcelRowAddedTrigger,
   ],
   exports: [PollTriggerRegistry],
 })
@@ -52,11 +56,13 @@ export class PollModule implements OnModuleInit {
     private readonly sheetsRowAdded: SheetsRowAddedTrigger,
     private readonly calendarEventCreated: CalendarEventCreatedTrigger,
     private readonly gmailLabelAdded: GmailLabelAddedTrigger,
+    private readonly excelRowAdded: ExcelRowAddedTrigger,
   ) {}
 
   onModuleInit(): void {
     this.registry.register(SHEETS_ROW_ADDED_TYPE, this.sheetsRowAdded);
     this.registry.register(CALENDAR_EVENT_CREATED_TYPE, this.calendarEventCreated);
     this.registry.register(GMAIL_LABEL_ADDED_TYPE, this.gmailLabelAdded);
+    this.registry.register(EXCEL_ROW_ADDED_TYPE, this.excelRowAdded);
   }
 }

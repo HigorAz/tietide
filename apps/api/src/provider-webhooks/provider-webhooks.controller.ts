@@ -1,4 +1,14 @@
-import { Controller, Headers, HttpCode, HttpStatus, Param, Post, Req } from '@nestjs/common';
+import {
+  Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
 import {
   ApiAcceptedResponse,
   ApiNotFoundResponse,
@@ -7,9 +17,10 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { ProviderWebhooksService } from './provider-webhooks.service';
 import { ProviderWebhookResponseDto } from './dto/provider-webhook-response.dto';
+import { ProviderTriggerRegistry } from '../provider-triggers/provider-trigger.registry';
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
@@ -19,7 +30,10 @@ interface RawBodyRequest extends Request {
 @SkipThrottle()
 @Controller('provider-webhooks')
 export class ProviderWebhooksController {
-  constructor(private readonly providerWebhooks: ProviderWebhooksService) {}
+  constructor(
+    private readonly providerWebhooks: ProviderWebhooksService,
+    private readonly registry: ProviderTriggerRegistry,
+  ) {}
 
   @Post(':provider/:subscriptionId')
   @HttpCode(HttpStatus.ACCEPTED)
@@ -32,10 +46,28 @@ export class ProviderWebhooksController {
   async receive(
     @Param('provider') provider: string,
     @Param('subscriptionId') subscriptionId: string,
+    @Query() query: Record<string, string | string[] | undefined>,
     @Req() req: RawBodyRequest & { id?: string },
     @Headers() headers: Record<string, string | string[] | undefined>,
-  ): Promise<ProviderWebhookResponseDto> {
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ProviderWebhookResponseDto | undefined> {
     const rawBody = req.rawBody ?? Buffer.alloc(0);
+
+    // Out-of-band URL-ownership challenges (currently MS Graph's
+    // ?validationToken= echo). These fire while onActivate is still in
+    // flight — no ProviderSubscription row exists yet — so we MUST answer
+    // before consulting the database. Triggers that don't need a challenge
+    // (Stripe, Drive, Gmail) leave handleValidation undefined and the call
+    // falls through.
+    const trigger = this.registry.getByProvider(provider);
+    if (trigger?.handleValidation) {
+      const validation = trigger.handleValidation({ query, headers, rawBody });
+      if (validation) {
+        res.status(HttpStatus.OK).type(validation.contentType).send(validation.body);
+        return undefined;
+      }
+    }
+
     return this.providerWebhooks.trigger({
       provider,
       subscriptionId,

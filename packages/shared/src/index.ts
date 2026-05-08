@@ -183,6 +183,17 @@ export {
   type ExcelReadConfig,
   type OnedriveCreateConfig,
 } from './schemas/microsoft.schema.js';
+export {
+  outlookMessageReceivedConfigSchema,
+  outlookMessageFlaggedConfigSchema,
+  onedriveFileAddedConfigSchema,
+  excelRowAddedConfigSchema,
+  MICROSOFT_TRIGGER_REQUIRED_SCOPES,
+  type OutlookMessageReceivedConfig,
+  type OutlookMessageFlaggedConfig,
+  type OnedriveFileAddedConfig,
+  type ExcelRowAddedConfig,
+} from './schemas/microsoft-triggers.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,
