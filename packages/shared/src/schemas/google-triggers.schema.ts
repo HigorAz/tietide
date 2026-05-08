@@ -12,19 +12,15 @@ const pubsubTopicName = z
     message: 'topicName must be in the form projects/<project-id>/topics/<topic-name>',
   });
 
-export const gmailMessageReceivedConfigSchema = z
-  .object({
-    connectionId,
-    mode: z.enum(['push', 'poll']).default('poll'),
-    topicName: pubsubTopicName.optional(),
-    query: z.string().max(2048).optional(),
-    labelIds: z.array(z.string().min(1).max(128)).max(20).optional(),
-    intervalSeconds: z.number().int().positive().max(3600).optional(),
-  })
-  .refine((v) => v.mode !== 'push' || typeof v.topicName === 'string', {
-    message: 'topicName is required when mode is "push"',
-    path: ['topicName'],
-  });
+// Push-only for #199. Pub/Sub topic must be provisioned upstream — see
+// docs/deployment.md. For label-based polling without GCP setup users
+// should pick the `gmail-label-added` trigger instead.
+export const gmailMessageReceivedConfigSchema = z.object({
+  connectionId,
+  topicName: pubsubTopicName,
+  labelIds: z.array(z.string().min(1).max(128)).max(20).optional(),
+  labelFilterAction: z.enum(['include', 'exclude']).optional(),
+});
 export type GmailMessageReceivedConfig = z.infer<typeof gmailMessageReceivedConfigSchema>;
 
 export const gmailLabelAddedConfigSchema = z.object({
