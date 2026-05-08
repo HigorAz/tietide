@@ -370,3 +370,64 @@ curl -fsS https://tietide.example.com/v1/health | jq
 ```
 
 If `/v1/health` flips to `fail` after the swap, see the runbook's [service-down](runbook.md#api-or-worker-down) playbook before reaching for `git revert`.
+
+---
+
+## 11. Google Cloud OAuth app setup (for the Google connector pack)
+
+The 8 Google connector nodes (Gmail, Drive, Sheets, Docs, Calendar) all share a single OAuth 2.0 Web Application client. Each user creates their own Google `Connection` through the SPA, which redirects them through Google's consent screen and stores the granted access + refresh tokens encrypted at rest.
+
+### 11.1. Enable Google APIs
+
+In the [Google Cloud Console](https://console.cloud.google.com/), select (or create) a project, then enable each API your deployment will use:
+
+- Gmail API — `gmail.googleapis.com`
+- Google Drive API — `drive.googleapis.com`
+- Google Sheets API — `sheets.googleapis.com`
+- Google Docs API — `docs.googleapis.com`
+- Google Calendar API — `calendar.googleapis.com`
+
+You only need the APIs whose nodes you intend to use, but enabling all five upfront avoids surprise 403s the first time a user tries a new node type.
+
+### 11.2. Configure the OAuth consent screen
+
+1. Navigate to **APIs & Services → OAuth consent screen**.
+2. **User type**: choose `External` (or `Internal` for a Workspace-only deployment).
+3. Fill in the app name (e.g., "TieTide"), user support email, and developer contact.
+4. **Scopes** — leave the OAuth-consent-screen scope list empty. TieTide requests scopes per-flow, not as a fixed app-level set. The current allow-list is in `apps/api/src/connections/oauth/providers/google.provider.ts` (`ALLOWED_SCOPES`), which includes:
+   - `openid`, `email`, `profile` (always granted on first connect)
+   - `https://www.googleapis.com/auth/gmail.readonly|.send|.modify`
+   - `https://www.googleapis.com/auth/drive|.readonly|.file`
+   - `https://www.googleapis.com/auth/spreadsheets|.readonly`
+   - `https://www.googleapis.com/auth/documents|.readonly`
+   - `https://www.googleapis.com/auth/calendar|.readonly|.events`
+5. **Test users** — while the consent screen is in `Testing` mode, add the Google accounts that will use the deployment. Move to `In production` once verified.
+
+### 11.3. Create the OAuth 2.0 client credentials
+
+1. **APIs & Services → Credentials → Create credentials → OAuth client ID**.
+2. **Application type**: `Web application`.
+3. **Name**: e.g., "TieTide Web Client".
+4. **Authorized redirect URIs**: add `https://tietide.example.com/v1/connections/oauth/callback?provider=google` (replace with your real public hostname; for local development add `http://localhost:3030/v1/connections/oauth/callback?provider=google` as a second URI).
+5. Click **Create** and copy the generated **Client ID** and **Client Secret**.
+
+### 11.4. Wire the credentials into the deployment
+
+Add (or update) these variables in your deployment's `.env`:
+
+```bash
+GOOGLE_OAUTH_CLIENT_ID=<the client id from 11.3>
+GOOGLE_OAUTH_CLIENT_SECRET=<the client secret from 11.3>
+GOOGLE_OAUTH_REDIRECT_URI=https://tietide.example.com/v1/connections/oauth/callback?provider=google
+```
+
+The redirect URI in the env var **must exactly match** one of the URIs registered with the OAuth client; Google rejects mismatches with `redirect_uri_mismatch`. Recreate the API and worker containers after editing `.env` so the new values are loaded.
+
+### 11.5. Verify
+
+1. Open `https://tietide.example.com/connections` in the SPA.
+2. Click "Connect Google", complete consent in the popup.
+3. The connection appears with status `ACTIVE` and the granted scope string.
+4. Build a workflow with a Manual trigger → Gmail Send (recipient = your own address). Run it. Email arrives, no `Bearer` tokens leak in `apps/worker/logs/*`.
+
+If users need additional scopes (e.g., a connection was created for `gmail.send` only and they later add a Drive node), have them create a new Google connection from `/connections` with the broader scope set; the editor's `ConnectionPicker` filters by `provider=google` and lists all of the user's Google connections.
