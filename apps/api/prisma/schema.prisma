@@ -70,13 +70,15 @@ model Workflow {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user          User                   @relation(fields: [userId], references: [id])
-  folder        Folder?                @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  executions    WorkflowExecution[]
-  webhooks      Webhook[]
-  documentation WorkflowDocumentation?
-  versions      WorkflowVersion[]
-  tags          WorkflowTag[]
+  user                  User                   @relation(fields: [userId], references: [id])
+  folder                Folder?                @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  executions            WorkflowExecution[]
+  webhooks              Webhook[]
+  documentation         WorkflowDocumentation?
+  versions              WorkflowVersion[]
+  tags                  WorkflowTag[]
+  providerSubscriptions ProviderSubscription[]
+  triggerCursors        TriggerCursor[]
 
   @@index([userId, folderId])
   @@map("workflows")
@@ -113,8 +115,8 @@ model Tag {
 }
 
 model WorkflowTag {
-  workflowId String @map("workflow_id")
-  tagId      String @map("tag_id")
+  workflowId String   @map("workflow_id")
+  tagId      String   @map("tag_id")
   createdAt  DateTime @default(now()) @map("created_at")
 
   workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
@@ -290,4 +292,35 @@ model AuditLog {
 
   @@index([userId, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+model ProviderSubscription {
+  id            String    @id @default(uuid())
+  workflowId    String    @map("workflow_id")
+  nodeId        String    @map("node_id")
+  provider      String
+  providerSubId String    @map("provider_sub_id")
+  secretEnc     String    @map("secret_enc")
+  secretNonce   String    @map("secret_nonce")
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, nodeId])
+  @@index([workflowId])
+  @@index([expiresAt])
+  @@map("provider_subscriptions")
+}
+
+model TriggerCursor {
+  workflowId   String   @map("workflow_id")
+  nodeId       String   @map("node_id")
+  cursor       String
+  lastPolledAt DateTime @default(now()) @map("last_polled_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@id([workflowId, nodeId])
+  @@map("trigger_cursors")
 }
