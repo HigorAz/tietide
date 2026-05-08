@@ -6,7 +6,6 @@ import {
 import {
   makeAuthService,
   makeClients,
-  makeConnection,
   makeContext,
   VALID_CONNECTION_ID,
   authError,
