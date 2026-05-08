@@ -38,6 +38,11 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.SHEETS_READ]: Sheet,
   [NodeType.DOCS_CREATE]: FileText,
   [NodeType.CALENDAR_CREATE]: Calendar,
+  [NodeType.OUTLOOK_SEND]: Mail,
+  [NodeType.OUTLOOK_SEARCH]: Mail,
+  [NodeType.EXCEL_APPEND]: Sheet,
+  [NodeType.EXCEL_READ]: Sheet,
+  [NodeType.ONEDRIVE_CREATE]: HardDrive,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;
