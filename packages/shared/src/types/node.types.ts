@@ -2,6 +2,7 @@ export const NodeCategory = {
   TRIGGER: 'trigger',
   ACTION: 'action',
   LOGIC: 'logic',
+  ANNOTATION: 'annotation',
 } as const;
 
 export type NodeCategory = (typeof NodeCategory)[keyof typeof NodeCategory];
@@ -16,6 +17,7 @@ export const NodeType = {
   ITERATOR: 'iterator',
   SUBWORKFLOW: 'subworkflow',
   RETURN: 'return',
+  STICKY: 'sticky',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -126,5 +128,12 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     name: 'Return',
     description: 'Mark the value to forward to a parent subworkflow caller',
     category: NodeCategory.LOGIC,
+  },
+  {
+    type: NodeType.STICKY,
+    name: 'Sticky Note',
+    description: 'Add a colored note for documentation. Does not execute.',
+    category: NodeCategory.ANNOTATION,
+    group: NodeGroup.CUSTOM,
   },
 ];
