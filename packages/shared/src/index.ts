@@ -143,6 +143,20 @@ export {
   type DocsCreateConfig,
   type CalendarCreateConfig,
 } from './schemas/google.schema.js';
+export {
+  outlookSendConfigSchema,
+  outlookSearchConfigSchema,
+  excelAppendConfigSchema,
+  excelReadConfigSchema,
+  onedriveCreateConfigSchema,
+  MICROSOFT_NODE_REQUIRED_SCOPES,
+  MICROSOFT_NODE_TYPES,
+  type OutlookSendConfig,
+  type OutlookSearchConfig,
+  type ExcelAppendConfig,
+  type ExcelReadConfig,
+  type OnedriveCreateConfig,
+} from './schemas/microsoft.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,
