@@ -189,6 +189,8 @@ describe('AppTour', () => {
             createdAt: new Date(),
             updatedAt: new Date(),
             documentation: null,
+            folderId: null,
+            tags: [],
           },
         ],
         create,

@@ -31,6 +31,8 @@ const sampleWorkflow: Workflow = {
   updatedAt: new Date('2026-05-04T10:00:00Z'),
   executionCount: 0,
   documentation: null,
+  folderId: null,
+  tags: [],
 };
 
 const mockedGet = vi.mocked(api.get);

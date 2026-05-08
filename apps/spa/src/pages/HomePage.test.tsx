@@ -62,6 +62,8 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   updatedAt: new Date('2026-04-10T12:00:00Z'),
   executionCount: 0,
   documentation: null,
+  folderId: null,
+  tags: [],
   ...overrides,
 });
 
