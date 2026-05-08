@@ -1,11 +1,14 @@
 import { useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, Play, Redo2, Save, Undo2 } from 'lucide-react';
+import { ArrowLeft, Download, FlaskConical, Play, Redo2, Save, Undo2 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { executeWorkflow, testWorkflow } from '@/api/executions';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
+import { buildExportPayload, exportFilename, serializeExport } from '@/lib/workflowExport';
+import { downloadJson } from '@/lib/downloadFile';
 import { saveWorkflow } from './saveWorkflow';
 import { toWorkflowDefinition } from './serialization';
 
@@ -59,6 +62,15 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
     }
   }, [isRunning, isSaving, setSearchParams, toast, workflowId]);
 
+  const handleExport = useCallback(() => {
+    const { nodes, edges } = useEditorStore.getState();
+    const definition = toWorkflowDefinition(nodes, edges);
+    const workflow = useWorkflowsStore.getState().workflows.find((w) => w.id === workflowId);
+    const name = workflow?.name ?? '';
+    const payload = buildExportPayload(name, definition);
+    downloadJson(exportFilename(name), serializeExport(payload));
+  }, [workflowId]);
+
   const handleTest = useCallback(async () => {
     if (isTesting || isSaving) return;
     setIsTesting(true);
@@ -78,6 +90,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const saveDisabled = !isDirty || isSaving;
   const runDisabled = isRunning || isSaving;
   const testDisabled = isTesting || isSaving || nodeCount === 0;
+  const exportDisabled = nodeCount === 0;
   const undoDisabled = past.length === 0;
   const redoDisabled = future.length === 0;
 
@@ -116,6 +129,12 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           icon={<Redo2 size={16} aria-hidden />}
         />
         <div aria-hidden className="mx-1 h-5 w-px bg-white/10" />
+        <ToolbarButton
+          label="Export"
+          onClick={handleExport}
+          disabled={exportDisabled}
+          icon={<Download size={16} aria-hidden />}
+        />
         <ToolbarButton
           label={isRunning ? 'Running…' : 'Run'}
           onClick={handleRun}
