@@ -91,10 +91,12 @@ describe('LibraryService', () => {
       definition: { nodes: [], edges: [] },
       isActive: false,
       version: 1,
+      folderId: null,
       createdAt: new Date('2026-05-04T10:00:00Z'),
       updatedAt: new Date('2026-05-04T10:00:00Z'),
       _count: { executions: 0 },
       documentation: null,
+      tags: [],
     };
 
     beforeEach(() => {

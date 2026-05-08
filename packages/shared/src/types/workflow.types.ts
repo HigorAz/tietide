@@ -26,6 +26,12 @@ export interface WorkflowDocumentationMeta {
   version: number;
 }
 
+export interface WorkflowTagSummary {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 export interface Workflow {
   id: string;
   name: string;
@@ -34,8 +40,10 @@ export interface Workflow {
   isActive: boolean;
   version: number;
   userId: string;
+  folderId: string | null;
   createdAt: Date;
   updatedAt: Date;
   executionCount: number;
   documentation: WorkflowDocumentationMeta | null;
+  tags: WorkflowTagSummary[];
 }

@@ -12,10 +12,26 @@ export interface UpdateWorkflowBody {
   description?: string | null;
   definition?: WorkflowDefinition;
   isActive?: boolean;
+  folderId?: string | null;
+  tagIds?: string[];
 }
 
-export async function listWorkflows(): Promise<Workflow[]> {
-  const { data } = await api.get<Workflow[]>('/workflows');
+export interface ListWorkflowsParams {
+  /** UUID, null for root, or undefined for no filter. */
+  folderId?: string | null;
+  tagIds?: string[];
+}
+
+export async function listWorkflows(params: ListWorkflowsParams = {}): Promise<Workflow[]> {
+  const search = new URLSearchParams();
+  if (params.folderId !== undefined) {
+    search.set('folderId', params.folderId === null ? 'null' : params.folderId);
+  }
+  if (params.tagIds && params.tagIds.length > 0) {
+    search.set('tagIds', params.tagIds.join(','));
+  }
+  const qs = search.toString();
+  const { data } = await api.get<Workflow[]>(`/workflows${qs ? `?${qs}` : ''}`);
   return data;
 }
 

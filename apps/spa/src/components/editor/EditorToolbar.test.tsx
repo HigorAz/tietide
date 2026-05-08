@@ -49,6 +49,8 @@ const savedResponse: Workflow = {
   updatedAt: new Date('2026-01-01T00:00:00Z'),
   executionCount: 0,
   documentation: null,
+  folderId: null,
+  tags: [],
 };
 
 describe('EditorToolbar', () => {
@@ -446,6 +448,8 @@ describe('EditorToolbar', () => {
         updatedAt: new Date('2026-01-01T00:00:00Z'),
         executionCount: 0,
         documentation: null,
+        folderId: null,
+        tags: [],
         ...overrides,
       };
       useWorkflowsStore.setState({ workflows: [wf], status: 'ready', error: null });

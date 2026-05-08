@@ -6,7 +6,10 @@ export type {
   WorkflowDefinition,
   Workflow,
   WorkflowDocumentationMeta,
+  WorkflowTagSummary,
 } from './types/workflow.types.js';
+export type { Folder } from './types/folder.types.js';
+export type { Tag } from './types/tag.types.js';
 export type { WorkflowExecution, ExecutionStep } from './types/execution.types.js';
 export type {
   ExecutionEventType,
@@ -39,6 +42,23 @@ export {
   updateWorkflowSchema,
   FORBIDDEN_NODE_TYPES,
 } from './schemas/workflow.schema.js';
+export {
+  folderNameSchema,
+  createFolderSchema,
+  updateFolderSchema,
+  FOLDER_NAME_MAX_LENGTH,
+  type CreateFolderInput,
+  type UpdateFolderInput,
+} from './schemas/folder.schema.js';
+export {
+  tagNameSchema,
+  tagColorSchema,
+  createTagSchema,
+  updateTagSchema,
+  TAG_NAME_MAX_LENGTH,
+  type CreateTagInput,
+  type UpdateTagInput,
+} from './schemas/tag.schema.js';
 export { ZodError } from 'zod';
 export {
   httpRequestConfigSchema,

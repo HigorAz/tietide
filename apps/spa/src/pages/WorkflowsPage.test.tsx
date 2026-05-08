@@ -15,6 +15,7 @@ vi.mock('@/api/workflows', () => ({
   createWorkflow: vi.fn(),
   deleteWorkflow: vi.fn(),
   toggleWorkflowActive: vi.fn(),
+  updateWorkflow: vi.fn(),
 }));
 
 vi.mock('@/api/ai', () => ({
@@ -22,9 +23,27 @@ vi.mock('@/api/ai', () => ({
   regenerateWorkflowDocs: vi.fn(),
 }));
 
+vi.mock('@/api/folders', () => ({
+  listFolders: vi.fn(),
+  createFolder: vi.fn(),
+  updateFolder: vi.fn(),
+  deleteFolder: vi.fn(),
+}));
+
+vi.mock('@/api/tags', () => ({
+  listTags: vi.fn(),
+  createTag: vi.fn(),
+  updateTag: vi.fn(),
+  deleteTag: vi.fn(),
+}));
+
 import * as workflowsApi from '@/api/workflows';
 import * as aiApi from '@/api/ai';
+import * as foldersApi from '@/api/folders';
+import * as tagsApi from '@/api/tags';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
+import { useFoldersStore } from '@/stores/foldersStore';
+import { useTagsStore } from '@/stores/tagsStore';
 import { initialToastState, useToastStore } from '@/stores/toastStore';
 import { Toaster } from '@/components/ui/Toaster';
 import { WorkflowsPage } from './WorkflowsPage';
@@ -33,8 +52,13 @@ const mockedList = vi.mocked(workflowsApi.listWorkflows);
 const mockedCreate = vi.mocked(workflowsApi.createWorkflow);
 const mockedDelete = vi.mocked(workflowsApi.deleteWorkflow);
 const mockedToggle = vi.mocked(workflowsApi.toggleWorkflowActive);
+const mockedUpdate = vi.mocked(workflowsApi.updateWorkflow);
 const mockedGetDocs = vi.mocked(aiApi.getWorkflowDocs);
 const mockedRegenerateDocs = vi.mocked(aiApi.regenerateWorkflowDocs);
+const mockedListFolders = vi.mocked(foldersApi.listFolders);
+const mockedCreateFolder = vi.mocked(foldersApi.createFolder);
+const mockedDeleteFolder = vi.mocked(foldersApi.deleteFolder);
+const mockedListTags = vi.mocked(tagsApi.listTags);
 
 const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   id: 'wf-1',
@@ -48,6 +72,8 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   updatedAt: new Date('2026-04-10T12:00:00Z'),
   executionCount: 0,
   documentation: null,
+  folderId: null,
+  tags: [],
   ...overrides,
 });
 
@@ -63,7 +89,15 @@ const renderWorkflows = (): ReturnType<typeof render> =>
   );
 
 const resetStore = (): void => {
-  useWorkflowsStore.setState({ workflows: [], status: 'idle', error: null });
+  useWorkflowsStore.setState({
+    workflows: [],
+    status: 'idle',
+    error: null,
+    selectedFolderId: undefined,
+    selectedTagIds: [],
+  });
+  useFoldersStore.setState({ folders: [], status: 'idle', error: null });
+  useTagsStore.setState({ tags: [], status: 'idle', error: null });
 };
 
 describe('WorkflowsPage', () => {
@@ -74,8 +108,15 @@ describe('WorkflowsPage', () => {
     mockedCreate.mockReset();
     mockedDelete.mockReset();
     mockedToggle.mockReset();
+    mockedUpdate.mockReset();
     mockedGetDocs.mockReset();
     mockedRegenerateDocs.mockReset();
+    mockedListFolders.mockReset();
+    mockedCreateFolder.mockReset();
+    mockedDeleteFolder.mockReset();
+    mockedListTags.mockReset();
+    mockedListFolders.mockResolvedValue([]);
+    mockedListTags.mockResolvedValue([]);
   });
 
   it('fetches and displays workflows (AC1)', async () => {
@@ -455,6 +496,104 @@ describe('WorkflowsPage', () => {
       ).toBeInTheDocument();
       // Generation errors stay inline; do not toast.
       expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+  });
+
+  describe('folders + tags (issue #135)', () => {
+    it('renders the folder tree with All / Unfiled pins and seeded folders', async () => {
+      mockedList.mockResolvedValue([]);
+      mockedListFolders.mockResolvedValue([
+        {
+          id: 'f-1',
+          name: 'Personal',
+          parentFolderId: null,
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+      ]);
+      mockedListTags.mockResolvedValue([]);
+
+      renderWorkflows();
+
+      expect(await screen.findByRole('button', { name: /all workflows/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /unfiled/i })).toBeInTheDocument();
+      expect(await screen.findByText('Personal')).toBeInTheDocument();
+    });
+
+    it('refetches workflows with selectedFolderId when a folder pin is selected', async () => {
+      mockedList.mockResolvedValue([]);
+      mockedListFolders.mockResolvedValue([]);
+      mockedListTags.mockResolvedValue([]);
+
+      const user = userEvent.setup();
+      renderWorkflows();
+
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+      mockedList.mockClear();
+
+      await user.click(await screen.findByRole('button', { name: /unfiled/i }));
+
+      await waitFor(() => {
+        expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ folderId: null }));
+      });
+    });
+
+    it('shows tag chips and toggles a chip to filter the list', async () => {
+      mockedList.mockResolvedValue([]);
+      mockedListFolders.mockResolvedValue([]);
+      mockedListTags.mockResolvedValue([
+        {
+          id: 't-1',
+          name: 'urgent',
+          color: '#ef4444',
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+      ]);
+
+      const user = userEvent.setup();
+      renderWorkflows();
+
+      const chip = await screen.findByRole('button', { name: 'urgent' });
+      expect(chip).toHaveAttribute('aria-pressed', 'false');
+
+      mockedList.mockClear();
+      await user.click(chip);
+
+      await waitFor(() => {
+        expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['t-1'] }));
+      });
+    });
+
+    it('opens the cascade-aware delete dialog with the impact counts', async () => {
+      mockedList.mockResolvedValue([
+        makeWorkflow({ id: 'wf-1', folderId: 'f-1' }),
+        makeWorkflow({ id: 'wf-2', folderId: 'f-1' }),
+      ]);
+      mockedListFolders.mockResolvedValue([
+        {
+          id: 'f-1',
+          name: 'ToDelete',
+          parentFolderId: null,
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+        {
+          id: 'f-1-child',
+          name: 'Child',
+          parentFolderId: 'f-1',
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+      ]);
+      mockedListTags.mockResolvedValue([]);
+
+      const user = userEvent.setup();
+      renderWorkflows();
+
+      await user.click(await screen.findByLabelText('Delete folder ToDelete'));
+
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent(/cannot be undone/i);
+      // 1 sub-folder + 2 workflows in the cascade preview
+      expect(dialog).toHaveTextContent('1');
+      expect(dialog).toHaveTextContent('2');
     });
   });
 });

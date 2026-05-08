@@ -84,10 +84,12 @@ const sampleWorkflow: Workflow = {
   isActive: true,
   version: 1,
   userId: 'user-1',
+  folderId: null,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
   executionCount: 0,
   documentation: null,
+  tags: [],
 };
 
 const sampleExecution = (status: WorkflowExecution['status']): WorkflowExecution => ({

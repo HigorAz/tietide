@@ -5,22 +5,33 @@ import {
   createWorkflow as apiCreate,
   deleteWorkflow as apiDelete,
   toggleWorkflowActive as apiToggle,
+  updateWorkflow as apiUpdate,
   type CreateWorkflowBody,
+  type ListWorkflowsParams,
 } from '@/api/workflows';
 
 export type WorkflowsStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+/** undefined = "no filter", null = "root only", string = folder UUID. */
+export type FolderFilter = string | null | undefined;
 
 export interface WorkflowsState {
   workflows: Workflow[];
   status: WorkflowsStatus;
   error: string | null;
+  selectedFolderId: FolderFilter;
+  selectedTagIds: string[];
 }
 
 export interface WorkflowsActions {
-  fetch: () => Promise<void>;
+  fetch: (params?: ListWorkflowsParams) => Promise<void>;
   create: (body: CreateWorkflowBody) => Promise<Workflow>;
   remove: (id: string) => Promise<void>;
   toggleActive: (id: string, next: boolean) => Promise<void>;
+  moveToFolder: (id: string, folderId: string | null) => Promise<void>;
+  setTags: (id: string, tagIds: string[]) => Promise<void>;
+  setSelectedFolderId: (folderId: FolderFilter) => void;
+  setSelectedTagIds: (tagIds: string[]) => void;
   setDocumentationMeta: (id: string, meta: WorkflowDocumentationMeta) => void;
 }
 
@@ -35,11 +46,17 @@ export const useWorkflowsStore = create<WorkflowsStore>((set, get) => ({
   workflows: [],
   status: 'idle',
   error: null,
+  selectedFolderId: undefined,
+  selectedTagIds: [],
 
-  fetch: async () => {
+  fetch: async (params) => {
     set({ status: 'loading', error: null });
     try {
-      const workflows = await apiList();
+      const effective: ListWorkflowsParams = params ?? {
+        folderId: get().selectedFolderId,
+        tagIds: get().selectedTagIds,
+      };
+      const workflows = await apiList(effective);
       set({ workflows, status: 'ready', error: null });
     } catch (err) {
       set({ status: 'error', error: toMessage(err) });
@@ -77,6 +94,46 @@ export const useWorkflowsStore = create<WorkflowsStore>((set, get) => ({
       });
       throw err;
     }
+  },
+
+  moveToFolder: async (id, folderId) => {
+    const existing = get().workflows.find((w) => w.id === id);
+    if (!existing) return;
+
+    const previousFolderId = existing.folderId;
+    // Optimistic update
+    set({
+      workflows: get().workflows.map((w) => (w.id === id ? { ...w, folderId } : w)),
+    });
+
+    try {
+      const updated = await apiUpdate(id, { folderId });
+      set({
+        workflows: get().workflows.map((w) => (w.id === id ? updated : w)),
+      });
+    } catch (err) {
+      set({
+        workflows: get().workflows.map((w) =>
+          w.id === id ? { ...w, folderId: previousFolderId } : w,
+        ),
+      });
+      throw err;
+    }
+  },
+
+  setTags: async (id, tagIds) => {
+    const updated = await apiUpdate(id, { tagIds });
+    set({
+      workflows: get().workflows.map((w) => (w.id === id ? updated : w)),
+    });
+  },
+
+  setSelectedFolderId: (folderId) => {
+    set({ selectedFolderId: folderId });
+  },
+
+  setSelectedTagIds: (tagIds) => {
+    set({ selectedTagIds: tagIds });
   },
 
   setDocumentationMeta: (id, meta) => {

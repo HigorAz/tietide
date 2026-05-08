@@ -1,9 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   MinLength,
   ValidateIf,
@@ -45,4 +48,25 @@ export class UpdateWorkflowDto {
   @IsString()
   @MaxLength(200)
   versionMessage?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'Folder to place this workflow in. Pass null to move to root.',
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsUUID('4')
+  folderId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Replaces the workflow tag set. Pass [] to clear all tags.',
+    type: [String],
+    format: 'uuid',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsUUID('4', { each: true })
+  tagIds?: string[];
 }
