@@ -18,6 +18,10 @@ import { SheetsReadForm } from './google/SheetsReadForm';
 import { DocsCreateForm } from './google/DocsCreateForm';
 import { CalendarCreateForm } from './google/CalendarCreateForm';
 import { SheetsRowAddedForm } from './google/SheetsRowAddedForm';
+import { GmailMessageReceivedForm } from './google/GmailMessageReceivedForm';
+import { GmailLabelAddedForm } from './google/GmailLabelAddedForm';
+import { DriveFileAddedForm } from './google/DriveFileAddedForm';
+import { CalendarEventCreatedForm } from './google/CalendarEventCreatedForm';
 import { OutlookSendForm } from './microsoft/OutlookSendForm';
 import { OutlookSearchForm } from './microsoft/OutlookSearchForm';
 import { ExcelAppendForm } from './microsoft/ExcelAppendForm';
@@ -48,6 +52,10 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.DOCS_CREATE]: DocsCreateForm,
   [NodeType.CALENDAR_CREATE]: CalendarCreateForm,
   [NodeType.SHEETS_ROW_ADDED]: SheetsRowAddedForm,
+  [NodeType.GMAIL_MESSAGE_RECEIVED]: GmailMessageReceivedForm,
+  [NodeType.GMAIL_LABEL_ADDED]: GmailLabelAddedForm,
+  [NodeType.DRIVE_FILE_ADDED]: DriveFileAddedForm,
+  [NodeType.CALENDAR_EVENT_CREATED]: CalendarEventCreatedForm,
   [NodeType.OUTLOOK_SEND]: OutlookSendForm,
   [NodeType.OUTLOOK_SEARCH]: OutlookSearchForm,
   [NodeType.EXCEL_APPEND]: ExcelAppendForm,
