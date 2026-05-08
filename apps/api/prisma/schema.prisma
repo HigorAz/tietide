@@ -22,6 +22,8 @@ model User {
   auditLogs            AuditLog[]
   workflowVersions     WorkflowVersion[]
   environmentVariables EnvironmentVariable[]
+  folders              Folder[]
+  tags                 Tag[]
 
   @@map("users")
 }
@@ -64,16 +66,63 @@ model Workflow {
   isActive    Boolean  @default(false) @map("is_active")
   version     Int      @default(1)
   userId      String   @map("user_id")
+  folderId    String?  @map("folder_id")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   user          User                   @relation(fields: [userId], references: [id])
+  folder        Folder?                @relation(fields: [folderId], references: [id], onDelete: Cascade)
   executions    WorkflowExecution[]
   webhooks      Webhook[]
   documentation WorkflowDocumentation?
   versions      WorkflowVersion[]
+  tags          WorkflowTag[]
 
+  @@index([userId, folderId])
   @@map("workflows")
+}
+
+model Folder {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  name           String
+  parentFolderId String?  @map("parent_folder_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Folder?    @relation("FolderTree", fields: [parentFolderId], references: [id], onDelete: Cascade)
+  children  Folder[]   @relation("FolderTree")
+  workflows Workflow[]
+
+  @@index([userId, parentFolderId])
+  @@map("folders")
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  name      String
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflows WorkflowTag[]
+
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+model WorkflowTag {
+  workflowId String @map("workflow_id")
+  tagId      String @map("tag_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([workflowId, tagId])
+  @@index([tagId])
+  @@map("workflow_tags")
 }
 
 model WorkflowVersion {
