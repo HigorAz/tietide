@@ -17,6 +17,8 @@ export type {
   SignatureInput,
   PollContext,
   PollResult,
+  ValidationInput,
+  ValidationResponse,
 } from './interfaces/lifecycle.interface.js';
 
 // Base classes

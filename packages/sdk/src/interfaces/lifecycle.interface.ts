@@ -43,3 +43,20 @@ export interface PollResult {
   items: Record<string, unknown>[];
   newCursor: string;
 }
+
+// Some providers (e.g. Microsoft Graph) gate notification-URL ownership with a
+// one-shot challenge that arrives BEFORE any subscription row exists in our
+// DB: the provider sends `?validationToken=<token>` and expects a 200
+// text/plain echo within seconds. The webhook controller invokes
+// `BasePushTrigger.handleValidation` ahead of the normal lookup flow so the
+// trigger can answer the challenge without consulting persisted state.
+export interface ValidationInput {
+  query: Record<string, string | string[] | undefined>;
+  headers: Record<string, string | string[] | undefined>;
+  rawBody: Uint8Array;
+}
+
+export interface ValidationResponse {
+  body: string;
+  contentType: string;
+}
