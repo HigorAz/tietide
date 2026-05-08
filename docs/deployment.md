@@ -537,3 +537,61 @@ For local development the public webhook URL needs to be reachable by Google —
 ngrok http 3030
 # Then set PUBLIC_API_URL=https://<ngrok-id>.ngrok-free.app in .env and restart
 ```
+
+## 15. Communication connector pack
+
+### 15.1 Slack app setup (actions + triggers)
+
+The Slack connector pack uses one Slack App per user. Create the app at <https://api.slack.com/apps> → "From scratch", name it, attach to a workspace.
+
+OAuth & Permissions:
+
+- Add the redirect URL `${PUBLIC_API_URL}/v1/connections/oauth/callback` (the value of `SLACK_OAUTH_REDIRECT_URI`).
+- Bot Token Scopes: pick from the allowed list — `chat:write`, `chat:write.public`, `channels:read`, `channels:history`, `groups:read`, `groups:history`, `im:read`, `im:history`, `mpim:read`, `mpim:history`, `users:read`, `users:read.email`, `files:read`, `files:write`, `reactions:read`, `reactions:write`, `app_mentions:read`. Request only what your workflows need.
+
+For Slack triggers (`slack-message-received`, `slack-reaction-added`):
+
+1. Open **Event Subscriptions** in the Slack App dashboard.
+2. Set the Request URL to `${PUBLIC_API_URL}/v1/provider-webhooks/slack/<subscription-id>`. Slack sends a `url_verification` challenge — TieTide responds via `BasePushTrigger.handleValidation` before the subscription row is consulted.
+3. Subscribe to bot events: `message.channels`, `app_mention`, and/or `reaction_added` based on the trigger types you'll use.
+4. Copy the **Signing Secret** from the Basic Information page.
+5. In TieTide, open the connection on `/connections`, edit it, and paste the signing secret. Slack triggers will fail to activate without it.
+
+### 15.2 Discord (incoming webhook for actions)
+
+For `discord-post-webhook`: in the Discord channel, **Edit channel → Integrations → Webhooks → New Webhook**. Copy the webhook URL — it has the form `https://discord.com/api/webhooks/<id>/<token>`. In TieTide, pick "Discord (Webhook)" on `/connections` and paste the URL into the form. The URL is encrypted at rest and validated against Discord's documented pattern at the boundary.
+
+### 15.3 Discord (bot for triggers)
+
+For `discord-message-received` (slash commands): create a Discord application at <https://discord.com/developers/applications>.
+
+1. Go to **Bot** and reset the token; copy it.
+2. Go to **General Information** and copy the **Application ID** and the **Public Key**.
+3. Add the bot to a guild via the **OAuth2 → URL Generator** (scope: `bot applications.commands`).
+4. In **General Information**, set the **Interactions Endpoint URL** to `${PUBLIC_API_URL}/v1/provider-webhooks/discord-bot/<subscription-id>`. Discord sends a signed PING — TieTide handles it via `handleValidation`. The URL only saves if PING succeeds; if Discord rejects the URL, check `PUBLIC_API_URL` is HTTPS and reachable.
+5. In TieTide, pick "Discord (Bot)" on `/connections` and paste Application ID + Public Key + Bot Token.
+
+**Limitation**: `discord-message-received` fires only on a registered slash command (default `/tietide-trigger`), not on every channel message. Discord exposes only the Interactions endpoint for HTTP-based bots; full message coverage would require a long-lived Gateway WebSocket connection (out of scope).
+
+### 15.4 Twilio (SMS + WhatsApp + inbound)
+
+For send actions and the inbound trigger:
+
+1. Get an Account SID (`AC…`) and Auth Token from <https://console.twilio.com> → Account → API keys & tokens.
+2. Buy or import a phone number under **Phone Numbers → Manage → Buy a number** for SMS sending.
+3. In TieTide, pick "Twilio" on `/connections` and paste Account SID + Auth Token.
+
+WhatsApp (sandbox path for the demo): the Twilio WhatsApp Sandbox `whatsapp:+14155238886` works without Meta approval — join via the sandbox setup page, then use that number as `from`. For production WhatsApp, you need a Meta-approved Content Template (`HX…` SID) — set `contentSid` and `contentVariables` in the node config.
+
+For `twilio-sms-received`: the trigger calls Twilio's REST API on workflow activation to set `SmsUrl=${PUBLIC_API_URL}/v1/provider-webhooks/twilio/<sub-id>` on the IncomingPhoneNumber. Inbound SMS is HMAC-SHA1-signed by Twilio over `URL + sortedFormPairs`; TieTide verifies via `crypto.timingSafeEqual`. The phone number SID (`PN…`) is required in the trigger's node config — copy it from the Twilio Console phone-number page.
+
+### 15.5 Telegram
+
+Create a bot via [@BotFather](https://t.me/BotFather) on Telegram:
+
+1. Send `/newbot`, follow prompts, copy the token (form: `<bot_id>:<secret>`).
+2. In TieTide, pick "Telegram" on `/connections` and paste the bot token.
+
+For send actions: chat IDs come from the Telegram Bot API (e.g. ask the bot to echo `chat.id`); channel handles like `@mychannel` also work for public channels.
+
+For `telegram-message-received`: TieTide calls `setWebhook` on activation with our callback URL plus a server-generated `secret_token`. Telegram echoes the token in the `X-Telegram-Bot-Api-Secret-Token` header on every inbound update; TieTide constant-time compares it. On deactivation we call `deleteWebhook`. No extra dashboard configuration is required.

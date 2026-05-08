@@ -11,19 +11,33 @@ describe('ProviderPicker', () => {
     onPick.mockReset();
   });
 
-  it('should render a card for every provider in the catalog (6)', () => {
+  it('should render a card for every provider in the catalog', () => {
     render(<ProviderPicker onPick={onPick} />);
 
-    for (const label of ['Google', 'Microsoft', 'Slack', 'Notion', 'OpenAI', 'Anthropic']) {
+    for (const label of [
+      'Google',
+      'Microsoft',
+      'Slack',
+      'Notion',
+      'OpenAI',
+      'Anthropic',
+      'Discord (Webhook)',
+      'Discord (Bot)',
+      'Twilio',
+      'Telegram',
+    ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
 
-  it('should distinguish OAuth vs API key providers in the card subtitle', () => {
+  it('should distinguish OAuth vs other providers in the card subtitle', () => {
     render(<ProviderPicker onPick={onPick} />);
-    // Four OAuth + two API-key entries.
+    // OAuth: Google, Microsoft, Slack, Notion = 4.
+    // The picker labels both API_KEY and CUSTOM types as "API key" since users
+    // see only one form-from-schema flow either way: OpenAI, Anthropic, Twilio,
+    // Telegram, Discord (Webhook), Discord (Bot) = 6.
     expect(screen.getAllByText(/^OAuth$/).length).toBe(4);
-    expect(screen.getAllByText(/^API key$/).length).toBe(2);
+    expect(screen.getAllByText(/^API key$/).length).toBe(6);
   });
 
   it('should call onPick with the provider entry when a card is clicked', async () => {

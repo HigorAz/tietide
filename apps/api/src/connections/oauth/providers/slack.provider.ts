@@ -17,20 +17,28 @@ const TOKEN_URL_DEFAULT = 'https://slack.com/api/oauth.v2.access';
 
 const DEFAULT_SCOPES = ['chat:write', 'channels:read'] as const;
 
+// Allowed scopes — kept in lockstep with the bot scopes the connector pack
+// actually uses. Trigger pack additions: app_mentions:read (slack-message-received
+// when used as @-mention), chat:write.public (post in channels the bot is not in),
+// mpim:history/mpim:read (group DM coverage for slack-message-received).
 const ALLOWED_SCOPES = new Set([
   'chat:write',
+  'chat:write.public',
   'channels:read',
   'channels:history',
   'groups:read',
   'groups:history',
   'im:read',
   'im:history',
+  'mpim:read',
+  'mpim:history',
   'users:read',
   'users:read.email',
   'files:read',
   'files:write',
   'reactions:read',
   'reactions:write',
+  'app_mentions:read',
 ]);
 
 interface SlackTokenResponse {

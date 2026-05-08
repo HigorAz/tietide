@@ -5,6 +5,11 @@ export const PUSH_TRIGGER_TYPES = [
   'outlook-message-received',
   'outlook-message-flagged',
   'onedrive-file-added',
+  'slack-message-received',
+  'slack-reaction-added',
+  'discord-message-received',
+  'telegram-message-received',
+  'twilio-sms-received',
 ] as const;
 export type PushTriggerType = (typeof PUSH_TRIGGER_TYPES)[number];
 export const isPushTriggerType = (value: string): value is PushTriggerType =>
@@ -20,7 +25,15 @@ export type PollTriggerType = (typeof POLL_TRIGGER_TYPES)[number];
 export const isPollTriggerType = (value: string): value is PollTriggerType =>
   (POLL_TRIGGER_TYPES as readonly string[]).includes(value);
 
-export const PROVIDER_TRIGGER_PROVIDERS = ['stripe', 'google', 'microsoft'] as const;
+export const PROVIDER_TRIGGER_PROVIDERS = [
+  'stripe',
+  'google',
+  'microsoft',
+  'slack',
+  'discord-bot',
+  'telegram',
+  'twilio',
+] as const;
 export type ProviderTriggerProvider = (typeof PROVIDER_TRIGGER_PROVIDERS)[number];
 
 export const TRIGGER_TYPE_TO_PROVIDER: Record<PushTriggerType, ProviderTriggerProvider> = {
@@ -30,4 +43,9 @@ export const TRIGGER_TYPE_TO_PROVIDER: Record<PushTriggerType, ProviderTriggerPr
   'outlook-message-received': 'microsoft',
   'outlook-message-flagged': 'microsoft',
   'onedrive-file-added': 'microsoft',
+  'slack-message-received': 'slack',
+  'slack-reaction-added': 'slack',
+  'discord-message-received': 'discord-bot',
+  'telegram-message-received': 'telegram',
+  'twilio-sms-received': 'twilio',
 };

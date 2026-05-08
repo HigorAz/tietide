@@ -31,6 +31,18 @@ import { OutlookMessageReceivedForm } from './microsoft/OutlookMessageReceivedFo
 import { OutlookMessageFlaggedForm } from './microsoft/OutlookMessageFlaggedForm';
 import { OneDriveFileAddedForm } from './microsoft/OneDriveFileAddedForm';
 import { ExcelRowAddedForm } from './microsoft/ExcelRowAddedForm';
+import { SlackPostMessageForm } from './slack/SlackPostMessageForm';
+import { SlackPostToChannelForm } from './slack/SlackPostToChannelForm';
+import { SlackUploadFileForm } from './slack/SlackUploadFileForm';
+import { SlackMessageReceivedForm } from './slack/SlackMessageReceivedForm';
+import { SlackReactionAddedForm } from './slack/SlackReactionAddedForm';
+import { DiscordPostWebhookForm } from './discord/DiscordPostWebhookForm';
+import { DiscordMessageReceivedForm } from './discord/DiscordMessageReceivedForm';
+import { TwilioSendSmsForm } from './twilio/TwilioSendSmsForm';
+import { TwilioSendWhatsAppForm } from './twilio/TwilioSendWhatsAppForm';
+import { TwilioSmsReceivedForm } from './twilio/TwilioSmsReceivedForm';
+import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
+import { TelegramMessageReceivedForm } from './telegram/TelegramMessageReceivedForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -69,4 +81,16 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: OutlookMessageFlaggedForm,
   [NodeType.ONEDRIVE_FILE_ADDED]: OneDriveFileAddedForm,
   [NodeType.EXCEL_ROW_ADDED]: ExcelRowAddedForm,
+  [NodeType.SLACK_POST_MESSAGE]: SlackPostMessageForm,
+  [NodeType.SLACK_POST_TO_CHANNEL]: SlackPostToChannelForm,
+  [NodeType.SLACK_UPLOAD_FILE]: SlackUploadFileForm,
+  [NodeType.SLACK_MESSAGE_RECEIVED]: SlackMessageReceivedForm,
+  [NodeType.SLACK_REACTION_ADDED]: SlackReactionAddedForm,
+  [NodeType.DISCORD_POST_WEBHOOK]: DiscordPostWebhookForm,
+  [NodeType.DISCORD_MESSAGE_RECEIVED]: DiscordMessageReceivedForm,
+  [NodeType.TWILIO_SEND_SMS]: TwilioSendSmsForm,
+  [NodeType.TWILIO_SEND_WHATSAPP]: TwilioSendWhatsAppForm,
+  [NodeType.TWILIO_SMS_RECEIVED]: TwilioSmsReceivedForm,
+  [NodeType.TELEGRAM_SEND_MESSAGE]: TelegramSendMessageForm,
+  [NodeType.TELEGRAM_MESSAGE_RECEIVED]: TelegramMessageReceivedForm,
 };

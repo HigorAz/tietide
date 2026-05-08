@@ -41,7 +41,9 @@ describe('NodeLibrary provider filtering', () => {
     const { NodeLibrary } = await import('./NodeLibrary');
     render(<NodeLibrary />);
 
-    const communication = screen.getByRole('region', { name: /communication/i });
+    // Anchor the regex so the "Communication" region matches but the new
+    // "Communication Triggers" region added for push triggers does not.
+    const communication = screen.getByRole('region', { name: /^communication$/i });
     expect(communication).toBeInTheDocument();
     expect(screen.getByText('Send Slack Message')).toBeInTheDocument();
   });

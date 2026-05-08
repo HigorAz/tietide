@@ -5,6 +5,9 @@ import slackIcon from '@/assets/providers/slack.svg';
 import notionIcon from '@/assets/providers/notion.svg';
 import openaiIcon from '@/assets/providers/openai.svg';
 import anthropicIcon from '@/assets/providers/anthropic.svg';
+import discordIcon from '@/assets/providers/discord.svg';
+import twilioIcon from '@/assets/providers/twilio.svg';
+import telegramIcon from '@/assets/providers/telegram.svg';
 
 export interface ProviderEntry {
   id: ConnectionProvider;
@@ -49,6 +52,30 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     label: 'Anthropic',
     type: ConnectionType.API_KEY,
     iconUrl: anthropicIcon,
+  },
+  {
+    id: ConnectionProvider.DISCORD,
+    label: 'Discord (Webhook)',
+    type: ConnectionType.CUSTOM,
+    iconUrl: discordIcon,
+  },
+  {
+    id: ConnectionProvider.DISCORD_BOT,
+    label: 'Discord (Bot)',
+    type: ConnectionType.CUSTOM,
+    iconUrl: discordIcon,
+  },
+  {
+    id: ConnectionProvider.TWILIO,
+    label: 'Twilio',
+    type: ConnectionType.API_KEY,
+    iconUrl: twilioIcon,
+  },
+  {
+    id: ConnectionProvider.TELEGRAM,
+    label: 'Telegram',
+    type: ConnectionType.API_KEY,
+    iconUrl: telegramIcon,
   },
 ] as const;
 

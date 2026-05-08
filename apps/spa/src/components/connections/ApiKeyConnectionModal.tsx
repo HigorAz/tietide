@@ -16,6 +16,10 @@ import { getProviderLabel } from './providerCatalog';
 
 export interface ApiKeyConnectionModalProps {
   provider: ConnectionProviderType;
+  // ConnectionType to write on the created Connection. Defaults to API_KEY for
+  // backwards compatibility; CUSTOM is used for providers like Discord webhook
+  // where the credential is a single URL that doesn't fit the API_KEY profile.
+  type?: ConnectionType;
   onClose: () => void;
   onCreate: (body: CreateConnectionBody) => Promise<void> | void;
 }
@@ -65,6 +69,7 @@ const buildFormSchema = (provider: ConnectionProviderType): ZodObject<ZodRawShap
 
 export function ApiKeyConnectionModal({
   provider,
+  type = ConnectionType.API_KEY,
   onClose,
   onCreate,
 }: ApiKeyConnectionModalProps): JSX.Element {
@@ -97,7 +102,7 @@ export function ApiKeyConnectionModal({
     try {
       await onCreate({
         provider,
-        type: ConnectionType.API_KEY,
+        type,
         name: values.name.trim(),
         config,
       });
