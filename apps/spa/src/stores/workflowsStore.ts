@@ -28,6 +28,7 @@ export interface WorkflowsActions {
   create: (body: CreateWorkflowBody) => Promise<Workflow>;
   remove: (id: string) => Promise<void>;
   toggleActive: (id: string, next: boolean) => Promise<void>;
+  rename: (id: string, name: string) => Promise<void>;
   moveToFolder: (id: string, folderId: string | null) => Promise<void>;
   setTags: (id: string, tagIds: string[]) => Promise<void>;
   setSelectedFolderId: (folderId: FolderFilter) => void;
@@ -91,6 +92,28 @@ export const useWorkflowsStore = create<WorkflowsStore>((set, get) => ({
     } catch (err) {
       set({
         workflows: get().workflows.map((w) => (w.id === id ? { ...w, isActive: previous } : w)),
+      });
+      throw err;
+    }
+  },
+
+  rename: async (id, name) => {
+    const existing = get().workflows.find((w) => w.id === id);
+    if (!existing) return;
+
+    const previousName = existing.name;
+    set({
+      workflows: get().workflows.map((w) => (w.id === id ? { ...w, name } : w)),
+    });
+
+    try {
+      const updated = await apiUpdate(id, { name });
+      set({
+        workflows: get().workflows.map((w) => (w.id === id ? updated : w)),
+      });
+    } catch (err) {
+      set({
+        workflows: get().workflows.map((w) => (w.id === id ? { ...w, name: previousName } : w)),
       });
       throw err;
     }

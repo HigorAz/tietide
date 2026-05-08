@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
@@ -9,6 +9,8 @@ import { useTagsStore } from '@/stores/tagsStore';
 import { WorkflowRow } from '@/components/dashboard/WorkflowRow';
 import { NewWorkflowModal } from '@/components/dashboard/NewWorkflowModal';
 import { DeleteWorkflowDialog } from '@/components/dashboard/DeleteWorkflowDialog';
+import { BulkActionsToolbar } from '@/components/dashboard/BulkActionsToolbar';
+import { BulkDeleteDialog } from '@/components/dashboard/BulkDeleteDialog';
 import { ImportWorkflowButton } from '@/components/dashboard/ImportWorkflowButton';
 import {
   FolderTree,
@@ -78,6 +80,7 @@ export function WorkflowsPage(): JSX.Element {
     create,
     remove,
     toggleActive,
+    rename,
     moveToFolder,
     setDocumentationMeta,
     selectedFolderId,
@@ -104,6 +107,10 @@ export function WorkflowsPage(): JSX.Element {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState('');
   const [docsByWorkflow, setDocsByWorkflow] = useState<Record<string, RowDocsState>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   // Hydrate filter selections from URL on mount and when URL changes externally.
   useEffect(() => {
@@ -235,6 +242,142 @@ export function WorkflowsPage(): JSX.Element {
     if (!q) return workflows;
     return workflows.filter((w) => w.name.toLowerCase().includes(q));
   }, [workflows, query]);
+
+  // Prune selections to only IDs that are still in the current workflow list.
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const liveIds = new Set(workflows.map((w) => w.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (liveIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [workflows]);
+
+  // Indeterminate state on the select-all checkbox.
+  useEffect(() => {
+    if (!selectAllRef.current) return;
+    const total = filtered.length;
+    const sel = filtered.filter((w) => selectedIds.has(w.id)).length;
+    selectAllRef.current.indeterminate = sel > 0 && sel < total;
+  }, [filtered, selectedIds]);
+
+  const toggleSelect = useCallback((id: string): void => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback((): void => {
+    setSelectedIds((prev) => {
+      const allIds = filtered.map((w) => w.id);
+      const allSelected = allIds.length > 0 && allIds.every((id) => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        for (const id of allIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of allIds) next.add(id);
+      return next;
+    });
+  }, [filtered]);
+
+  const clearSelection = useCallback((): void => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleRename = useCallback(
+    async (id: string, name: string): Promise<void> => {
+      const trimmed = name.trim();
+      if (trimmed.length === 0) {
+        toast({ tone: 'error', message: 'Workflow name cannot be empty' });
+        throw new Error('Empty name');
+      }
+      try {
+        await rename(id, trimmed);
+        toast({ tone: 'success', message: 'Workflow renamed' });
+      } catch (err) {
+        toast({ tone: 'error', message: errorMessage(err, 'Could not rename workflow') });
+        throw err;
+      }
+    },
+    [rename, toast],
+  );
+
+  const runBulk = useCallback(
+    async (
+      successMessage: (count: number) => string,
+      failurePrefix: string,
+      action: (workflow: Workflow) => Promise<unknown>,
+    ): Promise<void> => {
+      const targets = workflows.filter((w) => selectedIds.has(w.id));
+      if (targets.length === 0) return;
+      setBulkBusy(true);
+      try {
+        const results = await Promise.allSettled(targets.map((wf) => action(wf)));
+        const failedNames: string[] = [];
+        results.forEach((r, idx) => {
+          if (r.status === 'rejected') failedNames.push(targets[idx].name);
+        });
+        if (failedNames.length === 0) {
+          toast({ tone: 'success', message: successMessage(targets.length) });
+          clearSelection();
+        } else {
+          toast({
+            tone: 'error',
+            message: `${failurePrefix}: ${failedNames.join(', ')}`,
+          });
+        }
+      } finally {
+        setBulkBusy(false);
+      }
+    },
+    [workflows, selectedIds, toast, clearSelection],
+  );
+
+  const handleBulkActivate = useCallback(async (): Promise<void> => {
+    await runBulk(
+      (n) => `Activated ${n} workflow${n === 1 ? '' : 's'}`,
+      'Failed to activate',
+      (wf) => toggleActive(wf.id, true),
+    );
+  }, [runBulk, toggleActive]);
+
+  const handleBulkDeactivate = useCallback(async (): Promise<void> => {
+    await runBulk(
+      (n) => `Deactivated ${n} workflow${n === 1 ? '' : 's'}`,
+      'Failed to deactivate',
+      (wf) => toggleActive(wf.id, false),
+    );
+  }, [runBulk, toggleActive]);
+
+  const handleBulkMove = useCallback(
+    async (folderId: string | null): Promise<void> => {
+      await runBulk(
+        (n) => `Moved ${n} workflow${n === 1 ? '' : 's'}`,
+        'Failed to move',
+        (wf) => moveToFolder(wf.id, folderId),
+      );
+    },
+    [runBulk, moveToFolder],
+  );
+
+  const handleBulkDeleteConfirm = useCallback(async (): Promise<void> => {
+    await runBulk(
+      (n) => `Deleted ${n} workflow${n === 1 ? '' : 's'}`,
+      'Failed to delete',
+      (wf) => remove(wf.id),
+    );
+    setBulkDeleteOpen(false);
+  }, [runBulk, remove]);
 
   const handleOpen = (id: string): void => {
     navigate(`/workflows/${id}`, { state: { from: '/workflows' } });
@@ -479,8 +622,33 @@ export function WorkflowsPage(): JSX.Element {
 
             {workflows.length > 0 && (
               <>
+                {selectedIds.size > 0 && (
+                  <BulkActionsToolbar
+                    count={selectedIds.size}
+                    busy={bulkBusy}
+                    folders={folders}
+                    onActivate={handleBulkActivate}
+                    onDeactivate={handleBulkDeactivate}
+                    onMove={handleBulkMove}
+                    onDelete={() => setBulkDeleteOpen(true)}
+                    onClear={clearSelection}
+                  />
+                )}
                 {isFiltering && filtered.length === 0 && (
                   <p className="text-sm text-text-secondary">No workflows match “{query}”.</p>
+                )}
+                {filtered.length > 0 && (
+                  <div className="mb-2 flex items-center gap-3 px-1 py-1 text-xs text-text-muted">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      aria-label="Select all workflows"
+                      checked={filtered.length > 0 && filtered.every((w) => selectedIds.has(w.id))}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 cursor-pointer rounded border-white/20 bg-elevated text-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal"
+                    />
+                    <span>Select all</span>
+                  </div>
                 )}
                 <ul aria-label="Workflows" className="flex flex-col gap-3">
                   {filtered.map((wf) => {
@@ -493,6 +661,7 @@ export function WorkflowsPage(): JSX.Element {
                           isGeneratingDocs={docs.isGenerating}
                           docsContent={docs.content}
                           docsError={docs.error}
+                          selected={selectedIds.has(wf.id)}
                           onOpen={handleOpen}
                           onToggleActive={handleToggle}
                           onDelete={(id) => {
@@ -501,6 +670,8 @@ export function WorkflowsPage(): JSX.Element {
                           }}
                           onGenerateDocs={handleGenerateDocs}
                           onToggleDocsExpanded={handleToggleDocsExpanded}
+                          onToggleSelect={toggleSelect}
+                          onRename={handleRename}
                           isToggling={togglingIds.has(wf.id)}
                           isDeleting={deletingIds.has(wf.id)}
                         />
@@ -522,6 +693,14 @@ export function WorkflowsPage(): JSX.Element {
             workflow={toDelete}
             onClose={() => setToDelete(null)}
             onConfirm={handleDeleteConfirm}
+          />
+        )}
+
+        {bulkDeleteOpen && (
+          <BulkDeleteDialog
+            count={selectedIds.size}
+            onClose={() => setBulkDeleteOpen(false)}
+            onConfirm={handleBulkDeleteConfirm}
           />
         )}
 

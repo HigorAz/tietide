@@ -1,4 +1,12 @@
-import type { KeyboardEvent, MouseEvent } from 'react';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   Activity,
   ChevronDown,
@@ -22,16 +30,19 @@ export interface WorkflowRowProps {
   isGeneratingDocs: boolean;
   docsContent: string | null;
   docsError: string | null;
+  selected: boolean;
   onOpen: (id: string) => void;
   onToggleActive: (id: string, next: boolean) => void;
   onDelete: (id: string) => void;
   onGenerateDocs: (id: string) => void;
   onToggleDocsExpanded: (id: string) => void;
+  onToggleSelect: (id: string) => void;
+  onRename: (id: string, name: string) => Promise<void>;
   isToggling?: boolean;
   isDeleting?: boolean;
 }
 
-const stop = (event: MouseEvent<HTMLElement>): void => {
+const stop = (event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>): void => {
   event.preventDefault();
   event.stopPropagation();
 };
@@ -42,16 +53,29 @@ export function WorkflowRow({
   isGeneratingDocs,
   docsContent,
   docsError,
+  selected,
   onOpen,
   onToggleActive,
   onDelete,
   onGenerateDocs,
   onToggleDocsExpanded,
+  onToggleSelect,
+  onRename,
   isToggling,
   isDeleting,
 }: WorkflowRowProps): JSX.Element {
   const { id, name, isActive, updatedAt, executionCount, documentation } = workflow;
   const hasDocs = documentation !== null || docsContent !== null;
+
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(name);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+
+  // Reset draft when the underlying workflow name changes (e.g. after a successful save).
+  useEffect(() => {
+    if (!editing) setDraftName(name);
+  }, [name, editing]);
 
   const handleOpen = (): void => onOpen(id);
 
@@ -63,6 +87,53 @@ export function WorkflowRow({
     }
   };
 
+  const startEditing = (event: MouseEvent<HTMLElement>): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDraftName(name);
+    setEditing(true);
+  };
+
+  const cancelEditing = (): void => {
+    setDraftName(name);
+    setEditing(false);
+  };
+
+  const submitRename = async (): Promise<void> => {
+    if (submittingRef.current) return;
+    const next = draftName.trim();
+    if (next === name) {
+      cancelEditing();
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
+    try {
+      await onRename(id, next);
+      setEditing(false);
+    } catch {
+      // Parent toasts; row stays in edit mode so the user can correct.
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
+  };
+
+  const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void submitRename();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelEditing();
+    }
+  };
+
+  const handleCheckboxChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    event.stopPropagation();
+    onToggleSelect(id);
+  };
+
   const docsLabel = documentation
     ? `Update docs · ${formatDistanceToNow(documentation.generatedAt, { addSuffix: true })}`
     : 'Generate docs';
@@ -72,8 +143,26 @@ export function WorkflowRow({
   const expandAriaLabel = isExpanded ? `Hide docs for ${name}` : `View docs for ${name}`;
 
   return (
-    <li className="rounded-lg border border-white/5 bg-surface transition hover:border-accent-teal/40">
+    <li
+      className={cn(
+        'rounded-lg border border-white/5 bg-surface transition hover:border-accent-teal/40',
+        selected && 'border-accent-teal/40 bg-accent-teal/[0.04]',
+      )}
+    >
       <div className="flex items-center gap-3 p-4">
+        <input
+          type="checkbox"
+          aria-label={`Select ${name}`}
+          checked={selected}
+          onChange={handleCheckboxChange}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+          className={cn(
+            'h-4 w-4 shrink-0 cursor-pointer rounded border-white/20 bg-elevated text-accent-teal',
+            'focus:outline-none focus:ring-1 focus:ring-accent-teal',
+          )}
+        />
+
         <div
           role="button"
           tabIndex={0}
@@ -96,9 +185,43 @@ export function WorkflowRow({
           ) : (
             <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
           )}
-          <h3 className="truncate text-sm font-semibold text-text-primary" title={name}>
-            {name}
-          </h3>
+          {editing ? (
+            <input
+              autoFocus
+              type="text"
+              value={draftName}
+              aria-label={`Rename ${name}`}
+              onChange={(event) => setDraftName(event.target.value)}
+              onKeyDown={handleInputKeyDown}
+              onBlur={() => void submitRename()}
+              onClick={stop}
+              onPointerDown={(event) => event.stopPropagation()}
+              disabled={submitting}
+              className={cn(
+                'flex-1 truncate rounded-md border border-accent-teal/40 bg-elevated px-2 py-1 text-sm text-text-primary',
+                'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+                'disabled:cursor-wait disabled:opacity-60',
+              )}
+            />
+          ) : (
+            <h3
+              role="button"
+              tabIndex={0}
+              onClick={startEditing}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setDraftName(name);
+                  setEditing(true);
+                }
+              }}
+              title={`Click to rename ${name}`}
+              className="truncate cursor-text rounded text-sm font-semibold text-text-primary hover:text-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal"
+            >
+              {name}
+            </h3>
+          )}
           <span
             className={cn(
               'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
