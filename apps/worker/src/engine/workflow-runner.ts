@@ -3,6 +3,7 @@ import {
   ITERATOR_MAX_ITEMS_DEFAULT,
   NODE_CATALOG,
   NodeCategory,
+  NodeType,
   iteratorConfigSchema,
   resolveTemplate,
   type EnvScope,
@@ -92,9 +93,27 @@ export class WorkflowRunner {
       return { status: 'FAILED', error: new RecursionDepthExceededError(depth).message };
     }
 
+    // Sticky notes are non-executing canvas annotations: no executor, no
+    // ExecutionStep, no events. Drop them (and any edges incident on them)
+    // from a working copy of the definition before topological sort so they
+    // do not count as extra in-degree-zero roots and never enter the rest of
+    // the pipeline.
+    const stickyIds = new Set(
+      definition.nodes.filter((n) => n.type === NodeType.STICKY).map((n) => n.id),
+    );
+    const executableDefinition: WorkflowDefinition =
+      stickyIds.size > 0
+        ? {
+            nodes: definition.nodes.filter((n) => !stickyIds.has(n.id)),
+            edges: definition.edges.filter(
+              (e) => !stickyIds.has(e.source) && !stickyIds.has(e.target),
+            ),
+          }
+        : definition;
+
     let order: string[];
     try {
-      order = topologicalSort(definition);
+      order = topologicalSort(executableDefinition);
     } catch (err) {
       if (err instanceof CircularDependencyError) {
         return { status: 'FAILED', error: err.message };
@@ -108,20 +127,20 @@ export class WorkflowRunner {
     const envScope = await this.envVarResolver.getEnvScope(executionId);
 
     for (const nodeId of order) {
-      const n = definition.nodes.find((x) => x.id === nodeId)!;
+      const n = executableDefinition.nodes.find((x) => x.id === nodeId)!;
       if (!this.registry.has(n.type)) {
         return { status: 'FAILED', error: `No executor registered for node type "${n.type}"` };
       }
     }
 
-    const nodeById = new Map(definition.nodes.map((n) => [n.id, n]));
+    const nodeById = new Map(executableDefinition.nodes.map((n) => [n.id, n]));
     const incomingEdges = new Map<string, WorkflowEdge[]>();
     const outgoingEdges = new Map<string, WorkflowEdge[]>();
-    for (const n of definition.nodes) {
+    for (const n of executableDefinition.nodes) {
       incomingEdges.set(n.id, []);
       outgoingEdges.set(n.id, []);
     }
-    for (const e of definition.edges) {
+    for (const e of executableDefinition.edges) {
       incomingEdges.get(e.target)!.push(e);
       outgoingEdges.get(e.source)!.push(e);
     }

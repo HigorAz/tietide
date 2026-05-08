@@ -6,6 +6,7 @@ import {
   GitBranch,
   Globe,
   Repeat2,
+  StickyNote,
   Webhook,
   Workflow,
   Zap,
@@ -23,6 +24,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.ITERATOR]: Repeat2,
   [NodeType.SUBWORKFLOW]: Workflow,
   [NodeType.RETURN]: CornerDownLeft,
+  [NodeType.STICKY]: StickyNote,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

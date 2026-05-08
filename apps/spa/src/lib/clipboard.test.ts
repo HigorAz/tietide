@@ -271,5 +271,34 @@ describe('clipboard', () => {
       expect(remapped.idMap['node-a']).toBe(remapped.nodes[0].id);
       expect(remapped.idMap['node-b']).toBe(remapped.nodes[1].id);
     });
+
+    it('should round-trip a sticky note preserving its React Flow type and config', () => {
+      const sticky: Node<CustomNodeData> = {
+        id: 'sticky-1',
+        type: 'sticky',
+        position: { x: 30, y: 40 },
+        data: {
+          label: 'Sticky Note',
+          nodeType: NodeType.STICKY,
+          status: 'idle',
+          config: { text: 'note', color: 'blue', width: 240, height: 160 },
+        },
+      };
+
+      const payload = buildClipboardPayload([sticky], []);
+      const json = serializeClipboardPayload(payload);
+      const parsed = parseClipboardPayload(json);
+      const remapped = remapClipboardIds(parsed);
+
+      expect(remapped.nodes).toHaveLength(1);
+      expect(remapped.nodes[0].type).toBe('sticky');
+      expect(remapped.nodes[0].data.nodeType).toBe(NodeType.STICKY);
+      expect(remapped.nodes[0].data.config).toEqual({
+        text: 'note',
+        color: 'blue',
+        width: 240,
+        height: 160,
+      });
+    });
   });
 });

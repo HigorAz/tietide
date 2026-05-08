@@ -14,7 +14,9 @@ import {
   FORBIDDEN_NODE_TYPES,
   NODE_CATALOG,
   NodeCategory,
-  type NodeType,
+  NodeType,
+  STICKY_DEFAULT_HEIGHT,
+  STICKY_DEFAULT_WIDTH,
   type WorkflowDefinition,
 } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
@@ -114,16 +116,24 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const def = NODE_CATALOG.find((d) => d.type === nodeType);
       if (!def) return;
 
+      const isSticky = nodeType === NodeType.STICKY;
       const newNode: Node<CustomNodeData> = {
         id: generateNodeId(),
-        type: 'custom',
+        type: isSticky ? 'sticky' : 'custom',
         position,
         data: {
           label: def.name,
           description: def.description,
           nodeType: def.type,
           status: 'idle',
-          config: {},
+          config: isSticky
+            ? {
+                text: '',
+                color: 'yellow',
+                width: STICKY_DEFAULT_WIDTH,
+                height: STICKY_DEFAULT_HEIGHT,
+              }
+            : {},
         },
       };
 

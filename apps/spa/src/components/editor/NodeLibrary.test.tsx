@@ -60,6 +60,10 @@ describe('NodeLibrary', () => {
       expect(within(logic).getByText('Subworkflow')).toBeInTheDocument();
       expect(within(logic).getByText('Return')).toBeInTheDocument();
       expect(within(logic).queryAllByTestId('node-library-item')).toHaveLength(4);
+
+      const custom = screen.getByRole('region', { name: /^custom$/i });
+      expect(within(custom).getByText('Sticky Note')).toBeInTheDocument();
+      expect(within(custom).queryAllByTestId('node-library-item')).toHaveLength(1);
     });
 
     it('should not expose forbidden node types (Code) in the palette', async () => {
@@ -72,7 +76,7 @@ describe('NodeLibrary', () => {
       const { NodeLibrary } = await importComponent();
       render(<NodeLibrary />);
       const items = screen.getAllByTestId('node-library-item');
-      expect(items).toHaveLength(8);
+      expect(items).toHaveLength(9);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -145,7 +149,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(8);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(9);
     });
   });
 

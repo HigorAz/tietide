@@ -329,6 +329,63 @@ describe('serialization', () => {
     });
   });
 
+  describe('sticky notes', () => {
+    it('should rehydrate a sticky WorkflowNode as a React Flow node with type="sticky"', () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 's1',
+            type: NodeType.STICKY,
+            name: 'Sticky Note',
+            position: { x: 10, y: 20 },
+            config: { text: 'TODO', color: 'pink', width: 240, height: 160 },
+          },
+        ],
+        edges: [],
+      };
+
+      const { nodes } = fromWorkflowDefinition(def);
+
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0]).toMatchObject({
+        id: 's1',
+        type: 'sticky',
+        position: { x: 10, y: 20 },
+        data: {
+          nodeType: NodeType.STICKY,
+          config: { text: 'TODO', color: 'pink', width: 240, height: 160 },
+        },
+      });
+    });
+
+    it('should round-trip a workflow that contains a sticky alongside real nodes', () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 't1',
+            type: NodeType.MANUAL_TRIGGER,
+            name: 'Start',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+          {
+            id: 's1',
+            type: NodeType.STICKY,
+            name: 'Sticky Note',
+            position: { x: 200, y: 0 },
+            config: { text: 'docs', color: 'green', width: 220, height: 140 },
+          },
+        ],
+        edges: [],
+      };
+
+      const hydrated = fromWorkflowDefinition(def);
+      const roundTripped = toWorkflowDefinition(hydrated.nodes, hydrated.edges);
+
+      expect(roundTripped).toEqual(def);
+    });
+  });
+
   describe('round-trip', () => {
     it('should preserve a canonical WorkflowDefinition through from→to', () => {
       const def: WorkflowDefinition = {
