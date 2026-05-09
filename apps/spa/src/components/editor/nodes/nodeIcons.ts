@@ -19,6 +19,9 @@ import {
   Mail,
   MessageSquare,
   Move,
+  Sparkles,
+  Bot,
+  Cpu,
   Phone,
   Repeat2,
   Search,
@@ -92,6 +95,9 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.GITHUB_CREATE_ISSUE]: Github,
   [NodeType.GITHUB_COMMENT_ISSUE]: GitMerge,
   [NodeType.GITHUB_CREATE_PR]: GitPullRequest,
+  [NodeType.CLAUDE_MESSAGES]: Sparkles,
+  [NodeType.OPENAI_CHAT_COMPLETION]: Bot,
+  [NodeType.OLLAMA_GENERATE]: Cpu,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

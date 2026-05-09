@@ -14,6 +14,7 @@ import { TrelloHealthChecker } from './health/checkers/trello.checker';
 import { AirtableHealthChecker } from './health/checkers/airtable.checker';
 import { LinearHealthChecker } from './health/checkers/linear.checker';
 import { GitHubHealthChecker } from './health/checkers/github.checker';
+import { OllamaHealthChecker } from './health/checkers/ollama.checker';
 
 @Module({
   imports: [OAuthModule],
@@ -34,6 +35,7 @@ import { GitHubHealthChecker } from './health/checkers/github.checker';
         registry.register(AirtableHealthChecker.fromConfig(config));
         registry.register(LinearHealthChecker.fromConfig(config));
         registry.register(GitHubHealthChecker.fromConfig(config));
+        registry.register(OllamaHealthChecker.fromConfig());
         return registry;
       },
       inject: [ConfigService],

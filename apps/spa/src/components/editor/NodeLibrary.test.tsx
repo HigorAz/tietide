@@ -101,8 +101,9 @@ describe('NodeLibrary', () => {
       //     Calendar / Excel × 2 / OneDrive)
       // + 12 Productivity-pack actions (notion ×2, trello ×2, airtable ×3,
       //     linear ×2, github ×3)
-      // + 1 Custom (Sticky) = 55.
-      expect(items).toHaveLength(55);
+      // + 3 AI-pack actions (claude-messages, openai-chat-completion, ollama-generate)
+      // + 1 Custom (Sticky) = 58.
+      expect(items).toHaveLength(58);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -175,7 +176,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(55);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(58);
     });
   });
 

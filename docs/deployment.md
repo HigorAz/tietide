@@ -170,6 +170,32 @@ The OAuth state JWT has a 10-minute TTL. If the VPS clock drifts more than a few
 timedatectl status        # NTP synchronized: yes
 ```
 
+### 3.4 AI connector setup (Anthropic, OpenAI, Ollama)
+
+The `claude-messages`, `openai-chat-completion`, and `ollama-generate` action nodes use **per-user API_KEY connections** stored encrypted at rest (libsodium XChaCha20-Poly1305) via the `Connection` model. Anthropic and OpenAI keys are **never** placed in `.env` — each user (or admin) creates a connection from `Settings → Connections` in the SPA and pastes their own key.
+
+#### Anthropic (Claude)
+
+1. Generate a key at https://console.anthropic.com/settings/keys.
+2. In TieTide: `Settings → Connections → New connection → provider: Anthropic` → paste the `sk-ant-…` key. Click **Test connection** (calls `GET https://api.anthropic.com/v1/models` with `x-api-key`); a green status confirms the key is valid.
+3. The default node model is `claude-sonnet-4-6`. The `model` field on each Claude node is free-text so you can pin to specific snapshots (e.g. `claude-opus-4-7`) without code changes.
+4. **Prompt caching** (`enablePromptCaching: true` on the node) wraps the system prompt in `cache_control: { type: 'ephemeral' }`. Anthropic only writes to the cache when the cached prefix exceeds the model's minimum size (~1024 tokens for Sonnet); below that the marker is silently ignored.
+
+#### OpenAI
+
+1. Generate a key at https://platform.openai.com/api-keys.
+2. In TieTide: `Settings → Connections → New connection → provider: OpenAI` → paste the `sk-…` key. Optionally fill in `organization` if your OpenAI account uses one. Click **Test connection** to verify against `GET /v1/models`.
+3. Default model on the node is `gpt-4o`; override per-node as needed.
+
+#### Ollama (self-hosted)
+
+1. Decide where the Ollama server runs — same host as the worker, a remote GPU box, or the bundled Docker service. The compose stack includes an `ollama` service reachable at `http://ollama:11434` from the worker network.
+2. In TieTide: `Settings → Connections → New connection → provider: Ollama` → fill in:
+   - `baseUrl`: `http://ollama:11434` (Docker network) or `http://your-gpu-host:11434` (remote).
+   - `model`: the default model identifier, e.g. `llama3.1:8b`. The Ollama node accepts a per-node `model` override that falls back to this connection-level default.
+3. Click **Test connection** — `GET ${baseUrl}/api/tags` is called; a green status confirms the server is reachable and lists installed models.
+4. Ollama is the only AI provider that **does not** require a hosted API key. The `OLLAMA_BASE_URL` env var is still used by the AI service (`apps/ai`) for its docs-generation pipeline, but workflow nodes always use the per-connection `baseUrl`.
+
 ---
 
 ## 4. Bring the dependencies up
