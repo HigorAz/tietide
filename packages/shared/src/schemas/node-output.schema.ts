@@ -30,6 +30,20 @@ export const returnOutputSchema = z.object({
   value: z.unknown(),
 });
 
+// Standardized output for AI/LLM action nodes (Claude, OpenAI, Ollama). All three
+// nodes normalize their provider-specific responses into this shape so downstream
+// nodes can data-pill `{{node.text}}`, `{{node.usage.inputTokens}}`, etc. without
+// caring which provider produced the result.
+export const aiNodeOutputSchema = z.object({
+  text: z.string(),
+  usage: z.object({
+    inputTokens: z.number().int().nonnegative(),
+    outputTokens: z.number().int().nonnegative(),
+  }),
+  model: z.string(),
+  finishReason: z.string().nullable(),
+});
+
 export const nodeOutputSchemas: Record<string, z.ZodTypeAny> = {
   'webhook-trigger': webhookTriggerOutputSchema,
   'cron-trigger': cronTriggerOutputSchema,
@@ -39,4 +53,7 @@ export const nodeOutputSchemas: Record<string, z.ZodTypeAny> = {
   iterator: iteratorOutputSchema,
   subworkflow: subworkflowOutputSchema,
   return: returnOutputSchema,
+  'claude-messages': aiNodeOutputSchema,
+  'openai-chat-completion': aiNodeOutputSchema,
+  'ollama-generate': aiNodeOutputSchema,
 };

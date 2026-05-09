@@ -3,6 +3,7 @@ import {
   anthropicApiKeyConfigSchema,
   googleOAuth2ConfigSchema,
   notionOAuth2ConfigSchema,
+  ollamaConfigSchema,
   openAIApiKeyConfigSchema,
   slackOAuth2ConfigSchema,
 } from '@tietide/shared';
@@ -109,6 +110,29 @@ describe('connection config schemas', () => {
     });
   });
 
+  describe('ollamaConfigSchema', () => {
+    it('should accept a valid baseUrl + model', () => {
+      const result = ollamaConfigSchema.safeParse({
+        baseUrl: 'http://localhost:11434',
+        model: 'llama3.1:8b',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject non-http(s) URL schemes', () => {
+      const result = ollamaConfigSchema.safeParse({
+        baseUrl: 'ftp://example.com',
+        model: 'llama3.1:8b',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject when model is missing', () => {
+      const result = ollamaConfigSchema.safeParse({ baseUrl: 'http://localhost:11434' });
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe('PROVIDER_CONFIG_SCHEMAS', () => {
     it('should expose every provider schema by its provider key', () => {
       expect(PROVIDER_CONFIG_SCHEMAS.google).toBe(googleOAuth2ConfigSchema);
@@ -116,6 +140,7 @@ describe('connection config schemas', () => {
       expect(PROVIDER_CONFIG_SCHEMAS.notion).toBe(notionOAuth2ConfigSchema);
       expect(PROVIDER_CONFIG_SCHEMAS.openai).toBe(openAIApiKeyConfigSchema);
       expect(PROVIDER_CONFIG_SCHEMAS.anthropic).toBe(anthropicApiKeyConfigSchema);
+      expect(PROVIDER_CONFIG_SCHEMAS.ollama).toBe(ollamaConfigSchema);
     });
   });
 });

@@ -64,6 +64,9 @@ export const NodeType = {
   GITHUB_CREATE_ISSUE: 'github-create-issue',
   GITHUB_COMMENT_ISSUE: 'github-comment-issue',
   GITHUB_CREATE_PR: 'github-create-pr',
+  CLAUDE_MESSAGES: 'claude-messages',
+  OPENAI_CHAT_COMPLETION: 'openai-chat-completion',
+  OLLAMA_GENERATE: 'ollama-generate',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -562,5 +565,29 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.PRODUCTIVITY,
     provider: 'github',
+  },
+  {
+    type: NodeType.CLAUDE_MESSAGES,
+    name: 'Claude: Messages',
+    description: 'Send a prompt to the Anthropic Messages API and capture the response',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.AI,
+    provider: 'anthropic',
+  },
+  {
+    type: NodeType.OPENAI_CHAT_COMPLETION,
+    name: 'OpenAI: Chat Completion',
+    description: 'Send a chat completion request to OpenAI (gpt-4o, gpt-4-turbo, etc.)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.AI,
+    provider: 'openai',
+  },
+  {
+    type: NodeType.OLLAMA_GENERATE,
+    name: 'Ollama: Generate',
+    description: 'Generate text from a self-hosted Ollama server (per-workspace connection)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.AI,
+    provider: 'ollama',
   },
 ];

@@ -39,6 +39,9 @@ import { LinearUpdateIssueStatusAction } from '../nodes/connectors/linear/linear
 import { GitHubCreateIssueAction } from '../nodes/connectors/github/github-create-issue';
 import { GitHubCommentIssueAction } from '../nodes/connectors/github/github-comment-issue';
 import { GitHubCreatePrAction } from '../nodes/connectors/github/github-create-pr';
+import { ClaudeMessagesAction } from '../nodes/connectors/anthropic/claude-messages';
+import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-chat-completion';
+import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
@@ -116,6 +119,9 @@ describe('EngineModule', () => {
     const githubCreateIssue = new GitHubCreateIssueAction(undefined as never);
     const githubCommentIssue = new GitHubCommentIssueAction(undefined as never);
     const githubCreatePr = new GitHubCreatePrAction(undefined as never);
+    const claudeMessages = new ClaudeMessagesAction(undefined as never);
+    const openaiChatCompletion = new OpenaiChatCompletionAction(undefined as never);
+    const ollamaGenerate = new OllamaGenerateAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -170,6 +176,9 @@ describe('EngineModule', () => {
       githubCreateIssue,
       githubCommentIssue,
       githubCreatePr,
+      claudeMessages,
+      openaiChatCompletion,
+      ollamaGenerate,
     );
     return {
       registry,
@@ -225,6 +234,9 @@ describe('EngineModule', () => {
       githubCreateIssue,
       githubCommentIssue,
       githubCreatePr,
+      claudeMessages,
+      openaiChatCompletion,
+      ollamaGenerate,
       module,
     };
   };
@@ -287,6 +299,9 @@ describe('EngineModule', () => {
       ['GitHubCreateIssueAction', 'github-create-issue', 'githubCreateIssue'],
       ['GitHubCommentIssueAction', 'github-comment-issue', 'githubCommentIssue'],
       ['GitHubCreatePrAction', 'github-create-pr', 'githubCreatePr'],
+      ['ClaudeMessagesAction', 'claude-messages', 'claudeMessages'],
+      ['OpenaiChatCompletionAction', 'openai-chat-completion', 'openaiChatCompletion'],
+      ['OllamaGenerateAction', 'ollama-generate', 'ollamaGenerate'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -315,8 +330,9 @@ describe('EngineModule', () => {
       // 5 Microsoft connector actions +
       // 7 communication actions (slack ×3, discord, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
-      //   linear ×2, github ×3) = 33.
-      expect(counts.action).toBe(33);
+      //   linear ×2, github ×3) +
+      // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) = 36.
+      expect(counts.action).toBe(36);
     });
   });
 });

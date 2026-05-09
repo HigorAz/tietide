@@ -64,6 +64,12 @@ import { GitHubClientFactory } from '../nodes/connectors/github/github-client.fa
 import { GitHubCreateIssueAction } from '../nodes/connectors/github/github-create-issue';
 import { GitHubCommentIssueAction } from '../nodes/connectors/github/github-comment-issue';
 import { GitHubCreatePrAction } from '../nodes/connectors/github/github-create-pr';
+import { ClaudeClientFactory } from '../nodes/connectors/anthropic/claude-client.factory';
+import { ClaudeMessagesAction } from '../nodes/connectors/anthropic/claude-messages';
+import { OpenaiClientFactory } from '../nodes/connectors/openai/openai-client.factory';
+import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-chat-completion';
+import { OllamaClientFactory } from '../nodes/connectors/ollama/ollama-client.factory';
+import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
@@ -136,6 +142,12 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     GitHubCreateIssueAction,
     GitHubCommentIssueAction,
     GitHubCreatePrAction,
+    ClaudeClientFactory,
+    ClaudeMessagesAction,
+    OpenaiClientFactory,
+    OpenaiChatCompletionAction,
+    OllamaClientFactory,
+    OllamaGenerateAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
     OutlookMessageReceivedPassthrough,
@@ -209,6 +221,9 @@ export class EngineModule implements OnModuleInit {
     private readonly githubCreateIssue: GitHubCreateIssueAction,
     private readonly githubCommentIssue: GitHubCommentIssueAction,
     private readonly githubCreatePr: GitHubCreatePrAction,
+    private readonly claudeMessages: ClaudeMessagesAction,
+    private readonly openaiChatCompletion: OpenaiChatCompletionAction,
+    private readonly ollamaGenerate: OllamaGenerateAction,
   ) {}
 
   onModuleInit(): void {
@@ -264,5 +279,8 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.githubCreateIssue);
     this.registry.register(this.githubCommentIssue);
     this.registry.register(this.githubCreatePr);
+    this.registry.register(this.claudeMessages);
+    this.registry.register(this.openaiChatCompletion);
+    this.registry.register(this.ollamaGenerate);
   }
 }

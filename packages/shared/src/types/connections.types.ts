@@ -33,6 +33,7 @@ export const ConnectionProvider = {
   AIRTABLE: 'airtable',
   LINEAR: 'linear',
   GITHUB: 'github',
+  OLLAMA: 'ollama',
 } as const;
 
 export type ConnectionProvider = (typeof ConnectionProvider)[keyof typeof ConnectionProvider];
