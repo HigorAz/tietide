@@ -27,6 +27,18 @@ import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-po
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
 import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
+import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
+import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
+import { TrelloCreateCardAction } from '../nodes/connectors/trello/trello-create-card';
+import { TrelloMoveCardAction } from '../nodes/connectors/trello/trello-move-card';
+import { AirtableCreateRecordAction } from '../nodes/connectors/airtable/airtable-create-record';
+import { AirtableUpdateRecordAction } from '../nodes/connectors/airtable/airtable-update-record';
+import { AirtableListRecordsAction } from '../nodes/connectors/airtable/airtable-list-records';
+import { LinearCreateIssueAction } from '../nodes/connectors/linear/linear-create-issue';
+import { LinearUpdateIssueStatusAction } from '../nodes/connectors/linear/linear-update-issue-status';
+import { GitHubCreateIssueAction } from '../nodes/connectors/github/github-create-issue';
+import { GitHubCommentIssueAction } from '../nodes/connectors/github/github-comment-issue';
+import { GitHubCreatePrAction } from '../nodes/connectors/github/github-create-pr';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
@@ -92,6 +104,18 @@ describe('EngineModule', () => {
     const discordMessageReceived = new DiscordMessageReceivedPassthrough();
     const telegramMessageReceived = new TelegramMessageReceivedPassthrough();
     const twilioSmsReceived = new TwilioSmsReceivedPassthrough();
+    const notionCreatePage = new NotionCreatePageAction(undefined as never);
+    const notionQueryDatabase = new NotionQueryDatabaseAction(undefined as never);
+    const trelloCreateCard = new TrelloCreateCardAction(undefined as never);
+    const trelloMoveCard = new TrelloMoveCardAction(undefined as never);
+    const airtableCreateRecord = new AirtableCreateRecordAction(undefined as never);
+    const airtableUpdateRecord = new AirtableUpdateRecordAction(undefined as never);
+    const airtableListRecords = new AirtableListRecordsAction(undefined as never);
+    const linearCreateIssue = new LinearCreateIssueAction(undefined as never);
+    const linearUpdateIssueStatus = new LinearUpdateIssueStatusAction(undefined as never);
+    const githubCreateIssue = new GitHubCreateIssueAction(undefined as never);
+    const githubCommentIssue = new GitHubCommentIssueAction(undefined as never);
+    const githubCreatePr = new GitHubCreatePrAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -134,6 +158,18 @@ describe('EngineModule', () => {
       discordMessageReceived,
       telegramMessageReceived,
       twilioSmsReceived,
+      notionCreatePage,
+      notionQueryDatabase,
+      trelloCreateCard,
+      trelloMoveCard,
+      airtableCreateRecord,
+      airtableUpdateRecord,
+      airtableListRecords,
+      linearCreateIssue,
+      linearUpdateIssueStatus,
+      githubCreateIssue,
+      githubCommentIssue,
+      githubCreatePr,
     );
     return {
       registry,
@@ -177,6 +213,18 @@ describe('EngineModule', () => {
       discordMessageReceived,
       telegramMessageReceived,
       twilioSmsReceived,
+      notionCreatePage,
+      notionQueryDatabase,
+      trelloCreateCard,
+      trelloMoveCard,
+      airtableCreateRecord,
+      airtableUpdateRecord,
+      airtableListRecords,
+      linearCreateIssue,
+      linearUpdateIssueStatus,
+      githubCreateIssue,
+      githubCommentIssue,
+      githubCreatePr,
       module,
     };
   };
@@ -227,6 +275,18 @@ describe('EngineModule', () => {
         'telegramMessageReceived',
       ],
       ['TwilioSmsReceivedPassthrough', 'twilio-sms-received', 'twilioSmsReceived'],
+      ['NotionCreatePageAction', 'notion-create-page', 'notionCreatePage'],
+      ['NotionQueryDatabaseAction', 'notion-query-database', 'notionQueryDatabase'],
+      ['TrelloCreateCardAction', 'trello-create-card', 'trelloCreateCard'],
+      ['TrelloMoveCardAction', 'trello-move-card', 'trelloMoveCard'],
+      ['AirtableCreateRecordAction', 'airtable-create-record', 'airtableCreateRecord'],
+      ['AirtableUpdateRecordAction', 'airtable-update-record', 'airtableUpdateRecord'],
+      ['AirtableListRecordsAction', 'airtable-list-records', 'airtableListRecords'],
+      ['LinearCreateIssueAction', 'linear-create-issue', 'linearCreateIssue'],
+      ['LinearUpdateIssueStatusAction', 'linear-update-issue-status', 'linearUpdateIssueStatus'],
+      ['GitHubCreateIssueAction', 'github-create-issue', 'githubCreateIssue'],
+      ['GitHubCommentIssueAction', 'github-comment-issue', 'githubCommentIssue'],
+      ['GitHubCreatePrAction', 'github-create-pr', 'githubCreatePr'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -253,8 +313,10 @@ describe('EngineModule', () => {
       expect(counts.logic).toBe(4);
       // 1 generic action (http-request) + 8 Google connector actions +
       // 5 Microsoft connector actions +
-      // 7 communication actions (slack ×3, discord, twilio ×2, telegram) = 21.
-      expect(counts.action).toBe(21);
+      // 7 communication actions (slack ×3, discord, twilio ×2, telegram) +
+      // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
+      //   linear ×2, github ×3) = 33.
+      expect(counts.action).toBe(33);
     });
   });
 });

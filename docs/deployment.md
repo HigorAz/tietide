@@ -595,3 +595,67 @@ Create a bot via [@BotFather](https://t.me/BotFather) on Telegram:
 For send actions: chat IDs come from the Telegram Bot API (e.g. ask the bot to echo `chat.id`); channel handles like `@mychannel` also work for public channels.
 
 For `telegram-message-received`: TieTide calls `setWebhook` on activation with our callback URL plus a server-generated `secret_token`. Telegram echoes the token in the `X-Telegram-Bot-Api-Secret-Token` header on every inbound update; TieTide constant-time compares it. On deactivation we call `deleteWebhook`. No extra dashboard configuration is required.
+
+## 16. Productivity connector pack
+
+Five new providers covering writing, kanban, spreadsheets, issue tracking, and source control. Notion uses OAuth (already wired in §3.3); the other four use API keys exchanged at the provider's dashboard.
+
+### 16.1 Notion (OAuth — pages, databases, blocks)
+
+Notion is already covered by the OAuth scaffolding (§3.3). Quick recap:
+
+1. Register an integration at <https://www.notion.so/my-integrations> → **New integration**. Pick **Public** if you want non-workspace users to be able to authorise; **Internal** is fine for self-hosted single-workspace use.
+2. Under **OAuth Domain & URIs**, add `${PUBLIC_API_URL}/v1/connections/oauth/callback`. Make sure the redirect URI matches `NOTION_OAUTH_REDIRECT_URI` exactly (including the `?provider=notion` suffix the env-default uses).
+3. Copy **Client ID** and **Client Secret**, set `NOTION_OAUTH_CLIENT_ID` and `NOTION_OAUTH_CLIENT_SECRET`.
+4. **Share the target database / page with the integration**: open the database in Notion, click the "•••" menu → **Connections** → add your integration. Without this step the API returns `object_not_found` (403/404).
+5. In TieTide, pick "Notion" on `/connections`, complete the OAuth flow, then paste the database ID into the `notion-create-page` / `notion-query-database` node forms.
+
+**Limitation**: Notion access tokens do not expire and cannot be refreshed. If a user revokes access, the connection must be reconnected — TieTide surfaces the underlying `NotionHttpError(401)` verbatim because there's no refresh path.
+
+### 16.2 Trello (API key + user token)
+
+Trello uses a developer key + per-user authorised token model rather than OAuth.
+
+1. Visit <https://trello.com/app-key> while logged in to copy your **API Key**.
+2. From the same page, click "Token" (or visit `https://trello.com/1/authorize?expiration=never&scope=read,write&response_type=token&key=<APP_KEY>`) to mint a personal token. Choose `scope=read,write` (the actions need both); pick `never` for `expiration` if you want a long-lived token.
+3. In TieTide, pick "Trello" on `/connections` and paste both **API Key** and **Token**. Both are encrypted at rest with libsodium and never returned by the API.
+4. Find list IDs via the Trello UI URL (`https://trello.com/b/<board>/<name>` then append `.json` while logged in) or the Trello REST API.
+
+Health check hits `GET /1/members/me?key=<…>&token=<…>` and returns `ok=false` with the upstream message on any non-2xx.
+
+### 16.3 Airtable (Personal Access Token)
+
+Airtable deprecated user API keys in 2024; PATs are the only supported flow.
+
+1. Visit <https://airtable.com/create/tokens> and click **Create new token**.
+2. Pick scopes: `data.records:read`, `data.records:write`, `schema.bases:read`. Add the bases the token should access (or grant access to all). The required scope set depends on which actions you'll use — list/create/update need both read and write.
+3. Copy the token (form: `pat<id>.<secret>`) — Airtable shows it once.
+4. In TieTide, pick "Airtable" on `/connections` and paste the token. The schema regex enforces the `pat…` prefix at the boundary.
+5. Get base IDs from `https://airtable.com/api` while logged in (the URL changes to `https://airtable.com/<baseId>/api/docs` when you pick a base). Table names can be passed verbatim or as `tbl…` IDs.
+
+Health check hits `GET /v0/meta/whoami` with `Authorization: Bearer <pat>`.
+
+### 16.4 Linear (Personal API key)
+
+1. In Linear, open **Settings → API → Personal API keys** and click **Create key**.
+2. Copy the value (form: `lin_api_<base64>`). Linear shows it once.
+3. In TieTide, pick "Linear" on `/connections` and paste the key. The schema enforces the `lin_api_` prefix.
+4. Team and state IDs are UUIDs. Find a team UUID by querying the Linear GraphQL API: `query { teams { nodes { id name } } }`. State (workflow) UUIDs come from `query { workflowStates(filter: {team: {id: {eq: "<team>"}}}) { nodes { id name } } }`.
+
+Linear's API uses GraphQL exclusively. The TieTide client posts mutations to `https://api.linear.app/graphql` and surfaces GraphQL `errors[].extensions.code === 'AUTHENTICATION_ERROR'` as HTTP 401 internally so the connector framework's auth path triggers if the connection ever gains a refresh token (today it doesn't).
+
+Health check posts `{ viewer { id } }` and inspects `errors[]`.
+
+### 16.5 GitHub (Personal Access Token)
+
+GitHub supports both classic PATs (`ghp_…`) and fine-grained PATs (`github_pat_…`). Fine-grained is preferred for least-privilege.
+
+1. Visit <https://github.com/settings/tokens?type=beta> for fine-grained, or `/settings/tokens` for classic.
+2. **Fine-grained**: pick the repositories the token can access; grant `Issues: Read & write`, `Pull requests: Read & write`, `Contents: Read-only` (PR creation needs to read commits) under **Repository permissions**.
+3. **Classic**: pick the `repo` scope (covers issues + PRs + comments).
+4. Copy the token. In TieTide, pick "GitHub" on `/connections` and paste it. The schema accepts any GitHub token prefix (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`).
+5. The actions take `owner`/`repo` strings (e.g. `octocat`/`hello-world`), not numeric IDs.
+
+For installation tokens (GitHub Apps): generate a token via your App and paste it the same way. Token rotates every hour; TieTide will surface 401s when it expires — re-paste a fresh token, or build an App-token-rotation flow as a follow-up.
+
+Health check hits `GET /user` with `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, and `X-GitHub-Api-Version: 2022-11-28`.
