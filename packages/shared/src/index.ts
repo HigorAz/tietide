@@ -119,6 +119,10 @@ export {
   discordBotConfigSchema,
   twilioApiKeyConfigSchema,
   telegramBotTokenConfigSchema,
+  trelloApiKeyConfigSchema,
+  airtableApiKeyConfigSchema,
+  linearApiKeyConfigSchema,
+  githubApiKeyConfigSchema,
   DISCORD_WEBHOOK_URL_REGEX,
   PROVIDER_CONFIG_SCHEMAS,
   type GoogleOAuth2Config,
@@ -132,6 +136,10 @@ export {
   type DiscordBotConfig,
   type TwilioApiKeyConfig,
   type TelegramBotTokenConfig,
+  type TrelloApiKeyConfig,
+  type AirtableApiKeyConfig,
+  type LinearApiKeyConfig,
+  type GitHubApiKeyConfig,
   type ProviderConfigMap,
 } from './schemas/connections.schema.js';
 export {
@@ -241,6 +249,40 @@ export {
   type TelegramMessageReceivedConfig,
   type TelegramParseMode,
 } from './schemas/telegram.schema.js';
+export {
+  notionCreatePageConfigSchema,
+  notionQueryDatabaseConfigSchema,
+  type NotionCreatePageConfig,
+  type NotionQueryDatabaseConfig,
+} from './schemas/notion.schema.js';
+export {
+  trelloCreateCardConfigSchema,
+  trelloMoveCardConfigSchema,
+  type TrelloCreateCardConfig,
+  type TrelloMoveCardConfig,
+} from './schemas/trello.schema.js';
+export {
+  airtableCreateRecordConfigSchema,
+  airtableUpdateRecordConfigSchema,
+  airtableListRecordsConfigSchema,
+  type AirtableCreateRecordConfig,
+  type AirtableUpdateRecordConfig,
+  type AirtableListRecordsConfig,
+} from './schemas/airtable.schema.js';
+export {
+  linearCreateIssueConfigSchema,
+  linearUpdateIssueStatusConfigSchema,
+  type LinearCreateIssueConfig,
+  type LinearUpdateIssueStatusConfig,
+} from './schemas/linear.schema.js';
+export {
+  githubCreateIssueConfigSchema,
+  githubCommentIssueConfigSchema,
+  githubCreatePrConfigSchema,
+  type GitHubCreateIssueConfig,
+  type GitHubCommentIssueConfig,
+  type GitHubCreatePrConfig,
+} from './schemas/github.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" aria-label="Trello">
+  <rect width="48" height="48" rx="8" fill="#0079BF"/>
+  <rect x="8" y="10" width="13" height="22" rx="2" fill="#fff"/>
+  <rect x="27" y="10" width="13" height="14" rx="2" fill="#fff"/>
+</svg>

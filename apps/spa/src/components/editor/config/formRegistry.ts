@@ -43,6 +43,18 @@ import { TwilioSendWhatsAppForm } from './twilio/TwilioSendWhatsAppForm';
 import { TwilioSmsReceivedForm } from './twilio/TwilioSmsReceivedForm';
 import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
 import { TelegramMessageReceivedForm } from './telegram/TelegramMessageReceivedForm';
+import { NotionCreatePageForm } from './notion/NotionCreatePageForm';
+import { NotionQueryDatabaseForm } from './notion/NotionQueryDatabaseForm';
+import { TrelloCreateCardForm } from './trello/TrelloCreateCardForm';
+import { TrelloMoveCardForm } from './trello/TrelloMoveCardForm';
+import { AirtableCreateRecordForm } from './airtable/AirtableCreateRecordForm';
+import { AirtableUpdateRecordForm } from './airtable/AirtableUpdateRecordForm';
+import { AirtableListRecordsForm } from './airtable/AirtableListRecordsForm';
+import { LinearCreateIssueForm } from './linear/LinearCreateIssueForm';
+import { LinearUpdateIssueStatusForm } from './linear/LinearUpdateIssueStatusForm';
+import { GitHubCreateIssueForm } from './github/GitHubCreateIssueForm';
+import { GitHubCommentIssueForm } from './github/GitHubCommentIssueForm';
+import { GitHubCreatePrForm } from './github/GitHubCreatePrForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -93,4 +105,16 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TWILIO_SMS_RECEIVED]: TwilioSmsReceivedForm,
   [NodeType.TELEGRAM_SEND_MESSAGE]: TelegramSendMessageForm,
   [NodeType.TELEGRAM_MESSAGE_RECEIVED]: TelegramMessageReceivedForm,
+  [NodeType.NOTION_CREATE_PAGE]: NotionCreatePageForm,
+  [NodeType.NOTION_QUERY_DATABASE]: NotionQueryDatabaseForm,
+  [NodeType.TRELLO_CREATE_CARD]: TrelloCreateCardForm,
+  [NodeType.TRELLO_MOVE_CARD]: TrelloMoveCardForm,
+  [NodeType.AIRTABLE_CREATE_RECORD]: AirtableCreateRecordForm,
+  [NodeType.AIRTABLE_UPDATE_RECORD]: AirtableUpdateRecordForm,
+  [NodeType.AIRTABLE_LIST_RECORDS]: AirtableListRecordsForm,
+  [NodeType.LINEAR_CREATE_ISSUE]: LinearCreateIssueForm,
+  [NodeType.LINEAR_UPDATE_ISSUE_STATUS]: LinearUpdateIssueStatusForm,
+  [NodeType.GITHUB_CREATE_ISSUE]: GitHubCreateIssueForm,
+  [NodeType.GITHUB_COMMENT_ISSUE]: GitHubCommentIssueForm,
+  [NodeType.GITHUB_CREATE_PR]: GitHubCreatePrForm,
 };

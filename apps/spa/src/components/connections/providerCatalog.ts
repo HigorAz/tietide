@@ -8,6 +8,10 @@ import anthropicIcon from '@/assets/providers/anthropic.svg';
 import discordIcon from '@/assets/providers/discord.svg';
 import twilioIcon from '@/assets/providers/twilio.svg';
 import telegramIcon from '@/assets/providers/telegram.svg';
+import trelloIcon from '@/assets/providers/trello.svg';
+import airtableIcon from '@/assets/providers/airtable.svg';
+import linearIcon from '@/assets/providers/linear.svg';
+import githubIcon from '@/assets/providers/github.svg';
 
 export interface ProviderEntry {
   id: ConnectionProvider;
@@ -76,6 +80,30 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     label: 'Telegram',
     type: ConnectionType.API_KEY,
     iconUrl: telegramIcon,
+  },
+  {
+    id: ConnectionProvider.TRELLO,
+    label: 'Trello',
+    type: ConnectionType.API_KEY,
+    iconUrl: trelloIcon,
+  },
+  {
+    id: ConnectionProvider.AIRTABLE,
+    label: 'Airtable',
+    type: ConnectionType.API_KEY,
+    iconUrl: airtableIcon,
+  },
+  {
+    id: ConnectionProvider.LINEAR,
+    label: 'Linear',
+    type: ConnectionType.API_KEY,
+    iconUrl: linearIcon,
+  },
+  {
+    id: ConnectionProvider.GITHUB,
+    label: 'GitHub',
+    type: ConnectionType.API_KEY,
+    iconUrl: githubIcon,
   },
 ] as const;
 

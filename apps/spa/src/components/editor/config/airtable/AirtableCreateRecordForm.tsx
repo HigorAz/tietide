@@ -1,0 +1,189 @@
+import { useId } from 'react';
+import { airtableCreateRecordConfigSchema } from '@tietide/shared';
+import { useEditorStore } from '@/stores/editorStore';
+import { cn } from '@/utils/cn';
+import type { NodeConfigFormProps } from '../formRegistry';
+import { ConnectionPicker } from '../../ConnectionPicker';
+import { DataPillInput } from '../DataPillInput';
+
+const inputClass = cn(
+  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
+  'text-sm text-text-primary placeholder:text-text-muted',
+  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+);
+const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
+const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
+
+const stringifyJson = (v: unknown): string => {
+  if (typeof v === 'string') return v;
+  if (v === undefined || v === null) return '';
+  try {
+    return JSON.stringify(v, null, 2);
+  } catch {
+    return '';
+  }
+};
+
+const tryParseJson = (s: string): { ok: true; value: unknown } | { ok: false; error: string } => {
+  if (!s.trim()) return { ok: true, value: undefined };
+  try {
+    return { ok: true, value: JSON.parse(s) };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Invalid JSON' };
+  }
+};
+
+export function AirtableCreateRecordForm({ nodeId, config }: NodeConfigFormProps): JSX.Element {
+  const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
+
+  const connectionId = asString(config.connectionId);
+  const baseId = asString(config.baseId);
+  const tableIdOrName = asString(config.tableIdOrName);
+  const fieldsText = stringifyJson(config.fields);
+  const typecast = config.typecast === true;
+  const mockOnDryRun = config.mockOnDryRun === true;
+
+  const baseFieldId = useId();
+  const tableFieldId = useId();
+  const fieldsFieldId = useId();
+  const typecastId = useId();
+  const mockId = useId();
+
+  const fieldsParse = tryParseJson(fieldsText);
+  const parsed = airtableCreateRecordConfigSchema.safeParse({
+    connectionId: connectionId || undefined,
+    baseId,
+    tableIdOrName,
+    fields: fieldsParse.ok ? (fieldsParse.value ?? {}) : {},
+    typecast: typecast || undefined,
+    mockOnDryRun: mockOnDryRun || undefined,
+  });
+  const issueFor = (field: string): string | null =>
+    parsed.success ? null : (parsed.error.issues.find((i) => i.path[0] === field)?.message ?? null);
+
+  const connIssue = issueFor('connectionId');
+  const baseIssue = issueFor('baseId');
+  const tableIssue = issueFor('tableIdOrName');
+  const fieldsIssue = !fieldsParse.ok ? fieldsParse.error : issueFor('fields');
+
+  return (
+    <div data-testid="airtable-create-record-form" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <span className={labelClass}>Airtable connection</span>
+        <ConnectionPicker
+          provider="airtable"
+          value={connectionId || null}
+          onChange={(next) => updateNodeConfig(nodeId, { connectionId: next })}
+        />
+        {connIssue && (
+          <p
+            data-testid="airtable-create-record-connection-error"
+            role="alert"
+            className="text-xs text-red-400"
+          >
+            Select an Airtable connection.
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={baseFieldId} className={labelClass}>
+          Base ID
+        </label>
+        <DataPillInput
+          id={baseFieldId}
+          nodeId={nodeId}
+          value={baseId}
+          placeholder="appAAAAAAAAAAAAAA"
+          aria-invalid={baseIssue !== null}
+          onChange={(next) => updateNodeConfig(nodeId, { baseId: next })}
+        />
+        {baseIssue && (
+          <p
+            data-testid="airtable-create-record-base-error"
+            role="alert"
+            className="text-xs text-red-400"
+          >
+            {baseIssue}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={tableFieldId} className={labelClass}>
+          Table name or ID
+        </label>
+        <DataPillInput
+          id={tableFieldId}
+          nodeId={nodeId}
+          value={tableIdOrName}
+          placeholder="Tasks"
+          aria-invalid={tableIssue !== null}
+          onChange={(next) => updateNodeConfig(nodeId, { tableIdOrName: next })}
+        />
+        {tableIssue && (
+          <p
+            data-testid="airtable-create-record-table-error"
+            role="alert"
+            className="text-xs text-red-400"
+          >
+            {tableIssue}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={fieldsFieldId} className={labelClass}>
+          Fields (JSON)
+        </label>
+        <textarea
+          id={fieldsFieldId}
+          value={fieldsText}
+          rows={6}
+          placeholder='{"Name": "First task", "Status": "Todo"}'
+          aria-invalid={fieldsIssue !== null}
+          onChange={(e) => {
+            const next = tryParseJson(e.target.value);
+            updateNodeConfig(nodeId, { fields: next.ok ? next.value : e.target.value });
+          }}
+          className={cn(inputClass, 'font-mono text-xs')}
+        />
+        {fieldsIssue && (
+          <p
+            data-testid="airtable-create-record-fields-error"
+            role="alert"
+            className="text-xs text-red-400"
+          >
+            {fieldsIssue}
+          </p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={typecastId}
+          type="checkbox"
+          checked={typecast}
+          onChange={(e) => updateNodeConfig(nodeId, { typecast: e.target.checked })}
+          className="h-4 w-4 rounded border-white/10 bg-elevated text-accent-teal focus:ring-accent-teal"
+        />
+        <label htmlFor={typecastId} className="text-xs text-text-secondary">
+          typecast — coerce string values to matching field types
+        </label>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id={mockId}
+          type="checkbox"
+          checked={mockOnDryRun}
+          onChange={(e) => updateNodeConfig(nodeId, { mockOnDryRun: e.target.checked })}
+          className="h-4 w-4 rounded border-white/10 bg-elevated text-accent-teal focus:ring-accent-teal"
+        />
+        <label htmlFor={mockId} className="text-xs text-text-secondary">
+          Skip Airtable call on test runs (return mocked output)
+        </label>
+      </div>
+    </div>
+  );
+}

@@ -10,6 +10,10 @@ import { SlackHealthChecker } from './health/checkers/slack.checker';
 import { NotionHealthChecker } from './health/checkers/notion.checker';
 import { OpenAIHealthChecker } from './health/checkers/openai.checker';
 import { AnthropicHealthChecker } from './health/checkers/anthropic.checker';
+import { TrelloHealthChecker } from './health/checkers/trello.checker';
+import { AirtableHealthChecker } from './health/checkers/airtable.checker';
+import { LinearHealthChecker } from './health/checkers/linear.checker';
+import { GitHubHealthChecker } from './health/checkers/github.checker';
 
 @Module({
   imports: [OAuthModule],
@@ -26,6 +30,10 @@ import { AnthropicHealthChecker } from './health/checkers/anthropic.checker';
         registry.register(NotionHealthChecker.fromConfig(config));
         registry.register(OpenAIHealthChecker.fromConfig(config));
         registry.register(AnthropicHealthChecker.fromConfig(config));
+        registry.register(TrelloHealthChecker.fromConfig(config));
+        registry.register(AirtableHealthChecker.fromConfig(config));
+        registry.register(LinearHealthChecker.fromConfig(config));
+        registry.register(GitHubHealthChecker.fromConfig(config));
         return registry;
       },
       inject: [ConfigService],
