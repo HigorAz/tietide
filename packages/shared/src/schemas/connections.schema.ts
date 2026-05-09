@@ -146,6 +146,19 @@ export const githubApiKeyConfigSchema = z.object({
     }),
 });
 
+// Ollama: per-workspace pointer to a self-hosted Ollama server. baseUrl points at the
+// server root (e.g. http://localhost:11434); the default model is the connection-level
+// fallback used when the action node does not specify its own.
+export const ollamaConfigSchema = z.object({
+  baseUrl: z
+    .string()
+    .min(1)
+    .max(256)
+    .url({ message: 'baseUrl must be a valid URL' })
+    .regex(/^https?:\/\//, { message: 'baseUrl must use http:// or https://' }),
+  model: z.string().min(1).max(128),
+});
+
 export type GoogleOAuth2Config = z.infer<typeof googleOAuth2ConfigSchema>;
 export type MicrosoftOAuth2Config = z.infer<typeof microsoftOAuth2ConfigSchema>;
 export type SlackOAuth2Config = z.infer<typeof slackOAuth2ConfigSchema>;
@@ -161,6 +174,7 @@ export type TrelloApiKeyConfig = z.infer<typeof trelloApiKeyConfigSchema>;
 export type AirtableApiKeyConfig = z.infer<typeof airtableApiKeyConfigSchema>;
 export type LinearApiKeyConfig = z.infer<typeof linearApiKeyConfigSchema>;
 export type GitHubApiKeyConfig = z.infer<typeof githubApiKeyConfigSchema>;
+export type OllamaConfig = z.infer<typeof ollamaConfigSchema>;
 
 export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.GOOGLE]: googleOAuth2ConfigSchema,
@@ -178,6 +192,7 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.AIRTABLE]: airtableApiKeyConfigSchema,
   [ConnectionProvider.LINEAR]: linearApiKeyConfigSchema,
   [ConnectionProvider.GITHUB]: githubApiKeyConfigSchema,
+  [ConnectionProvider.OLLAMA]: ollamaConfigSchema,
 } as const;
 
 export type ProviderConfigMap = {
@@ -196,4 +211,5 @@ export type ProviderConfigMap = {
   airtable: AirtableApiKeyConfig;
   linear: LinearApiKeyConfig;
   github: GitHubApiKeyConfig;
+  ollama: OllamaConfig;
 };

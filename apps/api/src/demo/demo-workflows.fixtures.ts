@@ -238,6 +238,59 @@ export const DEMO_WORKFLOWS: readonly DemoWorkflowFixture[] = [
       edges: [{ id: 'e1', source: 'start', target: 'broken' }],
     },
   },
+  // Flagship S14 demo: incoming webhook payload is summarized by Claude and the
+  // summary is posted to a Slack channel. Both connection IDs are intentionally
+  // empty — the user binds their own Anthropic + Slack connections after
+  // instantiation, then activates the workflow.
+  {
+    slug: 'webhook-claude-slack-summary',
+    name: 'Demo: Webhook → Claude Summarize → Slack Post',
+    description:
+      'Inbound webhook payload is summarized via Claude (with prompt caching), then posted to a Slack channel.',
+    category: 'AI',
+    activate: false,
+    webhook: { pathSuffix: 'claude-summarize-demo' },
+    definition: {
+      nodes: [
+        {
+          id: 'trigger',
+          type: NodeType.WEBHOOK_TRIGGER,
+          name: 'Inbound Webhook',
+          position: { x: 80, y: 160 },
+          config: {},
+        },
+        {
+          id: 'summarize',
+          type: NodeType.CLAUDE_MESSAGES,
+          name: 'Claude: Summarize',
+          position: { x: 360, y: 160 },
+          config: {
+            connectionId: '',
+            model: 'claude-sonnet-4-6',
+            system: 'You are a concise summarization assistant. Reply in 2-3 sentences.',
+            prompt: 'Summarize the following text:\n\n{{trigger.body.text}}',
+            maxTokens: 256,
+            enablePromptCaching: true,
+          },
+        },
+        {
+          id: 'post',
+          type: NodeType.SLACK_POST_MESSAGE,
+          name: 'Post to Slack',
+          position: { x: 640, y: 160 },
+          config: {
+            connectionId: '',
+            channel: 'C0123ABCDEF',
+            text: '*New summary:*\n{{summarize.text}}',
+          },
+        },
+      ],
+      edges: [
+        { id: 'e1', source: 'trigger', target: 'summarize' },
+        { id: 'e2', source: 'summarize', target: 'post' },
+      ],
+    },
+  },
 ];
 
 export const DEMO_WORKFLOW_SLUGS = DEMO_WORKFLOWS.map((w) => w.slug);

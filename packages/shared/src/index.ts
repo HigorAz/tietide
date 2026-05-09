@@ -99,6 +99,7 @@ export {
   iteratorOutputSchema,
   subworkflowOutputSchema,
   returnOutputSchema,
+  aiNodeOutputSchema,
   nodeOutputSchemas,
 } from './schemas/node-output.schema.js';
 export {
@@ -123,6 +124,7 @@ export {
   airtableApiKeyConfigSchema,
   linearApiKeyConfigSchema,
   githubApiKeyConfigSchema,
+  ollamaConfigSchema,
   DISCORD_WEBHOOK_URL_REGEX,
   PROVIDER_CONFIG_SCHEMAS,
   type GoogleOAuth2Config,
@@ -140,6 +142,7 @@ export {
   type AirtableApiKeyConfig,
   type LinearApiKeyConfig,
   type GitHubApiKeyConfig,
+  type OllamaConfig,
   type ProviderConfigMap,
 } from './schemas/connections.schema.js';
 export {
@@ -283,6 +286,15 @@ export {
   type GitHubCommentIssueConfig,
   type GitHubCreatePrConfig,
 } from './schemas/github.schema.js';
+export {
+  claudeMessagesConfigSchema,
+  type ClaudeMessagesConfig,
+} from './schemas/anthropic.schema.js';
+export {
+  openaiChatCompletionConfigSchema,
+  type OpenaiChatCompletionConfig,
+} from './schemas/openai-actions.schema.js';
+export { ollamaGenerateConfigSchema, type OllamaGenerateConfig } from './schemas/ollama.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,
