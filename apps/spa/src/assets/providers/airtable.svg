@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" aria-label="Airtable">
+  <rect width="48" height="48" rx="8" fill="#FCB400"/>
+  <path d="M8 16L24 10L40 16L24 22L8 16Z" fill="#fff"/>
+  <path d="M8 22L22 28V40L8 34V22Z" fill="#fff" opacity="0.85"/>
+  <path d="M40 22L26 28V40L40 34V22Z" fill="#fff" opacity="0.7"/>
+</svg>

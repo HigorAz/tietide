@@ -29,6 +29,10 @@ export const ConnectionProvider = {
   DISCORD_BOT: 'discord-bot',
   TWILIO: 'twilio',
   TELEGRAM: 'telegram',
+  TRELLO: 'trello',
+  AIRTABLE: 'airtable',
+  LINEAR: 'linear',
+  GITHUB: 'github',
 } as const;
 
 export type ConnectionProvider = (typeof ConnectionProvider)[keyof typeof ConnectionProvider];

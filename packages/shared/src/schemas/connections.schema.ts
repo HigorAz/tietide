@@ -100,6 +100,52 @@ export const telegramBotTokenConfigSchema = z.object({
     .regex(/^\d+:[\w-]+$/, { message: 'botToken must be in the form <bot_id>:<secret>' }),
 });
 
+// Trello uses an API key + per-user token model (not OAuth1 in our flow). The key is
+// the developer key from https://trello.com/app-key; the token is the user-issued
+// token authorising read/write on their boards.
+export const trelloApiKeyConfigSchema = z.object({
+  apiKey: z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z0-9_-]+$/, { message: 'apiKey must be alphanumeric (Trello dev key)' }),
+  token: z
+    .string()
+    .min(1)
+    .max(256)
+    .regex(/^[A-Za-z0-9_-]+$/, { message: 'token must be a Trello user token' }),
+});
+
+// Airtable Personal Access Tokens look like "patXXXXXXXX.YYYYYYY…" (dot-delimited).
+export const airtableApiKeyConfigSchema = z.object({
+  apiKey: z
+    .string()
+    .min(1)
+    .max(256)
+    .regex(/^pat[A-Za-z0-9_.-]+$/, { message: 'apiKey must be an Airtable PAT (pat…)' }),
+});
+
+// Linear personal API keys are prefixed "lin_api_" per Linear docs.
+export const linearApiKeyConfigSchema = z.object({
+  apiKey: z
+    .string()
+    .min(1)
+    .max(256)
+    .regex(/^lin_api_[A-Za-z0-9_-]+$/, { message: 'apiKey must be a Linear API key (lin_api_…)' }),
+});
+
+// GitHub tokens — accept fine-grained PATs (`github_pat_`), classic PATs (`ghp_`),
+// installation tokens (`ghs_`/`ghu_`/`ghr_`), and OAuth user-to-server tokens (`gho_`).
+export const githubApiKeyConfigSchema = z.object({
+  apiKey: z
+    .string()
+    .min(1)
+    .max(256)
+    .regex(/^(github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9_]+$/, {
+      message: 'apiKey must be a GitHub token (ghp_/gho_/ghu_/ghs_/ghr_/github_pat_…)',
+    }),
+});
+
 export type GoogleOAuth2Config = z.infer<typeof googleOAuth2ConfigSchema>;
 export type MicrosoftOAuth2Config = z.infer<typeof microsoftOAuth2ConfigSchema>;
 export type SlackOAuth2Config = z.infer<typeof slackOAuth2ConfigSchema>;
@@ -111,6 +157,10 @@ export type DiscordWebhookConfig = z.infer<typeof discordWebhookConfigSchema>;
 export type DiscordBotConfig = z.infer<typeof discordBotConfigSchema>;
 export type TwilioApiKeyConfig = z.infer<typeof twilioApiKeyConfigSchema>;
 export type TelegramBotTokenConfig = z.infer<typeof telegramBotTokenConfigSchema>;
+export type TrelloApiKeyConfig = z.infer<typeof trelloApiKeyConfigSchema>;
+export type AirtableApiKeyConfig = z.infer<typeof airtableApiKeyConfigSchema>;
+export type LinearApiKeyConfig = z.infer<typeof linearApiKeyConfigSchema>;
+export type GitHubApiKeyConfig = z.infer<typeof githubApiKeyConfigSchema>;
 
 export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.GOOGLE]: googleOAuth2ConfigSchema,
@@ -124,6 +174,10 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.DISCORD_BOT]: discordBotConfigSchema,
   [ConnectionProvider.TWILIO]: twilioApiKeyConfigSchema,
   [ConnectionProvider.TELEGRAM]: telegramBotTokenConfigSchema,
+  [ConnectionProvider.TRELLO]: trelloApiKeyConfigSchema,
+  [ConnectionProvider.AIRTABLE]: airtableApiKeyConfigSchema,
+  [ConnectionProvider.LINEAR]: linearApiKeyConfigSchema,
+  [ConnectionProvider.GITHUB]: githubApiKeyConfigSchema,
 } as const;
 
 export type ProviderConfigMap = {
@@ -138,4 +192,8 @@ export type ProviderConfigMap = {
   'discord-bot': DiscordBotConfig;
   twilio: TwilioApiKeyConfig;
   telegram: TelegramBotTokenConfig;
+  trello: TrelloApiKeyConfig;
+  airtable: AirtableApiKeyConfig;
+  linear: LinearApiKeyConfig;
+  github: GitHubApiKeyConfig;
 };

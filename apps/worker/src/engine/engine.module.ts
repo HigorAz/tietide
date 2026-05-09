@@ -47,6 +47,23 @@ import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms'
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
 import { TelegramClientFactory } from '../nodes/connectors/telegram/telegram-client.factory';
 import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
+import { NotionClientFactory } from '../nodes/connectors/notion/notion-client.factory';
+import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
+import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
+import { TrelloClientFactory } from '../nodes/connectors/trello/trello-client.factory';
+import { TrelloCreateCardAction } from '../nodes/connectors/trello/trello-create-card';
+import { TrelloMoveCardAction } from '../nodes/connectors/trello/trello-move-card';
+import { AirtableClientFactory } from '../nodes/connectors/airtable/airtable-client.factory';
+import { AirtableCreateRecordAction } from '../nodes/connectors/airtable/airtable-create-record';
+import { AirtableUpdateRecordAction } from '../nodes/connectors/airtable/airtable-update-record';
+import { AirtableListRecordsAction } from '../nodes/connectors/airtable/airtable-list-records';
+import { LinearClientFactory } from '../nodes/connectors/linear/linear-client.factory';
+import { LinearCreateIssueAction } from '../nodes/connectors/linear/linear-create-issue';
+import { LinearUpdateIssueStatusAction } from '../nodes/connectors/linear/linear-update-issue-status';
+import { GitHubClientFactory } from '../nodes/connectors/github/github-client.factory';
+import { GitHubCreateIssueAction } from '../nodes/connectors/github/github-create-issue';
+import { GitHubCommentIssueAction } from '../nodes/connectors/github/github-comment-issue';
+import { GitHubCreatePrAction } from '../nodes/connectors/github/github-create-pr';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
@@ -102,6 +119,23 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     TwilioSendWhatsAppAction,
     TelegramClientFactory,
     TelegramSendMessageAction,
+    NotionClientFactory,
+    NotionCreatePageAction,
+    NotionQueryDatabaseAction,
+    TrelloClientFactory,
+    TrelloCreateCardAction,
+    TrelloMoveCardAction,
+    AirtableClientFactory,
+    AirtableCreateRecordAction,
+    AirtableUpdateRecordAction,
+    AirtableListRecordsAction,
+    LinearClientFactory,
+    LinearCreateIssueAction,
+    LinearUpdateIssueStatusAction,
+    GitHubClientFactory,
+    GitHubCreateIssueAction,
+    GitHubCommentIssueAction,
+    GitHubCreatePrAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
     OutlookMessageReceivedPassthrough,
@@ -163,6 +197,18 @@ export class EngineModule implements OnModuleInit {
     private readonly discordMessageReceived: DiscordMessageReceivedPassthrough,
     private readonly telegramMessageReceived: TelegramMessageReceivedPassthrough,
     private readonly twilioSmsReceived: TwilioSmsReceivedPassthrough,
+    private readonly notionCreatePage: NotionCreatePageAction,
+    private readonly notionQueryDatabase: NotionQueryDatabaseAction,
+    private readonly trelloCreateCard: TrelloCreateCardAction,
+    private readonly trelloMoveCard: TrelloMoveCardAction,
+    private readonly airtableCreateRecord: AirtableCreateRecordAction,
+    private readonly airtableUpdateRecord: AirtableUpdateRecordAction,
+    private readonly airtableListRecords: AirtableListRecordsAction,
+    private readonly linearCreateIssue: LinearCreateIssueAction,
+    private readonly linearUpdateIssueStatus: LinearUpdateIssueStatusAction,
+    private readonly githubCreateIssue: GitHubCreateIssueAction,
+    private readonly githubCommentIssue: GitHubCommentIssueAction,
+    private readonly githubCreatePr: GitHubCreatePrAction,
   ) {}
 
   onModuleInit(): void {
@@ -206,5 +252,17 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.discordMessageReceived);
     this.registry.register(this.telegramMessageReceived);
     this.registry.register(this.twilioSmsReceived);
+    this.registry.register(this.notionCreatePage);
+    this.registry.register(this.notionQueryDatabase);
+    this.registry.register(this.trelloCreateCard);
+    this.registry.register(this.trelloMoveCard);
+    this.registry.register(this.airtableCreateRecord);
+    this.registry.register(this.airtableUpdateRecord);
+    this.registry.register(this.airtableListRecords);
+    this.registry.register(this.linearCreateIssue);
+    this.registry.register(this.linearUpdateIssueStatus);
+    this.registry.register(this.githubCreateIssue);
+    this.registry.register(this.githubCommentIssue);
+    this.registry.register(this.githubCreatePr);
   }
 }

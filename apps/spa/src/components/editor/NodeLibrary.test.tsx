@@ -97,9 +97,12 @@ describe('NodeLibrary', () => {
       // + 1 generic action (http-request, code forbidden) + 4 logic
       // + 4 Communication actions (Gmail × 2 + Outlook × 2)
       // + 7 Communication-pack actions (slack ×3, discord, twilio ×2, telegram)
-      // + 9 Productivity (Drive × 2 / Sheets × 2 / Docs / Calendar / Excel × 2 / OneDrive)
-      // + 1 Custom (Sticky) = 43.
-      expect(items).toHaveLength(43);
+      // + 9 Productivity-Google/Microsoft (Drive × 2 / Sheets × 2 / Docs /
+      //     Calendar / Excel × 2 / OneDrive)
+      // + 12 Productivity-pack actions (notion ×2, trello ×2, airtable ×3,
+      //     linear ×2, github ×3)
+      // + 1 Custom (Sticky) = 55.
+      expect(items).toHaveLength(55);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -172,7 +175,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(43);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(55);
     });
   });
 
