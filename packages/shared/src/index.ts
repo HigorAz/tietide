@@ -387,6 +387,11 @@ export {
 // Utilities
 export { sanitizePayload } from './utils/sanitize-payload.js';
 export {
+  validateWorkflowTopology,
+  type WorkflowTopologyIssue,
+  type WorkflowTopologyIssueCode,
+} from './validation/workflow-topology.js';
+export {
   resolveTemplate,
   TemplatePathNotFoundError,
   EnvVarNotFoundError,
