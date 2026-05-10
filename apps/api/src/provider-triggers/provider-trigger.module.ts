@@ -53,6 +53,22 @@ import {
   DiscordMessageReceivedTrigger,
   DISCORD_MESSAGE_RECEIVED_TYPE,
 } from './triggers/discord/discord-message-received.trigger';
+import {
+  HubspotContactChangedTrigger,
+  HUBSPOT_CONTACT_CHANGED_TYPE,
+} from './triggers/hubspot/hubspot-contact-changed.trigger';
+import {
+  MailchimpSubscriberAddedTrigger,
+  MAILCHIMP_SUBSCRIBER_ADDED_TYPE,
+} from './triggers/mailchimp/mailchimp-subscriber-added.trigger';
+import {
+  CalendlyEventScheduledTrigger,
+  CALENDLY_EVENT_SCHEDULED_TYPE,
+} from './triggers/calendly/calendly-event-scheduled.trigger';
+import {
+  TrelloCardChangedTrigger,
+  TRELLO_CARD_CHANGED_TYPE,
+} from './triggers/trello/trello-card-changed.trigger';
 import { RENEWAL_QUEUE_NAME } from './renewal/subscription-renewer.constants';
 import { SubscriptionRenewerProcessor } from './renewal/subscription-renewer.processor';
 import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-bootstrap.service';
@@ -83,6 +99,10 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     SlackReactionAddedTrigger,
     DiscordBotClientFactory,
     DiscordMessageReceivedTrigger,
+    HubspotContactChangedTrigger,
+    MailchimpSubscriberAddedTrigger,
+    CalendlyEventScheduledTrigger,
+    TrelloCardChangedTrigger,
     ActivationService,
     SubscriptionRenewerProcessor,
     SubscriptionRenewerBootstrap,
@@ -109,6 +129,10 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly slackMessageReceived: SlackMessageReceivedTrigger,
     private readonly slackReactionAdded: SlackReactionAddedTrigger,
     private readonly discordMessageReceived: DiscordMessageReceivedTrigger,
+    private readonly hubspotContactChanged: HubspotContactChangedTrigger,
+    private readonly mailchimpSubscriberAdded: MailchimpSubscriberAddedTrigger,
+    private readonly calendlyEventScheduled: CalendlyEventScheduledTrigger,
+    private readonly trelloCardChanged: TrelloCardChangedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -123,5 +147,9 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(SLACK_MESSAGE_RECEIVED_TYPE, this.slackMessageReceived);
     this.registry.register(SLACK_REACTION_ADDED_TYPE, this.slackReactionAdded);
     this.registry.register(DISCORD_MESSAGE_RECEIVED_TYPE, this.discordMessageReceived);
+    this.registry.register(HUBSPOT_CONTACT_CHANGED_TYPE, this.hubspotContactChanged);
+    this.registry.register(MAILCHIMP_SUBSCRIBER_ADDED_TYPE, this.mailchimpSubscriberAdded);
+    this.registry.register(CALENDLY_EVENT_SCHEDULED_TYPE, this.calendlyEventScheduled);
+    this.registry.register(TRELLO_CARD_CHANGED_TYPE, this.trelloCardChanged);
   }
 }

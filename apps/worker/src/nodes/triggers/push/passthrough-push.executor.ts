@@ -131,3 +131,47 @@ export class TwilioSmsReceivedPassthrough extends PassthroughPushExecutor {
     );
   }
 }
+
+@Injectable()
+export class HubspotContactChangedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'hubspot-contact-changed',
+      'HubSpot: Contact Changed',
+      'Triggers when a HubSpot contact is created, updated, or deleted',
+    );
+  }
+}
+
+@Injectable()
+export class MailchimpSubscriberAddedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'mailchimp-subscriber-added',
+      'Mailchimp: Subscriber Added',
+      'Triggers when a Mailchimp audience webhook fires (subscribe / unsubscribe / cleaned)',
+    );
+  }
+}
+
+@Injectable()
+export class CalendlyEventScheduledPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'calendly-event-scheduled',
+      'Calendly: Event Scheduled',
+      'Triggers when a Calendly invitee schedules or cancels an event',
+    );
+  }
+}
+
+@Injectable()
+export class TrelloCardChangedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'trello-card-changed',
+      'Trello: Card Changed',
+      'Triggers when a Trello board emits a card-related action',
+    );
+  }
+}

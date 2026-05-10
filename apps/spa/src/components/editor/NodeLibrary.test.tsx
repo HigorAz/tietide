@@ -94,6 +94,7 @@ describe('NodeLibrary', () => {
       const items = screen.getAllByTestId('node-library-item');
       // 3 triggers + 5 google triggers + 4 microsoft triggers
       // + 5 communication push triggers (slack ×2, discord, telegram, twilio)
+      // + 5 commerce push triggers (stripe, hubspot, mailchimp, calendly, trello)
       // + 1 generic action (http-request, code forbidden) + 4 logic
       // + 4 Communication actions (Gmail × 2 + Outlook × 2)
       // + 7 Communication-pack actions (slack ×3, discord, twilio ×2, telegram)
@@ -102,8 +103,10 @@ describe('NodeLibrary', () => {
       // + 12 Productivity-pack actions (notion ×2, trello ×2, airtable ×3,
       //     linear ×2, github ×3)
       // + 3 AI-pack actions (claude-messages, openai-chat-completion, ollama-generate)
-      // + 1 Custom (Sticky) = 58.
-      expect(items).toHaveLength(58);
+      // + 12 Commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
+      //     calendly, postgres, mysql, s3, trello ×2)
+      // + 1 Custom (Sticky) = 75.
+      expect(items).toHaveLength(75);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -134,7 +137,7 @@ describe('NodeLibrary', () => {
       const user = userEvent.setup();
       render(<NodeLibrary />);
 
-      await user.type(screen.getByPlaceholderText(/search/i), 'schedule');
+      await user.type(screen.getByPlaceholderText(/search/i), 'workflow on a sched');
 
       const items = screen.getAllByTestId('node-library-item');
       expect(items).toHaveLength(1);
@@ -176,7 +179,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(58);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(75);
     });
   });
 

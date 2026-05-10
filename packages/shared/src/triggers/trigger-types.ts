@@ -10,6 +10,10 @@ export const PUSH_TRIGGER_TYPES = [
   'discord-message-received',
   'telegram-message-received',
   'twilio-sms-received',
+  'hubspot-contact-changed',
+  'mailchimp-subscriber-added',
+  'calendly-event-scheduled',
+  'trello-card-changed',
 ] as const;
 export type PushTriggerType = (typeof PUSH_TRIGGER_TYPES)[number];
 export const isPushTriggerType = (value: string): value is PushTriggerType =>
@@ -33,6 +37,10 @@ export const PROVIDER_TRIGGER_PROVIDERS = [
   'discord-bot',
   'telegram',
   'twilio',
+  'hubspot',
+  'mailchimp',
+  'calendly',
+  'trello',
 ] as const;
 export type ProviderTriggerProvider = (typeof PROVIDER_TRIGGER_PROVIDERS)[number];
 
@@ -48,4 +56,8 @@ export const TRIGGER_TYPE_TO_PROVIDER: Record<PushTriggerType, ProviderTriggerPr
   'discord-message-received': 'discord-bot',
   'telegram-message-received': 'telegram',
   'twilio-sms-received': 'twilio',
+  'hubspot-contact-changed': 'hubspot',
+  'mailchimp-subscriber-added': 'mailchimp',
+  'calendly-event-scheduled': 'calendly',
+  'trello-card-changed': 'trello',
 };

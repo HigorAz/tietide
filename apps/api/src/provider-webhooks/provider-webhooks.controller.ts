@@ -1,5 +1,6 @@
 import {
   Controller,
+  Head,
   Headers,
   HttpCode,
   HttpStatus,
@@ -34,6 +35,19 @@ export class ProviderWebhooksController {
     private readonly providerWebhooks: ProviderWebhooksService,
     private readonly registry: ProviderTriggerRegistry,
   ) {}
+
+  // Trello pings the webhook URL with a HEAD request before creating the
+  // webhook to confirm reachability — answer 200 unconditionally. We
+  // intentionally do not consult any database state here so the URL is
+  // reachable before onActivate has had a chance to write the
+  // ProviderSubscription row. Other providers that send GET/HEAD challenges
+  // (e.g. Microsoft Graph's validationToken) use a separate handleValidation
+  // path on the existing POST route.
+  @Head(':provider/:subscriptionId')
+  @HttpCode(HttpStatus.OK)
+  reachabilityCheck(): void {
+    return;
+  }
 
   @Post(':provider/:subscriptionId')
   @HttpCode(HttpStatus.ACCEPTED)

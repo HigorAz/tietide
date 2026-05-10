@@ -125,6 +125,12 @@ export {
   linearApiKeyConfigSchema,
   githubApiKeyConfigSchema,
   ollamaConfigSchema,
+  hubspotOAuth2ConfigSchema,
+  mailchimpApiKeyConfigSchema,
+  calendlyApiKeyConfigSchema,
+  postgresCustomConfigSchema,
+  mysqlCustomConfigSchema,
+  s3CustomConfigSchema,
   DISCORD_WEBHOOK_URL_REGEX,
   PROVIDER_CONFIG_SCHEMAS,
   type GoogleOAuth2Config,
@@ -143,6 +149,12 @@ export {
   type LinearApiKeyConfig,
   type GitHubApiKeyConfig,
   type OllamaConfig,
+  type HubspotOAuth2Config,
+  type MailchimpApiKeyConfig,
+  type CalendlyApiKeyConfig,
+  type PostgresCustomConfig,
+  type MysqlCustomConfig,
+  type S3CustomConfig,
   type ProviderConfigMap,
 } from './schemas/connections.schema.js';
 export {
@@ -261,9 +273,78 @@ export {
 export {
   trelloCreateCardConfigSchema,
   trelloMoveCardConfigSchema,
+  trelloAddCommentConfigSchema,
+  trelloUpdateCardConfigSchema,
+  trelloCardChangedConfigSchema,
+  TRELLO_CARD_EVENT_TYPES,
   type TrelloCreateCardConfig,
   type TrelloMoveCardConfig,
+  type TrelloAddCommentConfig,
+  type TrelloUpdateCardConfig,
+  type TrelloCardChangedConfig,
+  type TrelloCardEventType,
 } from './schemas/trello.schema.js';
+export {
+  hubspotCreateContactConfigSchema,
+  hubspotCreateDealConfigSchema,
+  hubspotContactChangedConfigSchema,
+  HUBSPOT_CONTACT_EVENT_TYPES,
+  type HubspotCreateContactConfig,
+  type HubspotCreateDealConfig,
+  type HubspotContactChangedConfig,
+  type HubspotContactEventType,
+} from './schemas/hubspot.schema.js';
+export {
+  stripeCreateCustomerConfigSchema,
+  stripeListChargesConfigSchema,
+  stripeEventReceivedConfigSchema,
+  type StripeCreateCustomerConfig,
+  type StripeListChargesConfig,
+  type StripeEventReceivedConfig,
+} from './schemas/stripe-actions.schema.js';
+export {
+  mailchimpAddSubscriberConfigSchema,
+  mailchimpSendCampaignConfigSchema,
+  mailchimpSubscriberAddedConfigSchema,
+  MAILCHIMP_SUBSCRIBER_STATUSES,
+  MAILCHIMP_TRIGGER_EVENT_TYPES,
+  type MailchimpAddSubscriberConfig,
+  type MailchimpSendCampaignConfig,
+  type MailchimpSubscriberAddedConfig,
+  type MailchimpSubscriberStatus,
+  type MailchimpTriggerEventType,
+} from './schemas/mailchimp.schema.js';
+export {
+  calendlyListEventsConfigSchema,
+  calendlyEventScheduledConfigSchema,
+  CALENDLY_TRIGGER_EVENT_TYPES,
+  type CalendlyListEventsConfig,
+  type CalendlyEventScheduledConfig,
+  type CalendlyTriggerEventType,
+} from './schemas/calendly.schema.js';
+export {
+  postgresRunQueryConfigSchema,
+  POSTGRES_MAX_QUERY_LENGTH,
+  POSTGRES_MAX_PARAMS,
+  POSTGRES_MAX_PARAM_LENGTH,
+  POSTGRES_MAX_ROW_LIMIT,
+  POSTGRES_DEFAULT_ROW_LIMIT,
+  type PostgresRunQueryConfig,
+} from './schemas/postgres.schema.js';
+export {
+  mysqlRunQueryConfigSchema,
+  MYSQL_MAX_QUERY_LENGTH,
+  MYSQL_MAX_PARAMS,
+  MYSQL_MAX_PARAM_LENGTH,
+  MYSQL_MAX_ROW_LIMIT,
+  MYSQL_DEFAULT_ROW_LIMIT,
+  type MysqlRunQueryConfig,
+} from './schemas/mysql.schema.js';
+export {
+  s3UploadFileConfigSchema,
+  S3_STREAMING_THRESHOLD_BYTES,
+  type S3UploadFileConfig,
+} from './schemas/s3.schema.js';
 export {
   airtableCreateRecordConfigSchema,
   airtableUpdateRecordConfigSchema,

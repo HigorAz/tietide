@@ -42,6 +42,18 @@ import { GitHubCreatePrAction } from '../nodes/connectors/github/github-create-p
 import { ClaudeMessagesAction } from '../nodes/connectors/anthropic/claude-messages';
 import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-chat-completion';
 import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
+import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-create-contact';
+import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
+import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
+import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
+import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
+import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
+import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
+import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
+import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
+import { S3UploadFileAction } from '../nodes/connectors/s3/s3-upload-file';
+import { TrelloAddCommentAction } from '../nodes/connectors/trello/trello-add-comment';
+import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update-card';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
@@ -53,6 +65,10 @@ import {
   DiscordMessageReceivedPassthrough,
   TelegramMessageReceivedPassthrough,
   TwilioSmsReceivedPassthrough,
+  HubspotContactChangedPassthrough,
+  MailchimpSubscriberAddedPassthrough,
+  CalendlyEventScheduledPassthrough,
+  TrelloCardChangedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -122,6 +138,22 @@ describe('EngineModule', () => {
     const claudeMessages = new ClaudeMessagesAction(undefined as never);
     const openaiChatCompletion = new OpenaiChatCompletionAction(undefined as never);
     const ollamaGenerate = new OllamaGenerateAction(undefined as never);
+    const hubspotCreateContact = new HubspotCreateContactAction(undefined as never);
+    const hubspotCreateDeal = new HubspotCreateDealAction(undefined as never);
+    const stripeCreateCustomer = new StripeCreateCustomerAction(undefined as never);
+    const stripeListCharges = new StripeListChargesAction(undefined as never);
+    const mailchimpAddSubscriber = new MailchimpAddSubscriberAction(undefined as never);
+    const mailchimpSendCampaign = new MailchimpSendCampaignAction(undefined as never);
+    const calendlyListEvents = new CalendlyListEventsAction(undefined as never);
+    const postgresRunQuery = new PostgresRunQueryAction(undefined as never);
+    const mysqlRunQuery = new MysqlRunQueryAction(undefined as never);
+    const s3UploadFile = new S3UploadFileAction(undefined as never);
+    const trelloAddComment = new TrelloAddCommentAction(undefined as never);
+    const trelloUpdateCard = new TrelloUpdateCardAction(undefined as never);
+    const hubspotContactChanged = new HubspotContactChangedPassthrough();
+    const mailchimpSubscriberAdded = new MailchimpSubscriberAddedPassthrough();
+    const calendlyEventScheduled = new CalendlyEventScheduledPassthrough();
+    const trelloCardChanged = new TrelloCardChangedPassthrough();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -179,6 +211,22 @@ describe('EngineModule', () => {
       claudeMessages,
       openaiChatCompletion,
       ollamaGenerate,
+      hubspotCreateContact,
+      hubspotCreateDeal,
+      stripeCreateCustomer,
+      stripeListCharges,
+      mailchimpAddSubscriber,
+      mailchimpSendCampaign,
+      calendlyListEvents,
+      postgresRunQuery,
+      mysqlRunQuery,
+      s3UploadFile,
+      trelloAddComment,
+      trelloUpdateCard,
+      hubspotContactChanged,
+      mailchimpSubscriberAdded,
+      calendlyEventScheduled,
+      trelloCardChanged,
     );
     return {
       registry,
@@ -237,6 +285,22 @@ describe('EngineModule', () => {
       claudeMessages,
       openaiChatCompletion,
       ollamaGenerate,
+      hubspotCreateContact,
+      hubspotCreateDeal,
+      stripeCreateCustomer,
+      stripeListCharges,
+      mailchimpAddSubscriber,
+      mailchimpSendCampaign,
+      calendlyListEvents,
+      postgresRunQuery,
+      mysqlRunQuery,
+      s3UploadFile,
+      trelloAddComment,
+      trelloUpdateCard,
+      hubspotContactChanged,
+      mailchimpSubscriberAdded,
+      calendlyEventScheduled,
+      trelloCardChanged,
       module,
     };
   };
@@ -302,6 +366,26 @@ describe('EngineModule', () => {
       ['ClaudeMessagesAction', 'claude-messages', 'claudeMessages'],
       ['OpenaiChatCompletionAction', 'openai-chat-completion', 'openaiChatCompletion'],
       ['OllamaGenerateAction', 'ollama-generate', 'ollamaGenerate'],
+      ['HubspotCreateContactAction', 'hubspot-create-contact', 'hubspotCreateContact'],
+      ['HubspotCreateDealAction', 'hubspot-create-deal', 'hubspotCreateDeal'],
+      ['StripeCreateCustomerAction', 'stripe-create-customer', 'stripeCreateCustomer'],
+      ['StripeListChargesAction', 'stripe-list-charges', 'stripeListCharges'],
+      ['MailchimpAddSubscriberAction', 'mailchimp-add-subscriber', 'mailchimpAddSubscriber'],
+      ['MailchimpSendCampaignAction', 'mailchimp-send-campaign', 'mailchimpSendCampaign'],
+      ['CalendlyListEventsAction', 'calendly-list-events', 'calendlyListEvents'],
+      ['PostgresRunQueryAction', 'postgres-run-query', 'postgresRunQuery'],
+      ['MysqlRunQueryAction', 'mysql-run-query', 'mysqlRunQuery'],
+      ['S3UploadFileAction', 's3-upload-file', 's3UploadFile'],
+      ['TrelloAddCommentAction', 'trello-add-comment', 'trelloAddComment'],
+      ['TrelloUpdateCardAction', 'trello-update-card', 'trelloUpdateCard'],
+      ['HubspotContactChangedPassthrough', 'hubspot-contact-changed', 'hubspotContactChanged'],
+      [
+        'MailchimpSubscriberAddedPassthrough',
+        'mailchimp-subscriber-added',
+        'mailchimpSubscriberAdded',
+      ],
+      ['CalendlyEventScheduledPassthrough', 'calendly-event-scheduled', 'calendlyEventScheduled'],
+      ['TrelloCardChangedPassthrough', 'trello-card-changed', 'trelloCardChanged'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -323,16 +407,19 @@ describe('EngineModule', () => {
       // 6 baseline triggers (manual, cron, webhook, stripe, drive, gmail) +
       // 4 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
       // onedrive-file-added, excel-row-added) +
-      // 5 communication push triggers (slack ×2, discord, telegram, twilio) = 15.
-      expect(counts.trigger).toBe(15);
+      // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
+      // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
+      expect(counts.trigger).toBe(19);
       expect(counts.logic).toBe(4);
       // 1 generic action (http-request) + 8 Google connector actions +
       // 5 Microsoft connector actions +
       // 7 communication actions (slack ×3, discord, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
-      // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) = 36.
-      expect(counts.action).toBe(36);
+      // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
+      // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
+      //   calendly, postgres, mysql, s3, trello ×2) = 48.
+      expect(counts.action).toBe(48);
     });
   });
 });
