@@ -2,20 +2,28 @@ import { BadRequestException, HttpException, HttpStatus, NotFoundException } fro
 import type { ArgumentsHost } from '@nestjs/common';
 import { GlobalExceptionFilter } from './http-exception.filter';
 
+interface RequestStub {
+  id?: string;
+  originalUrl?: string;
+  url?: string;
+}
+
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
   let statusMock: jest.Mock;
   let jsonMock: jest.Mock;
+  let request: RequestStub;
   let host: ArgumentsHost;
 
   beforeEach(() => {
     filter = new GlobalExceptionFilter();
     jsonMock = jest.fn();
     statusMock = jest.fn().mockReturnValue({ json: jsonMock });
+    request = {};
     host = {
       switchToHttp: () => ({
         getResponse: () => ({ status: statusMock }),
-        getRequest: () => ({}),
+        getRequest: () => request,
         getNext: () => undefined,
       }),
     } as unknown as ArgumentsHost;
@@ -100,6 +108,103 @@ describe('GlobalExceptionFilter', () => {
       const payload = jsonMock.mock.calls[0][0];
       expect(typeof payload.timestamp).toBe('string');
       expect(new Date(payload.timestamp).toISOString()).toBe(payload.timestamp);
+    });
+
+    describe('requestId propagation (CLAUDE.md §11)', () => {
+      it('should include req.id as requestId for non-webhook routes', () => {
+        request.id = 'req-123-abc';
+        request.originalUrl = '/v1/workflows/some-id';
+
+        filter.catch(new NotFoundException('Workflow not found'), host);
+
+        expect(jsonMock).toHaveBeenCalledWith(
+          expect.objectContaining({ requestId: 'req-123-abc' }),
+        );
+      });
+
+      it('should fall back to req.url when originalUrl is absent', () => {
+        request.id = 'req-fallback';
+        request.url = '/v1/auth/login';
+
+        filter.catch(new BadRequestException('bad'), host);
+
+        expect(jsonMock).toHaveBeenCalledWith(
+          expect.objectContaining({ requestId: 'req-fallback' }),
+        );
+      });
+
+      it('should omit requestId when req.id is missing', () => {
+        request.originalUrl = '/v1/workflows/abc';
+
+        filter.catch(new NotFoundException(), host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('requestId');
+      });
+
+      it('should omit requestId when req.id is an empty string', () => {
+        request.id = '';
+        request.originalUrl = '/v1/workflows/abc';
+
+        filter.catch(new NotFoundException(), host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('requestId');
+      });
+
+      it('should omit requestId for /v1/webhooks/<path> routes', () => {
+        request.id = 'req-webhook';
+        request.originalUrl = '/v1/webhooks/some-hook-path';
+
+        filter.catch(new NotFoundException('Webhook not found'), host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('requestId');
+      });
+
+      it('should omit requestId for /v1/provider-webhooks/<...> routes', () => {
+        request.id = 'req-provider';
+        request.originalUrl = '/v1/provider-webhooks/stripe/sub-1';
+
+        filter.catch(new NotFoundException(), host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('requestId');
+      });
+
+      it('should still suppress requestId on webhook routes carrying a query string', () => {
+        request.id = 'req-q';
+        request.originalUrl = '/v1/webhooks/abc?foo=bar';
+
+        filter.catch(new NotFoundException(), host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('requestId');
+      });
+    });
+
+    describe('error code (CLAUDE.md §11)', () => {
+      it('should derive code from HttpStatus for known statuses', () => {
+        filter.catch(new NotFoundException(), host);
+        expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({ code: 'NOT_FOUND' }));
+      });
+
+      it('should set code to BAD_REQUEST for 400', () => {
+        filter.catch(new BadRequestException('bad'), host);
+        expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({ code: 'BAD_REQUEST' }));
+      });
+
+      it('should set code to INTERNAL_SERVER_ERROR for unknown exceptions', () => {
+        filter.catch(new Error('boom'), host);
+        expect(jsonMock).toHaveBeenCalledWith(
+          expect.objectContaining({ code: 'INTERNAL_SERVER_ERROR' }),
+        );
+      });
+
+      it('should set code to I_AM_A_TEAPOT for the matching status', () => {
+        filter.catch(new HttpException('tea', HttpStatus.I_AM_A_TEAPOT), host);
+        expect(jsonMock).toHaveBeenCalledWith(expect.objectContaining({ code: 'I_AM_A_TEAPOT' }));
+      });
     });
   });
 });

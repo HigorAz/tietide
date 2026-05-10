@@ -61,6 +61,7 @@ export class EngineService {
         isDryRun,
         parentExecutionId,
         depth,
+        requestId,
       });
 
       const finishedAt = new Date();
