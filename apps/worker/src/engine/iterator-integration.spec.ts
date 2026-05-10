@@ -9,6 +9,7 @@
 // Real: WorkflowRunner, NodeRegistry, IteratorNode, manual-trigger.
 
 import { Test, type TestingModule } from '@nestjs/testing';
+import { PinoLogger } from 'nestjs-pino';
 import type { WorkflowDefinition } from '@tietide/shared';
 import type { INodeExecutor, NodeInput, NodeOutput, ExecutionContext } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,6 +21,27 @@ import { WorkflowRunner } from './workflow-runner';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
+
+function makePinoLoggerStub(): unknown {
+  const noopChild = {
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    child: jest.fn(),
+  };
+  noopChild.child.mockReturnValue(noopChild);
+  return {
+    logger: { child: jest.fn().mockReturnValue(noopChild) },
+    setContext: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    trace: jest.fn(),
+    fatal: jest.fn(),
+  };
+}
 
 interface FakeWorkflowExecution {
   id: string;
@@ -197,6 +219,7 @@ describe('WorkflowRunner — iterator integration', () => {
         { provide: ENV_VAR_RESOLVER, useValue: envVarResolver },
         { provide: CONNECTION_RESOLVER, useValue: connectionResolver },
         { provide: ExecutionEventsService, useValue: events },
+        { provide: PinoLogger, useValue: makePinoLoggerStub() },
       ],
     }).compile();
 

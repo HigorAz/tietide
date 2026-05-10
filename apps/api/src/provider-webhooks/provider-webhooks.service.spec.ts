@@ -131,6 +131,28 @@ describe('ProviderWebhooksService', () => {
       expect(result).toEqual({ executionId, status: 'PENDING' });
     });
 
+    it('should propagate requestId into the BullMQ job payload for correlation', async () => {
+      prisma.providerSubscription.findUnique.mockResolvedValue(activeSubscription());
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'provider:stripe',
+        triggerData: {},
+      });
+
+      await service.trigger({
+        provider: 'stripe',
+        subscriptionId,
+        rawBody: Buffer.from(JSON.stringify({ type: 'payment_intent.succeeded' })),
+        headers: { 'stripe-signature': 't=1,v1=abc' },
+        requestId: 'req-provider-corr',
+      });
+
+      const jobPayload = queue.add.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(jobPayload).toEqual(expect.objectContaining({ requestId: 'req-provider-corr' }));
+    });
+
     it('should throw NotFoundException when subscription does not exist', async () => {
       prisma.providerSubscription.findUnique.mockResolvedValue(null);
 
