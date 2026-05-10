@@ -34,6 +34,12 @@ export const ConnectionProvider = {
   LINEAR: 'linear',
   GITHUB: 'github',
   OLLAMA: 'ollama',
+  HUBSPOT: 'hubspot',
+  MAILCHIMP: 'mailchimp',
+  CALENDLY: 'calendly',
+  POSTGRES: 'postgres',
+  MYSQL: 'mysql',
+  S3: 's3',
 } as const;
 
 export type ConnectionProvider = (typeof ConnectionProvider)[keyof typeof ConnectionProvider];

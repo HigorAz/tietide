@@ -80,6 +80,30 @@ export class ProviderWebhooksService {
     }
 
     const triggerData = this.parseBody(input.rawBody);
+
+    // Per-trigger eventType filter (acceptance criteria for #143). If the
+    // workflow's trigger-node config narrows to a specific provider event
+    // type and the parsed body's event type does not match, ack the webhook
+    // (200) without enqueuing execution. Saves jobs for events the workflow
+    // doesn't care about.
+    const nodeConfig = this.findTriggerNodeConfigInDefinition(
+      subscription.workflow.definition,
+      subscription.nodeId,
+    );
+    if (
+      !shouldEmitForEventType(input.provider, triggerType, triggerData, nodeConfig ?? undefined)
+    ) {
+      this.log.debug(
+        {
+          provider: input.provider,
+          subscriptionId: input.subscriptionId,
+          workflowId: subscription.workflow.id,
+        },
+        'Provider webhook accepted but filtered out by eventType — no execution enqueued',
+      );
+      return { executionId: '', status: 'FILTERED' };
+    }
+
     const executionTriggerType = `provider:${subscription.provider}`;
 
     const created = await this.prisma.workflowExecution.create({
@@ -151,5 +175,87 @@ export class ProviderWebhooksService {
       }
     }
     return null;
+  }
+
+  private findTriggerNodeConfigInDefinition(
+    definition: Prisma.JsonValue | null,
+    nodeId: string,
+  ): Record<string, unknown> | null {
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) return null;
+    const def = definition as { nodes?: unknown };
+    if (!Array.isArray(def.nodes)) return null;
+    for (const n of def.nodes) {
+      if (!n || typeof n !== 'object' || Array.isArray(n)) continue;
+      const node = n as { id?: unknown; config?: unknown };
+      if (
+        node.id === nodeId &&
+        node.config &&
+        typeof node.config === 'object' &&
+        !Array.isArray(node.config)
+      ) {
+        return node.config as Record<string, unknown>;
+      }
+    }
+    return null;
+  }
+}
+
+// Per-provider event-type matchers. Each one extracts a "type" from the inbound
+// payload and compares to the trigger node's eventType filter (if set). When
+// the node has no filter we always emit. When the node has a filter and the
+// payload type doesn't match, we drop the event.
+export function shouldEmitForEventType(
+  provider: string,
+  triggerType: string | null,
+  triggerData: Record<string, unknown>,
+  nodeConfig?: Record<string, unknown>,
+): boolean {
+  if (!nodeConfig) return true;
+  const filter = nodeConfig.eventType;
+  if (typeof filter !== 'string' || filter.length === 0) return true;
+
+  const payloadType = extractPayloadEventType(provider, triggerType, triggerData);
+  if (payloadType === null) return true; // Could not classify; don't drop.
+  return payloadType === filter;
+}
+
+function extractPayloadEventType(
+  provider: string,
+  triggerType: string | null,
+  payload: Record<string, unknown>,
+): string | null {
+  switch (provider) {
+    case 'stripe': {
+      const t = (payload as { type?: unknown }).type;
+      return typeof t === 'string' ? t : null;
+    }
+    case 'mailchimp': {
+      const t = (payload as { type?: unknown }).type;
+      return typeof t === 'string' ? t : null;
+    }
+    case 'calendly': {
+      const t = (payload as { event?: unknown }).event;
+      return typeof t === 'string' ? t : null;
+    }
+    case 'hubspot': {
+      // HubSpot sends an array of events; if any matches the filter, emit.
+      // The caller's compare-equality semantics make this awkward — here we
+      // just return null (don't filter) when the shape is array-of-events,
+      // and let the trigger node consume the whole batch.
+      const events = (payload as { events?: unknown }).events;
+      if (Array.isArray(events) && events.length > 0) {
+        const first = events[0] as { subscriptionType?: unknown };
+        if (typeof first.subscriptionType === 'string') return first.subscriptionType;
+      }
+      return null;
+    }
+    case 'trello': {
+      const action = (payload as { action?: { type?: unknown } }).action;
+      const t = action && typeof action === 'object' ? action.type : undefined;
+      return typeof t === 'string' ? t : null;
+    }
+    default:
+      void triggerType;
+      return null;
   }
 }

@@ -12,6 +12,7 @@ import { GoogleOAuthProvider } from './providers/google.provider';
 import { MicrosoftOAuthProvider } from './providers/microsoft.provider';
 import { SlackOAuthProvider } from './providers/slack.provider';
 import { NotionOAuthProvider } from './providers/notion.provider';
+import { HubspotOAuthProvider } from './providers/hubspot.provider';
 
 @Module({
   imports: [AuthModule, CryptoModule, AuditModule, PrismaModule],
@@ -25,6 +26,7 @@ import { NotionOAuthProvider } from './providers/notion.provider';
     MicrosoftOAuthProvider,
     SlackOAuthProvider,
     NotionOAuthProvider,
+    HubspotOAuthProvider,
   ],
 })
 export class OAuthModule {}

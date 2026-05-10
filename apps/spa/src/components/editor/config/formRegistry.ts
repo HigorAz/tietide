@@ -58,6 +58,23 @@ import { GitHubCreatePrForm } from './github/GitHubCreatePrForm';
 import { ClaudeMessagesForm } from './anthropic/ClaudeMessagesForm';
 import { OpenAIChatCompletionForm } from './openai/OpenAIChatCompletionForm';
 import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
+import { HubspotCreateContactForm } from './hubspot/HubspotCreateContactForm';
+import { HubspotCreateDealForm } from './hubspot/HubspotCreateDealForm';
+import { HubspotContactChangedForm } from './hubspot/HubspotContactChangedForm';
+import { StripeCreateCustomerForm } from './stripe/StripeCreateCustomerForm';
+import { StripeListChargesForm } from './stripe/StripeListChargesForm';
+import { StripeEventReceivedForm } from './stripe/StripeEventReceivedForm';
+import { MailchimpAddSubscriberForm } from './mailchimp/MailchimpAddSubscriberForm';
+import { MailchimpSendCampaignForm } from './mailchimp/MailchimpSendCampaignForm';
+import { MailchimpSubscriberAddedForm } from './mailchimp/MailchimpSubscriberAddedForm';
+import { CalendlyListEventsForm } from './calendly/CalendlyListEventsForm';
+import { CalendlyEventScheduledForm } from './calendly/CalendlyEventScheduledForm';
+import { PostgresRunQueryForm } from './postgres/PostgresRunQueryForm';
+import { MysqlRunQueryForm } from './mysql/MysqlRunQueryForm';
+import { S3UploadFileForm } from './s3/S3UploadFileForm';
+import { TrelloAddCommentForm } from './trello/TrelloAddCommentForm';
+import { TrelloUpdateCardForm } from './trello/TrelloUpdateCardForm';
+import { TrelloCardChangedForm } from './trello/TrelloCardChangedForm';
 
 export interface NodeConfigFormProps {
   nodeId: string;
@@ -123,4 +140,21 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.CLAUDE_MESSAGES]: ClaudeMessagesForm,
   [NodeType.OPENAI_CHAT_COMPLETION]: OpenAIChatCompletionForm,
   [NodeType.OLLAMA_GENERATE]: OllamaGenerateForm,
+  [NodeType.HUBSPOT_CREATE_CONTACT]: HubspotCreateContactForm,
+  [NodeType.HUBSPOT_CREATE_DEAL]: HubspotCreateDealForm,
+  [NodeType.HUBSPOT_CONTACT_CHANGED]: HubspotContactChangedForm,
+  [NodeType.STRIPE_CREATE_CUSTOMER]: StripeCreateCustomerForm,
+  [NodeType.STRIPE_LIST_CHARGES]: StripeListChargesForm,
+  [NodeType.STRIPE_EVENT_RECEIVED]: StripeEventReceivedForm,
+  [NodeType.MAILCHIMP_ADD_SUBSCRIBER]: MailchimpAddSubscriberForm,
+  [NodeType.MAILCHIMP_SEND_CAMPAIGN]: MailchimpSendCampaignForm,
+  [NodeType.MAILCHIMP_SUBSCRIBER_ADDED]: MailchimpSubscriberAddedForm,
+  [NodeType.CALENDLY_LIST_EVENTS]: CalendlyListEventsForm,
+  [NodeType.CALENDLY_EVENT_SCHEDULED]: CalendlyEventScheduledForm,
+  [NodeType.POSTGRES_RUN_QUERY]: PostgresRunQueryForm,
+  [NodeType.MYSQL_RUN_QUERY]: MysqlRunQueryForm,
+  [NodeType.S3_UPLOAD_FILE]: S3UploadFileForm,
+  [NodeType.TRELLO_ADD_COMMENT]: TrelloAddCommentForm,
+  [NodeType.TRELLO_UPDATE_CARD]: TrelloUpdateCardForm,
+  [NodeType.TRELLO_CARD_CHANGED]: TrelloCardChangedForm,
 };
