@@ -1,4 +1,10 @@
-import { BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import type { ArgumentsHost } from '@nestjs/common';
 import { GlobalExceptionFilter } from './http-exception.filter';
 
@@ -180,6 +186,49 @@ describe('GlobalExceptionFilter', () => {
 
         const payload = jsonMock.mock.calls[0][0];
         expect(payload).not.toHaveProperty('requestId');
+      });
+    });
+
+    describe('structured issues passthrough', () => {
+      it('should preserve an `issues` array from an UnprocessableEntityException body', () => {
+        const exception = new UnprocessableEntityException({
+          message: 'Workflow topology is invalid',
+          issues: [
+            {
+              code: 'cycle',
+              path: ['nodes'],
+              message: 'Circular dependency detected: A -> B -> A',
+            },
+          ],
+        });
+
+        filter.catch(exception, host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload.statusCode).toBe(HttpStatus.UNPROCESSABLE_ENTITY);
+        expect(payload.message).toBe('Workflow topology is invalid');
+        expect(payload.issues).toEqual([
+          { code: 'cycle', path: ['nodes'], message: 'Circular dependency detected: A -> B -> A' },
+        ]);
+      });
+
+      it('should omit `issues` when the exception body does not carry one', () => {
+        filter.catch(new BadRequestException('plain message'), host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('issues');
+      });
+
+      it('should ignore `issues` when it is not an array', () => {
+        const exception = new BadRequestException({
+          message: 'something',
+          issues: 'not-an-array',
+        });
+
+        filter.catch(exception, host);
+
+        const payload = jsonMock.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('issues');
       });
     });
 

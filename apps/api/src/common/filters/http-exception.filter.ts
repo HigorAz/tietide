@@ -24,14 +24,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
+    let issues: unknown = undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      message =
-        typeof exceptionResponse === 'string'
-          ? exceptionResponse
-          : ((exceptionResponse as Record<string, unknown>).message?.toString() ?? message);
+      if (typeof exceptionResponse === 'string') {
+        message = exceptionResponse;
+      } else if (exceptionResponse && typeof exceptionResponse === 'object') {
+        const obj = exceptionResponse as Record<string, unknown>;
+        message = obj.message?.toString() ?? message;
+        // Structured-validation errors (Zod / topology) carry a typed `issues`
+        // array describing each violation. Preserve it so clients can map
+        // errors to specific form fields. See CLAUDE.md §11.
+        if (Array.isArray(obj.issues)) {
+          issues = obj.issues;
+        }
+      }
     }
 
     const code = HttpStatus[status] ?? 'INTERNAL_SERVER_ERROR';
@@ -43,6 +52,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message,
       timestamp: new Date().toISOString(),
     };
+    if (issues !== undefined) {
+      body.issues = issues;
+    }
     if (requestId !== undefined) {
       body.requestId = requestId;
     }

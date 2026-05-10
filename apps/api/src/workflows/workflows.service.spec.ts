@@ -1,6 +1,11 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { ActivationService } from '../provider-triggers/activation.service';
@@ -185,7 +190,7 @@ describe('WorkflowsService', () => {
       );
     });
 
-    it('should reject definitions containing a "code" node with BadRequestException', async () => {
+    it('should reject definitions containing a "code" node with UnprocessableEntityException', async () => {
       const definitionWithCode = {
         ...validDefinition,
         nodes: [
@@ -196,11 +201,89 @@ describe('WorkflowsService', () => {
 
       await expect(
         service.create(userId, { name: 'Demo', definition: definitionWithCode }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(UnprocessableEntityException);
 
       expect(prisma.workflow.create).not.toHaveBeenCalled();
       expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
       expect(audit.log).not.toHaveBeenCalled();
+    });
+
+    describe('topology validation', () => {
+      const trigger = (id: string, type = 'manual-trigger', name = id) => ({
+        id,
+        type,
+        name,
+        position: { x: 0, y: 0 },
+        config: {},
+      });
+      const action = (id: string, type = 'http-request', name = id) => ({
+        id,
+        type,
+        name,
+        position: { x: 0, y: 0 },
+        config: {},
+      });
+      const edge = (id: string, source: string, target: string) => ({ id, source, target });
+
+      async function expectTopologyRejection(
+        definition: { nodes: unknown[]; edges: unknown[] },
+        expectedCode: string,
+      ) {
+        const promise = service.create(userId, {
+          name: 'Demo',
+          definition: definition as unknown as typeof validDefinition,
+        });
+        await expect(promise).rejects.toThrow(UnprocessableEntityException);
+        try {
+          await promise;
+        } catch (err) {
+          const body = (err as UnprocessableEntityException).getResponse() as {
+            issues: { code: string; path: unknown[]; message: string }[];
+          };
+          expect(Array.isArray(body.issues)).toBe(true);
+          expect(body.issues.some((i) => i.code === expectedCode)).toBe(true);
+        }
+        expect(prisma.workflow.create).not.toHaveBeenCalled();
+        expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+        expect(audit.log).not.toHaveBeenCalled();
+      }
+
+      it('rejects a definition with zero triggers (self-loop A->A)', async () => {
+        await expectTopologyRejection(
+          { nodes: [action('A')], edges: [edge('e1', 'A', 'A')] },
+          'no_trigger',
+        );
+      });
+
+      it('rejects a definition with more than one trigger', async () => {
+        await expectTopologyRejection(
+          {
+            nodes: [trigger('t1'), trigger('t2'), action('a1')],
+            edges: [edge('e1', 't1', 'a1'), edge('e2', 't2', 'a1')],
+          },
+          'multiple_triggers',
+        );
+      });
+
+      it('rejects a definition containing a cycle downstream of the trigger', async () => {
+        await expectTopologyRejection(
+          {
+            nodes: [trigger('t'), action('A'), action('B')],
+            edges: [edge('e0', 't', 'A'), edge('e1', 'A', 'B'), edge('e2', 'B', 'A')],
+          },
+          'cycle',
+        );
+      });
+
+      it('rejects a definition with an edge that references a non-existent node id', async () => {
+        await expectTopologyRejection(
+          {
+            nodes: [trigger('t'), action('A')],
+            edges: [edge('e1', 't', 'A'), edge('e2', 'A', 'ghost')],
+          },
+          'dangling_edge',
+        );
+      });
     });
 
     it('should seed an initial WorkflowVersion v1 with the new definition', async () => {
@@ -391,8 +474,17 @@ describe('WorkflowsService', () => {
 
     it('should accept an updated definition and persist it verbatim', async () => {
       const newDef = {
-        ...validDefinition,
-        nodes: [...validDefinition.nodes, { ...validDefinition.nodes[0], id: 'n2' }],
+        nodes: [
+          ...validDefinition.nodes,
+          {
+            id: 'n2',
+            type: 'http-request',
+            name: 'Call API',
+            position: { x: 100, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
       await service.update(userId, workflowId, { definition: newDef });
@@ -431,8 +523,17 @@ describe('WorkflowsService', () => {
         version: 1,
       });
       const newDef = {
-        ...validDefinition,
-        nodes: [...validDefinition.nodes, { ...validDefinition.nodes[0], id: 'n2' }],
+        nodes: [
+          ...validDefinition.nodes,
+          {
+            id: 'n2',
+            type: 'http-request',
+            name: 'Call API',
+            position: { x: 100, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
       await service.update(userId, workflowId, { definition: newDef, versionMessage: 'tweak' });
@@ -534,7 +635,7 @@ describe('WorkflowsService', () => {
       );
     });
 
-    it('should reject definitions containing a "code" node with BadRequestException', async () => {
+    it('should reject definitions containing a "code" node with UnprocessableEntityException', async () => {
       const definitionWithCode = {
         ...validDefinition,
         nodes: [
@@ -545,10 +646,85 @@ describe('WorkflowsService', () => {
 
       await expect(
         service.update(userId, workflowId, { definition: definitionWithCode }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(UnprocessableEntityException);
 
       expect(prisma.workflow.update).not.toHaveBeenCalled();
       expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+    });
+
+    describe('topology validation', () => {
+      const trigger = (id: string, type = 'manual-trigger', name = id) => ({
+        id,
+        type,
+        name,
+        position: { x: 0, y: 0 },
+        config: {},
+      });
+      const action = (id: string, type = 'http-request', name = id) => ({
+        id,
+        type,
+        name,
+        position: { x: 0, y: 0 },
+        config: {},
+      });
+      const edge = (id: string, source: string, target: string) => ({ id, source, target });
+
+      async function expectTopologyRejection(
+        definition: { nodes: unknown[]; edges: unknown[] },
+        expectedCode: string,
+      ) {
+        const promise = service.update(userId, workflowId, {
+          definition: definition as unknown as typeof validDefinition,
+        });
+        await expect(promise).rejects.toThrow(UnprocessableEntityException);
+        try {
+          await promise;
+        } catch (err) {
+          const body = (err as UnprocessableEntityException).getResponse() as {
+            issues: { code: string; path: unknown[]; message: string }[];
+          };
+          expect(body.issues.some((i) => i.code === expectedCode)).toBe(true);
+        }
+        expect(prisma.workflow.update).not.toHaveBeenCalled();
+        expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+      }
+
+      it('rejects an update with zero triggers (self-loop)', async () => {
+        await expectTopologyRejection(
+          { nodes: [action('A')], edges: [edge('e1', 'A', 'A')] },
+          'no_trigger',
+        );
+      });
+
+      it('rejects an update with more than one trigger', async () => {
+        await expectTopologyRejection(
+          {
+            nodes: [trigger('t1'), trigger('t2'), action('a1')],
+            edges: [edge('e1', 't1', 'a1'), edge('e2', 't2', 'a1')],
+          },
+          'multiple_triggers',
+        );
+      });
+
+      it('rejects an update with a cycle downstream of the trigger', async () => {
+        await expectTopologyRejection(
+          {
+            nodes: [trigger('t'), action('A'), action('B')],
+            edges: [edge('e0', 't', 'A'), edge('e1', 'A', 'B'), edge('e2', 'B', 'A')],
+          },
+          'cycle',
+        );
+      });
+
+      it('rejects an update with a dangling edge', async () => {
+        await expectTopologyRejection(
+          {
+            nodes: [trigger('t'), action('A')],
+            edges: [edge('e1', 't', 'A'), edge('e2', 'A', 'ghost')],
+          },
+          'dangling_edge',
+        );
+      });
     });
   });
 

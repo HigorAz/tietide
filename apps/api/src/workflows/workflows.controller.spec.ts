@@ -3,8 +3,10 @@ import {
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
+  UnprocessableEntityException,
   ValidationPipe,
 } from '@nestjs/common';
+import { GlobalExceptionFilter } from '../common/filters/http-exception.filter';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -85,6 +87,7 @@ describe('WorkflowsController (integration)', () => {
         transform: true,
       }),
     );
+    app.useGlobalFilters(new GlobalExceptionFilter());
     await app.init();
   });
 
@@ -148,6 +151,58 @@ describe('WorkflowsController (integration)', () => {
       await request(app.getHttpServer()).post('/workflows').send(validBody).expect(201);
 
       expect(workflowsService.create).toHaveBeenCalledWith('owner-uuid', validBody);
+    });
+
+    describe('topology validation (issue #163)', () => {
+      function topologyException(
+        code: string,
+        message: string,
+        path: (string | number)[] = ['nodes'],
+      ) {
+        return new UnprocessableEntityException({
+          message: 'Workflow topology is invalid',
+          issues: [{ code, path, message }],
+        });
+      }
+
+      async function assertTopology422(code: string, message: string) {
+        workflowsService.create.mockRejectedValue(topologyException(code, message));
+
+        const res = await request(app.getHttpServer())
+          .post('/workflows')
+          .send(validBody)
+          .expect(422);
+
+        expect(res.body.statusCode).toBe(422);
+        expect(res.body.code).toBe('UNPROCESSABLE_ENTITY');
+        expect(res.body.message).toBe('Workflow topology is invalid');
+        expect(Array.isArray(res.body.issues)).toBe(true);
+        expect(res.body.issues[0]).toEqual(
+          expect.objectContaining({ code, message, path: expect.any(Array) }),
+        );
+      }
+
+      it('returns 422 with structured issues when the definition has zero triggers', async () => {
+        await assertTopology422(
+          'no_trigger',
+          'Workflow must have exactly one trigger node (in-degree 0), found 0.',
+        );
+      });
+
+      it('returns 422 with structured issues when the definition has more than one trigger', async () => {
+        await assertTopology422(
+          'multiple_triggers',
+          'Workflow must have exactly one trigger node (in-degree 0), found 2.',
+        );
+      });
+
+      it('returns 422 with structured issues when the definition contains a cycle', async () => {
+        await assertTopology422('cycle', 'Circular dependency detected: A -> B -> A');
+      });
+
+      it('returns 422 with structured issues when an edge references a non-existent node id', async () => {
+        await assertTopology422('dangling_edge', 'Edge "e1" references unknown node "ghost".');
+      });
     });
   });
 
@@ -281,6 +336,58 @@ describe('WorkflowsController (integration)', () => {
         .patch(`/workflows/${uuid}`)
         .send({ name: 'X' })
         .expect(403);
+    });
+
+    describe('topology validation (issue #163)', () => {
+      function topologyException(
+        code: string,
+        message: string,
+        path: (string | number)[] = ['nodes'],
+      ) {
+        return new UnprocessableEntityException({
+          message: 'Workflow topology is invalid',
+          issues: [{ code, path, message }],
+        });
+      }
+
+      async function assertTopology422(code: string, message: string) {
+        workflowsService.update.mockRejectedValue(topologyException(code, message));
+
+        const res = await request(app.getHttpServer())
+          .patch(`/workflows/${uuid}`)
+          .send({ definition: validDefinition })
+          .expect(422);
+
+        expect(res.body.statusCode).toBe(422);
+        expect(res.body.code).toBe('UNPROCESSABLE_ENTITY');
+        expect(res.body.message).toBe('Workflow topology is invalid');
+        expect(Array.isArray(res.body.issues)).toBe(true);
+        expect(res.body.issues[0]).toEqual(
+          expect.objectContaining({ code, message, path: expect.any(Array) }),
+        );
+      }
+
+      it('returns 422 with structured issues when the definition has zero triggers', async () => {
+        await assertTopology422(
+          'no_trigger',
+          'Workflow must have exactly one trigger node (in-degree 0), found 0.',
+        );
+      });
+
+      it('returns 422 with structured issues when the definition has more than one trigger', async () => {
+        await assertTopology422(
+          'multiple_triggers',
+          'Workflow must have exactly one trigger node (in-degree 0), found 2.',
+        );
+      });
+
+      it('returns 422 with structured issues when the definition contains a cycle', async () => {
+        await assertTopology422('cycle', 'Circular dependency detected: A -> B -> A');
+      });
+
+      it('returns 422 with structured issues when an edge references a non-existent node id', async () => {
+        await assertTopology422('dangling_edge', 'Edge "e1" references unknown node "ghost".');
+      });
     });
   });
 
