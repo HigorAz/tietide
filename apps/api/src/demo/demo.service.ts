@@ -107,7 +107,7 @@ export class DemoService {
       return existing.path;
     }
 
-    const path = `${config.pathSuffix}-${userId.slice(0, 8)}`;
+    const path = `${config.pathSuffix}-${randomBytes(4).toString('hex')}`;
     const hmacSecret = randomBytes(32).toString('hex');
 
     const created = await this.prisma.webhook.create({
