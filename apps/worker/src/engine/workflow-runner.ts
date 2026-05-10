@@ -1,4 +1,7 @@
-import { Inject, Injectable, Logger as NestLogger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
+
+type PinoChildLogger = ReturnType<PinoLogger['logger']['child']>;
 import {
   ITERATOR_MAX_ITEMS_DEFAULT,
   NODE_CATALOG,
@@ -11,7 +14,7 @@ import {
   type WorkflowNode,
   type WorkflowEdge,
 } from '@tietide/shared';
-import type { ExecutionContext, Logger, NodeInput, NodeOutput } from '@tietide/sdk';
+import type { ExecutionContext, Logger as SdkLogger, NodeInput, NodeOutput } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
 import { ExecutionEventsService } from '../events/execution-events.service';
@@ -54,6 +57,10 @@ export interface RunArgs {
   // Depth in the parent->child execution tree. 0 for top-level. The runner
   // propagates depth+1 to any iterator/subworkflow children it spawns.
   depth?: number;
+  // Originating API X-Request-Id, propagated via BullMQ job metadata.
+  // Bound on a pino child logger so step-level logs can be correlated back
+  // to the originating request (CLAUDE.md §11).
+  requestId?: string;
 }
 
 export interface RunResult {
@@ -64,8 +71,6 @@ export interface RunResult {
 
 @Injectable()
 export class WorkflowRunner {
-  private readonly log = new NestLogger(WorkflowRunner.name);
-
   constructor(
     private readonly registry: NodeRegistry,
     private readonly prisma: PrismaService,
@@ -73,7 +78,20 @@ export class WorkflowRunner {
     @Inject(ENV_VAR_RESOLVER) private readonly envVarResolver: EnvVarResolver,
     @Inject(CONNECTION_RESOLVER) private readonly connectionResolver: ConnectionResolver,
     private readonly events: ExecutionEventsService,
-  ) {}
+    private readonly log: PinoLogger,
+  ) {
+    this.log.setContext(WorkflowRunner.name);
+  }
+
+  // Build a pino child logger bound to this run's correlation fields. The
+  // requestId propagates from the BullMQ job payload (Issue #162) and is
+  // attached here once so every step-level log line within this run carries
+  // it without threading the value through every helper signature.
+  private buildRunLogger(args: { requestId: string | undefined }): PinoChildLogger {
+    const bindings: Record<string, unknown> = { runner: 'WorkflowRunner' };
+    if (args.requestId) bindings.requestId = args.requestId;
+    return this.log.logger.child(bindings);
+  }
 
   async run(args: RunArgs): Promise<RunResult> {
     try {
@@ -88,6 +106,7 @@ export class WorkflowRunner {
   private async runInner(args: RunArgs): Promise<RunResult> {
     const { executionId, workflowId, definition, triggerData, isDryRun = false } = args;
     const depth = args.depth ?? 0;
+    const runLog = this.buildRunLogger({ requestId: args.requestId });
 
     if (depth > MAX_RECURSION_DEPTH) {
       return { status: 'FAILED', error: new RecursionDepthExceededError(depth).message };
@@ -195,6 +214,7 @@ export class WorkflowRunner {
           reachable,
           isDryRun,
           envScope,
+          requestId: args.requestId,
         });
         if (iterResult.status === 'FAILED') {
           failure = { nodeId: n.id, error: iterResult.error ?? 'Iterator failed' };
@@ -259,7 +279,7 @@ export class WorkflowRunner {
         const message = (err as Error).message ?? 'Unknown error';
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
-        this.log.warn(
+        runLog.warn(
           { executionId, workflowId, nodeId: n.id, nodeType: n.type },
           `Node failed: ${message}`,
         );
@@ -449,6 +469,7 @@ export class WorkflowRunner {
     reachable: Set<string>;
     isDryRun: boolean;
     envScope: EnvScope;
+    requestId: string | undefined;
   }): Promise<{ status: 'SUCCESS' | 'FAILED'; error?: string }> {
     const {
       iteratorNode: n,
@@ -464,6 +485,7 @@ export class WorkflowRunner {
       reachable,
       isDryRun,
       envScope,
+      requestId,
     } = opts;
 
     const startedAt = new Date();
@@ -604,6 +626,7 @@ export class WorkflowRunner {
           isDryRun,
           parentExecutionId,
           depth: depth + 1,
+          requestId,
         });
         iterStatus = childResult.status;
         iterError = childResult.error;
@@ -717,8 +740,8 @@ export class WorkflowRunner {
   ): ExecutionContext {
     const secrets = this.secretResolver;
     const connections = this.connectionResolver;
-    const logger: Logger = {
-      info: (msg, ctx) => this.log.log({ nodeId, ctx }, msg),
+    const logger: SdkLogger = {
+      info: (msg, ctx) => this.log.info({ nodeId, ctx }, msg),
       warn: (msg, ctx) => this.log.warn({ nodeId, ctx }, msg),
       error: (msg, ctx) => this.log.error({ nodeId, ctx }, msg),
       debug: (msg, ctx) => this.log.debug({ nodeId, ctx }, msg),

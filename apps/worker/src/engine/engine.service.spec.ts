@@ -136,6 +136,22 @@ describe('EngineService', () => {
       expect(lastCall![0].data.error).toContain('unexpected');
     });
 
+    it('should forward requestId from job payload into runner.run for child-logger binding', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+      runner.run.mockResolvedValue({ status: 'SUCCESS' });
+
+      await engine.execute({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        triggerType: 'manual',
+        requestId: 'req-trace-001',
+      });
+
+      expect(runner.run).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: 'req-trace-001' }),
+      );
+    });
+
     it('should pass triggerData as initial input to the runner', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
       runner.run.mockResolvedValue({ status: 'SUCCESS' });

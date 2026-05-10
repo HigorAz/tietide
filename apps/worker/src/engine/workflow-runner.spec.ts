@@ -1,4 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { PinoLogger } from 'nestjs-pino';
 import type { WorkflowDefinition } from '@tietide/shared';
 import type { INodeExecutor, NodeInput, NodeOutput, ExecutionContext } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,6 +9,51 @@ import { WorkflowRunner } from './workflow-runner';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
+
+interface ChildLoggerMock {
+  warn: jest.Mock;
+  info: jest.Mock;
+  error: jest.Mock;
+  debug: jest.Mock;
+  child: jest.Mock;
+}
+
+interface PinoLoggerMock {
+  child: jest.Mock<ChildLoggerMock, [Record<string, unknown>]>;
+}
+
+interface NestjsPinoLoggerMock {
+  logger: PinoLoggerMock;
+  setContext: jest.Mock;
+  info: jest.Mock;
+  warn: jest.Mock;
+  error: jest.Mock;
+  debug: jest.Mock;
+  trace: jest.Mock;
+  fatal: jest.Mock;
+}
+
+function createLoggerMock(): { logger: NestjsPinoLoggerMock; child: ChildLoggerMock } {
+  const child: ChildLoggerMock = {
+    warn: jest.fn(),
+    info: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    child: jest.fn(),
+  };
+  child.child.mockReturnValue(child);
+  const logger: NestjsPinoLoggerMock = {
+    logger: { child: jest.fn().mockReturnValue(child) },
+    setContext: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    trace: jest.fn(),
+    fatal: jest.fn(),
+  };
+  return { logger, child };
+}
 
 type CallableExecutor = INodeExecutor & {
   execute: jest.Mock<Promise<NodeOutput>, [NodeInput, ExecutionContext]>;
@@ -81,8 +127,13 @@ describe('WorkflowRunner', () => {
     releaseExecution: jest.Mock;
   };
   let events: EventsMock;
+  let loggerMock: NestjsPinoLoggerMock;
+  let childLogger: ChildLoggerMock;
 
   beforeEach(async () => {
+    const created = createLoggerMock();
+    loggerMock = created.logger;
+    childLogger = created.child;
     registry = new NodeRegistry();
 
     prisma = {
@@ -137,6 +188,7 @@ describe('WorkflowRunner', () => {
         { provide: ENV_VAR_RESOLVER, useValue: envVarResolver },
         { provide: CONNECTION_RESOLVER, useValue: connectionResolver },
         { provide: ExecutionEventsService, useValue: events },
+        { provide: PinoLogger, useValue: loggerMock },
       ],
     }).compile();
 
@@ -316,6 +368,48 @@ describe('WorkflowRunner', () => {
       const updateCall = prisma.executionStep.update.mock.calls[0][0];
       expect(updateCall.data.status).toBe('FAILED');
       expect(updateCall.data.error).toContain('kaboom');
+    });
+
+    describe('requestId correlation (Issue #162)', () => {
+      it('should bind requestId on the child pino logger when one is supplied', async () => {
+        registry.register(
+          makeExecutor('a', async () => {
+            throw new Error('kaboom');
+          }),
+        );
+        const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+        await runner.run({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          definition: def,
+          requestId: 'req-xyz',
+        });
+
+        expect(loggerMock.logger.child).toHaveBeenCalledWith(
+          expect.objectContaining({ requestId: 'req-xyz' }),
+        );
+        expect(childLogger.warn).toHaveBeenCalled();
+        const warnArgs = childLogger.warn.mock.calls[0];
+        expect(warnArgs[0]).toEqual(
+          expect.objectContaining({ executionId: 'exec-1', nodeId: 'A' }),
+        );
+      });
+
+      it('should not bind a requestId field when no requestId is supplied', async () => {
+        registry.register(
+          makeExecutor('a', async () => {
+            throw new Error('boom');
+          }),
+        );
+        const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(loggerMock.logger.child).toHaveBeenCalled();
+        const childArgs = loggerMock.logger.child.mock.calls[0][0] as Record<string, unknown>;
+        expect(childArgs).not.toHaveProperty('requestId');
+      });
     });
 
     it('should abort with clear error when NodeRegistry has no executor for a node type', async () => {
