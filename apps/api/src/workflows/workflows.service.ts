@@ -3,9 +3,15 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import { executableWorkflowDefinitionSchema, ZodError } from '@tietide/shared';
+import type { WorkflowDefinition } from '@tietide/shared';
+import {
+  executableWorkflowDefinitionSchema,
+  validateWorkflowTopology,
+  ZodError,
+} from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { ActivationService } from '../provider-triggers/activation.service';
@@ -38,11 +44,12 @@ export interface WorkflowListFilter {
 }
 
 function assertExecutableDefinition(definition: unknown): void {
+  let parsed: WorkflowDefinition;
   try {
-    executableWorkflowDefinitionSchema.parse(definition);
+    parsed = executableWorkflowDefinitionSchema.parse(definition);
   } catch (error) {
     if (error instanceof ZodError) {
-      throw new BadRequestException({
+      throw new UnprocessableEntityException({
         message: 'Workflow definition is not executable',
         issues: error.issues.map((issue) => ({
           path: issue.path,
@@ -51,6 +58,18 @@ function assertExecutableDefinition(definition: unknown): void {
       });
     }
     throw error;
+  }
+
+  const topologyIssues = validateWorkflowTopology(parsed);
+  if (topologyIssues.length > 0) {
+    throw new UnprocessableEntityException({
+      message: 'Workflow topology is invalid',
+      issues: topologyIssues.map((issue) => ({
+        code: issue.code,
+        path: issue.path,
+        message: issue.message,
+      })),
+    });
   }
 }
 
