@@ -1,4 +1,5 @@
 import type { WorkflowDefinition } from '@tietide/shared';
+import { validateWorkflowTopology } from '@tietide/shared';
 
 export class CircularDependencyError extends Error {
   readonly cycle: string[];
@@ -13,24 +14,27 @@ export class CircularDependencyError extends Error {
 /**
  * Topologically orders workflow nodes using Kahn's algorithm.
  *
- * MVP constraints:
- * - Exactly one node must have in-degree zero (the trigger).
- * - Edges must reference only known node ids.
- * - Graph must be acyclic.
+ * Validation rules (single trigger, no cycles, no dangling edges) are shared
+ * with the API save-time check via `validateWorkflowTopology` from
+ * `@tietide/shared`. This function only adds ordering on top of a validated
+ * graph, and re-throws typed errors so existing engine callers keep their
+ * current control flow.
  */
 export function topologicalSort(definition: WorkflowDefinition): string[] {
   const { nodes, edges } = definition;
 
-  if (nodes.length === 0) {
-    throw new Error('Workflow must have at least one node.');
-  }
-
-  const nodeIds = new Set(nodes.map((n) => n.id));
-  for (const e of edges) {
-    if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) {
-      const unknown = !nodeIds.has(e.source) ? e.source : e.target;
-      throw new Error(`Edge "${e.id}" references unknown node "${unknown}".`);
+  const issues = validateWorkflowTopology(definition);
+  if (issues.length > 0) {
+    const issue = issues[0]!;
+    if (issue.code === 'cycle' || issue.code === 'no_trigger') {
+      // `no_trigger` happens when every node has an incoming edge — that's a
+      // cycle covering the whole graph. Surface it as CircularDependencyError
+      // for engine callers that branch on the error type.
+      if (issue.cycle && issue.cycle.length > 0) {
+        throw new CircularDependencyError(issue.cycle);
+      }
     }
+    throw new Error(issue.message);
   }
 
   const inDegree = new Map<string, number>();
@@ -44,18 +48,10 @@ export function topologicalSort(definition: WorkflowDefinition): string[] {
     adjacency.get(e.source)!.push(e.target);
   }
 
-  const roots = nodes.filter((n) => inDegree.get(n.id) === 0);
-  if (roots.length === 0) {
-    throw new CircularDependencyError(nodes.map((n) => n.id));
-  }
-  if (roots.length > 1) {
-    throw new Error(
-      `Workflow must have exactly one trigger node (in-degree 0), found ${roots.length}.`,
-    );
-  }
+  const root = nodes.find((n) => inDegree.get(n.id) === 0)!;
 
   const order: string[] = [];
-  const queue: string[] = [roots[0].id];
+  const queue: string[] = [root.id];
   while (queue.length > 0) {
     const current = queue.shift()!;
     order.push(current);
@@ -64,11 +60,6 @@ export function topologicalSort(definition: WorkflowDefinition): string[] {
       inDegree.set(next, remaining);
       if (remaining === 0) queue.push(next);
     }
-  }
-
-  if (order.length !== nodes.length) {
-    const cycle = nodes.filter((n) => (inDegree.get(n.id) ?? 0) > 0).map((n) => n.id);
-    throw new CircularDependencyError(cycle);
   }
 
   return order;
