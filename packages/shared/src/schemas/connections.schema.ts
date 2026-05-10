@@ -159,6 +159,63 @@ export const ollamaConfigSchema = z.object({
   model: z.string().min(1).max(128),
 });
 
+// HubSpot OAuth2: access + refresh token, plus the hub identifier returned by the
+// token introspection endpoint so we can attribute API calls to the right portal.
+export const hubspotOAuth2ConfigSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1),
+  hubId: z.string().min(1).optional(),
+  scope: z.string().optional(),
+  tokenType: z.string().min(1).optional(),
+});
+
+// Mailchimp Marketing API: server prefix (e.g. "us1") is required because the
+// Mailchimp REST host is region-pinned (https://<dc>.api.mailchimp.com/3.0/).
+// Mailchimp API keys carry a trailing "-<dc>" suffix; we accept the prefix as
+// an explicit field so callers can paste the key as-is and have us derive it.
+export const mailchimpApiKeyConfigSchema = z.object({
+  apiKey: z.string().min(1).max(128),
+  dataCenter: z
+    .string()
+    .min(1)
+    .max(16)
+    .regex(/^[a-z]{2}\d+$/, { message: 'dataCenter must be like "us1", "eu2", etc.' }),
+});
+
+// Calendly v2 uses long-lived Personal Access Tokens. No refresh.
+export const calendlyApiKeyConfigSchema = z.object({
+  apiKey: z.string().min(1).max(512),
+});
+
+// Postgres: full libpq-compatible connection string (postgresql:// or postgres://).
+// Stored encrypted via libsodium; never logged.
+const POSTGRES_URL_REGEX = /^postgres(ql)?:\/\//;
+export const postgresCustomConfigSchema = z.object({
+  connectionString: z.string().min(1).max(2048).regex(POSTGRES_URL_REGEX, {
+    message: 'connectionString must start with postgres:// or postgresql://',
+  }),
+});
+
+// MySQL: full mysql:// or mysql2:// connection string.
+const MYSQL_URL_REGEX = /^mysql\d?:\/\//;
+export const mysqlCustomConfigSchema = z.object({
+  connectionString: z
+    .string()
+    .min(1)
+    .max(2048)
+    .regex(MYSQL_URL_REGEX, { message: 'connectionString must start with mysql:// or mysql2://' }),
+});
+
+// S3-compatible: AWS S3 plus R2/MinIO/etc. via custom endpoint URL. forcePathStyle
+// is required for MinIO and some R2 setups; default false for true AWS S3.
+export const s3CustomConfigSchema = z.object({
+  accessKeyId: z.string().min(1).max(128),
+  secretAccessKey: z.string().min(1).max(256),
+  region: z.string().min(1).max(64),
+  endpoint: z.string().min(1).max(512).url({ message: 'endpoint must be a valid URL' }).optional(),
+  forcePathStyle: z.boolean().optional(),
+});
+
 export type GoogleOAuth2Config = z.infer<typeof googleOAuth2ConfigSchema>;
 export type MicrosoftOAuth2Config = z.infer<typeof microsoftOAuth2ConfigSchema>;
 export type SlackOAuth2Config = z.infer<typeof slackOAuth2ConfigSchema>;
@@ -175,6 +232,12 @@ export type AirtableApiKeyConfig = z.infer<typeof airtableApiKeyConfigSchema>;
 export type LinearApiKeyConfig = z.infer<typeof linearApiKeyConfigSchema>;
 export type GitHubApiKeyConfig = z.infer<typeof githubApiKeyConfigSchema>;
 export type OllamaConfig = z.infer<typeof ollamaConfigSchema>;
+export type HubspotOAuth2Config = z.infer<typeof hubspotOAuth2ConfigSchema>;
+export type MailchimpApiKeyConfig = z.infer<typeof mailchimpApiKeyConfigSchema>;
+export type CalendlyApiKeyConfig = z.infer<typeof calendlyApiKeyConfigSchema>;
+export type PostgresCustomConfig = z.infer<typeof postgresCustomConfigSchema>;
+export type MysqlCustomConfig = z.infer<typeof mysqlCustomConfigSchema>;
+export type S3CustomConfig = z.infer<typeof s3CustomConfigSchema>;
 
 export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.GOOGLE]: googleOAuth2ConfigSchema,
@@ -193,6 +256,12 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.LINEAR]: linearApiKeyConfigSchema,
   [ConnectionProvider.GITHUB]: githubApiKeyConfigSchema,
   [ConnectionProvider.OLLAMA]: ollamaConfigSchema,
+  [ConnectionProvider.HUBSPOT]: hubspotOAuth2ConfigSchema,
+  [ConnectionProvider.MAILCHIMP]: mailchimpApiKeyConfigSchema,
+  [ConnectionProvider.CALENDLY]: calendlyApiKeyConfigSchema,
+  [ConnectionProvider.POSTGRES]: postgresCustomConfigSchema,
+  [ConnectionProvider.MYSQL]: mysqlCustomConfigSchema,
+  [ConnectionProvider.S3]: s3CustomConfigSchema,
 } as const;
 
 export type ProviderConfigMap = {
@@ -212,4 +281,10 @@ export type ProviderConfigMap = {
   linear: LinearApiKeyConfig;
   github: GitHubApiKeyConfig;
   ollama: OllamaConfig;
+  hubspot: HubspotOAuth2Config;
+  mailchimp: MailchimpApiKeyConfig;
+  calendly: CalendlyApiKeyConfig;
+  postgres: PostgresCustomConfig;
+  mysql: MysqlCustomConfig;
+  s3: S3CustomConfig;
 };

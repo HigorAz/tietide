@@ -70,6 +70,25 @@ import { OpenaiClientFactory } from '../nodes/connectors/openai/openai-client.fa
 import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-chat-completion';
 import { OllamaClientFactory } from '../nodes/connectors/ollama/ollama-client.factory';
 import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
+import { HubspotClientFactory } from '../nodes/connectors/hubspot/hubspot-client.factory';
+import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-create-contact';
+import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
+import { StripeClientFactory } from '../nodes/connectors/stripe/stripe-client.factory';
+import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
+import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
+import { MailchimpClientFactory } from '../nodes/connectors/mailchimp/mailchimp-client.factory';
+import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
+import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
+import { CalendlyClientFactory } from '../nodes/connectors/calendly/calendly-client.factory';
+import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
+import { PostgresClientFactory } from '../nodes/connectors/postgres/postgres-client.factory';
+import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
+import { MysqlClientFactory } from '../nodes/connectors/mysql/mysql-client.factory';
+import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
+import { S3ClientFactory } from '../nodes/connectors/s3/s3-client.factory';
+import { S3UploadFileAction } from '../nodes/connectors/s3/s3-upload-file';
+import { TrelloAddCommentAction } from '../nodes/connectors/trello/trello-add-comment';
+import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update-card';
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
@@ -81,6 +100,10 @@ import {
   DiscordMessageReceivedPassthrough,
   TelegramMessageReceivedPassthrough,
   TwilioSmsReceivedPassthrough,
+  HubspotContactChangedPassthrough,
+  MailchimpSubscriberAddedPassthrough,
+  CalendlyEventScheduledPassthrough,
+  TrelloCardChangedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -148,6 +171,25 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     OpenaiChatCompletionAction,
     OllamaClientFactory,
     OllamaGenerateAction,
+    HubspotClientFactory,
+    HubspotCreateContactAction,
+    HubspotCreateDealAction,
+    StripeClientFactory,
+    StripeCreateCustomerAction,
+    StripeListChargesAction,
+    MailchimpClientFactory,
+    MailchimpAddSubscriberAction,
+    MailchimpSendCampaignAction,
+    CalendlyClientFactory,
+    CalendlyListEventsAction,
+    PostgresClientFactory,
+    PostgresRunQueryAction,
+    MysqlClientFactory,
+    MysqlRunQueryAction,
+    S3ClientFactory,
+    S3UploadFileAction,
+    TrelloAddCommentAction,
+    TrelloUpdateCardAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
     OutlookMessageReceivedPassthrough,
@@ -158,6 +200,10 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     DiscordMessageReceivedPassthrough,
     TelegramMessageReceivedPassthrough,
     TwilioSmsReceivedPassthrough,
+    HubspotContactChangedPassthrough,
+    MailchimpSubscriberAddedPassthrough,
+    CalendlyEventScheduledPassthrough,
+    TrelloCardChangedPassthrough,
     GmailMessageReceivedExecutor,
     ExcelRowAddedTrigger,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
@@ -224,6 +270,22 @@ export class EngineModule implements OnModuleInit {
     private readonly claudeMessages: ClaudeMessagesAction,
     private readonly openaiChatCompletion: OpenaiChatCompletionAction,
     private readonly ollamaGenerate: OllamaGenerateAction,
+    private readonly hubspotCreateContact: HubspotCreateContactAction,
+    private readonly hubspotCreateDeal: HubspotCreateDealAction,
+    private readonly stripeCreateCustomer: StripeCreateCustomerAction,
+    private readonly stripeListCharges: StripeListChargesAction,
+    private readonly mailchimpAddSubscriber: MailchimpAddSubscriberAction,
+    private readonly mailchimpSendCampaign: MailchimpSendCampaignAction,
+    private readonly calendlyListEvents: CalendlyListEventsAction,
+    private readonly postgresRunQuery: PostgresRunQueryAction,
+    private readonly mysqlRunQuery: MysqlRunQueryAction,
+    private readonly s3UploadFile: S3UploadFileAction,
+    private readonly trelloAddComment: TrelloAddCommentAction,
+    private readonly trelloUpdateCard: TrelloUpdateCardAction,
+    private readonly hubspotContactChanged: HubspotContactChangedPassthrough,
+    private readonly mailchimpSubscriberAdded: MailchimpSubscriberAddedPassthrough,
+    private readonly calendlyEventScheduled: CalendlyEventScheduledPassthrough,
+    private readonly trelloCardChanged: TrelloCardChangedPassthrough,
   ) {}
 
   onModuleInit(): void {
@@ -282,5 +344,21 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.claudeMessages);
     this.registry.register(this.openaiChatCompletion);
     this.registry.register(this.ollamaGenerate);
+    this.registry.register(this.hubspotCreateContact);
+    this.registry.register(this.hubspotCreateDeal);
+    this.registry.register(this.stripeCreateCustomer);
+    this.registry.register(this.stripeListCharges);
+    this.registry.register(this.mailchimpAddSubscriber);
+    this.registry.register(this.mailchimpSendCampaign);
+    this.registry.register(this.calendlyListEvents);
+    this.registry.register(this.postgresRunQuery);
+    this.registry.register(this.mysqlRunQuery);
+    this.registry.register(this.s3UploadFile);
+    this.registry.register(this.trelloAddComment);
+    this.registry.register(this.trelloUpdateCard);
+    this.registry.register(this.hubspotContactChanged);
+    this.registry.register(this.mailchimpSubscriberAdded);
+    this.registry.register(this.calendlyEventScheduled);
+    this.registry.register(this.trelloCardChanged);
   }
 }

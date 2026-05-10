@@ -24,6 +24,7 @@ describe('OAuthProviderRegistry', () => {
       makeProvider('microsoft') as never,
       makeProvider('slack') as never,
       makeProvider('notion') as never,
+      makeProvider('hubspot') as never,
     );
   });
 
@@ -32,6 +33,7 @@ describe('OAuthProviderRegistry', () => {
     expect(registry.get('microsoft').id).toBe('microsoft');
     expect(registry.get('slack').id).toBe('slack');
     expect(registry.get('notion').id).toBe('notion');
+    expect(registry.get('hubspot').id).toBe('hubspot');
   });
 
   it('throws BadRequestException for an unknown provider', () => {
@@ -44,6 +46,6 @@ describe('OAuthProviderRegistry', () => {
         .list()
         .map((p) => p.id)
         .sort(),
-    ).toEqual(['google', 'microsoft', 'notion', 'slack']);
+    ).toEqual(['google', 'hubspot', 'microsoft', 'notion', 'slack']);
   });
 });

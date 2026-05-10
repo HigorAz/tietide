@@ -12,6 +12,13 @@ import trelloIcon from '@/assets/providers/trello.svg';
 import airtableIcon from '@/assets/providers/airtable.svg';
 import linearIcon from '@/assets/providers/linear.svg';
 import githubIcon from '@/assets/providers/github.svg';
+import hubspotIcon from '@/assets/providers/hubspot.svg';
+import stripeIcon from '@/assets/providers/stripe.svg';
+import mailchimpIcon from '@/assets/providers/mailchimp.svg';
+import calendlyIcon from '@/assets/providers/calendly.svg';
+import postgresIcon from '@/assets/providers/postgres.svg';
+import mysqlIcon from '@/assets/providers/mysql.svg';
+import s3Icon from '@/assets/providers/s3.svg';
 
 export interface ProviderEntry {
   id: ConnectionProvider;
@@ -104,6 +111,48 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     label: 'GitHub',
     type: ConnectionType.API_KEY,
     iconUrl: githubIcon,
+  },
+  {
+    id: ConnectionProvider.HUBSPOT,
+    label: 'HubSpot',
+    type: ConnectionType.OAUTH2,
+    iconUrl: hubspotIcon,
+  },
+  {
+    id: ConnectionProvider.STRIPE,
+    label: 'Stripe',
+    type: ConnectionType.API_KEY,
+    iconUrl: stripeIcon,
+  },
+  {
+    id: ConnectionProvider.MAILCHIMP,
+    label: 'Mailchimp',
+    type: ConnectionType.API_KEY,
+    iconUrl: mailchimpIcon,
+  },
+  {
+    id: ConnectionProvider.CALENDLY,
+    label: 'Calendly',
+    type: ConnectionType.API_KEY,
+    iconUrl: calendlyIcon,
+  },
+  {
+    id: ConnectionProvider.POSTGRES,
+    label: 'Postgres',
+    type: ConnectionType.CUSTOM,
+    iconUrl: postgresIcon,
+  },
+  {
+    id: ConnectionProvider.MYSQL,
+    label: 'MySQL',
+    type: ConnectionType.CUSTOM,
+    iconUrl: mysqlIcon,
+  },
+  {
+    id: ConnectionProvider.S3,
+    label: 'S3 / R2 / MinIO',
+    type: ConnectionType.CUSTOM,
+    iconUrl: s3Icon,
   },
 ] as const;
 
