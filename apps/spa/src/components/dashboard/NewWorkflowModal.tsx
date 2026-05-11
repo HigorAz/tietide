@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { NodeType, type WorkflowDefinition } from '@tietide/shared';
+import type { WorkflowDefinition } from '@tietide/shared';
 import type { CreateWorkflowBody } from '@/api/workflows';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
@@ -23,15 +23,7 @@ const newWorkflowSchema = z.object({
 type NewWorkflowFormValues = z.infer<typeof newWorkflowSchema>;
 
 const buildStarterDefinition = (): WorkflowDefinition => ({
-  nodes: [
-    {
-      id: 'trigger-1',
-      type: NodeType.MANUAL_TRIGGER,
-      name: 'Manual Trigger',
-      position: { x: 0, y: 0 },
-      config: {},
-    },
-  ],
+  nodes: [],
   edges: [],
 });
 

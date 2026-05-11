@@ -91,13 +91,14 @@ describe('Canvas', () => {
   });
 
   describe('viewport configuration', () => {
-    it('should pass fitView with padding 0.4 and minZoom 0.5 to React Flow', () => {
+    it('should pass fitView with padding 1.2, minZoom 0.5, maxZoom 0.85 to React Flow', () => {
       render(<Canvas />);
       expect(lastReactFlowProps.current).not.toBeNull();
       expect(lastReactFlowProps.current?.fitView).toBe(true);
       expect(lastReactFlowProps.current?.fitViewOptions).toEqual({
-        padding: 0.4,
+        padding: 1.2,
         minZoom: 0.5,
+        maxZoom: 0.85,
       });
     });
   });

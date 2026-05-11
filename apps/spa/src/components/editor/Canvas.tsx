@@ -18,7 +18,7 @@ import { InspectorDock } from './InspectorDock';
 import { nodeTypes } from './nodes';
 import { NODE_LIBRARY_DRAG_MIME } from './NodeLibrary';
 
-const FIT_VIEW_OPTIONS = { padding: 0.4, minZoom: 0.5 } as const;
+const FIT_VIEW_OPTIONS = { padding: 1.2, minZoom: 0.5, maxZoom: 0.85 } as const;
 const MULTI_SELECT_KEYS = ['Meta', 'Control', 'Shift'] as const;
 
 export const CANVAS_DROP_MIME = NODE_LIBRARY_DRAG_MIME;
@@ -51,6 +51,7 @@ export function Canvas() {
   const onConnect = useEditorStore((s) => s.onConnect);
   const addNode = useEditorStore((s) => s.addNode);
   const selectNode = useEditorStore((s) => s.selectNode);
+  const deleteSelected = useEditorStore((s) => s.deleteSelected);
   const pasteFromClipboardPayload = useEditorStore((s) => s.pasteFromClipboardPayload);
   const showToast = useToastStore((s) => s.show);
   const { screenToFlowPosition } = useReactFlow();
@@ -95,9 +96,14 @@ export function Canvas() {
       const nodeType = event.dataTransfer.getData(CANVAS_DROP_MIME);
       if (!nodeType) return;
       const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+      const beforeCount = useEditorStore.getState().nodes.length;
       addNode(nodeType as NodeType, position);
+      const afterCount = useEditorStore.getState().nodes.length;
+      if (afterCount === beforeCount) {
+        showToast({ tone: 'error', message: 'Workflows can only have one trigger.' });
+      }
     },
-    [addNode, screenToFlowPosition],
+    [addNode, screenToFlowPosition, showToast],
   );
 
   const buildSelectedJson = useCallback((): string => {
@@ -111,10 +117,19 @@ export function Canvas() {
       try {
         const payload = parseClipboardPayload(text);
         const ids = pasteFromClipboardPayload(payload);
-        showToast({
-          tone: 'success',
-          message: `Pasted ${ids.length} node${ids.length === 1 ? '' : 's'}`,
-        });
+        const skipped = payload.nodes.length - ids.length;
+        if (skipped > 0) {
+          showToast({
+            tone: 'warning',
+            message: `Skipped ${skipped} trigger node${skipped === 1 ? '' : 's'} — workflow already has a trigger.`,
+          });
+        }
+        if (ids.length > 0) {
+          showToast({
+            tone: 'success',
+            message: `Pasted ${ids.length} node${ids.length === 1 ? '' : 's'}`,
+          });
+        }
         return undefined;
       } catch (err) {
         if (err instanceof ClipboardFormatError) return err.message;
@@ -153,21 +168,29 @@ export function Canvas() {
 
   useEffect(() => {
     const handler = (event: KeyboardEvent): void => {
-      if (!(event.metaKey || event.ctrlKey)) return;
       if (isEditableTarget(event.target)) return;
-      const key = event.key.toLowerCase();
-      if (key === 'c') {
+      if (event.metaKey || event.ctrlKey) {
+        const key = event.key.toLowerCase();
+        if (key === 'c') {
+          event.preventDefault();
+          void runCopy();
+        } else if (key === 'v') {
+          event.preventDefault();
+          void runPaste();
+        }
+        return;
+      }
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        const hasSelection = useEditorStore.getState().nodes.some((n) => n.selected === true);
+        if (!hasSelection) return;
         event.preventDefault();
-        void runCopy();
-      } else if (key === 'v') {
-        event.preventDefault();
-        void runPaste();
+        deleteSelected();
       }
     };
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [runCopy, runPaste]);
+  }, [runCopy, runPaste, deleteSelected]);
 
   const handlePaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
@@ -242,16 +265,29 @@ export function Canvas() {
           </span>
         </div>
       )}
+      {!isDragActive && nodes.length === 0 && (
+        <div
+          aria-hidden
+          data-testid="canvas-empty-hint"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center"
+        >
+          <span className="rounded-md border border-white/5 bg-deep-blue/70 px-4 py-2 text-sm font-medium text-text-secondary shadow-sm">
+            Drag a trigger from the Node Library to start.
+          </span>
+        </div>
+      )}
       <EditorContextMenu
         open={menu.open}
         x={menu.x}
         y={menu.y}
         canCopy={hasSelection}
+        canDelete={hasSelection}
         onClose={closeMenu}
         onCopy={() => void runCopy()}
         onPaste={() => void runPaste()}
         onCopyAsJson={() => setDialog({ open: true, mode: 'copy', json: buildSelectedJson() })}
         onPasteFromJson={() => setDialog({ open: true, mode: 'paste', json: '' })}
+        onDelete={() => deleteSelected()}
       />
       <ClipboardJsonDialog
         open={dialog.open}
