@@ -138,7 +138,7 @@ describe('DemoService', () => {
       }
     });
 
-    it('should generate per-user webhook paths to avoid global collisions', async () => {
+    it('should generate cryptographically random webhook path suffixes (not derived from userId)', async () => {
       prisma.workflow.findFirst.mockResolvedValue(null);
       prisma.workflow.create.mockImplementation(({ data }: { data: { name: string } }) =>
         Promise.resolve(baseWorkflow({ id: `wf-${data.name}`, name: data.name })),
@@ -152,8 +152,36 @@ describe('DemoService', () => {
 
       for (const call of prisma.webhook.create.mock.calls) {
         const path = call[0].data.path as string;
-        // Per-user prefix prevents two users from claiming the same path
-        expect(path).toContain(userId.slice(0, 8));
+        expect(path).toMatch(/-[a-f0-9]{8}$/);
+        expect(path).not.toContain(userId.slice(0, 8));
+      }
+    });
+
+    it('should not collide on path between two users whose userIds share the first 8 chars', async () => {
+      const sharedPrefix = 'aaaaaaaa';
+      const userA = `${sharedPrefix}-1111-2222-3333-444444444444`;
+      const userB = `${sharedPrefix}-5555-6666-7777-888888888888`;
+
+      prisma.workflow.findFirst.mockResolvedValue(null);
+      prisma.workflow.create.mockImplementation(({ data }: { data: { name: string } }) =>
+        Promise.resolve(baseWorkflow({ id: `wf-${data.name}`, name: data.name })),
+      );
+      prisma.webhook.findFirst.mockResolvedValue(null);
+      prisma.webhook.create.mockImplementation(({ data }: { data: { path: string } }) =>
+        Promise.resolve({ id: `hk-${data.path}`, path: data.path }),
+      );
+
+      await service.seedForUser(userA);
+      const pathsA = prisma.webhook.create.mock.calls.map((c) => c[0].data.path as string);
+
+      prisma.webhook.create.mockClear();
+      await service.seedForUser(userB);
+      const pathsB = prisma.webhook.create.mock.calls.map((c) => c[0].data.path as string);
+
+      expect(pathsA.length).toBeGreaterThan(0);
+      expect(pathsA.length).toBe(pathsB.length);
+      for (let i = 0; i < pathsA.length; i++) {
+        expect(pathsA[i]).not.toBe(pathsB[i]);
       }
     });
 
