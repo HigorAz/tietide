@@ -50,10 +50,11 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().isDirty).toBe(false);
     });
 
-    it('should be a no-op when the node type is in FORBIDDEN_NODE_TYPES (e.g. code)', () => {
+    it('should add a code node now that the sandboxed executor is shipped', () => {
       useEditorStore.getState().addNode(NodeType.CODE, { x: 0, y: 0 });
-      expect(useEditorStore.getState().nodes).toHaveLength(0);
-      expect(useEditorStore.getState().isDirty).toBe(false);
+      expect(useEditorStore.getState().nodes).toHaveLength(1);
+      expect(useEditorStore.getState().nodes[0].data.nodeType).toBe(NodeType.CODE);
+      expect(useEditorStore.getState().isDirty).toBe(true);
     });
 
     it('should create a sticky node with React Flow type="sticky" and default config', () => {

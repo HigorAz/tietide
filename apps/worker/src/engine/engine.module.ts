@@ -1,5 +1,6 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { HttpRequestAction } from '../nodes/actions/http-request';
+import { CodeAction } from '../nodes/actions/code';
 import { Conditional } from '../nodes/logic/conditional';
 import { IteratorNode } from '../nodes/logic/iterator';
 import { ReturnNode } from '../nodes/logic/return';
@@ -118,6 +119,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     CronTrigger,
     WebhookTrigger,
     HttpRequestAction,
+    CodeAction,
     Conditional,
     ReturnNode,
     IteratorNode,
@@ -219,6 +221,7 @@ export class EngineModule implements OnModuleInit {
     private readonly cronTrigger: CronTrigger,
     private readonly webhookTrigger: WebhookTrigger,
     private readonly httpRequest: HttpRequestAction,
+    private readonly codeAction: CodeAction,
     private readonly conditional: Conditional,
     private readonly returnNode: ReturnNode,
     private readonly iteratorNode: IteratorNode,
@@ -293,6 +296,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.cronTrigger);
     this.registry.register(this.webhookTrigger);
     this.registry.register(this.httpRequest);
+    this.registry.register(this.codeAction);
     this.registry.register(this.conditional);
     this.registry.register(this.returnNode);
     this.registry.register(this.iteratorNode);

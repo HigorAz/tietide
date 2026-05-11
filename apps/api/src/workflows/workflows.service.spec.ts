@@ -190,22 +190,25 @@ describe('WorkflowsService', () => {
       );
     });
 
-    it('should reject definitions containing a "code" node with UnprocessableEntityException', async () => {
+    it('should accept definitions containing a "code" node now that the sandboxed executor is registered', async () => {
+      prisma.workflow.create.mockResolvedValue(persisted);
       const definitionWithCode = {
-        ...validDefinition,
         nodes: [
           ...validDefinition.nodes,
-          { id: 'n2', type: 'code', name: 'Run JS', position: { x: 100, y: 0 }, config: {} },
+          {
+            id: 'n2',
+            type: 'code',
+            name: 'Run JS',
+            position: { x: 100, y: 0 },
+            config: { code: 'return input;', language: 'javascript' },
+          },
         ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
-      await expect(
-        service.create(userId, { name: 'Demo', definition: definitionWithCode }),
-      ).rejects.toThrow(UnprocessableEntityException);
+      await service.create(userId, { name: 'Demo', definition: definitionWithCode });
 
-      expect(prisma.workflow.create).not.toHaveBeenCalled();
-      expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
-      expect(audit.log).not.toHaveBeenCalled();
+      expect(prisma.workflow.create).toHaveBeenCalled();
     });
 
     describe('topology validation', () => {
@@ -635,21 +638,24 @@ describe('WorkflowsService', () => {
       );
     });
 
-    it('should reject definitions containing a "code" node with UnprocessableEntityException', async () => {
+    it('should accept definitions containing a "code" node now that the sandboxed executor is registered', async () => {
       const definitionWithCode = {
-        ...validDefinition,
         nodes: [
           ...validDefinition.nodes,
-          { id: 'n2', type: 'code', name: 'Run JS', position: { x: 100, y: 0 }, config: {} },
+          {
+            id: 'n2',
+            type: 'code',
+            name: 'Run JS',
+            position: { x: 100, y: 0 },
+            config: { code: 'return input;', language: 'javascript' },
+          },
         ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
-      await expect(
-        service.update(userId, workflowId, { definition: definitionWithCode }),
-      ).rejects.toThrow(UnprocessableEntityException);
+      await service.update(userId, workflowId, { definition: definitionWithCode });
 
-      expect(prisma.workflow.update).not.toHaveBeenCalled();
-      expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+      expect(prisma.workflow.update).toHaveBeenCalled();
     });
 
     describe('topology validation', () => {
