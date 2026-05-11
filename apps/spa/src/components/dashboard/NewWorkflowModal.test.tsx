@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { NodeType } from '@tietide/shared';
 import { NewWorkflowModal } from './NewWorkflowModal';
 
 describe('NewWorkflowModal', () => {
@@ -30,7 +29,7 @@ describe('NewWorkflowModal', () => {
     expect(onCreate).not.toHaveBeenCalled();
   });
 
-  it('should call onCreate with a starter manual-trigger definition on valid submit', async () => {
+  it('should call onCreate with an empty starter definition on valid submit', async () => {
     const user = userEvent.setup();
     onCreate.mockResolvedValueOnce(undefined);
     render(<NewWorkflowModal onClose={onClose} onCreate={onCreate} />);
@@ -43,8 +42,7 @@ describe('NewWorkflowModal', () => {
     const [arg] = onCreate.mock.calls[0];
     expect(arg.name).toBe('Invoice Automation');
     expect(arg.description).toBe('Sends invoices nightly');
-    expect(arg.definition.nodes).toHaveLength(1);
-    expect(arg.definition.nodes[0].type).toBe(NodeType.MANUAL_TRIGGER);
+    expect(arg.definition.nodes).toEqual([]);
     expect(arg.definition.edges).toEqual([]);
   });
 

@@ -10,11 +10,13 @@ const renderMenu = (overrides: Partial<React.ComponentProps<typeof EditorContext
     x: 100,
     y: 100,
     canCopy: true,
+    canDelete: true,
     onClose: vi.fn(),
     onCopy: vi.fn(),
     onPaste: vi.fn(),
     onCopyAsJson: vi.fn(),
     onPasteFromJson: vi.fn(),
+    onDelete: vi.fn(),
     ...overrides,
   };
   const utils = render(<EditorContextMenu {...props} />);
@@ -23,12 +25,18 @@ const renderMenu = (overrides: Partial<React.ComponentProps<typeof EditorContext
 
 describe('EditorContextMenu', () => {
   describe('rendering', () => {
-    it('should render four items: Copy, Paste, Copy as JSON, Paste from JSON', () => {
+    it('should render five items: Copy, Paste, Copy as JSON, Paste from JSON, Delete', () => {
       renderMenu();
       expect(screen.getByRole('menuitem', { name: 'Copy' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Paste' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Copy as JSON' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Paste from JSON' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+    });
+
+    it('should disable Delete when canDelete is false', () => {
+      renderMenu({ canDelete: false });
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeDisabled();
     });
 
     it('should render nothing when open is false', () => {
@@ -94,6 +102,26 @@ describe('EditorContextMenu', () => {
 
       expect(onCopy).not.toHaveBeenCalled();
     });
+
+    it('should call onDelete and then onClose when the Delete item is clicked', () => {
+      const onDelete = vi.fn();
+      const onClose = vi.fn();
+      renderMenu({ onDelete, onClose });
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+
+      expect(onDelete).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not call onDelete when the disabled Delete item is clicked', () => {
+      const onDelete = vi.fn();
+      renderMenu({ canDelete: false, onDelete });
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+
+      expect(onDelete).not.toHaveBeenCalled();
+    });
   });
 
   describe('dismissal', () => {
@@ -115,11 +143,13 @@ describe('EditorContextMenu', () => {
             x={0}
             y={0}
             canCopy
+            canDelete
             onClose={onClose}
             onCopy={noop}
             onPaste={noop}
             onCopyAsJson={noop}
             onPasteFromJson={noop}
+            onDelete={noop}
           />
           <div data-testid="outside" />
         </>,
