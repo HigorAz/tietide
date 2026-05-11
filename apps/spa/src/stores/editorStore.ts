@@ -116,6 +116,14 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       const def = NODE_CATALOG.find((d) => d.type === nodeType);
       if (!def) return;
 
+      if (def.category === NodeCategory.TRIGGER) {
+        const hasTrigger = get().nodes.some((n) => {
+          const cat = NODE_CATALOG.find((d) => d.type === n.data.nodeType)?.category;
+          return cat === NodeCategory.TRIGGER;
+        });
+        if (hasTrigger) return;
+      }
+
       const isSticky = nodeType === NodeType.STICKY;
       const newNode: Node<CustomNodeData> = {
         id: generateNodeId(),
@@ -280,7 +288,29 @@ export const useEditorStore = create<EditorStore>((set, get) => {
 
     pasteFromClipboardPayload: (payload) => {
       const prev = get();
-      const { nodes: newNodes, edges: newEdges } = remapClipboardIds(payload);
+
+      const isTriggerType = (nodeType: string): boolean => {
+        return NODE_CATALOG.find((d) => d.type === nodeType)?.category === NodeCategory.TRIGGER;
+      };
+      const hasTrigger = prev.nodes.some((n) => isTriggerType(n.data.nodeType));
+
+      let filteredPayload = payload;
+      if (hasTrigger) {
+        const droppedIds = new Set(
+          payload.nodes.filter((n) => isTriggerType(n.data.nodeType)).map((n) => n.id),
+        );
+        if (droppedIds.size > 0) {
+          filteredPayload = {
+            ...payload,
+            nodes: payload.nodes.filter((n) => !droppedIds.has(n.id)),
+            edges: payload.edges.filter(
+              (e) => !droppedIds.has(e.source) && !droppedIds.has(e.target),
+            ),
+          };
+        }
+      }
+
+      const { nodes: newNodes, edges: newEdges } = remapClipboardIds(filteredPayload);
       if (newNodes.length === 0) return [];
 
       const deselected = prev.nodes.map((n) => (n.selected ? { ...n, selected: false } : n));

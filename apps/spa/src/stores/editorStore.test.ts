@@ -57,6 +57,32 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().isDirty).toBe(true);
     });
 
+    it('should refuse to add a second trigger when one already exists', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      expect(useEditorStore.getState().nodes).toHaveLength(1);
+
+      addNode(NodeType.CRON_TRIGGER, { x: 50, y: 50 });
+
+      const nodes = useEditorStore.getState().nodes;
+      expect(nodes).toHaveLength(1);
+      expect(nodes[0].data.nodeType).toBe(NodeType.MANUAL_TRIGGER);
+    });
+
+    it('should allow adding a trigger after the existing one is deleted', () => {
+      const { addNode, onNodesChange, deleteSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const id = useEditorStore.getState().nodes[0].id;
+      onNodesChange([{ id, type: 'select', selected: true }]);
+      deleteSelected();
+      expect(useEditorStore.getState().nodes).toHaveLength(0);
+
+      addNode(NodeType.CRON_TRIGGER, { x: 0, y: 0 });
+
+      expect(useEditorStore.getState().nodes).toHaveLength(1);
+      expect(useEditorStore.getState().nodes[0].data.nodeType).toBe(NodeType.CRON_TRIGGER);
+    });
+
     it('should create a sticky node with React Flow type="sticky" and default config', () => {
       useEditorStore.getState().addNode(NodeType.STICKY, { x: 50, y: 60 });
 
@@ -374,10 +400,10 @@ describe('editorStore', () => {
   });
 
   describe('duplicateSelected', () => {
-    it('should append a copy of every selected node with fresh ids', () => {
+    it('should append a copy of every selected non-trigger node with fresh ids', () => {
       const { addNode, onNodesChange, duplicateSelected } = useEditorStore.getState();
-      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
-      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.CONDITIONAL, { x: 100, y: 0 });
       const originalIds = useEditorStore.getState().nodes.map((n) => n.id);
       onNodesChange(originalIds.map((id) => ({ id, type: 'select', selected: true })));
 
@@ -392,8 +418,8 @@ describe('editorStore', () => {
 
     it('should also copy inter-edges between selected nodes', () => {
       const { addNode, onNodesChange, onConnect, duplicateSelected } = useEditorStore.getState();
-      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
-      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      addNode(NodeType.CONDITIONAL, { x: 100, y: 0 });
       const [source, target] = useEditorStore.getState().nodes;
       onConnect({
         source: source.id,
@@ -409,6 +435,18 @@ describe('editorStore', () => {
       duplicateSelected();
 
       expect(useEditorStore.getState().edges).toHaveLength(2);
+    });
+
+    it('should strip trigger duplicates when the workflow already has a trigger', () => {
+      const { addNode, onNodesChange, duplicateSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const triggerId = useEditorStore.getState().nodes[0].id;
+      onNodesChange([{ id: triggerId, type: 'select', selected: true }]);
+
+      const created = duplicateSelected();
+
+      expect(created).toEqual([]);
+      expect(useEditorStore.getState().nodes).toHaveLength(1);
     });
 
     it('should select only the freshly duplicated nodes', () => {
@@ -555,13 +593,32 @@ describe('editorStore', () => {
     it('should return the array of new node ids', () => {
       const { addNode } = useEditorStore.getState();
       addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
-      addNode(NodeType.CRON_TRIGGER, { x: 100, y: 0 });
+      addNode(NodeType.CONDITIONAL, { x: 100, y: 0 });
       const payload = buildPayloadFromCurrent();
 
       const ids = useEditorStore.getState().pasteFromClipboardPayload(payload);
 
       expect(ids).toHaveLength(2);
       ids.forEach((id) => expect(id).toMatch(/^node-/));
+    });
+
+    it('should strip trigger nodes from the payload when one trigger already exists', () => {
+      const { addNode } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      const payload = buildPayloadFromCurrent();
+
+      // Reset to a workflow that already has a trigger so the paste re-runs
+      // against state with a trigger present.
+      const ids = useEditorStore.getState().pasteFromClipboardPayload(payload);
+
+      // Trigger from the payload is dropped; only the HTTP_REQUEST is pasted.
+      expect(ids).toHaveLength(1);
+      const nodeTypesAfter = useEditorStore.getState().nodes.map((n) => n.data.nodeType);
+      const triggerCount = nodeTypesAfter.filter(
+        (t) => t === NodeType.MANUAL_TRIGGER || t === NodeType.CRON_TRIGGER,
+      ).length;
+      expect(triggerCount).toBe(1);
     });
 
     it('should set isDirty: true (AC #9)', () => {

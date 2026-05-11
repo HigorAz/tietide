@@ -73,8 +73,10 @@ describe('editorStore — history and workflow lifecycle', () => {
 
     it('should bound the past stack to 50 snapshots', () => {
       const { addNode } = useEditorStore.getState();
+      // HTTP_REQUEST is a non-trigger so the one-trigger guard does not reject
+      // later inserts.
       for (let i = 0; i < 55; i += 1) {
-        addNode(NodeType.MANUAL_TRIGGER, { x: i, y: 0 });
+        addNode(NodeType.HTTP_REQUEST, { x: i, y: 0 });
       }
 
       expect(useEditorStore.getState().past.length).toBe(50);

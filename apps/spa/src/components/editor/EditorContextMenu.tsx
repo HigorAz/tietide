@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Clipboard, ClipboardCopy, ClipboardPaste, Code2 } from 'lucide-react';
+import { Clipboard, ClipboardCopy, ClipboardPaste, Code2, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export interface EditorContextMenuProps {
@@ -7,11 +7,13 @@ export interface EditorContextMenuProps {
   x: number;
   y: number;
   canCopy: boolean;
+  canDelete: boolean;
   onClose: () => void;
   onCopy: () => void;
   onPaste: () => void;
   onCopyAsJson: () => void;
   onPasteFromJson: () => void;
+  onDelete: () => void;
 }
 
 interface ItemProps {
@@ -43,11 +45,13 @@ export function EditorContextMenu({
   x,
   y,
   canCopy,
+  canDelete,
   onClose,
   onCopy,
   onPaste,
   onCopyAsJson,
   onPasteFromJson,
+  onDelete,
 }: EditorContextMenuProps): React.ReactElement | null {
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -103,6 +107,13 @@ export function EditorContextMenu({
         label="Paste from JSON"
         icon={<Clipboard size={14} />}
         onClick={select(onPasteFromJson)}
+      />
+      <div className="my-1 h-px bg-white/10" />
+      <Item
+        label="Delete"
+        icon={<Trash2 size={14} />}
+        disabled={!canDelete}
+        onClick={select(onDelete)}
       />
     </div>
   );
