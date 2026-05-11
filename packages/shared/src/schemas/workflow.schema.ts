@@ -3,9 +3,10 @@ import { z } from 'zod';
 // Node types that exist in the SPA (form, icon, type) but have no executor in the
 // worker NodeRegistry. Workflow definitions referencing these are rejected at
 // save time so users cannot persist a workflow that the engine cannot run.
-// TODO(S13): replace with an allow-list keyed off NodeRegistry.types() once
-// the sandboxed `code` executor (CLAUDE.md §10) lands.
-export const FORBIDDEN_NODE_TYPES: ReadonlySet<string> = new Set(['code']);
+// Currently empty: the sandboxed `code` executor (CLAUDE.md §10) shipped, so
+// `code` is fully executable. Add a type here only if its SPA form is being
+// previewed before its worker executor lands.
+export const FORBIDDEN_NODE_TYPES: ReadonlySet<string> = new Set<string>();
 
 export const workflowNodeSchema = z.object({
   id: z.string().min(1),

@@ -68,7 +68,8 @@ describe('NodeLibrary', () => {
 
       const actions = screen.getByRole('region', { name: /actions/i });
       expect(within(actions).getByText('HTTP Request')).toBeInTheDocument();
-      expect(within(actions).queryAllByTestId('node-library-item')).toHaveLength(1);
+      expect(within(actions).getByText('Code')).toBeInTheDocument();
+      expect(within(actions).queryAllByTestId('node-library-item')).toHaveLength(2);
 
       const logic = screen.getByRole('region', { name: /^logic$/i });
       expect(within(logic).getByText('Conditional (IF)')).toBeInTheDocument();
@@ -82,10 +83,10 @@ describe('NodeLibrary', () => {
       expect(within(custom).queryAllByTestId('node-library-item')).toHaveLength(1);
     });
 
-    it('should not expose forbidden node types (Code) in the palette', async () => {
+    it('should expose the Code node now that its sandboxed executor is registered', async () => {
       const { NodeLibrary } = await importComponent();
       render(<NodeLibrary />);
-      expect(screen.queryByText('Code')).not.toBeInTheDocument();
+      expect(screen.getByText('Code')).toBeInTheDocument();
     });
 
     it('should render an icon and name on every item, with description in the title attribute', async () => {
@@ -95,7 +96,7 @@ describe('NodeLibrary', () => {
       // 3 triggers + 5 google triggers + 4 microsoft triggers
       // + 5 communication push triggers (slack ×2, discord, telegram, twilio)
       // + 5 commerce push triggers (stripe, hubspot, mailchimp, calendly, trello)
-      // + 1 generic action (http-request, code forbidden) + 4 logic
+      // + 2 generic actions (http-request, code) + 4 logic
       // + 4 Communication actions (Gmail × 2 + Outlook × 2)
       // + 7 Communication-pack actions (slack ×3, discord, twilio ×2, telegram)
       // + 9 Productivity-Google/Microsoft (Drive × 2 / Sheets × 2 / Docs /
@@ -105,8 +106,8 @@ describe('NodeLibrary', () => {
       // + 3 AI-pack actions (claude-messages, openai-chat-completion, ollama-generate)
       // + 12 Commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //     calendly, postgres, mysql, s3, trello ×2)
-      // + 1 Custom (Sticky) = 75.
-      expect(items).toHaveLength(75);
+      // + 1 Custom (Sticky) = 76.
+      expect(items).toHaveLength(76);
       items.forEach((item) => {
         expect(item.querySelector('svg')).toBeInTheDocument();
       });
@@ -179,7 +180,7 @@ describe('NodeLibrary', () => {
       await user.type(input, 'http');
       await user.clear(input);
 
-      expect(screen.getAllByTestId('node-library-item')).toHaveLength(75);
+      expect(screen.getAllByTestId('node-library-item')).toHaveLength(76);
     });
   });
 

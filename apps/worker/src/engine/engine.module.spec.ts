@@ -1,4 +1,5 @@
 import { HttpRequestAction } from '../nodes/actions/http-request';
+import { CodeAction } from '../nodes/actions/code';
 import { Conditional } from '../nodes/logic/conditional';
 import { IteratorNode } from '../nodes/logic/iterator';
 import { ReturnNode } from '../nodes/logic/return';
@@ -81,6 +82,7 @@ describe('EngineModule', () => {
     const cronTrigger = new CronTrigger();
     const webhookTrigger = new WebhookTrigger();
     const httpRequest = new HttpRequestAction();
+    const codeAction = new CodeAction();
     const conditional = new Conditional();
     const returnNode = new ReturnNode();
     const iteratorNode = new IteratorNode();
@@ -160,6 +162,7 @@ describe('EngineModule', () => {
       cronTrigger,
       webhookTrigger,
       httpRequest,
+      codeAction,
       conditional,
       returnNode,
       iteratorNode,
@@ -234,6 +237,7 @@ describe('EngineModule', () => {
       cronTrigger,
       webhookTrigger,
       httpRequest,
+      codeAction,
       conditional,
       returnNode,
       iteratorNode,
@@ -311,6 +315,7 @@ describe('EngineModule', () => {
       ['CronTrigger', 'cron-trigger', 'cronTrigger'],
       ['WebhookTrigger', 'webhook-trigger', 'webhookTrigger'],
       ['HttpRequestAction', 'http-request', 'httpRequest'],
+      ['CodeAction', 'code', 'codeAction'],
       ['Conditional', 'conditional', 'conditional'],
       ['ReturnNode', 'return', 'returnNode'],
       ['IteratorNode', 'iterator', 'iteratorNode'],
@@ -411,15 +416,15 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
       expect(counts.trigger).toBe(19);
       expect(counts.logic).toBe(4);
-      // 1 generic action (http-request) + 8 Google connector actions +
+      // 2 generic actions (http-request, code) + 8 Google connector actions +
       // 5 Microsoft connector actions +
       // 7 communication actions (slack ×3, discord, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 48.
-      expect(counts.action).toBe(48);
+      //   calendly, postgres, mysql, s3, trello ×2) = 49.
+      expect(counts.action).toBe(49);
     });
   });
 });
