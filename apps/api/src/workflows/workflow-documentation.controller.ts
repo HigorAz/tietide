@@ -22,11 +22,18 @@ import {
   ApiResponse,
   ApiServiceUnavailableResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import {
+  DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
+  DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
+  DEFAULT_THROTTLER_NAME,
+} from '../common/throttler/throttler.config';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
 import {
@@ -37,6 +44,13 @@ import {
 // Sunset date for the deprecated POST /workflows/:id/generate-docs alias.
 // Per CLAUDE.md §11, deprecated endpoints stay for at least one release.
 const LEGACY_SUNSET_HTTP_DATE = new Date('2026-07-04T00:00:00Z').toUTCString();
+
+const AI_DOCS_THROTTLE = {
+  [DEFAULT_THROTTLER_NAME]: {
+    ttl: DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
+    limit: DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
+  },
+} as const;
 
 @ApiTags('workflows')
 @ApiBearerAuth()
@@ -94,6 +108,7 @@ export class WorkflowDocumentationController {
   }
 
   @Post('documentation/regenerate')
+  @Throttle(AI_DOCS_THROTTLE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Regenerate AI documentation for a workflow',
@@ -106,6 +121,7 @@ export class WorkflowDocumentationController {
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   @ApiServiceUnavailableResponse({ description: 'AI service temporarily unavailable' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async regenerate(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
@@ -114,6 +130,7 @@ export class WorkflowDocumentationController {
   }
 
   @Post('generate-docs')
+  @Throttle(AI_DOCS_THROTTLE)
   @HttpCode(HttpStatus.OK)
   @Header('Deprecation', 'true')
   @Header('Sunset', LEGACY_SUNSET_HTTP_DATE)
@@ -130,6 +147,7 @@ export class WorkflowDocumentationController {
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   @ApiServiceUnavailableResponse({ description: 'AI service temporarily unavailable' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async generateLegacy(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,

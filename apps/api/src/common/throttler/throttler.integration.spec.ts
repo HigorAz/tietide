@@ -5,7 +5,13 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import request from 'supertest';
-import { DEFAULT_THROTTLER_NAME } from './throttler.config';
+import {
+  DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
+  DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
+  DEFAULT_THROTTLER_NAME,
+  DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
+  DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+} from './throttler.config';
 import { AppThrottlerModule } from './throttler.module';
 
 @Controller('test')
@@ -18,6 +24,28 @@ class TestController {
   @Post('auth')
   @Throttle({ [DEFAULT_THROTTLER_NAME]: { ttl: 60_000, limit: 3 } })
   auth(): { ok: true } {
+    return { ok: true };
+  }
+
+  @Post('execute')
+  @Throttle({
+    [DEFAULT_THROTTLER_NAME]: {
+      ttl: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+      limit: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
+    },
+  })
+  execute(): { ok: true } {
+    return { ok: true };
+  }
+
+  @Post('ai-docs')
+  @Throttle({
+    [DEFAULT_THROTTLER_NAME]: {
+      ttl: DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
+      limit: DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
+    },
+  })
+  aiDocs(): { ok: true } {
     return { ok: true };
   }
 
@@ -94,5 +122,33 @@ describe('AppThrottlerModule (integration)', () => {
     for (let i = 0; i < 20; i += 1) {
       await request(server).post(url).expect(201);
     }
+  });
+
+  it(`should block /test/execute after ${DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT} requests`, async () => {
+    const url = '/test/execute';
+    const server = app.getHttpServer();
+
+    for (let i = 0; i < DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT; i += 1) {
+      await request(server).post(url).expect(201);
+    }
+    const blocked = await request(server).post(url);
+    expect(blocked.status).toBe(429);
+  });
+
+  it(`should block /test/ai-docs after ${DEFAULT_AI_GENERATE_THROTTLE_LIMIT} requests`, async () => {
+    const url = '/test/ai-docs';
+    const server = app.getHttpServer();
+
+    for (let i = 0; i < DEFAULT_AI_GENERATE_THROTTLE_LIMIT; i += 1) {
+      await request(server).post(url).expect(201);
+    }
+    const blocked = await request(server).post(url);
+    expect(blocked.status).toBe(429);
+  });
+
+  it('should enforce stricter AI limit than execute limit', () => {
+    expect(DEFAULT_AI_GENERATE_THROTTLE_LIMIT).toBeLessThan(
+      DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
+    );
   });
 });
