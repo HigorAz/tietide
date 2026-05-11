@@ -20,16 +20,30 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiTags,
+  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { WorkflowDefinition } from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import {
+  DEFAULT_THROTTLER_NAME,
+  DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
+  DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+} from '../common/throttler/throttler.config';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { ExecutionsService } from './executions.service';
 import { TriggerExecutionDto } from './dto/trigger-execution.dto';
 import { TestExecutionDto } from './dto/test-execution.dto';
 import { ExecutionResponseDto } from './dto/execution-response.dto';
+
+const EXECUTE_THROTTLE = {
+  [DEFAULT_THROTTLER_NAME]: {
+    ttl: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+    limit: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
+  },
+} as const;
 
 @ApiTags('executions')
 @ApiBearerAuth()
@@ -40,6 +54,7 @@ export class ExecutionsController {
   constructor(private readonly executions: ExecutionsService) {}
 
   @Post('execute')
+  @Throttle(EXECUTE_THROTTLE)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Manually trigger a workflow execution' })
   @ApiAcceptedResponse({
@@ -49,6 +64,7 @@ export class ExecutionsController {
   @ApiBadRequestResponse({ description: 'Invalid input' })
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   @ApiHeader({
     name: 'Idempotency-Key',
     required: false,
@@ -69,6 +85,7 @@ export class ExecutionsController {
   }
 
   @Post('test')
+  @Throttle(EXECUTE_THROTTLE)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Run an in-memory workflow definition without persisting changes',
@@ -82,6 +99,7 @@ export class ExecutionsController {
   @ApiBadRequestResponse({ description: 'Invalid input' })
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async runTest(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
