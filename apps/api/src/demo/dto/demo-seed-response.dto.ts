@@ -16,7 +16,7 @@ export class SeededDemoWorkflowDto {
   @ApiProperty({ example: false, description: 'true when this fixture was already seeded earlier' })
   alreadyExisted!: boolean;
 
-  @ApiPropertyOptional({ example: 'webhook-demo-aaaaaaaa' })
+  @ApiPropertyOptional({ example: 'webhook-demo-a1b2c3d4' })
   webhookPath?: string;
 }
 
