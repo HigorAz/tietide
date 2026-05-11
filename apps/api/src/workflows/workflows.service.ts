@@ -60,6 +60,14 @@ function assertExecutableDefinition(definition: unknown): void {
     throw error;
   }
 
+  // Empty workflows are saved as drafts so users can pick a trigger from the
+  // sidebar without being forced to commit to one before the canvas opens.
+  // Topology (trigger count, no cycles, no dangling edges) is still enforced
+  // at execute/activate time by the Worker's topologicalSort.
+  if (parsed.nodes.length === 0) {
+    return;
+  }
+
   const topologyIssues = validateWorkflowTopology(parsed);
   if (topologyIssues.length > 0) {
     throw new UnprocessableEntityException({

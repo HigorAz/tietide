@@ -30,7 +30,11 @@ export const workflowEdgeSchema = z.object({
 });
 
 export const workflowDefinitionSchema = z.object({
-  nodes: z.array(workflowNodeSchema).min(1),
+  // Empty `nodes` is valid: new workflows are created as drafts so the user
+  // can pick a trigger from the sidebar instead of being committed to one
+  // before the canvas opens. Topology rules (trigger count, no cycles, no
+  // dangling edges) are enforced at execute/activate time, not at save time.
+  nodes: z.array(workflowNodeSchema),
   edges: z.array(workflowEdgeSchema),
 });
 

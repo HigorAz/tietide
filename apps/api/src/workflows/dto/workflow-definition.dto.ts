@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize,
   IsArray,
   IsNumber,
   IsObject,
@@ -77,9 +76,11 @@ export class WorkflowEdgeDto {
 }
 
 export class WorkflowDefinitionDto {
-  @ApiProperty({ type: [WorkflowNodeDto], minItems: 1 })
+  // Empty `nodes` is valid: new workflows are saved as drafts so the user can
+  // pick a trigger from the sidebar before being committed to one. Topology
+  // (trigger count, no cycles, no dangling edges) is enforced at execute time.
+  @ApiProperty({ type: [WorkflowNodeDto] })
   @IsArray()
-  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => WorkflowNodeDto)
   nodes!: WorkflowNodeDto[];
