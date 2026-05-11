@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectionsController } from './connections.controller';
 import { ConnectionsService } from './connections.service';
@@ -17,7 +17,7 @@ import { GitHubHealthChecker } from './health/checkers/github.checker';
 import { OllamaHealthChecker } from './health/checkers/ollama.checker';
 
 @Module({
-  imports: [OAuthModule],
+  imports: [forwardRef(() => OAuthModule)],
   controllers: [ConnectionsController],
   providers: [
     ConnectionsService,
