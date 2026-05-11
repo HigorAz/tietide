@@ -121,11 +121,21 @@ describe('WorkflowsController (integration)', () => {
         .expect(400);
     });
 
-    it('should return 400 when definition has empty nodes array', async () => {
+    it('should accept an empty definition (workflow is created as a draft)', async () => {
+      workflowsService.create.mockResolvedValueOnce({
+        ...persisted,
+        definition: { nodes: [], edges: [] },
+      });
+
       await request(app.getHttpServer())
         .post('/workflows')
         .send({ name: 'X', definition: { nodes: [], edges: [] } })
-        .expect(400);
+        .expect(201);
+
+      expect(workflowsService.create).toHaveBeenCalledWith('owner-uuid', {
+        name: 'X',
+        definition: { nodes: [], edges: [] },
+      });
     });
 
     it('should return 400 when definition node is missing required fields', async () => {
@@ -307,12 +317,21 @@ describe('WorkflowsController (integration)', () => {
       expect(workflowsService.update).toHaveBeenCalledWith('owner-uuid', uuid, { name: 'Renamed' });
     });
 
-    it('should return 400 when definition is invalid (empty nodes)', async () => {
+    it('should accept an empty definition on update (workflow reverts to draft)', async () => {
+      workflowsService.update.mockResolvedValueOnce({
+        ...persisted,
+        definition: { nodes: [], edges: [] },
+        version: 2,
+      });
+
       await request(app.getHttpServer())
         .patch(`/workflows/${uuid}`)
         .send({ definition: { nodes: [], edges: [] } })
-        .expect(400);
-      expect(workflowsService.update).not.toHaveBeenCalled();
+        .expect(200);
+
+      expect(workflowsService.update).toHaveBeenCalledWith('owner-uuid', uuid, {
+        definition: { nodes: [], edges: [] },
+      });
     });
 
     it('should return 400 when id is not a UUID', async () => {
