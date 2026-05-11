@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthModule } from '../../auth/auth.module';
 import { CryptoModule } from '../../crypto/crypto.module';
 import { AuditModule } from '../../audit/audit.module';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { ConnectionsService } from '../connections.service';
+import { ConnectionsModule } from '../connections.module';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 import { OAuthStateService } from './oauth-state.service';
@@ -14,11 +14,20 @@ import { SlackOAuthProvider } from './providers/slack.provider';
 import { NotionOAuthProvider } from './providers/notion.provider';
 import { HubspotOAuthProvider } from './providers/hubspot.provider';
 
+// ConnectionsService is consumed by OAuthService but NOT re-declared here.
+// It lives in ConnectionsModule along with its ProviderHealthRegistry factory
+// (one source of truth). ConnectionsModule already imports OAuthModule, so
+// forwardRef is required on this side to break the circular reference.
 @Module({
-  imports: [AuthModule, CryptoModule, AuditModule, PrismaModule],
+  imports: [
+    AuthModule,
+    CryptoModule,
+    AuditModule,
+    PrismaModule,
+    forwardRef(() => ConnectionsModule),
+  ],
   controllers: [OAuthController],
   providers: [
-    ConnectionsService,
     OAuthService,
     OAuthStateService,
     OAuthProviderRegistry,
