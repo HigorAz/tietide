@@ -31,6 +31,18 @@ describe('HubspotOAuthProvider', () => {
     jest.restoreAllMocks();
   });
 
+  it('throws ServiceUnavailableException naming HUBSPOT_OAUTH_REDIRECT_URI when unset', () => {
+    const missing = {
+      get: (_key: string) => undefined,
+      getOrThrow: (k: string) => {
+        throw new Error(`Missing ${k}`);
+      },
+    } as unknown as ConfigService;
+    const p = new HubspotOAuthProvider(missing);
+    expect(() => p.redirectUri()).toThrow(/HUBSPOT_OAUTH_REDIRECT_URI/);
+    expect(() => p.redirectUri()).toThrow(/not configured/i);
+  });
+
   it('builds the authorize URL with space-separated scopes', () => {
     const url = new URL(
       provider.buildAuthorizeUrl({

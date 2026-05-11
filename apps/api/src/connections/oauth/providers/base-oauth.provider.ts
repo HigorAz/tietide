@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
@@ -6,7 +10,13 @@ export abstract class BaseOAuthProvider {
   constructor(protected readonly config: ConfigService) {}
 
   protected env(key: string): string {
-    return this.config.getOrThrow<string>(key);
+    const raw = this.config.get<string>(key);
+    if (raw === undefined || raw === null || raw.trim().length === 0) {
+      throw new ServiceUnavailableException(
+        `OAuth provider not configured: missing environment variable ${key}`,
+      );
+    }
+    return raw;
   }
 
   protected envOptional(key: string, fallback: string): string {

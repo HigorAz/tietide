@@ -31,6 +31,14 @@ describe('MicrosoftOAuthProvider', () => {
     jest.restoreAllMocks();
   });
 
+  describe('missing env', () => {
+    it('throws ServiceUnavailableException naming MS_OAUTH_REDIRECT_URI when unset', () => {
+      const p = new MicrosoftOAuthProvider(makeConfig({ MS_OAUTH_REDIRECT_URI: undefined }));
+      expect(() => p.redirectUri()).toThrow(/MS_OAUTH_REDIRECT_URI/);
+      expect(() => p.redirectUri()).toThrow(/not configured/i);
+    });
+  });
+
   describe('buildAuthorizeUrl', () => {
     it('uses the common tenant by default', () => {
       const url = new URL(
