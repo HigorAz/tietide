@@ -128,7 +128,7 @@ describe('workflowExport', () => {
       expect(() => parseExport('{not json')).toThrow(WorkflowExportFormatError);
     });
 
-    it('should throw on missing name, missing definition, or empty nodes array', () => {
+    it('should throw on missing name or missing definition', () => {
       const baseValid = buildExportPayload(
         'wf',
         makeDefinition(),
@@ -140,12 +140,21 @@ describe('workflowExport', () => {
 
       const noDef = JSON.stringify({ ...baseValid, definition: undefined });
       expect(() => parseExport(noDef)).toThrow(WorkflowExportFormatError);
+    });
 
+    it('should accept an empty nodes array as a valid draft export', () => {
+      // Matches the API: empty `nodes` is a valid draft (see commit 564ffae).
+      // Topology rules are enforced at execute/activate time, not on import.
+      const baseValid = buildExportPayload(
+        'wf',
+        makeDefinition(),
+        new Date('2026-01-01T00:00:00.000Z'),
+      );
       const emptyNodes = JSON.stringify({
         ...baseValid,
         definition: { nodes: [], edges: [] },
       });
-      expect(() => parseExport(emptyNodes)).toThrow(WorkflowExportFormatError);
+      expect(() => parseExport(emptyNodes)).not.toThrow();
     });
 
     it('should roundtrip build → serialize → parse to a deep-equal payload', () => {
