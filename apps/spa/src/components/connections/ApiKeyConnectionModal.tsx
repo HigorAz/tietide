@@ -12,7 +12,8 @@ import type { CreateConnectionBody } from '@/api/connections';
 import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from '@/components/dashboard/Modal';
 import { cn } from '@/utils/cn';
-import { getProviderLabel } from './providerCatalog';
+import { getProviderLabel, getProviderSetupGuidePath } from './providerCatalog';
+import { buildSetupGuideUrl } from './setupGuideUrl';
 
 export interface ApiKeyConnectionModalProps {
   provider: ConnectionProviderType;
@@ -115,15 +116,33 @@ export function ApiKeyConnectionModal({
     | Record<string, { message?: string } | undefined>
     | undefined;
 
+  const setupGuidePath = getProviderSetupGuidePath(provider);
+
   return (
     <Modal
       titleId="api-key-modal-title"
       ariaLabel={`Connect ${getProviderLabel(provider)}`}
       onClose={onClose}
     >
-      <h2 id="api-key-modal-title" className="mb-1 text-lg font-semibold text-text-primary">
-        Connect {getProviderLabel(provider)}
-      </h2>
+      <div className="mb-1 flex items-baseline justify-between gap-3">
+        <h2 id="api-key-modal-title" className="text-lg font-semibold text-text-primary">
+          Connect {getProviderLabel(provider)}
+        </h2>
+        {setupGuidePath && (
+          <a
+            href={buildSetupGuideUrl(setupGuidePath)}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="api-key-modal-setup-guide"
+            className={cn(
+              'text-xs font-medium text-accent-teal transition',
+              'hover:underline focus:outline-none focus:ring-1 focus:ring-accent-teal',
+            )}
+          >
+            Setup guide ↗
+          </a>
+        )}
+      </div>
       <p className="mb-5 text-sm text-text-secondary">
         Your credentials are encrypted at rest with libsodium and never leave the server in plain
         text.
