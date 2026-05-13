@@ -30,6 +30,18 @@ describe('SlackOAuthProvider', () => {
     jest.restoreAllMocks();
   });
 
+  it('throws ServiceUnavailableException naming SLACK_OAUTH_REDIRECT_URI when unset', () => {
+    const missing = {
+      get: (_key: string) => undefined,
+      getOrThrow: (k: string) => {
+        throw new Error(`Missing ${k}`);
+      },
+    } as unknown as ConfigService;
+    const p = new SlackOAuthProvider(missing);
+    expect(() => p.redirectUri()).toThrow(/SLACK_OAUTH_REDIRECT_URI/);
+    expect(() => p.redirectUri()).toThrow(/not configured/i);
+  });
+
   it('builds the v2 authorize URL with comma-separated scopes', () => {
     const url = new URL(
       provider.buildAuthorizeUrl({

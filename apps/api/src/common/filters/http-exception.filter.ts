@@ -1,5 +1,5 @@
 import type { ExceptionFilter, ArgumentsHost } from '@nestjs/common';
-import { Catch, HttpException, HttpStatus } from '@nestjs/common';
+import { Catch, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import type { Response } from 'express';
 
 // Routes that intentionally omit `requestId` from the response body.
@@ -17,6 +17,8 @@ interface RequestWithId {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(GlobalExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -41,6 +43,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           issues = obj.issues;
         }
       }
+    } else {
+      // Non-HttpException — the response stays generic, but we surface the
+      // underlying error in the server log so it's not invisible to operators.
+      this.logger.error(
+        { err: exception, path: resolvePath(request) },
+        'Unhandled non-HTTP exception',
+      );
     }
 
     const code = HttpStatus[status] ?? 'INTERNAL_SERVER_ERROR';
@@ -66,14 +75,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 function resolveRequestId(req: RequestWithId | undefined): string | undefined {
   if (!req || typeof req.id !== 'string' || req.id.length === 0) return undefined;
 
-  const path =
-    typeof req.originalUrl === 'string'
-      ? req.originalUrl
-      : typeof req.url === 'string'
-        ? req.url
-        : '';
+  const path = resolvePath(req);
   for (const prefix of REQUEST_ID_SUPPRESSED_PREFIXES) {
     if (path.startsWith(prefix)) return undefined;
   }
   return req.id;
+}
+
+function resolvePath(req: RequestWithId | undefined): string {
+  if (!req) return '';
+  if (typeof req.originalUrl === 'string') return req.originalUrl;
+  if (typeof req.url === 'string') return req.url;
+  return '';
 }
