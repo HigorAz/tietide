@@ -2,6 +2,7 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  Logger,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -93,6 +94,31 @@ describe('GlobalExceptionFilter', () => {
           message: 'Internal server error',
         }),
       );
+    });
+
+    it('should log the original exception via Logger.error when it is not an HttpException', () => {
+      const errSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      errSpy.mockClear();
+      const exception = new Error('database connection lost');
+      request.id = 'req-unhandled';
+      request.originalUrl = '/v1/workflows';
+
+      filter.catch(exception, host);
+
+      expect(errSpy).toHaveBeenCalledTimes(1);
+      const [payload] = errSpy.mock.calls[0];
+      expect(payload).toMatchObject({ err: exception, path: '/v1/workflows' });
+      errSpy.mockRestore();
+    });
+
+    it('should not call Logger.error for HttpException subclasses', () => {
+      const errSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      errSpy.mockClear();
+
+      filter.catch(new NotFoundException('nope'), host);
+
+      expect(errSpy).not.toHaveBeenCalled();
+      errSpy.mockRestore();
     });
 
     it('should not leak stack traces in the response payload', () => {

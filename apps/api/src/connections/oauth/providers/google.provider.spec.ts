@@ -31,6 +31,21 @@ describe('GoogleOAuthProvider', () => {
     jest.restoreAllMocks();
   });
 
+  describe('missing env', () => {
+    it('throws ServiceUnavailableException naming the missing variable when GOOGLE_OAUTH_REDIRECT_URI is unset', () => {
+      const p = new GoogleOAuthProvider(makeConfig({ GOOGLE_OAUTH_REDIRECT_URI: undefined }));
+      expect(() => p.redirectUri()).toThrow(/GOOGLE_OAUTH_REDIRECT_URI/);
+      expect(() => p.redirectUri()).toThrow(/not configured/i);
+    });
+
+    it('throws ServiceUnavailableException when GOOGLE_OAUTH_CLIENT_ID is empty', () => {
+      const p = new GoogleOAuthProvider(makeConfig({ GOOGLE_OAUTH_CLIENT_ID: '' }));
+      expect(() =>
+        p.buildAuthorizeUrl({ state: 's', scopes: ['openid'], redirectUri: 'http://x' }),
+      ).toThrow(/GOOGLE_OAUTH_CLIENT_ID/);
+    });
+  });
+
   describe('buildAuthorizeUrl', () => {
     it('produces a Google authorize URL with required parameters', () => {
       const url = provider.buildAuthorizeUrl({
