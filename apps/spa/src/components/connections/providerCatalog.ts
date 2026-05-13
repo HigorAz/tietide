@@ -25,6 +25,10 @@ export interface ProviderEntry {
   label: string;
   type: ConnectionType;
   iconUrl: string;
+  // Repo-relative path to a setup guide for this provider, e.g.
+  // 'docs/oauth-google-setup.md'. Combined with VITE_DOCS_BASE_URL at render
+  // time to produce a clickable link. Omit to hide the link for a provider.
+  setupGuidePath?: string;
 }
 
 export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
@@ -33,24 +37,28 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     label: 'Google',
     type: ConnectionType.OAUTH2,
     iconUrl: googleIcon,
+    setupGuidePath: 'docs/oauth-google-setup.md',
   },
   {
     id: ConnectionProvider.MICROSOFT,
     label: 'Microsoft',
     type: ConnectionType.OAUTH2,
     iconUrl: microsoftIcon,
+    setupGuidePath: 'docs/oauth-microsoft-setup.md',
   },
   {
     id: ConnectionProvider.SLACK,
     label: 'Slack',
     type: ConnectionType.OAUTH2,
     iconUrl: slackIcon,
+    setupGuidePath: 'docs/oauth-slack-setup.md',
   },
   {
     id: ConnectionProvider.NOTION,
     label: 'Notion',
     type: ConnectionType.OAUTH2,
     iconUrl: notionIcon,
+    setupGuidePath: 'docs/oauth-notion-setup.md',
   },
   {
     id: ConnectionProvider.OPENAI,
@@ -69,12 +77,14 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     label: 'Discord (Webhook)',
     type: ConnectionType.CUSTOM,
     iconUrl: discordIcon,
+    setupGuidePath: 'docs/connection-discord-setup.md',
   },
   {
     id: ConnectionProvider.DISCORD_BOT,
     label: 'Discord (Bot)',
     type: ConnectionType.CUSTOM,
     iconUrl: discordIcon,
+    setupGuidePath: 'docs/connection-discord-setup.md',
   },
   {
     id: ConnectionProvider.TWILIO,
@@ -87,54 +97,63 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     label: 'Telegram',
     type: ConnectionType.API_KEY,
     iconUrl: telegramIcon,
+    setupGuidePath: 'docs/connection-telegram-setup.md',
   },
   {
     id: ConnectionProvider.TRELLO,
     label: 'Trello',
     type: ConnectionType.API_KEY,
     iconUrl: trelloIcon,
+    setupGuidePath: 'docs/connection-trello-setup.md',
   },
   {
     id: ConnectionProvider.AIRTABLE,
     label: 'Airtable',
     type: ConnectionType.API_KEY,
     iconUrl: airtableIcon,
+    setupGuidePath: 'docs/connection-airtable-setup.md',
   },
   {
     id: ConnectionProvider.LINEAR,
     label: 'Linear',
     type: ConnectionType.API_KEY,
     iconUrl: linearIcon,
+    setupGuidePath: 'docs/connection-linear-setup.md',
   },
   {
     id: ConnectionProvider.GITHUB,
     label: 'GitHub',
     type: ConnectionType.API_KEY,
     iconUrl: githubIcon,
+    setupGuidePath: 'docs/connection-github-setup.md',
   },
   {
     id: ConnectionProvider.HUBSPOT,
     label: 'HubSpot',
     type: ConnectionType.OAUTH2,
     iconUrl: hubspotIcon,
+    setupGuidePath: 'docs/oauth-hubspot-setup.md',
   },
   {
     id: ConnectionProvider.STRIPE,
     label: 'Stripe',
     type: ConnectionType.API_KEY,
     iconUrl: stripeIcon,
+    setupGuidePath: 'docs/connection-stripe-setup.md',
   },
   {
     id: ConnectionProvider.MAILCHIMP,
     label: 'Mailchimp',
     type: ConnectionType.API_KEY,
     iconUrl: mailchimpIcon,
+    setupGuidePath: 'docs/connection-mailchimp-setup.md',
   },
   {
     id: ConnectionProvider.CALENDLY,
     label: 'Calendly',
     type: ConnectionType.API_KEY,
     iconUrl: calendlyIcon,
+    setupGuidePath: 'docs/connection-calendly-setup.md',
   },
   {
     id: ConnectionProvider.POSTGRES,
@@ -164,3 +183,6 @@ export const getProviderLabel = (provider: string): string =>
 
 export const getProviderIcon = (provider: string): string | undefined =>
   getProviderEntry(provider)?.iconUrl;
+
+export const getProviderSetupGuidePath = (provider: string): string | undefined =>
+  getProviderEntry(provider)?.setupGuidePath;
