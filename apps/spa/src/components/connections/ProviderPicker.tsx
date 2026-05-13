@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ConnectionType } from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { PROVIDER_CATALOG, type ProviderEntry } from './providerCatalog';
+import { buildSetupGuideUrl } from './setupGuideUrl';
 
 export interface ProviderPickerProps {
   onPick: (provider: ProviderEntry) => void;
@@ -22,7 +23,7 @@ export function ProviderPicker({ onPick }: ProviderPickerProps): JSX.Element {
         {PROVIDER_CATALOG.map((provider) => {
           const showFallback = iconErrors[provider.id];
           return (
-            <li key={provider.id}>
+            <li key={provider.id} className="relative">
               <button
                 type="button"
                 onClick={() => onPick(provider)}
@@ -52,6 +53,23 @@ export function ProviderPicker({ onPick }: ProviderPickerProps): JSX.Element {
                   Connect
                 </span>
               </button>
+              {provider.setupGuidePath && (
+                <a
+                  href={buildSetupGuideUrl(provider.setupGuidePath)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-testid={`provider-setup-guide-${provider.id}`}
+                  aria-label={`${provider.label} setup guide (opens in new tab)`}
+                  title={`${provider.label} setup guide`}
+                  className={cn(
+                    'absolute right-2 top-2 z-10 inline-flex h-6 w-6 items-center justify-center rounded-full',
+                    'border border-white/5 bg-elevated text-xs font-semibold text-text-secondary transition',
+                    'hover:border-accent-teal/40 hover:text-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+                  )}
+                >
+                  ?
+                </a>
+              )}
             </li>
           );
         })}
