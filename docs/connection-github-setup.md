@@ -54,7 +54,7 @@ GitHub shows the token **once**, prefixed `github_pat_…`. Copy it now — ther
    - **Api Key**: paste the token from step 3.
 4. **Connect**.
 
-The form is generated from `githubApiKeyConfigSchema` and validates the prefix client-side — if you paste a string that doesn't match one of the six accepted prefixes, you'll see "apiKey must be a GitHub token (ghp*/gho*/ghu*/ghs*/ghr*/github_pat*…)".
+The form is generated from `githubApiKeyConfigSchema` and validates the prefix client-side — if you paste a string that doesn't match one of the six accepted prefixes, you'll see the error: `apiKey must be a GitHub token (ghp_/gho_/ghu_/ghs_/ghr_/github_pat_…)`.
 
 ### 5. Test the connection
 

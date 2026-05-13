@@ -32,7 +32,7 @@ The validator in `packages/shared/src/schemas/connections.schema.ts:129-135` enf
    - **Api Key**: paste the key from step 2.
 4. **Connect**.
 
-The form is generated from `linearApiKeyConfigSchema`. If you paste a string that doesn't start with `lin_api_`, you'll see "apiKey must be a Linear API key (lin*api*…)".
+The form is generated from `linearApiKeyConfigSchema`. If you paste a string that doesn't start with `lin_api_`, you'll see the error: `apiKey must be a Linear API key (lin_api_…)`.
 
 ### 4. Test the connection
 
