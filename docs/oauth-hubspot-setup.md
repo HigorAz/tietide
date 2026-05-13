@@ -12,8 +12,6 @@ OAuth has two distinct credentials, and confusing them is the most common setup 
 
 This guide covers step 1 for HubSpot. Without it, `GET /v1/connections/oauth/start?provider=hubspot` returns `503 OAuth provider not configured: missing environment variable HUBSPOT_OAUTH_REDIRECT_URI` (or `_CLIENT_ID` / `_CLIENT_SECRET`).
 
-> **Heads-up**: `HUBSPOT_OAUTH_*` env vars are **not yet listed in `.env.example`**. You'll need to add them by hand to your `.env`. The provider is wired up in `apps/api/src/connections/oauth/oauth-provider.registry.ts:6` — adding the env block to `.env.example` is its own small follow-up task.
-
 ## Steps
 
 ### 1. Create a HubSpot developer account
@@ -47,10 +45,9 @@ This guide covers step 1 for HubSpot. Without it, `GET /v1/connections/oauth/sta
 
 ### 4. Populate `.env`
 
-`HUBSPOT_OAUTH_*` is not in `.env.example` yet — add this block at the end of your local `.env` (mirror the structure of the existing Google/Microsoft/Slack/Notion blocks at `.env.example:60-84`):
+Open `.env` at the repo root and set:
 
 ```env
-# HubSpot
 HUBSPOT_OAUTH_CLIENT_ID=<client-id-from-step-3>
 HUBSPOT_OAUTH_CLIENT_SECRET=<client-secret-from-step-3>
 HUBSPOT_OAUTH_REDIRECT_URI=http://localhost:3030/v1/connections/oauth/callback?provider=hubspot
