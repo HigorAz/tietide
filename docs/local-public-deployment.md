@@ -1,255 +1,484 @@
-# Running TieTide on Your Local Machine with a Public URL (Cloudflare Tunnel)
+# Running TieTide on Your Local Machine with a Public URL (WSL2 + Cloudflare Tunnel)
 
-> Audience: Higor (or anyone) who already owns a domain but doesn't want to pay for a VPS.
-> Time: ~30 minutes the first time, including DNS propagation.
+> Audience: Higor (or anyone) who already owns a domain but doesn't want to pay for a VPS, and wants TieTide isolated from their Windows install.
+> Time: ~45 minutes the first time, including WSL2 install and DNS propagation.
 
-This guide makes **your local laptop/desktop the server** while giving you a real public HTTPS URL on a domain you own (e.g. one registered through Hostinger). It uses **Cloudflare Tunnel** — a free service that holds an outbound connection from your machine to Cloudflare's edge and routes inbound traffic from `https://your-domain.com` to `localhost:3030` / `localhost:5173`.
+This guide makes **your local laptop the server** while giving you a real public HTTPS URL on a domain you own. **Everything TieTide-related runs inside a Linux VM (WSL2) on Windows** — Postgres, Valkey, Ollama, the API, the SPA, and `cloudflared` itself. Your Windows install stays clean.
 
-Compared to a Hostinger VPS:
+The path:
 
-| Trade-off        | Local + Cloudflare Tunnel                        | Hostinger VPS                     |
-| ---------------- | ------------------------------------------------ | --------------------------------- |
-| Cost             | Free (you pay for the domain you already have)   | $5–25/month                       |
-| Always on        | Only when your machine is running                | 24/7                              |
-| TLS / HTTPS      | Free, automatic (Cloudflare edge)                | You provision (Let's Encrypt)     |
-| Public IP needed | No (works behind any NAT/firewall)               | Yes (VPS has one)                 |
-| OAuth / webhooks | Works (stable URL)                               | Works                             |
-| Performance      | Your machine + your internet upload speed        | VPS hardware + datacenter network |
-| Suitable for     | Personal demos, college MVP, small private group | Real users, longer hours          |
+```
+Internet → Cloudflare edge → cloudflared (inside WSL2) → localhost (inside WSL2) → TieTide
+                                                                                      ↑
+                                                                                 stays here
+Windows host  ───────────────────────────────────────────────────────────────  no Linux services touch it
+```
 
-If your machine is reasonably modern (16 GB RAM) and your internet is decent, this is **the right setup for the TieTide MVP demo**.
+Compared to alternatives:
 
-## ⚠️ What you give up
+| Trade-off                         | Local + WSL2 + Cloudflare Tunnel                 | Hostinger VPS                 | Local + Windows-native (no VM)                        |
+| --------------------------------- | ------------------------------------------------ | ----------------------------- | ----------------------------------------------------- |
+| Cost                              | Free (you already own the domain)                | $5–25/month                   | Free                                                  |
+| Always on                         | Only when machine is on                          | 24/7                          | Only when machine is on                               |
+| TLS / HTTPS                       | Free, automatic (Cloudflare edge)                | You provision (Let's Encrypt) | Free, automatic                                       |
+| Public IP needed                  | No                                               | Yes                           | No                                                    |
+| Service isolation from your OS    | ✅ Linux VM                                      | ✅ Separate machine           | ❌ Postgres / Valkey / Ollama run as Windows services |
+| Matches eventual VPS workflow 1:1 | ✅ Same Ubuntu commands                          | n/a                           | ❌ Windows-specific commands                          |
+| Setup time                        | ~45 min                                          | ~60–90 min                    | ~30 min                                               |
+| Suitable for                      | Personal demos, college MVP, small private group | Real users, longer hours      | Quick experimentation                                 |
 
-- **Your machine must be on** whenever someone wants to use TieTide. Close the laptop, TieTide is down.
-- **Your home internet's upload speed** is the bottleneck. Fine for a handful of users; not for a viral launch.
-- **Residential ISPs** sometimes block specific traffic patterns. Cloudflare Tunnel uses outbound HTTPS, which almost never gets blocked, but if you're on a corporate network with deep packet inspection you may have problems.
-- **No automatic backups** — if your disk dies, TieTide data dies with it. Run the backup script from [`docs/deployment.md` §7.1](deployment.md#71-daily-encrypted-postgresql-backup) locally too, and copy the dumps somewhere off-machine.
+## Why a VM (WSL2)? Honest take on security
+
+WSL2 is a real Linux virtual machine running on Hyper-V — not a thin emulation layer. Putting TieTide inside it gives you:
+
+- ✅ **Service isolation.** Postgres, Valkey, Ollama, and `cloudflared` run as Linux processes inside the VM. None of them register as Windows services or bind to your Windows network interfaces.
+- ✅ **Filesystem isolation.** TieTide's source and the `.env` file (with your encryption master key) live on WSL's ext4 disk, not in `C:\Users\higor\...`. If something inside the VM is compromised, the attacker hits a Linux user account before they'd need a VM-escape to touch your Windows files.
+- ✅ **Different attack surface.** Exploits against TieTide / its dependencies are Linux-targeted by nature; even a successful exploit doesn't directly compromise your Windows session.
+- ✅ **Clean wipe.** `wsl --unregister Ubuntu-24.04` deletes the entire VM and its disk in one command. You can start over without uninstalling anything from Windows.
+- ✅ **Practice for the eventual VPS.** Every command in this guide is the exact command you'd run on a Hostinger VPS later. Same `apt`, same `systemctl`, same paths.
+
+What WSL2 **doesn't** protect against:
+
+- ❌ **Vulnerabilities in your HTTPS-exposed endpoint.** If an attacker finds an SSRF, IDOR, or auth bypass in TieTide itself, the VM boundary doesn't help — they're hitting the API the same way a legitimate user would.
+- ❌ **Compromised Cloudflare account.** Whoever controls your Cloudflare account can re-route the tunnel; the VM doesn't help.
+- ❌ **Leaked `.env`.** The encryption master key in `.env` decrypts every stored credential. If it leaks, it leaks. Treat `~/tietide/.env` inside WSL with the same care you would on a VPS.
+
+Net: WSL2 is a real and worthwhile improvement over running everything directly on Windows, but it's not a magic security wand. The bulk of your security posture comes from how TieTide itself handles auth and stored secrets — which is the same in either setup.
+
+## What you give up
+
+- **Your machine must be on.** Close the laptop, TieTide is down.
+- **Your home internet's upload speed** is the bottleneck.
+- **No automatic offsite backups.** Run the backup script from [`docs/deployment.md` §7.1](deployment.md#71-daily-encrypted-postgresql-backup) inside WSL and copy the encrypted dumps somewhere off-machine.
+
+## Prerequisites
+
+- Windows 10 (build 19041+) or Windows 11, with admin access.
+- A domain registered somewhere (this guide uses `tietide.com` registered at Hostinger as the running example — substitute yours).
+- A free Cloudflare account.
+- ~15 GB free disk for the WSL VM + Docker images + dependencies.
 
 ## Steps
 
-### 1. Create a free Cloudflare account
+### 1. Install WSL2 (Ubuntu 24.04)
 
-1. Open <https://dash.cloudflare.com/sign-up>, sign up with your email.
-2. Verify your email.
+Open **PowerShell as Administrator** and run:
 
-You don't need to enter payment info — everything in this guide is on the free plan.
+```powershell
+wsl --install -d Ubuntu-24.04
+```
 
-### 2. Add your Hostinger-registered domain to Cloudflare
+This enables the WSL feature, installs the kernel update, downloads Ubuntu 24.04, and prompts you to create a Linux username and password the first time you open it. **Reboot if Windows asks you to.**
 
-1. In the Cloudflare dashboard → **+ Add a domain**.
-2. Enter your domain (e.g. `your-domain.com`).
+After reboot, open the **Ubuntu** app from the Start menu. Pick a username (e.g. `higor`) and password (this is your Linux sudo password, unrelated to your Windows password).
+
+You'll land at:
+
+```
+higor@your-pc:~$
+```
+
+Everything from here happens inside this shell, **not** PowerShell.
+
+### 2. Enable systemd inside WSL2
+
+Required so `cloudflared` and other services can run as proper background daemons.
+
+```bash
+sudo tee /etc/wsl.conf > /dev/null <<'EOF'
+[boot]
+systemd=true
+
+[interop]
+appendWindowsPath=false
+EOF
+```
+
+Then exit WSL (`exit`), and from PowerShell:
+
+```powershell
+wsl --shutdown
+```
+
+Reopen the Ubuntu app. Confirm systemd is up:
+
+```bash
+systemctl --version
+ps -p 1 -o comm=
+# Should print: systemd
+```
+
+> The `appendWindowsPath=false` line in `wsl.conf` keeps your Windows `PATH` out of the WSL shell. Minor security hardening — prevents an accidental call to a Windows binary from inside the VM.
+
+### 3. Install base tooling and clone TieTide
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y curl git build-essential ca-certificates gnupg lsb-release
+
+# Node 20 via nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+source ~/.bashrc
+nvm install 20
+nvm use 20
+
+# pnpm
+curl -fsSL https://get.pnpm.io/install.sh | sh -
+source ~/.bashrc
+```
+
+Clone TieTide **inside the WSL filesystem** (not under `/mnt/c/...` — keeping it on Linux ext4 is 10–50× faster for `pnpm install` and `git` operations, and it's the isolation point):
+
+```bash
+cd ~
+git clone https://github.com/HigorAz/tietide.git
+cd tietide
+pnpm install
+```
+
+### 4. Install Docker Engine inside WSL2
+
+For Postgres / Valkey / Ollama / ChromaDB. We install Docker Engine directly inside the VM rather than relying on Docker Desktop on Windows — that keeps the whole stack inside the WSL boundary.
+
+```bash
+# Add Docker's official repo
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Run docker without sudo
+sudo usermod -aG docker $USER
+# log out / log back in for the group change to take effect
+exit
+```
+
+Reopen Ubuntu. Verify:
+
+```bash
+docker run --rm hello-world
+```
+
+### 5. Bring up TieTide's stateful dependencies
+
+```bash
+cd ~/tietide
+cp .env.example .env
+# We'll come back and finish .env in step 12; for now the placeholder values are fine.
+
+docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
+docker compose -f infra/docker/docker-compose.yml ps   # all healthy
+```
+
+### 6. Create a free Cloudflare account and add `tietide.com`
+
+This is web-based, no shell involved:
+
+1. Sign up at <https://dash.cloudflare.com/sign-up>.
+2. **+ Add a domain** → enter `tietide.com` (just the bare hostname — no `https://`, no path).
 3. Pick the **Free** plan → **Continue**.
-4. Cloudflare scans existing DNS records — for now you can leave them as-is (or delete unrelated parking-page records if Hostinger added any).
-5. Cloudflare shows you **two nameservers** (e.g. `kate.ns.cloudflare.com`, `tom.ns.cloudflare.com`). Copy both.
+4. Cloudflare scans existing DNS records. Leave them as-is.
+5. Cloudflare shows two **assigned nameservers** (e.g. `kate.ns.cloudflare.com`, `tom.ns.cloudflare.com`). Copy both.
 
-### 3. Point your Hostinger domain at Cloudflare's nameservers
+### 7. Point your Hostinger domain at Cloudflare's nameservers
 
-1. Open <https://hpanel.hostinger.com/> → **Domains** → your domain → **DNS / Nameservers** tab.
-2. Change to **Custom nameservers** and paste the two values from step 2.
+1. <https://hpanel.hostinger.com/> → **Domains** → `tietide.com` → **DNS / Nameservers**.
+2. Switch to **Custom nameservers** and paste the two from step 6.
 3. **Save**.
 
-Nameserver changes propagate in 5 min to ~24 hours; usually under an hour. Verify with:
+Verify (from inside WSL — Linux's `dig` is more pleasant than `nslookup`):
 
-```powershell
-nslookup -type=ns your-domain.com
+```bash
+sudo apt install -y dnsutils
+dig +short NS tietide.com
 ```
 
-When the response includes `kate.ns.cloudflare.com` (or whichever pair Cloudflare assigned you), continue. Cloudflare also emails you when activation is complete.
+When the response includes the two Cloudflare nameservers, continue. Cloudflare also emails you when activation completes (usually 5 min to 1 hour).
 
-### 4. Install `cloudflared` on Windows
+### 8. Install `cloudflared` inside WSL
 
-`cloudflared` is the tunnel daemon. Install via winget (or download the .msi from <https://github.com/cloudflare/cloudflared/releases>):
+```bash
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | \
+  sudo tee /etc/apt/sources.list.d/cloudflared.list
 
-```powershell
-winget install --id Cloudflare.cloudflared
-```
-
-Verify:
-
-```powershell
+sudo apt update
+sudo apt install -y cloudflared
 cloudflared --version
 ```
 
-### 5. Authenticate `cloudflared` with your Cloudflare account
+### 9. Authenticate `cloudflared`
 
-```powershell
+```bash
 cloudflared tunnel login
 ```
 
-A browser tab opens — sign in to Cloudflare and pick the domain you added in step 2. `cloudflared` writes a certificate to `%USERPROFILE%\.cloudflared\cert.pem`. Keep that file safe (it acts like an API token for tunnel management).
+A URL prints in the shell — Ctrl-click it (or copy/paste into your Windows browser). Sign in to Cloudflare, pick `tietide.com`. `cloudflared` writes a certificate to `~/.cloudflared/cert.pem`. Keep that file safe; it acts like an API token for tunnel management.
 
-### 6. Create a named tunnel
+### 10. Create a named tunnel
 
-```powershell
+```bash
 cloudflared tunnel create tietide
 ```
 
-This creates a tunnel called `tietide` and prints a UUID. It also writes a credentials JSON file to `%USERPROFILE%\.cloudflared\<uuid>.json`. Note both.
+Output includes a UUID and the path to a credentials JSON, e.g. `~/.cloudflared/<uuid>.json`. Note the UUID.
 
-### 7. Configure ingress (how the tunnel routes traffic)
+### 11. Configure ingress
 
-Create `%USERPROFILE%\.cloudflared\config.yml`. Replace `<uuid>` and `your-domain.com` with your real values:
+Create `~/.cloudflared/config.yml`. Replace `<uuid>` with the value from step 10:
 
-```yaml
+```bash
+cat > ~/.cloudflared/config.yml <<'EOF'
 tunnel: <uuid>
-credentials-file: C:\Users\higor\.cloudflared\<uuid>.json
+credentials-file: /home/higor/.cloudflared/<uuid>.json
 
 ingress:
-  # API + webhooks + OAuth callbacks — everything under /v1, /webhooks, /v1/provider-webhooks
-  - hostname: your-domain.com
+  # API + OAuth callbacks + webhook receivers
+  - hostname: tietide.com
     path: /v1/.*
     service: http://localhost:3030
-  - hostname: your-domain.com
+  - hostname: tietide.com
     path: /webhooks/.*
     service: http://localhost:3030
   # Everything else (the SPA's static assets and routes)
-  - hostname: your-domain.com
+  - hostname: tietide.com
     service: http://localhost:5173
   # Required catch-all
   - service: http_status:404
+EOF
 ```
 
-This single hostname strategy keeps CORS simple (everything is same-origin) and matches the production reverse-proxy layout described in [`docs/deployment.md` §6](deployment.md#6-reverse-proxy--tls).
+If your WSL username isn't `higor`, replace `/home/higor` with your actual home path (`echo $HOME` to check). Then open the file and replace both `<uuid>` placeholders:
 
-### 8. Route DNS to the tunnel
-
-```powershell
-cloudflared tunnel route dns tietide your-domain.com
+```bash
+sed -i "s|<uuid>|YOUR-ACTUAL-UUID|g" ~/.cloudflared/config.yml
+cat ~/.cloudflared/config.yml   # sanity check
 ```
 
-This creates a `CNAME` record in Cloudflare pointing `your-domain.com` at `<uuid>.cfargotunnel.com`. Cloudflare proxies it through their edge automatically, so visitors see `your-domain.com` and never the tunnel UUID.
+This single-hostname ingress keeps everything same-origin (no CORS friction) and mirrors the production reverse-proxy layout described in [`docs/deployment.md` §6](deployment.md#6-reverse-proxy--tls).
 
-### 9. Update TieTide's `.env` for the public URL
+### 12. Route DNS to the tunnel
 
-Edit `.env` at the repo root. Set:
+```bash
+cloudflared tunnel route dns tietide tietide.com
+```
+
+This creates a proxied CNAME in Cloudflare pointing `tietide.com` at `<uuid>.cfargotunnel.com`. Visitors hit `tietide.com` and never see the tunnel UUID.
+
+### 13. Finish wiring TieTide's `.env` for the public URL
+
+```bash
+cd ~/tietide
+nano .env   # or `code .env` if you've connected VS Code via the Remote-WSL extension
+```
+
+Set (or update):
 
 ```env
 # CORS — must match the public origin exactly
-CORS_ORIGIN=https://your-domain.com
+CORS_ORIGIN=https://tietide.com
 
 # SPA — Vite reads this at build / dev-server start
-VITE_API_URL=https://your-domain.com
+VITE_API_URL=https://tietide.com
 
 # Where TieTide redirects the browser after OAuth callback succeeds
-SPA_BASE_URL=https://your-domain.com
+SPA_BASE_URL=https://tietide.com
 
 # OAuth redirect URIs — every provider you've set up needs the public URL
-GOOGLE_OAUTH_REDIRECT_URI=https://your-domain.com/v1/connections/oauth/callback?provider=google
-MS_OAUTH_REDIRECT_URI=https://your-domain.com/v1/connections/oauth/callback?provider=microsoft
-SLACK_OAUTH_REDIRECT_URI=https://your-domain.com/v1/connections/oauth/callback?provider=slack
-NOTION_OAUTH_REDIRECT_URI=https://your-domain.com/v1/connections/oauth/callback?provider=notion
-HUBSPOT_OAUTH_REDIRECT_URI=https://your-domain.com/v1/connections/oauth/callback?provider=hubspot
+GOOGLE_OAUTH_REDIRECT_URI=https://tietide.com/v1/connections/oauth/callback?provider=google
+MS_OAUTH_REDIRECT_URI=https://tietide.com/v1/connections/oauth/callback?provider=microsoft
+SLACK_OAUTH_REDIRECT_URI=https://tietide.com/v1/connections/oauth/callback?provider=slack
+NOTION_OAUTH_REDIRECT_URI=https://tietide.com/v1/connections/oauth/callback?provider=notion
+HUBSPOT_OAUTH_REDIRECT_URI=https://tietide.com/v1/connections/oauth/callback?provider=hubspot
+
+# Strong secrets — DON'T leave these as placeholders
+# JWT_SECRET=<openssl rand -base64 64>
+# ENCRYPTION_MASTER_KEY=<openssl rand -base64 32>
+# WEBHOOK_HMAC_SECRET=<openssl rand -hex 32>
 ```
 
-Restart the API and SPA dev servers after editing `.env`:
+Generate the secrets (if you haven't already):
 
-```powershell
-# Stop any running `pnpm dev` processes, then:
+```bash
+echo "JWT_SECRET=$(openssl rand -base64 64 | tr -d '\n')"
+echo "ENCRYPTION_MASTER_KEY=$(openssl rand -base64 32)"
+echo "WEBHOOK_HMAC_SECRET=$(openssl rand -hex 32)"
+```
+
+Paste these into `.env`. **The `ENCRYPTION_MASTER_KEY` decrypts every stored OAuth/API-key connection — losing it makes them unrecoverable. Stash a copy in a password manager.**
+
+### 14. Add the public URL to each OAuth provider's redirect-URI list
+
+Each OAuth provider's developer console must include `https://tietide.com/v1/connections/oauth/callback?provider=<provider-id>` alongside the `http://localhost:3030/...` you (probably) added during initial setup. The per-provider OAuth guides in [`docs/Connection-setup/`](Connection-setup/) cover this — they tell you to add both URIs at the same time.
+
+If you skipped the production URI earlier, go back now and add it. Google, Microsoft, Slack, Notion, HubSpot.
+
+### 15. Start TieTide (two more terminals)
+
+Open two additional WSL Ubuntu windows. In one:
+
+```bash
+cd ~/tietide
 pnpm --filter @tietide/api dev
+```
+
+In the other:
+
+```bash
+cd ~/tietide
 pnpm --filter @tietide/spa dev
 ```
 
-### 10. Add the public URL to each OAuth provider's redirect-URI list
+API binds to `0.0.0.0:3030`, SPA dev server binds to `0.0.0.0:5173`. Both reachable from inside WSL on `localhost`.
 
-Each OAuth provider's developer console must include `https://your-domain.com/v1/connections/oauth/callback?provider=<provider-id>` in its **Authorized redirect URIs** list — alongside the `http://localhost:3030/...` you already added during initial setup. The per-provider OAuth guides in [`docs/Connection-setup/`](Connection-setup/) explain where to add this for each provider (Google, Microsoft, Slack, Notion, HubSpot).
+### 16. Start the tunnel
 
-> The guides specifically tell you to add both URIs at the same time. If you skipped the production one earlier, go back and add it now.
+In a third WSL window:
 
-### 11. Start the tunnel
-
-In a separate PowerShell window:
-
-```powershell
+```bash
 cloudflared tunnel run tietide
 ```
 
-You'll see:
+Output:
 
 ```
 INF Starting tunnel tunnelID=<uuid>
-INF Connection registered connIndex=0 location=<airport-code>
-INF Connection registered connIndex=1 location=<airport-code>
+INF Connection registered connIndex=0 location=...
+INF Connection registered connIndex=1 location=...
 ```
 
-Leave this window open. The tunnel is live as long as `cloudflared` is running.
+Leave this running.
 
-### 12. Test end-to-end
+### 17. Test end-to-end
 
-From another device (your phone on cellular data, a friend's laptop, anywhere outside your home network):
+From any device outside your home network (your phone on cellular data is the simplest test):
 
-1. Open `https://your-domain.com/` — TieTide's SPA should load. The page is served by Vite on `localhost:5173` and proxied through Cloudflare.
+1. Open `https://tietide.com/` — TieTide's SPA loads.
 2. Register an account, log in.
-3. Go to **Connections** → pick Google (or another OAuth provider you registered the public URL for in step 10) → click **Connect**.
-4. The popup should land on the provider's consent screen, then redirect back to `https://your-domain.com/v1/connections/oauth/callback?provider=google&code=...` → TieTide exchanges the code → the popup closes → SPA shows the new connection.
+3. **Connections** → pick Google (or whichever OAuth provider you added the public URL to in step 14) → **Connect**.
+4. The popup lands on the provider's consent screen → redirects back to `https://tietide.com/v1/connections/oauth/callback?provider=google&code=...` → TieTide exchanges the code → popup closes → connection appears in the list.
 
-If anything fails, the most common causes are listed under **Troubleshooting** below.
+If anything fails, jump to **Troubleshooting** below.
 
-### 13. (Optional) Run `cloudflared` as a Windows service
+### 18. (Recommended) Run `cloudflared` as a systemd service inside WSL
 
-So the tunnel restarts automatically when your machine reboots:
+So the tunnel restarts automatically every time WSL boots:
 
-```powershell
-cloudflared service install
+```bash
+sudo cloudflared --config /home/higor/.cloudflared/config.yml service install
+sudo systemctl enable --now cloudflared
+sudo systemctl status cloudflared   # should be active (running)
 ```
 
-Manage it like any service:
+Replace `/home/higor` with your actual `$HOME`. From here you don't need the dedicated terminal in step 16 — the service handles it.
 
-```powershell
-Get-Service cloudflared
-Restart-Service cloudflared
+To pause:
+
+```bash
+sudo systemctl stop cloudflared
 ```
 
-To stop running as a service:
+To remove:
 
-```powershell
-cloudflared service uninstall
+```bash
+sudo systemctl disable --now cloudflared
+sudo cloudflared service uninstall
 ```
+
+## Daily workflow
+
+After the one-time setup:
+
+1. Open the Ubuntu app from the Start menu.
+2. `cd ~/tietide`.
+3. `docker compose -f infra/docker/docker-compose.yml up -d` (if it's not still running from last time).
+4. Start API + SPA: `pnpm --filter @tietide/api dev` and `pnpm --filter @tietide/spa dev` in two windows.
+5. The tunnel is already up (systemd service). `https://tietide.com` is live.
+
+To take TieTide offline temporarily: `sudo systemctl stop cloudflared`. To take it offline completely: shut down WSL with `wsl --shutdown` in PowerShell.
 
 ## Troubleshooting
 
 ### "Bad gateway" / 502 from Cloudflare
 
-The tunnel reached your machine but `localhost:3030` (or `:5173`) isn't responding. Confirm both `pnpm dev` processes are running and listening:
+The tunnel reached WSL but `localhost:3030` (or `:5173`) isn't responding. From inside WSL:
 
-```powershell
-netstat -ano | findstr ":3030 :5173"
+```bash
+ss -lntp | grep -E ":(3030|5173)"
 ```
+
+If nothing is listening, the dev server isn't running — restart `pnpm dev` in the right window.
 
 ### OAuth callback gives `redirect_uri_mismatch`
 
-The provider's redirect-URI list doesn't include `https://your-domain.com/v1/connections/oauth/callback?provider=<id>`. Re-check the developer console for that provider, add the exact public URL, save.
+The provider's redirect-URI list doesn't include `https://tietide.com/v1/connections/oauth/callback?provider=<id>`. Re-check the developer console for that provider, add the exact public URL, save.
 
 ### Connection works locally but fails over tunnel
 
-Most likely you set `VITE_API_URL=http://localhost:3030` (or left it as the default). The SPA bundle baked in `localhost` and visitors' browsers can't reach your laptop. Restart the SPA dev server after fixing `.env` so Vite picks up the new value.
+You probably left `VITE_API_URL=http://localhost:3030` in `.env`. The SPA bundle baked in `localhost` and visitors' browsers can't reach it. Restart `pnpm --filter @tietide/spa dev` after fixing `.env` so Vite picks up the new value.
 
 ### Tunnel runs but DNS doesn't resolve
 
-`nslookup your-domain.com` should return a Cloudflare IP. If it returns an empty result or Hostinger's parking IP, your nameserver change in step 3 hasn't propagated yet, or you didn't run `cloudflared tunnel route dns` in step 8. Check Cloudflare → DNS → Records — there should be a proxied CNAME pointing to `<uuid>.cfargotunnel.com`.
+```bash
+dig +short tietide.com
+```
+
+Should return a Cloudflare IP (e.g. `104.x.x.x` or `172.x.x.x`). If it returns Hostinger's parking IP or nothing, either your nameserver change (step 7) hasn't propagated yet, or step 12 didn't run. Check Cloudflare → DNS → Records — there should be a proxied CNAME for `tietide.com` pointing to `<uuid>.cfargotunnel.com`.
 
 ### Webhooks (Stripe / Slack / Discord / Telegram) not arriving
 
-The webhook providers will POST to `https://your-domain.com/v1/provider-webhooks/<provider>/<sub-id>`. Watch the tunnel's log window — every inbound request is logged. If you don't see the POST attempt at all, the provider isn't sending it (check the provider's webhook delivery log). If you see the POST but TieTide returns 4xx, that's a TieTide-side problem (probably HMAC signature or expired subscription).
+Watch the tunnel log:
 
-### My machine sleeps
+```bash
+sudo journalctl -u cloudflared -f
+```
 
-Open **Settings → System → Power & battery → Screen and sleep** and set sleep to **Never** while the tunnel is active. Or use `powercfg /requestsoverride PROCESS cloudflared.exe SYSTEM` to keep the system awake whenever `cloudflared` is running.
+Every inbound request is logged. If you don't see the POST attempt at all, the provider isn't sending it (check the provider's webhook delivery log). If you see the POST but TieTide returns 4xx, that's a TieTide-side problem (probably HMAC signature mismatch or expired subscription).
+
+### WSL eats too much RAM
+
+WSL2 can balloon over time. Cap it via `%USERPROFILE%\.wslconfig` (on Windows, not in WSL):
+
+```ini
+[wsl2]
+memory=12GB
+processors=4
+swap=4GB
+```
+
+`wsl --shutdown` from PowerShell, then reopen Ubuntu to pick up the new limits.
+
+### Windows wants to sleep
+
+Open **Settings → System → Power & battery → Screen and sleep** and set sleep to **Never** while you want the tunnel reachable. WSL pauses when Windows sleeps; the tunnel goes down with it.
 
 ## When to outgrow this setup
 
-This is great for:
+Great for:
 
-- College demos and portfolio reviews
-- A small private group of users (yourself, a few classmates, a professor)
-- Testing webhooks end-to-end before paying for a VPS
-- Running TieTide while you sleep (it'll just be down)
+- College demos and portfolio reviews.
+- A small private group of users (you, classmates, a professor).
+- Testing webhooks end-to-end before paying for a VPS.
+- Running TieTide while you sleep (it'll just be down).
 
-Promote to a VPS — follow [`docs/hostinger-deployment.md`](hostinger-deployment.md) — when:
+Promote to a Hostinger VPS — see [`docs/hostinger-deployment.md`](hostinger-deployment.md) — when:
 
-- Real users depend on it being available
-- You start hitting your home internet's upload cap
-- You want server-class hardware (the API + Postgres + Ollama is RAM-hungry)
-- You want offsite backups by default
+- Real users depend on it being available 24/7.
+- You start hitting your home internet's upload cap.
+- You want server-class hardware (the API + Postgres + Ollama is RAM-hungry).
+- You want offsite backups by default.
 
-The same Cloudflare Tunnel config can keep working after you move to a VPS — point the tunnel at the VPS's `localhost` instead of your laptop's — but at that point a normal reverse proxy (Traefik / nginx) on the VPS is simpler and cheaper than running `cloudflared` there.
+Migrating from WSL to a VPS is mostly a `pg_dump | ssh tietide@vps psql` plus copying `.env` (carefully — the encryption master key must move too, otherwise stored credentials become garbage). The commands in this guide and in `docs/deployment.md` are identical at the shell level, which is the whole point of using WSL2 for this stage.
+
+## I already had TieTide working on Windows directly
+
+You can keep your Windows setup as a quick-edit playground and use WSL purely as the "publicly reachable" environment. Two paths:
+
+1. **Cut over**: clone fresh inside WSL (step 3) and treat that as your primary dev env going forward. Cleaner long-term.
+2. **Bridge**: keep the Windows clone for IDE/local-only work, and `git pull` inside WSL whenever you want to expose changes publicly. Adds a sync step but lets you keep your existing Windows workflow.
+
+Either way, the WSL clone is the one connected to the tunnel — the Windows-side processes are never exposed to `tietide.com`.

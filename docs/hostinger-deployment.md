@@ -5,7 +5,7 @@
 
 This guide is the Hostinger-specific layer on top of [docs/deployment.md](deployment.md). It tells you how to **get to a working Ubuntu host with your domain pointing at it**, then hands off to the generic deployment guide for the Docker Compose stack, TLS, backups, and operational scripts.
 
-> **Don't want to pay for a VPS yet?** If you only need a public URL on a domain you already own (e.g. for a portfolio demo) and you're fine with your local machine being the server, see [docs/local-public-deployment.md](local-public-deployment.md) — it uses **Cloudflare Tunnel** (free) to expose `localhost:3030` / `localhost:5173` through `https://your-domain.com` without any VPS, port forwarding, or public IP.
+> **Don't want to pay for a VPS yet?** If you only need a public URL on a domain you already own (e.g. for a portfolio demo) and you're fine with your local machine being the server, see [docs/local-public-deployment.md](local-public-deployment.md) — it walks through running TieTide inside **WSL2** (Linux VM on Windows, isolated from your host install) and exposing it through `https://your-domain.com` via a free **Cloudflare Tunnel**. No VPS, no port forwarding, no public IP.
 
 ## ⚠️ Hostinger product matters
 
