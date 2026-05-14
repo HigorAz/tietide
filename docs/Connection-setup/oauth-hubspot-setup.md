@@ -29,11 +29,15 @@ This guide covers step 1 for HubSpot. Without it, `GET /v1/connections/oauth/sta
 
 1. Inside the app, **Auth** tab.
 2. Copy the **Client ID** and **Client secret**. The secret is shown in plaintext — copy now.
-3. **Redirect URLs**: paste:
+3. **Redirect URLs**: HubSpot accepts multiple URLs on a single app — add one per environment you plan to run so you don't have to come back later:
    ```
    http://localhost:3030/v1/connections/oauth/callback?provider=hubspot
+   https://<your-domain>/v1/connections/oauth/callback?provider=hubspot
    ```
-   Byte-for-byte match with `HUBSPOT_OAUTH_REDIRECT_URI` in your `.env`.
+
+   - Each URL must match the `HUBSPOT_OAUTH_REDIRECT_URI` of its own environment byte-for-byte.
+   - **HTTPS is required** for any non-localhost URL.
+   - Skip the second URL for now if you don't have a domain yet — you can add it later on the same Auth tab.
 4. **Required scopes**: tick the scopes the actions in `apps/worker/src/nodes/connectors/hubspot/` need:
    - `crm.objects.contacts.read`
    - `crm.objects.contacts.write` — for `hubspot-create-contact`
