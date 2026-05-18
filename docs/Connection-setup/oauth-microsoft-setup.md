@@ -25,12 +25,15 @@ This guide covers step 1 for Microsoft. Without it, `GET /v1/connections/oauth/s
 2. Click **+ New registration**.
 3. Name: `TieTide`.
 4. **Supported account types**: pick **Accounts in any organizational directory and personal Microsoft accounts** (multi-tenant + personal). This matches the default `MS_OAUTH_TENANT=common` in `.env.example`. If you only want your own tenant, pick the single-tenant option and you'll override `MS_OAUTH_TENANT` later.
-5. **Redirect URI**: pick **Web** from the dropdown and paste:
+5. **Redirect URI**: pick **Web** from the dropdown and paste the URI for the environment you're setting up first. Azure lets you register additional URIs from the **Authentication** blade after creation — add the deployed URI in step 6 if you have a domain, otherwise come back later.
    ```
    http://localhost:3030/v1/connections/oauth/callback?provider=microsoft
    ```
-   Byte-for-byte match with `MS_OAUTH_REDIRECT_URI` in your `.env`. Microsoft compares exactly.
+
+   - Byte-for-byte match with `MS_OAUTH_REDIRECT_URI` in your `.env`. Microsoft compares exactly.
+   - **HTTPS is required** for any non-localhost URI; Azure rejects `http://` for real domains.
 6. Click **Register**.
+7. (Recommended) After registration, left nav → **Authentication** → **Add URI** under the Web platform and add your deployed URI too, e.g. `https://<your-domain>/v1/connections/oauth/callback?provider=microsoft`. Both URIs share the same client id/secret — only the env var differs per environment.
 
 ### 3. Add the API permissions TieTide will call
 

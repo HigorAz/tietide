@@ -26,11 +26,15 @@ Slack also has a **third** credential — `signingSecret` — that you paste int
 ### 2. Configure OAuth & Permissions
 
 1. Left nav → **OAuth & Permissions**.
-2. Scroll to **Redirect URLs** → **Add New Redirect URL** → paste:
+2. Scroll to **Redirect URLs** → **Add New Redirect URL**. Slack lets you list multiple URLs on a single app — add one per environment you plan to run so you don't have to come back later:
    ```
    http://localhost:3030/v1/connections/oauth/callback?provider=slack
+   https://<your-domain>/v1/connections/oauth/callback?provider=slack
    ```
-   This must match `SLACK_OAUTH_REDIRECT_URI` in your `.env` byte-for-byte.
+
+   - Each URL must match the `SLACK_OAUTH_REDIRECT_URI` of its own environment byte-for-byte.
+   - **HTTPS is required** for any non-localhost URL; Slack rejects plain `http://` for real domains.
+   - Skip the second URL for now if you don't have a domain yet — you can add it later on the same page.
 3. **Save URLs**.
 4. Scroll to **Bot Token Scopes** → **Add an OAuth Scope** → add each of:
    - `chat:write` — post messages

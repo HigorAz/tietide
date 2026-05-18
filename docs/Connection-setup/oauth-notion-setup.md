@@ -34,11 +34,15 @@ This guide covers **Public**.
    - **Company name**: TieTide (or your handle).
    - **Website**: any URL — `https://github.com/HigorAz/tietide` works for now.
    - **Privacy policy** / **Terms of use**: required for public integrations. Use a placeholder URL during development; Notion does not verify until you publish.
-   - **Redirect URIs**: paste:
+   - **Redirect URIs**: Notion accepts multiple URIs on a single integration — add one per environment you plan to run so you don't have to come back later:
      ```
      http://localhost:3030/v1/connections/oauth/callback?provider=notion
+     https://<your-domain>/v1/connections/oauth/callback?provider=notion
      ```
-     This must match `NOTION_OAUTH_REDIRECT_URI` in your `.env` byte-for-byte.
+
+     - Each URI must match the `NOTION_OAUTH_REDIRECT_URI` of its own environment byte-for-byte.
+     - **HTTPS is required** for any non-localhost URI.
+     - Skip the second URI for now if you don't have a domain yet — you can add it later via the **Distribution** tab.
 7. **Submit**.
 
 ### 2. Pick capabilities (scopes)
