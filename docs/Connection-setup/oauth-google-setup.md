@@ -55,11 +55,15 @@ The app stays in "Testing" mode for the MVP — that's fine. Production publishi
 2. **Create credentials** → **OAuth client ID**.
 3. Application type: **Web application**.
 4. Name: `TieTide local dev`.
-5. **Authorized redirect URIs** → add:
+5. **Authorized redirect URIs** → add **one URI per environment you plan to run** (Google lets you list as many as you want — adding the production URI now saves a round-trip later). For local dev plus a deployed instance:
    ```
    http://localhost:3030/v1/connections/oauth/callback?provider=google
+   https://<your-domain>/v1/connections/oauth/callback?provider=google
    ```
-   This must match `GOOGLE_OAUTH_REDIRECT_URI` in your `.env` byte-for-byte. Google compares exactly.
+
+   - Each URI must match the `GOOGLE_OAUTH_REDIRECT_URI` of its own environment byte-for-byte. Google compares exactly.
+   - **HTTPS is required** for any non-localhost URI; Google rejects plain `http://` for real domains.
+   - Skip the second URI for now if you don't have a domain yet — you can add it later under the same OAuth client (no need to create a new one).
 6. Create.
 
 A modal pops up with **Client ID** and **Client secret**. Copy both somewhere safe — the secret is only shown once here, but you can regenerate it later if needed.
