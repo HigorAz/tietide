@@ -1,0 +1,72 @@
+name: Promote main to Production
+
+# Manual one-click promotion. Click "Run workflow" on the Actions tab to fast-forward
+# the Production branch to whatever's currently on main. The WSL deploy timer
+# (see docs/guides/continuous-deployment.md) picks up the change within ~5 minutes
+# and runs git pull + conditional pnpm install / prisma migrate / shared rebuild.
+#
+# Designed as a safety gate: nothing happens automatically on push to main. You
+# explicitly trigger this when main is ready to go live.
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why are you promoting? (logged for the record)'
+        required: false
+        type: string
+
+jobs:
+  promote:
+    name: Fast-forward Production from main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Production with full history
+        uses: actions/checkout@v4
+        with:
+          ref: Production
+          # Full history is required so the fast-forward merge can resolve correctly.
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fast-forward to origin/main
+        run: |
+          git fetch origin main
+
+          OLD=$(git rev-parse HEAD)
+          MAIN=$(git rev-parse origin/main)
+
+          if [ "$OLD" = "$MAIN" ]; then
+            echo "✓ Production is already at $MAIN — nothing to promote."
+            exit 0
+          fi
+
+          echo "Production currently at: $OLD"
+          echo "main currently at:        $MAIN"
+
+          # --ff-only guarantees we can't accidentally merge anything that wasn't
+          # already on main. If Production has diverged (someone committed
+          # directly to it), this will fail loudly instead of silently merging.
+          git merge --ff-only origin/main
+          git push origin Production
+
+          NEW=$(git rev-parse HEAD)
+          echo ""
+          echo "✓ Promoted Production: $OLD → $NEW"
+
+      - name: Summary
+        if: ${{ always() }}
+        run: |
+          echo "### Promotion to Production" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Triggered by:** @${{ github.actor }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Reason:** ${{ inputs.reason || '(not provided)' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Production now at:** $(git rev-parse --short HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "The WSL deploy timer will pull this change within ~5 minutes." >> "$GITHUB_STEP_SUMMARY"
