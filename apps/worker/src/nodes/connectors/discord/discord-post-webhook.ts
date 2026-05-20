@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import {
   BaseConnectorAction,
   ConnectorMisconfiguredError,
@@ -32,7 +32,12 @@ export class DiscordPostWebhookAction extends BaseConnectorAction<DiscordWebhook
   readonly requiredConnectionType = 'discord';
 
   // Inject fetch for testability without monkey-patching globals.
-  constructor(private readonly fetchImpl: typeof fetch = (...args) => fetch(...args)) {
+  // @Optional() is required because Nest's DI emits `Object` as the runtime metadata
+  // for `typeof fetch` (a TS-only type) and would otherwise fail with
+  // "Nest can't resolve dependencies of the DiscordPostWebhookAction (?)" when
+  // instantiating the worker module. With @Optional, Nest passes undefined and the
+  // default-value expression provides the real global fetch.
+  constructor(@Optional() private readonly fetchImpl: typeof fetch = (...args) => fetch(...args)) {
     super();
   }
 
