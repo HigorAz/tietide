@@ -1,10 +1,12 @@
 import { X } from 'lucide-react';
 import { NODE_CATALOG } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 import { FORM_REGISTRY } from './config/formRegistry';
 import { getNodeIcon } from './nodes/nodeIcons';
 import { NodePreviewPanel } from './preview/NodePreviewPanel';
+import { NodeRunInspection } from './NodeRunInspection';
 
 export function NodeConfigPanel() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
@@ -13,6 +15,11 @@ export function NodeConfigPanel() {
   );
   const selectNode = useEditorStore((s) => s.selectNode);
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
+  // When viewing a run (live or replay) the panel flips into inspection mode:
+  // it shows the node's resolved config + the input/output/error from the
+  // execution instead of the editable config form.
+  const executionMode = useExecutionLiveStore((s) => s.mode);
+  const isExecutionMode = executionMode === 'live' || executionMode === 'replay';
 
   if (selectedNodeId === null) {
     return null;
@@ -71,39 +78,47 @@ export function NodeConfigPanel() {
       </header>
 
       <div className="flex-1 overflow-y-auto pr-1">
-        {Form ? (
-          <Form key={selectedNodeId} nodeId={selectedNodeId} config={config} />
+        {isExecutionMode ? (
+          <NodeRunInspection nodeId={selectedNodeId} config={config} />
         ) : (
-          <p className="text-sm text-text-muted">No configuration available for this node.</p>
-        )}
+          <>
+            {Form ? (
+              <Form key={selectedNodeId} nodeId={selectedNodeId} config={config} />
+            ) : (
+              <p className="text-sm text-text-muted">No configuration available for this node.</p>
+            )}
 
-        <div className="mt-4 flex items-start gap-2 border-t border-white/5 pt-3">
-          <input
-            type="checkbox"
-            id={`error-handler-${selectedNodeId}`}
-            data-testid="node-config-error-handler-toggle"
-            checked={hasErrorHandler}
-            onChange={(e) =>
-              updateNodeConfig(selectedNodeId, { hasErrorHandler: e.target.checked })
-            }
-            className="mt-0.5 h-4 w-4 cursor-pointer accent-red-500"
-          />
-          <label
-            htmlFor={`error-handler-${selectedNodeId}`}
-            className="cursor-pointer text-xs leading-snug text-text-secondary"
-          >
-            <span className="font-medium text-text-primary">Add error handler</span>
-            <span className="block text-text-muted">
-              Reveals a red output handle. Connect it to route execution down an error path when
-              this node fails.
-            </span>
-          </label>
-        </div>
+            <div className="mt-4 flex items-start gap-2 border-t border-white/5 pt-3">
+              <input
+                type="checkbox"
+                id={`error-handler-${selectedNodeId}`}
+                data-testid="node-config-error-handler-toggle"
+                checked={hasErrorHandler}
+                onChange={(e) =>
+                  updateNodeConfig(selectedNodeId, { hasErrorHandler: e.target.checked })
+                }
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-red-500"
+              />
+              <label
+                htmlFor={`error-handler-${selectedNodeId}`}
+                className="cursor-pointer text-xs leading-snug text-text-secondary"
+              >
+                <span className="font-medium text-text-primary">Add error handler</span>
+                <span className="block text-text-muted">
+                  Reveals a red output handle. Connect it to route execution down an error path when
+                  this node fails.
+                </span>
+              </label>
+            </div>
+          </>
+        )}
       </div>
 
-      <footer data-testid="node-preview-panel">
-        <NodePreviewPanel nodeId={selectedNodeId} />
-      </footer>
+      {!isExecutionMode && (
+        <footer data-testid="node-preview-panel">
+          <NodePreviewPanel nodeId={selectedNodeId} />
+        </footer>
+      )}
     </aside>
   );
 }
