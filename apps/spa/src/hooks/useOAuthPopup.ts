@@ -9,6 +9,7 @@ export type OAuthPopupOutcome =
 
 const POPUP_FEATURES = 'width=520,height=640,menubar=no,toolbar=no,location=yes';
 const POPUP_NAME = 'tietide-oauth';
+const BROADCAST_CHANNEL = 'tietide-oauth';
 const POLL_INTERVAL_MS = 500;
 const MAX_DURATION_MS = 5 * 60 * 1000;
 
@@ -70,34 +71,52 @@ export function useOAuthPopup(): OAuthPopupApi {
     return new Promise<OAuthPopupOutcome>((resolve) => {
       const startedAt = Date.now();
       const expectedOrigin = window.location.origin;
+      // BroadcastChannel covers the case where Chrome's COOP severs
+      // `window.opener` during the provider redirect chain — the popup can no
+      // longer postMessage back to us, so it broadcasts instead.
+      const channel =
+        typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(BROADCAST_CHANNEL) : null;
 
       const finish = (outcome: OAuthPopupOutcome): void => {
         window.removeEventListener('message', handleMessage);
+        channel?.removeEventListener('message', handleBroadcast);
+        channel?.close();
         window.clearInterval(interval);
         inflightRef.current = false;
         resolve(outcome);
       };
 
-      const handleMessage = (event: MessageEvent): void => {
-        if (event.origin !== expectedOrigin) return;
-        const data = event.data as {
+      const ingest = (data: unknown): void => {
+        if (!data || typeof data !== 'object') return;
+        const d = data as {
           type?: unknown;
           status?: unknown;
           connectionId?: unknown;
           message?: unknown;
-        } | null;
-        if (!data || typeof data !== 'object' || data.type !== 'tietide:oauth:done') return;
-        if (data.status === 'success') {
+        };
+        if (d.type !== 'tietide:oauth:done') return;
+        if (d.status === 'success') {
           finish({
             status: 'success',
-            connectionId: typeof data.connectionId === 'string' ? data.connectionId : undefined,
+            connectionId: typeof d.connectionId === 'string' ? d.connectionId : undefined,
           });
         } else {
           finish({
             status: 'error',
-            message: typeof data.message === 'string' ? data.message : undefined,
+            message: typeof d.message === 'string' ? d.message : undefined,
           });
         }
+      };
+
+      const handleMessage = (event: MessageEvent): void => {
+        if (event.origin !== expectedOrigin) return;
+        ingest(event.data);
+      };
+
+      // BroadcastChannel is same-origin by construction (browser-enforced) so
+      // we trust its payload without an origin check.
+      const handleBroadcast = (event: MessageEvent): void => {
+        ingest(event.data);
       };
 
       const interval = window.setInterval(() => {
@@ -116,6 +135,7 @@ export function useOAuthPopup(): OAuthPopupApi {
       }, POLL_INTERVAL_MS);
 
       window.addEventListener('message', handleMessage);
+      channel?.addEventListener('message', handleBroadcast);
     });
   }, []);
 

@@ -17,10 +17,15 @@ const errorMessage = (err: unknown, fallback: string): string =>
   err instanceof Error && err.message ? err.message : fallback;
 
 export function ConnectionsPage(): JSX.Element {
-  // ----- Bridge: if we're inside an OAuth popup, postMessage and close. -----
+  // ----- Bridge: if we're inside an OAuth popup, message the opener and close. -----
+  // Popup detection uses `window.name` (set by window.open) rather than
+  // `window.opener`. The provider redirect chain (e.g. Google) crosses
+  // origins, and Chrome's COOP severs `opener` on the return — `window.name`
+  // survives. Without this, the popup falls through to the "direct-mode"
+  // path, strips the query, and renders the full page.
   const [closing, setClosing] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    if (!window.opener || window.opener.closed) return false;
+    if (window.name !== 'tietide-oauth') return false;
     return readBridgeFromUrl(window.location.search) !== null;
   });
 
@@ -31,16 +36,27 @@ export function ConnectionsPage(): JSX.Element {
       setClosing(false);
       return;
     }
+    const payload = {
+      type: 'tietide:oauth:done',
+      status: outcome.status,
+      connectionId: outcome.connectionId,
+      message: outcome.message,
+    };
+    // Best-effort postMessage to opener (works only if COOP hasn't severed
+    // the reference). Always also broadcast on a same-origin channel so the
+    // opener still hears us when `opener` is null.
     try {
-      window.opener?.postMessage(
-        {
-          type: 'tietide:oauth:done',
-          status: outcome.status,
-          connectionId: outcome.connectionId,
-          message: outcome.message,
-        },
-        window.location.origin,
-      );
+      window.opener?.postMessage(payload, window.location.origin);
+    } catch {
+      // ignore
+    }
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const ch = new BroadcastChannel('tietide-oauth');
+        ch.postMessage(payload);
+        // Defer close so the message flushes before the window goes away.
+        setTimeout(() => ch.close(), 0);
+      }
     } catch {
       // ignore
     }
