@@ -124,7 +124,7 @@ describe('OAuth Google flow (fixture token server)', () => {
               GOOGLE_OAUTH_TOKEN_URL: fixture.url,
               MS_OAUTH_CLIENT_ID: 'm-cid',
               MS_OAUTH_CLIENT_SECRET: 'm-secret',
-              MS_OAUTH_REDIRECT_URI: 'http://localhost:3030/cb?provider=microsoft',
+              MS_OAUTH_REDIRECT_URI: 'http://localhost:3030/cb',
               SLACK_OAUTH_CLIENT_ID: 's-cid',
               SLACK_OAUTH_CLIENT_SECRET: 's-secret',
               SLACK_OAUTH_REDIRECT_URI: 'http://localhost:3030/cb?provider=slack',

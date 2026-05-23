@@ -89,12 +89,12 @@ describe('NodeConfigPanel', () => {
       expect(screen.getByRole('heading', { name: /HTTP Request/i })).toBeInTheDocument();
     });
 
-    it('should render a disabled Preview button with a tooltip', () => {
+    it('should render the live Preview panel in the footer', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
-      const preview = screen.getByTestId('node-preview-button');
-      expect(preview).toBeDisabled();
-      expect(preview).toHaveAttribute('title');
+      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
+      expect(screen.getByTestId('node-preview-toggle')).not.toBeDisabled();
     });
 
     it('should clear the selection when the close button is clicked', () => {

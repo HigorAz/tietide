@@ -26,14 +26,17 @@ This guide covers step 1 for Microsoft. Without it, `GET /v1/connections/oauth/s
 3. Name: `TieTide`.
 4. **Supported account types**: pick **Accounts in any organizational directory and personal Microsoft accounts** (multi-tenant + personal). This matches the default `MS_OAUTH_TENANT=common` in `.env.example`. If you only want your own tenant, pick the single-tenant option and you'll override `MS_OAUTH_TENANT` later.
 5. **Redirect URI**: pick **Web** from the dropdown and paste the URI for the environment you're setting up first. Azure lets you register additional URIs from the **Authentication** blade after creation — add the deployed URI in step 6 if you have a domain, otherwise come back later.
+
    ```
-   http://localhost:3030/v1/connections/oauth/callback?provider=microsoft
+   http://localhost:3030/v1/connections/oauth/callback
    ```
 
+   - **Do NOT append `?provider=microsoft`.** Microsoft Entra forbids query strings in redirect URIs for any app that supports personal Microsoft accounts (the account type chosen in step 4) — adding one fails registration with _"The URL must not contain a query string."_ Unlike Google, TieTide's Microsoft callback is query-string-free; the provider is resolved from the signed OAuth state JWT instead.
    - Byte-for-byte match with `MS_OAUTH_REDIRECT_URI` in your `.env`. Microsoft compares exactly.
    - **HTTPS is required** for any non-localhost URI; Azure rejects `http://` for real domains.
+
 6. Click **Register**.
-7. (Recommended) After registration, left nav → **Authentication** → **Add URI** under the Web platform and add your deployed URI too, e.g. `https://<your-domain>/v1/connections/oauth/callback?provider=microsoft`. Both URIs share the same client id/secret — only the env var differs per environment.
+7. (Recommended) After registration, left nav → **Authentication** → **Add URI** under the Web platform and add your deployed URI too, e.g. `https://<your-domain>/v1/connections/oauth/callback` (still no query string). Both URIs share the same client id/secret — only the env var differs per environment.
 
 ### 3. Add the API permissions TieTide will call
 
@@ -74,7 +77,7 @@ Open `.env` at the repo root and set:
 ```env
 MS_OAUTH_CLIENT_ID=<application-client-id-from-step-5>
 MS_OAUTH_CLIENT_SECRET=<client-secret-value-from-step-4>
-MS_OAUTH_REDIRECT_URI=http://localhost:3030/v1/connections/oauth/callback?provider=microsoft
+MS_OAUTH_REDIRECT_URI=http://localhost:3030/v1/connections/oauth/callback
 MS_OAUTH_TENANT=common
 ```
 
@@ -91,7 +94,7 @@ Then in the SPA:
 1. Log in to TieTide.
 2. Go to **Connections** → pick **Microsoft** → label it (e.g. "My Outlook") → **Connect**.
 3. Browser redirects to `login.microsoftonline.com/.../oauth2/v2.0/authorize?...` — you should see Microsoft's consent screen for the TieTide app.
-4. Approve → Microsoft redirects back to `localhost:3030/v1/connections/oauth/callback?provider=microsoft&code=...` → TieTide exchanges the code → SPA lands on `/connections?status=success&id=<connection-uuid>`.
+4. Approve → Microsoft redirects back to `localhost:3030/v1/connections/oauth/callback?code=...&state=...` (Microsoft appends `code`/`state` itself — that's fine; the prohibition is only on query strings in the _registered_ URI) → TieTide exchanges the code → SPA lands on `/connections?status=success&id=<connection-uuid>`.
 5. A new row appears in `Connection` for your user, with encrypted `access_token` + `refresh_token` + `tenantId`.
 
 If step 3 errors with `AADSTS50011: The reply URL specified in the request does not match`, the redirect URI in step 2 of Azure Portal doesn't match `MS_OAUTH_REDIRECT_URI` exactly. Trailing slashes, http vs https, and ports all count.
@@ -100,8 +103,8 @@ If step 3 errors with `AADSTS50011: The reply URL specified in the request does 
 
 When you deploy to a real domain (e.g. `app.tietide.com`):
 
-1. Edit the same app registration → **Authentication** → **+ Add a platform** → Web → paste `https://app.tietide.com/v1/connections/oauth/callback?provider=microsoft`. Keep the localhost URI for local dev parity.
-2. Update production env: `MS_OAUTH_REDIRECT_URI=https://app.tietide.com/v1/connections/oauth/callback?provider=microsoft` and `SPA_BASE_URL=https://app.tietide.com`.
+1. Edit the same app registration → **Authentication** → **+ Add a platform** → Web → paste `https://app.tietide.com/v1/connections/oauth/callback` (no query string). Keep the localhost URI for local dev parity.
+2. Update production env: `MS_OAUTH_REDIRECT_URI=https://app.tietide.com/v1/connections/oauth/callback` and `SPA_BASE_URL=https://app.tietide.com`.
 3. Client secrets expire — set a calendar reminder a month before the expiry date in step 4 to rotate.
 
 ## Free-tier limits
