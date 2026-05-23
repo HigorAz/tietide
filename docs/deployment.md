@@ -131,7 +131,7 @@ Each provider you want to enable requires registering an OAuth client at the pro
 
 1. Open https://entra.microsoft.com → **Identity → App registrations → New registration**
 2. **Supported account types**: choose multitenant (`AzureADMultipleOrgs`) for `MS_OAUTH_TENANT=common`, or single-tenant if locking to your own tenant id.
-3. **Redirect URI** (Web): `https://<DOMAIN>/v1/connections/oauth/callback?provider=microsoft`
+3. **Redirect URI** (Web): `https://<DOMAIN>/v1/connections/oauth/callback` (no `?provider=` query string — Entra rejects query strings in redirect URIs for personal-account apps; the provider comes from the signed state JWT)
 4. After creating the app, go to **Certificates & secrets → New client secret** and copy the secret value.
 5. Paste into:
    - `MS_OAUTH_CLIENT_ID` (Application (client) ID)
@@ -469,7 +469,7 @@ The 5 Microsoft 365 connector nodes (Outlook send/search, Excel append/read, One
 1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com/) → **Applications → App registrations → New registration**.
 2. **Name**: e.g., "TieTide".
 3. **Supported account types**: choose `Accounts in any organizational directory and personal Microsoft accounts (multitenant)`. Use a single-tenant option only if you control every account that will connect.
-4. **Redirect URI**: select `Web` and enter `https://tietide.example.com/v1/connections/oauth/callback?provider=microsoft` (replace with your real public hostname; for local development add `http://localhost:3030/v1/connections/oauth/callback?provider=microsoft` as a second redirect URI under **Authentication → Web → Add URI** after creation).
+4. **Redirect URI**: select `Web` and enter `https://tietide.example.com/v1/connections/oauth/callback` (replace with your real public hostname; for local development add `http://localhost:3030/v1/connections/oauth/callback` as a second redirect URI under **Authentication → Web → Add URI** after creation). **No `?provider=` query string** — Entra forbids query strings in redirect URIs for the personal-account app type chosen in step 3; the provider is resolved from the signed OAuth state JWT instead.
 5. Click **Register** and copy the **Application (client) ID** from the overview page.
 
 ### 12.2. Create a client secret
@@ -498,7 +498,7 @@ Add (or update) these variables in your deployment's `.env`:
 ```bash
 MS_OAUTH_CLIENT_ID=<the application (client) id from 12.1>
 MS_OAUTH_CLIENT_SECRET=<the client secret value from 12.2>
-MS_OAUTH_REDIRECT_URI=https://tietide.example.com/v1/connections/oauth/callback?provider=microsoft
+MS_OAUTH_REDIRECT_URI=https://tietide.example.com/v1/connections/oauth/callback
 # 'common' lets both work and personal Microsoft accounts connect; set to your
 # directory's tenant id for a single-tenant deployment.
 MS_OAUTH_TENANT=common

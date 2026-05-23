@@ -48,7 +48,7 @@ export function getUpstreamSchemas(
   return { byNode, suggestions };
 }
 
-function bfsAncestors(targetNodeId: string, edges: Edge[]): string[] {
+export function bfsAncestors(targetNodeId: string, edges: Edge[]): string[] {
   const reverseAdj = new Map<string, string[]>();
   for (const e of edges) {
     if (!reverseAdj.has(e.target)) reverseAdj.set(e.target, []);

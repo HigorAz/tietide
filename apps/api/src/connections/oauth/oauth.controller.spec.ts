@@ -139,6 +139,20 @@ describe('OAuthController (integration)', () => {
       });
     });
 
+    it('succeeds without a provider query param (Microsoft query-string-free callback)', async () => {
+      oauth.handleCallback.mockResolvedValue({ connectionId: 'ms-conn' });
+
+      const res = await request(app.getHttpServer())
+        .get('/connections/oauth/callback')
+        .query({ code: 'auth-code', state: 'jwt-state' })
+        .expect(HttpStatus.FOUND);
+
+      expect(res.headers.location).toMatch(/status=success/);
+      expect(oauth.handleCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'auth-code', state: 'jwt-state', provider: undefined }),
+      );
+    });
+
     it('redirects to error URL when state is invalid', async () => {
       oauth.handleCallback.mockRejectedValue(new BadRequestException('Invalid state'));
 
