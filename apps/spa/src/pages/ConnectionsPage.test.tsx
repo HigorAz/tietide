@@ -97,10 +97,10 @@ describe('ConnectionsPage', () => {
     expect(screen.getByText(/Expired/i)).toBeInTheDocument();
   });
 
-  it('should open a popup with about:blank when an OAuth provider card is clicked', async () => {
+  it('should open a popup with about:blank when the OAuth modal Connect button is clicked', async () => {
     const user = userEvent.setup();
     mockedList.mockResolvedValue([]);
-    // Never resolve startOAuth for this test — we're only verifying the synchronous popup open.
+    // Never resolve startOAuth — we're only verifying the synchronous popup open.
     mockedStartOAuth.mockReturnValueOnce(new Promise(() => {}));
     const fakePopup = { closed: false, location: { href: '' }, close: vi.fn() };
     openMock.mockReturnValueOnce(fakePopup as unknown as Window);
@@ -109,13 +109,15 @@ describe('ConnectionsPage', () => {
     await waitFor(() => expect(mockedList).toHaveBeenCalled());
 
     await user.click(screen.getByTestId('provider-card-google'));
+    // OAuth modal opens first; popup is opened from the Connect button inside it.
+    expect(openMock).not.toHaveBeenCalled();
+    await user.click(await screen.findByRole('button', { name: /connect with google/i }));
 
     expect(openMock).toHaveBeenCalledTimes(1);
     expect(openMock.mock.calls[0][0]).toBe('about:blank');
-    expect(mockedStartOAuth).toHaveBeenCalledWith({
-      provider: 'google',
-      label: 'My Google',
-    });
+    expect(mockedStartOAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'google', label: 'My Google' }),
+    );
   });
 
   it('should refetch connections and toast on a postMessage success from the popup', async () => {
@@ -130,6 +132,7 @@ describe('ConnectionsPage', () => {
     await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(1));
 
     await user.click(screen.getByTestId('provider-card-google'));
+    await user.click(await screen.findByRole('button', { name: /connect with google/i }));
 
     // Simulate the popup posting back.
     window.dispatchEvent(
@@ -215,18 +218,19 @@ describe('ConnectionsPage', () => {
   });
 
   describe('deep-link auto-connect (?provider=X&connect=true)', () => {
-    it('should auto-open the connect flow for the provider in the query string', async () => {
+    it('should auto-open the OAuth modal for the provider in the query string', async () => {
       mockedList.mockResolvedValue([]);
-      mockedStartOAuth.mockReturnValueOnce(new Promise(() => {}));
-      const fakePopup = { closed: false, location: { href: '' }, close: vi.fn() };
-      openMock.mockReturnValueOnce(fakePopup as unknown as Window);
 
       window.history.replaceState({}, '', '/connections?provider=google&connect=true');
 
       render(<ConnectionsPage />);
 
-      await waitFor(() => expect(mockedStartOAuth).toHaveBeenCalledTimes(1));
-      expect(mockedStartOAuth.mock.calls[0][0]).toMatchObject({ provider: 'google' });
+      // Modal opens for naming + scope selection — popup is launched from the
+      // Connect button inside, not auto-fired.
+      expect(
+        await screen.findByRole('button', { name: /connect with google/i }),
+      ).toBeInTheDocument();
+      expect(mockedStartOAuth).not.toHaveBeenCalled();
       // Query params should be stripped after handling so a refresh doesn't re-fire.
       expect(window.location.search).toBe('');
     });
@@ -255,11 +259,8 @@ describe('ConnectionsPage', () => {
       expect(openMock).not.toHaveBeenCalled();
     });
 
-    it('should fire exactly once even under React.StrictMode', async () => {
+    it('should open the OAuth modal exactly once even under React.StrictMode', async () => {
       mockedList.mockResolvedValue([]);
-      mockedStartOAuth.mockReturnValueOnce(new Promise(() => {}));
-      const fakePopup = { closed: false, location: { href: '' }, close: vi.fn() };
-      openMock.mockReturnValueOnce(fakePopup as unknown as Window);
 
       window.history.replaceState({}, '', '/connections?provider=google&connect=true');
 
@@ -269,10 +270,14 @@ describe('ConnectionsPage', () => {
         </StrictMode>,
       );
 
-      await waitFor(() => expect(mockedStartOAuth).toHaveBeenCalledTimes(1));
+      // Modal Connect button should be rendered exactly once.
+      await waitFor(() =>
+        expect(screen.getAllByRole('button', { name: /connect with google/i })).toHaveLength(1),
+      );
       // Give StrictMode's second effect pass a chance to misfire.
       await new Promise((r) => setTimeout(r, 50));
-      expect(mockedStartOAuth).toHaveBeenCalledTimes(1);
+      expect(screen.getAllByRole('button', { name: /connect with google/i })).toHaveLength(1);
+      expect(mockedStartOAuth).not.toHaveBeenCalled();
     });
 
     it('should auto-open the API-key modal when the provider is API_KEY-typed', async () => {

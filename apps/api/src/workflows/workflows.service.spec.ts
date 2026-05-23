@@ -508,18 +508,24 @@ describe('WorkflowsService', () => {
     });
 
     it('should bump version by 1 ONLY when definition changes', async () => {
+      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValueOnce({
+        definition: validDefinition,
+        version: 1,
+      });
       const newDef = { ...validDefinition };
       await service.update(userId, workflowId, { definition: newDef });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ version: { increment: 1 } }),
+          data: expect.objectContaining({ version: 2 }),
         }),
       );
     });
 
-    it('should snapshot the prior definition into WorkflowVersion when definition changes', async () => {
-      // findUnique inside the transaction returns the prior state
+    it('should snapshot the NEW definition at the NEW version when definition changes', async () => {
+      // WorkflowVersion(1) already exists from create; on update we snapshot the
+      // new state at v+1 (every version has exactly one row).
       prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, userId });
       prisma.workflow.findUnique.mockResolvedValueOnce({
         definition: validDefinition,
@@ -544,8 +550,8 @@ describe('WorkflowsService', () => {
       expect(prisma.workflowVersion.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           workflowId,
-          version: 1,
-          definition: validDefinition,
+          version: 2,
+          definition: newDef,
           createdById: userId,
           message: 'tweak',
         }),

@@ -165,6 +165,37 @@ describe('useOAuthPopup', () => {
     await expect(pending!).resolves.toEqual({ status: 'cancelled' });
   });
 
+  it('should resolve via BroadcastChannel when window.opener was severed by COOP', async () => {
+    // Real timers needed: BroadcastChannel delivery is microtask-async.
+    vi.useRealTimers();
+    mockedStartOAuth.mockResolvedValue({ redirectUrl: 'https://x', state: 's' });
+    const { result } = renderHook(() => useOAuthPopup());
+
+    let pending: Promise<unknown>;
+    act(() => {
+      pending = result.current.start({
+        provider: ConnectionProvider.GOOGLE,
+        label: 'g',
+      });
+    });
+    // Let the synchronous setup (startOAuth resolution + listener registration) flush.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // Simulate the popup (which has lost window.opener) broadcasting its outcome.
+    const sender = new BroadcastChannel('tietide-oauth');
+    sender.postMessage({
+      type: 'tietide:oauth:done',
+      status: 'success',
+      connectionId: 'broadcast-id',
+    });
+    sender.close();
+
+    await expect(pending!).resolves.toEqual({ status: 'success', connectionId: 'broadcast-id' });
+  });
+
   it('should fall back to same-window redirect when window.open returns null (popup blocked)', async () => {
     openMock.mockReturnValueOnce(null);
     mockedStartOAuth.mockResolvedValue({ redirectUrl: 'https://x/auth', state: 's' });
