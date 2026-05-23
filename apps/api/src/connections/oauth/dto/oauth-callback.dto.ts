@@ -24,4 +24,14 @@ export class OAuthCallbackDto {
   @IsString()
   @MaxLength(256)
   error?: string;
+
+  // Provider-supplied extras we don't use but must accept to avoid 400 under
+  // the global `forbidNonWhitelisted` policy. Google attaches `iss`/`scope`/
+  // `authuser`/`prompt`/`hd`; Microsoft adds `session_state`/`scope`.
+  @IsOptional() @IsString() @MaxLength(512) iss?: string;
+  @IsOptional() @IsString() @MaxLength(2048) scope?: string;
+  @IsOptional() @IsString() @MaxLength(32) authuser?: string;
+  @IsOptional() @IsString() @MaxLength(64) prompt?: string;
+  @IsOptional() @IsString() @MaxLength(256) hd?: string;
+  @IsOptional() @IsString() @MaxLength(256) session_state?: string;
 }
