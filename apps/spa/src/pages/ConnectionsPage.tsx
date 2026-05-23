@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ConnectionType } from '@tietide/shared';
 import { useConnectionsStore } from '@/stores/connectionsStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -18,57 +18,28 @@ const errorMessage = (err: unknown, fallback: string): string =>
   err instanceof Error && err.message ? err.message : fallback;
 
 export function ConnectionsPage(): JSX.Element {
-  // ----- Bridge: if we're inside an OAuth popup, message the opener and close. -----
-  // Popup detection uses `window.name` (set by window.open) rather than
-  // `window.opener`. The provider redirect chain (e.g. Google) crosses
-  // origins, and Chrome's COOP severs `opener` on the return — `window.name`
-  // survives. Without this, the popup falls through to the "direct-mode"
-  // path, strips the query, and renders the full page.
-  const [closing, setClosing] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    if (window.name !== 'tietide-oauth') return false;
-    return readBridgeFromUrl(window.location.search) !== null;
-  });
-
-  useEffect(() => {
-    if (!closing) return;
-    const outcome = readBridgeFromUrl(window.location.search);
-    if (!outcome) {
-      setClosing(false);
-      return;
-    }
-    const payload = {
-      type: 'tietide:oauth:done',
-      status: outcome.status,
-      connectionId: outcome.connectionId,
-      message: outcome.message,
-    };
-    // Best-effort postMessage to opener (works only if COOP hasn't severed
-    // the reference). Always also broadcast on a same-origin channel so the
-    // opener still hears us when `opener` is null.
-    try {
-      window.opener?.postMessage(payload, window.location.origin);
-    } catch {
-      // ignore
-    }
-    try {
-      if (typeof BroadcastChannel !== 'undefined') {
-        const ch = new BroadcastChannel('tietide-oauth');
-        ch.postMessage(payload);
-        // Defer close so the message flushes before the window goes away.
-        setTimeout(() => ch.close(), 0);
-      }
-    } catch {
-      // ignore
-    }
-    setTimeout(() => {
-      try {
-        window.close();
-      } catch {
-        // ignore
-      }
-    }, 50);
-  }, [closing]);
+  // ----- Bridge: relay the OAuth outcome to any opener/listener. -----
+  // Detect "bridge mode" purely from URL params. We used to gate on
+  // `window.opener` / `window.name`, but Chrome's default COOP can strip
+  // BOTH on the provider redirect chain (e.g. Google → API → SPA), leaving
+  // the popup looking like a normal /connections page and the opener
+  // hanging until the user closed it manually (which then registered as
+  // "cancelled"). URL params survive every navigation.
+  //
+  // Behavior whenever the URL has ?status=…:
+  //   1. postMessage to window.opener (best-effort; may be null).
+  //   2. broadcast on BroadcastChannel('tietide-oauth') — same-origin,
+  //      survives COOP severance.
+  //   3. attempt window.close() — works for script-opened popups, ignored
+  //      for normal tabs.
+  //   4. if we're still here after the close attempt, strip the query and
+  //      render the page as usual so direct-link arrivals aren't stuck on
+  //      a "Finalizing…" screen.
+  const initialOutcome = useMemo(
+    () => (typeof window === 'undefined' ? null : readBridgeFromUrl(window.location.search)),
+    [],
+  );
+  const [closing, setClosing] = useState<boolean>(initialOutcome !== null);
 
   // ----- Standard page state -----
   const {
@@ -92,23 +63,57 @@ export function ConnectionsPage(): JSX.Element {
   const deepLinkHandledRef = useRef<boolean>(false);
 
   useEffect(() => {
+    if (!closing || !initialOutcome) return;
+    const payload = {
+      type: 'tietide:oauth:done',
+      status: initialOutcome.status,
+      connectionId: initialOutcome.connectionId,
+      message: initialOutcome.message,
+    };
+    try {
+      window.opener?.postMessage(payload, window.location.origin);
+    } catch {
+      // ignore — opener may be null or cross-origin
+    }
+    let channel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        channel = new BroadcastChannel('tietide-oauth');
+        channel.postMessage(payload);
+      }
+    } catch {
+      // ignore
+    }
+    const closeTimer = window.setTimeout(() => {
+      try {
+        window.close();
+      } catch {
+        // ignore
+      }
+    }, 80);
+    const fallbackTimer = window.setTimeout(() => {
+      // window.close() was denied (regular tab / browser policy). Surface
+      // the outcome inline and drop back to the standard page so the user
+      // isn't stuck on the "Finalizing…" screen.
+      if (initialOutcome.status === 'success') {
+        toast({ tone: 'success', message: 'Connection added' });
+      } else {
+        toast({ tone: 'error', message: initialOutcome.message ?? 'OAuth failed' });
+      }
+      window.history.replaceState({}, '', window.location.pathname);
+      setClosing(false);
+    }, 500);
+    return () => {
+      window.clearTimeout(closeTimer);
+      window.clearTimeout(fallbackTimer);
+      channel?.close();
+    };
+  }, [closing, initialOutcome, toast]);
+
+  useEffect(() => {
     if (closing) return;
     void fetch();
   }, [fetch, closing]);
-
-  // ----- Direct-mode bridge fallback: page mounted (not in popup) but with status query. -----
-  useEffect(() => {
-    if (closing) return;
-    if (typeof window === 'undefined') return;
-    const outcome = readBridgeFromUrl(window.location.search);
-    if (!outcome) return;
-    if (outcome.status === 'success') {
-      toast({ tone: 'success', message: 'Connection added' });
-    } else {
-      toast({ tone: 'error', message: outcome.message ?? 'OAuth failed' });
-    }
-    window.history.replaceState({}, '', window.location.pathname);
-  }, [closing, toast]);
 
   // Deep-link: ConnectionPicker's empty-state CTA opens us at
   // /connections?provider=X&connect=true to auto-fire the connect flow.
