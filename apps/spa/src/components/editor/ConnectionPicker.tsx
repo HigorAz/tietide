@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import * as Select from '@radix-ui/react-select';
-import { Check, ChevronDown, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ExternalLink } from 'lucide-react';
 import type { ConnectionView } from '@/api/connections';
 import { ConnectionStatusBadge } from '@/components/connections/ConnectionStatusBadge';
 import { getProviderLabel } from '@/components/connections/providerCatalog';
@@ -56,6 +56,11 @@ export function ConnectionPicker({
     () => compatible.find((c) => c.id === value) ?? null,
     [compatible, value],
   );
+  // Stale: the workflow saved a connectionId that no longer matches any of
+  // the user's connections (deleted/revoked). Surface it so users don't
+  // assume the placeholder = "nothing was saved". This is the root-cause UX
+  // for the "Connection <uuid> not found" runtime failure.
+  const isStale = value !== null && selected === null;
 
   if (compatible.length === 0) {
     const addHref = `/connections?provider=${encodeURIComponent(provider)}&connect=true`;
@@ -82,45 +87,61 @@ export function ConnectionPicker({
   }
 
   return (
-    <Select.Root
-      value={value ?? ''}
-      onValueChange={(next) => onChange(next || null)}
-      disabled={disabled}
-    >
-      <Select.Trigger
-        aria-label="Connection"
-        className={cn(
-          'inline-flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-elevated px-3 py-2 text-sm text-text-primary transition',
-          'hover:border-white/20 focus:outline-none focus:ring-1 focus:ring-accent-teal',
-          'disabled:cursor-not-allowed disabled:opacity-60',
-        )}
-      >
-        <Select.Value
-          placeholder={`Select a ${label} connection…`}
-          aria-label={selected ? selected.name : undefined}
+    <div className="space-y-1.5">
+      {isStale && (
+        <div
+          role="alert"
+          data-testid="connection-picker-stale"
+          className="flex items-start gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2.5 py-2 text-xs text-amber-200"
         >
-          {selected ? <ConnectionTriggerContent connection={selected} /> : undefined}
-        </Select.Value>
-        <Select.Icon>
-          <ChevronDown aria-hidden className="h-4 w-4 text-text-secondary" />
-        </Select.Icon>
-      </Select.Trigger>
-      <Select.Portal>
-        <Select.Content
-          position="popper"
-          sideOffset={4}
+          <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+          <span>
+            The {label} connection saved on this node is no longer available — it was deleted or
+            revoked. Re-pick a connection below.
+          </span>
+        </div>
+      )}
+      <Select.Root
+        value={value ?? ''}
+        onValueChange={(next) => onChange(next || null)}
+        disabled={disabled}
+      >
+        <Select.Trigger
+          aria-label="Connection"
           className={cn(
-            'z-50 min-w-[--radix-select-trigger-width] overflow-hidden rounded-md border border-white/10 bg-surface shadow-lg',
+            'inline-flex w-full items-center justify-between gap-2 rounded-md border bg-elevated px-3 py-2 text-sm text-text-primary transition',
+            'hover:border-white/20 focus:outline-none focus:ring-1 focus:ring-accent-teal',
+            'disabled:cursor-not-allowed disabled:opacity-60',
+            isStale ? 'border-amber-400/40 focus:ring-amber-400' : 'border-white/10',
           )}
         >
-          <Select.Viewport className="p-1">
-            {compatible.map((conn) => (
-              <ConnectionPickerOption key={conn.id} connection={conn} />
-            ))}
-          </Select.Viewport>
-        </Select.Content>
-      </Select.Portal>
-    </Select.Root>
+          <Select.Value
+            placeholder={`Select a ${label} connection…`}
+            aria-label={selected ? selected.name : undefined}
+          >
+            {selected ? <ConnectionTriggerContent connection={selected} /> : undefined}
+          </Select.Value>
+          <Select.Icon>
+            <ChevronDown aria-hidden className="h-4 w-4 text-text-secondary" />
+          </Select.Icon>
+        </Select.Trigger>
+        <Select.Portal>
+          <Select.Content
+            position="popper"
+            sideOffset={4}
+            className={cn(
+              'z-50 min-w-[--radix-select-trigger-width] overflow-hidden rounded-md border border-white/10 bg-surface shadow-lg',
+            )}
+          >
+            <Select.Viewport className="p-1">
+              {compatible.map((conn) => (
+                <ConnectionPickerOption key={conn.id} connection={conn} />
+              ))}
+            </Select.Viewport>
+          </Select.Content>
+        </Select.Portal>
+      </Select.Root>
+    </div>
   );
 }
 

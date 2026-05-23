@@ -209,4 +209,50 @@ describe('ConnectionPicker', () => {
     const trigger = screen.getByRole('combobox', { name: /connection/i });
     expect(trigger).toHaveTextContent('Work Google');
   });
+
+  describe('stale id warning', () => {
+    it('should show a stale-id warning when value is set but no matching connection exists', () => {
+      // Repro: the workflow node stored a connectionId for a connection
+      // that has since been deleted/revoked. The picker used to silently
+      // fall back to the placeholder, so users could not tell their saved
+      // selection was gone.
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value="deleted-conn-id" onChange={vi.fn()} />);
+
+      const warning = screen.getByTestId('connection-picker-stale');
+      expect(warning).toBeInTheDocument();
+      expect(warning).toHaveTextContent(/unavailable|deleted|re-?pick/i);
+    });
+
+    it('should not show the stale warning when value matches a connection', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />);
+
+      expect(screen.queryByTestId('connection-picker-stale')).not.toBeInTheDocument();
+    });
+
+    it('should not show the stale warning when value is null', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value={null} onChange={vi.fn()} />);
+
+      expect(screen.queryByTestId('connection-picker-stale')).not.toBeInTheDocument();
+    });
+
+    it('should let the user pick a fresh connection from the dropdown to clear the stale state', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value="deleted-conn-id" onChange={onChange} />);
+
+      expect(screen.getByTestId('connection-picker-stale')).toBeInTheDocument();
+      await user.click(screen.getByRole('combobox', { name: /connection/i }));
+      await user.click(await screen.findByRole('option', { name: /work google/i }));
+
+      expect(onChange).toHaveBeenCalledWith('g-1');
+    });
+  });
 });
