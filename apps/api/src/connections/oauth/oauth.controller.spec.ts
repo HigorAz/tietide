@@ -183,5 +183,29 @@ describe('OAuthController (integration)', () => {
       expect(res.status).toBe(HttpStatus.FOUND);
       expect(oauth.handleCallback).toHaveBeenCalled();
     });
+
+    it('strips provider-supplied extras (iss, scope, authuser, prompt) instead of 400-ing', async () => {
+      oauth.handleCallback.mockResolvedValue({ connectionId: 'cb-extras' });
+
+      const res = await request(app.getHttpServer())
+        .get('/connections/oauth/callback')
+        .query({
+          provider: 'google',
+          code: 'auth-code',
+          state: 'jwt-state',
+          iss: 'https://accounts.google.com',
+          scope: 'openid email profile',
+          authuser: '0',
+          prompt: 'consent',
+        })
+        .expect(HttpStatus.FOUND);
+
+      expect(res.headers.location).toMatch(/status=success/);
+      expect(oauth.handleCallback).toHaveBeenCalledWith({
+        provider: 'google',
+        code: 'auth-code',
+        state: 'jwt-state',
+      });
+    });
   });
 });
