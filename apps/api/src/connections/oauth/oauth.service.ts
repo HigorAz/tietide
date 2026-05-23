@@ -27,7 +27,10 @@ export interface OAuthStartResult {
 }
 
 export interface OAuthCallbackInput {
-  provider: string;
+  // Optional: Microsoft Entra forbids query strings in redirect URIs for
+  // personal-account apps, so its callback omits `?provider=`. The signed state
+  // JWT carries the provider and is the source of truth.
+  provider?: string;
   code?: string;
   state: string;
   error?: string;
@@ -97,11 +100,14 @@ export class OAuthService {
       throw err;
     }
 
-    if (decoded.provider !== input.provider) {
+    // The provider query param is a defense-in-depth cross-check when present
+    // (Google attaches it); it is absent for Microsoft's query-string-free
+    // callback. Either way, the signed state JWT is the authoritative source.
+    if (input.provider && decoded.provider !== input.provider) {
       throw new BadRequestException('OAuth state provider mismatch');
     }
 
-    const provider = this.registry.get(input.provider);
+    const provider = this.registry.get(decoded.provider);
     const exchanged = await provider.exchangeCode({
       code: input.code,
       redirectUri: provider.redirectUri(),

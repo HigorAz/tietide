@@ -3,10 +3,14 @@ import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { SUPPORTED_OAUTH_PROVIDERS } from './start-oauth.dto';
 
 export class OAuthCallbackDto {
-  @ApiProperty({ enum: SUPPORTED_OAUTH_PROVIDERS })
+  // Optional: Microsoft Entra forbids query strings in redirect URIs for
+  // personal-account apps, so the Microsoft callback omits `?provider=`. The
+  // signed `state` JWT carries the provider and is the source of truth.
+  @ApiPropertyOptional({ enum: SUPPORTED_OAUTH_PROVIDERS })
+  @IsOptional()
   @IsString()
   @IsIn(SUPPORTED_OAUTH_PROVIDERS as readonly string[])
-  provider!: string;
+  provider?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

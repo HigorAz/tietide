@@ -4,7 +4,9 @@ import { MicrosoftOAuthProvider } from './microsoft.provider';
 const ENV: Record<string, string> = {
   MS_OAUTH_CLIENT_ID: 'ms-client',
   MS_OAUTH_CLIENT_SECRET: 'ms-secret',
-  MS_OAUTH_REDIRECT_URI: 'http://localhost:3030/v1/connections/oauth/callback?provider=microsoft',
+  // Microsoft Entra forbids query strings in redirect URIs for personal-account
+  // apps, so the Microsoft callback is query-string-free (no ?provider=).
+  MS_OAUTH_REDIRECT_URI: 'http://localhost:3030/v1/connections/oauth/callback',
 };
 
 function makeConfig(overrides: Partial<Record<string, string | undefined>> = {}): ConfigService {

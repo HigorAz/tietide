@@ -178,6 +178,23 @@ describe('OAuthService', () => {
       );
     });
 
+    it('resolves the provider from the signed state when the query param is omitted', async () => {
+      // Microsoft's redirect URI is query-string-free, so no ?provider= arrives.
+      const { service, provider, connections } = makeService({});
+
+      const result = await service.handleCallback(callback({ provider: undefined }));
+
+      expect(result.connectionId).toBe('11111111-1111-4111-8111-111111111111');
+      expect(provider.exchangeCode).toHaveBeenCalledWith({
+        code: 'auth-code',
+        redirectUri: provider.redirectUri(),
+      });
+      expect(connections.create).toHaveBeenCalledWith(
+        USER_ID,
+        expect.objectContaining({ provider: 'google' }),
+      );
+    });
+
     it('rejects when the state JWT cannot be verified', async () => {
       const { service } = makeService({
         stateVerify: jest.fn().mockRejectedValue(new UnauthorizedException()),
