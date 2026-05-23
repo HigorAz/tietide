@@ -11,6 +11,7 @@ export interface ConnectionRowProps {
   isDeleting: boolean;
   onTest: (id: string) => void;
   onRevoke: (connection: ConnectionView) => void;
+  onRename: (id: string, name: string) => Promise<void>;
 }
 
 const formatRelative = (iso: string | null): string => {
@@ -34,10 +35,41 @@ export function ConnectionRow({
   isDeleting,
   onTest,
   onRevoke,
+  onRename,
 }: ConnectionRowProps): JSX.Element {
   const [iconError, setIconError] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState(connection.name);
+  const [savingRename, setSavingRename] = useState(false);
   const iconUrl = getProviderIcon(connection.provider);
   const providerLabel = getProviderLabel(connection.provider);
+
+  const startRename = (): void => {
+    setDraftName(connection.name);
+    setRenaming(true);
+  };
+
+  const cancelRename = (): void => {
+    setRenaming(false);
+    setDraftName(connection.name);
+  };
+
+  const commitRename = async (): Promise<void> => {
+    const next = draftName.trim();
+    if (next.length === 0 || next === connection.name) {
+      cancelRename();
+      return;
+    }
+    setSavingRename(true);
+    try {
+      await onRename(connection.id, next);
+      setRenaming(false);
+    } catch {
+      // Parent toasts the error; keep the editor open so the user can retry.
+    } finally {
+      setSavingRename(false);
+    }
+  };
 
   return (
     <li
@@ -62,7 +94,34 @@ export function ConnectionRow({
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-sm font-semibold text-text-primary">{connection.name}</p>
+            {renaming ? (
+              <input
+                type="text"
+                autoFocus
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    void commitRename();
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelRename();
+                  }
+                }}
+                onBlur={() => void commitRename()}
+                disabled={savingRename}
+                aria-label="Connection name"
+                data-testid={`connection-row-${connection.id}-rename-input`}
+                className={cn(
+                  'min-w-0 flex-1 rounded-md border border-white/10 bg-elevated px-2 py-1 text-sm text-text-primary',
+                  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+                  'disabled:cursor-not-allowed disabled:opacity-60',
+                )}
+              />
+            ) : (
+              <p className="truncate text-sm font-semibold text-text-primary">{connection.name}</p>
+            )}
             <ConnectionStatusBadge status={connection.status} />
           </div>
           <p className="mt-0.5 truncate text-xs text-text-secondary">
@@ -72,10 +131,25 @@ export function ConnectionRow({
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-2">
+        {!renaming && (
+          <button
+            type="button"
+            onClick={startRename}
+            disabled={isDeleting || savingRename}
+            data-testid={`connection-row-${connection.id}-rename`}
+            className={cn(
+              'rounded-md border border-white/10 px-2.5 py-1 text-xs font-medium text-text-primary transition',
+              'hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+            )}
+          >
+            Rename
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onTest(connection.id)}
-          disabled={isTesting || isDeleting}
+          disabled={isTesting || isDeleting || renaming}
           className={cn(
             'inline-flex items-center gap-2 rounded-md border border-white/10 px-2.5 py-1 text-xs font-medium text-text-primary transition',
             'hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal',
@@ -88,7 +162,7 @@ export function ConnectionRow({
         <button
           type="button"
           onClick={() => onRevoke(connection)}
-          disabled={isDeleting}
+          disabled={isDeleting || renaming}
           className={cn(
             'rounded-md border border-error/30 px-2.5 py-1 text-xs font-medium text-error transition',
             'hover:bg-error/10 focus:outline-none focus:ring-1 focus:ring-error',

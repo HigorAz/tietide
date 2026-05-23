@@ -193,7 +193,11 @@ export function DataPillInput({
         aria-hidden="true"
         data-testid="data-pill-overlay"
         className={cn(
-          'pointer-events-none absolute inset-0 whitespace-pre-wrap break-words',
+          // z-10 lifts the syntax-highlighted overlay above the underlying
+          // <input>, which paints its own bg-elevated background. Without it,
+          // the input's bg covered the overlay and the text was invisible
+          // unless selected (selection highlight paints on top regardless).
+          'pointer-events-none absolute inset-0 z-10 whitespace-pre-wrap break-words',
           'px-3 py-2 text-sm leading-6',
         )}
       >

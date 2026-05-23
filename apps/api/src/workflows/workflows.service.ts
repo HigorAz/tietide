@@ -214,7 +214,8 @@ export class WorkflowsService {
     }
     if (dto.definition !== undefined) {
       data.definition = dto.definition as unknown as Prisma.InputJsonValue;
-      data.version = { increment: 1 };
+      // version bumped explicitly inside the transaction below — needed so we can
+      // snapshot the new (workflowId, version) into WorkflowVersion atomically.
     }
     if (dto.isActive !== undefined) {
       data.isActive = dto.isActive;
@@ -244,11 +245,18 @@ export class WorkflowsService {
             throw new NotFoundException('Workflow not found');
           }
 
+          // Bump the workflow version and snapshot the NEW definition at the NEW
+          // version. WorkflowVersion(create) already populates v1, so the prior
+          // approach of snapshotting (prior.version, prior.definition) on update
+          // collided with that initial row on the first save (P2002).
+          const newVersion = prior.version + 1;
+          data.version = newVersion;
+
           await tx.workflowVersion.create({
             data: {
               workflowId: id,
-              version: prior.version,
-              definition: prior.definition as Prisma.InputJsonValue,
+              version: newVersion,
+              definition: dto.definition as unknown as Prisma.InputJsonValue,
               createdById: userId,
               message: dto.versionMessage ?? null,
             },
