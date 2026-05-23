@@ -142,6 +142,33 @@ describe('InspectorRunPanel', () => {
     expect(errorBlock).toHaveTextContent('E_BOOM');
   });
 
+  it('should render long error messages in full without a hard height cap', () => {
+    useEditorStore.setState({
+      ...initialEditorState,
+      nodes: [editorNode('node-a', 'Outlook: Send Email')],
+    });
+    const longMessage =
+      'Connection "e2a3dd0c-053f-41d0-8d5e-abc123def456789012345678" not found in the database for this user. Re-pick the connection in the node config and save the workflow before running.';
+    useExecutionLiveStore.setState({
+      ...initialExecutionLiveState,
+      nodes: new Map([
+        ['node-a', runState({ status: 'failed', error: { message: longMessage, code: null } })],
+      ]),
+    });
+
+    render(<InspectorRunPanel />);
+    const errorBlock = screen.getByTestId('run-node-error');
+    // Full message rendered (no truncation in DOM).
+    expect(errorBlock).toHaveTextContent(longMessage);
+    // The <pre> wraps long tokens (so a UUID doesn't push a horizontal scrollbar)
+    // and is no longer artificially capped to max-h-32.
+    const pre = errorBlock.querySelector('pre');
+    expect(pre).not.toBeNull();
+    expect(pre?.className).toContain('whitespace-pre-wrap');
+    expect(pre?.className).toContain('break-words');
+    expect(pre?.className).not.toContain('max-h-32');
+  });
+
   it('should render a Copy button for each JSON block (input and output)', () => {
     useEditorStore.setState({
       ...initialEditorState,

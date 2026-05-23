@@ -137,9 +137,11 @@ describe('useOAuthPopup', () => {
     });
 
     // Now simulate popup close — should yield cancelled (proves the bad message did not resolve).
+    // 500ms interval tick detects closed; then a 250ms grace period waits for a late
+    // success postMessage before declaring cancellation.
     popup.closed = true;
     await act(async () => {
-      vi.advanceTimersByTime(600);
+      vi.advanceTimersByTime(800);
     });
 
     await expect(pending!).resolves.toEqual({ status: 'cancelled' });
@@ -159,10 +161,53 @@ describe('useOAuthPopup', () => {
 
     popup.closed = true;
     await act(async () => {
-      vi.advanceTimersByTime(600);
+      vi.advanceTimersByTime(800);
     });
 
     await expect(pending!).resolves.toEqual({ status: 'cancelled' });
+  });
+
+  it('should still resolve with success when a postMessage arrives within the close-grace window (race fix)', async () => {
+    // Repro: Microsoft Entra closes the popup very fast after firing the
+    // success event. The 500ms interval poll can detect popup.closed before
+    // the message listener runs, which used to false-fire "cancelled".
+    mockedStartOAuth.mockResolvedValue({ redirectUrl: 'https://x', state: 's' });
+    const { result } = renderHook(() => useOAuthPopup());
+
+    let pending: Promise<unknown>;
+    act(() => {
+      pending = result.current.start({ provider: ConnectionProvider.MICROSOFT, label: 'ms' });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Popup closes; interval tick schedules cancellation after a grace period.
+    popup.closed = true;
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // Inside the grace window, the success postMessage arrives. It must win.
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          origin: window.location.origin,
+          data: {
+            type: 'tietide:oauth:done',
+            status: 'success',
+            connectionId: 'race-fix',
+          },
+        }),
+      );
+    });
+
+    // Advance past when the grace cancel would have fired.
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+
+    await expect(pending!).resolves.toEqual({ status: 'success', connectionId: 'race-fix' });
   });
 
   it('should resolve via BroadcastChannel when window.opener was severed by COOP', async () => {

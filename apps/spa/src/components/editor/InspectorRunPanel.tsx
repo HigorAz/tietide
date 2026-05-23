@@ -154,7 +154,7 @@ export function InspectorRunPanel(): JSX.Element {
         {selected.state.error && (
           <div data-testid="run-node-error" className="space-y-1">
             <div className="text-[11px] uppercase tracking-wide text-status-failed">Error</div>
-            <pre className="max-h-32 overflow-auto rounded bg-status-failed/10 p-2 text-[11px] leading-tight text-status-failed">
+            <pre className="whitespace-pre-wrap break-words rounded bg-status-failed/10 p-2 text-[11px] leading-tight text-status-failed">
               {selected.state.error.message}
               {selected.state.error.code ? `\n[${selected.state.error.code}]` : ''}
             </pre>
