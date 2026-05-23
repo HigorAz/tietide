@@ -6,6 +6,7 @@ import { useOAuthPopup } from '@/hooks/useOAuthPopup';
 import { ProviderPicker } from '@/components/connections/ProviderPicker';
 import { ConnectionRow } from '@/components/connections/ConnectionRow';
 import { ApiKeyConnectionModal } from '@/components/connections/ApiKeyConnectionModal';
+import { OAuthConnectionModal } from '@/components/connections/OAuthConnectionModal';
 import { DeleteConnectionDialog } from '@/components/connections/DeleteConnectionDialog';
 import { PROVIDER_CATALOG, type ProviderEntry } from '@/components/connections/providerCatalog';
 import type { ConnectionView } from '@/api/connections';
@@ -70,14 +71,24 @@ export function ConnectionsPage(): JSX.Element {
   }, [closing]);
 
   // ----- Standard page state -----
-  const { connections, status, error, testingIds, deletingIds, fetch, create, remove, test } =
-    useConnectionsStore();
+  const {
+    connections,
+    status,
+    error,
+    testingIds,
+    deletingIds,
+    fetch,
+    create,
+    remove,
+    test,
+    update,
+  } = useConnectionsStore();
   const toast = useToastStore((s) => s.show);
   const oauth = useOAuthPopup();
 
   const [apiKeyProvider, setApiKeyProvider] = useState<ProviderEntry | null>(null);
+  const [oauthProvider, setOauthProvider] = useState<ProviderEntry | null>(null);
   const [toRevoke, setToRevoke] = useState<ConnectionView | null>(null);
-  const [oauthInflight, setOauthInflight] = useState<string | null>(null);
   const deepLinkHandledRef = useRef<boolean>(false);
 
   useEffect(() => {
@@ -114,33 +125,42 @@ export function ConnectionsPage(): JSX.Element {
     void handlePick(request.provider);
   }, [closing]);
 
-  const handlePick = async (provider: ProviderEntry): Promise<void> => {
+  const handlePick = (provider: ProviderEntry): void => {
     // API_KEY and CUSTOM both render via the same form-from-schema modal.
-    // The modal sends back the right `type` because we now pass it through.
     if (provider.type === ConnectionType.API_KEY || provider.type === ConnectionType.CUSTOM) {
       setApiKeyProvider(provider);
       return;
     }
-    setOauthInflight(provider.id);
-    try {
-      const outcome = await oauth.start({
-        provider: provider.id,
-        label: `My ${provider.label}`,
-      });
+    // OAuth providers open a naming + scope modal first; the popup is launched
+    // synchronously from the modal's Connect button to stay within the user
+    // gesture (popup-blockers reject window.open after an await).
+    setOauthProvider(provider);
+  };
+
+  const handleOAuthConnect: React.ComponentProps<typeof OAuthConnectionModal>['onConnect'] = (
+    params,
+  ) =>
+    oauth.start(params).then(async (outcome) => {
       if (outcome.status === 'success') {
-        toast({ tone: 'success', message: `Connected to ${provider.label}` });
+        toast({ tone: 'success', message: 'Connection added' });
         await fetch();
-      } else if (outcome.status === 'error') {
-        toast({ tone: 'error', message: outcome.message ?? 'OAuth failed' });
       } else if (outcome.status === 'cancelled') {
         toast({ tone: 'info', message: 'OAuth cancelled' });
+      } else if (outcome.status === 'error') {
+        toast({ tone: 'error', message: outcome.message ?? 'OAuth failed' });
       } else {
         toast({ tone: 'error', message: 'OAuth timed out' });
       }
+      return outcome;
+    });
+
+  const handleRename = async (id: string, name: string): Promise<void> => {
+    try {
+      await update(id, { name });
+      toast({ tone: 'success', message: 'Connection renamed' });
     } catch (err) {
-      toast({ tone: 'error', message: errorMessage(err, 'OAuth failed') });
-    } finally {
-      setOauthInflight(null);
+      toast({ tone: 'error', message: errorMessage(err, 'Could not rename connection') });
+      throw err;
     }
   };
 
@@ -202,8 +222,6 @@ export function ConnectionsPage(): JSX.Element {
         </p>
       </header>
 
-      <ProviderPicker onPick={handlePick} />
-
       <section aria-labelledby="your-connections-heading">
         <h2
           id="your-connections-heading"
@@ -238,7 +256,7 @@ export function ConnectionsPage(): JSX.Element {
         {status === 'ready' && connections.length === 0 && (
           <div className="rounded-lg border border-dashed border-white/10 bg-surface p-8 text-center">
             <p className="text-sm text-text-secondary">
-              No connections yet. Pick a provider above to add your first one.
+              No connections yet. Pick a provider below to add your first one.
             </p>
           </div>
         )}
@@ -253,17 +271,14 @@ export function ConnectionsPage(): JSX.Element {
                 isDeleting={Boolean(deletingIds[c.id])}
                 onTest={(id) => void handleTest(id)}
                 onRevoke={(conn) => setToRevoke(conn)}
+                onRename={handleRename}
               />
             ))}
           </ul>
         )}
-
-        {oauthInflight && (
-          <p className="mt-3 text-xs text-text-secondary" role="status">
-            Waiting for {oauthInflight} authorization…
-          </p>
-        )}
       </section>
+
+      <ProviderPicker onPick={handlePick} />
 
       {apiKeyProvider && (
         <ApiKeyConnectionModal
@@ -271,6 +286,14 @@ export function ConnectionsPage(): JSX.Element {
           type={apiKeyProvider.type}
           onClose={() => setApiKeyProvider(null)}
           onCreate={handleApiKeyCreate}
+        />
+      )}
+
+      {oauthProvider && (
+        <OAuthConnectionModal
+          provider={oauthProvider.id}
+          onClose={() => setOauthProvider(null)}
+          onConnect={handleOAuthConnect}
         />
       )}
 
