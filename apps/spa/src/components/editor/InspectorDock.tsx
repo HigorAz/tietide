@@ -9,8 +9,24 @@ import { ReplayScrubber } from './ReplayScrubber';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 
 export const INSPECTOR_DOCK_STORAGE_KEY = 'tietide-inspector-collapsed';
+export const INSPECTOR_DOCK_SIZE_STORAGE_KEY = 'tietide-inspector-size';
 
 type DockTab = 'overview' | 'run' | 'logs' | 'versions';
+
+interface DockSize {
+  width: number;
+  height: number;
+}
+
+// Matches the legacy `w-80 h-72` Tailwind defaults so existing users see no
+// visual change on first load.
+const DEFAULT_SIZE: DockSize = { width: 320, height: 288 };
+const MIN_WIDTH = 320;
+const MIN_HEIGHT = 200;
+// Hard ceiling so a runaway drag can't push the panel beyond reasonable
+// screen estimates. At render time we also soft-clamp to 90vw / 80vh.
+const MAX_WIDTH = 1600;
+const MAX_HEIGHT = 1200;
 
 const readCollapsed = (): boolean => {
   try {
@@ -31,6 +47,38 @@ const writeCollapsed = (value: boolean): void => {
   }
 };
 
+const clampSize = (raw: { width: number; height: number }): DockSize => ({
+  width: Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.round(raw.width))),
+  height: Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, Math.round(raw.height))),
+});
+
+const readSize = (): DockSize => {
+  try {
+    const raw = localStorage.getItem(INSPECTOR_DOCK_SIZE_STORAGE_KEY);
+    if (raw === null) return DEFAULT_SIZE;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as { width?: unknown }).width === 'number' &&
+      typeof (parsed as { height?: unknown }).height === 'number'
+    ) {
+      return clampSize(parsed as { width: number; height: number });
+    }
+    return DEFAULT_SIZE;
+  } catch {
+    return DEFAULT_SIZE;
+  }
+};
+
+const writeSize = (size: DockSize): void => {
+  try {
+    localStorage.setItem(INSPECTOR_DOCK_SIZE_STORAGE_KEY, JSON.stringify(size));
+  } catch {
+    // ignore
+  }
+};
+
 function EmptyRunState({ message }: { message: string }): JSX.Element {
   return (
     <div className="flex h-full items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
@@ -41,6 +89,7 @@ function EmptyRunState({ message }: { message: string }): JSX.Element {
 
 export function InspectorDock(): JSX.Element {
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
+  const [size, setSize] = useState<DockSize>(() => readSize());
   const [activeTab, setActiveTab] = useState<DockTab>('overview');
   const status = useExecutionLiveStore((s) => s.status);
   const previousStatusRef = useRef<ExecutionLiveStatus>(status);
@@ -67,17 +116,69 @@ export function InspectorDock(): JSX.Element {
     event.stopPropagation();
   }, []);
 
+  const handleResizeStart = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      // Anchored bottom-right: dragging the NW handle UP-LEFT grows the dock.
+      event.preventDefault();
+      event.stopPropagation();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startW = size.width;
+      const startH = size.height;
+      // Track the most recent size from mousemove so mouseUp can persist it
+      // without re-reading event coords (jsdom-emitted mouseUp may omit them).
+      let latestSize: DockSize = { width: startW, height: startH };
+
+      const onMove = (e: MouseEvent): void => {
+        latestSize = clampSize({
+          width: startW + (startX - e.clientX),
+          height: startH + (startY - e.clientY),
+        });
+        setSize(latestSize);
+      };
+      const onUp = (): void => {
+        writeSize(latestSize);
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [size.width, size.height],
+  );
+
   return (
     <div
       data-testid="inspector-dock"
       data-collapsed={collapsed ? 'true' : 'false'}
       onPointerDown={stopPointerPropagation}
       onWheel={(e) => e.stopPropagation()}
+      style={
+        collapsed
+          ? undefined
+          : {
+              width: `${size.width}px`,
+              height: `${size.height}px`,
+              maxWidth: '90vw',
+              maxHeight: '80vh',
+            }
+      }
       className={cn(
-        'absolute bottom-4 right-4 z-10 flex w-80 flex-col overflow-hidden rounded-md border border-white/5 bg-elevated shadow-lg',
-        collapsed ? 'h-9' : 'h-72',
+        'absolute bottom-4 right-4 z-10 flex flex-col overflow-hidden rounded-md border border-white/5 bg-elevated shadow-lg',
+        collapsed ? 'h-9 w-80' : '',
       )}
     >
+      {!collapsed && (
+        <div
+          role="separator"
+          aria-label="Resize inspector"
+          aria-orientation="horizontal"
+          data-testid="inspector-dock-resize-handle"
+          onMouseDown={handleResizeStart}
+          className="absolute left-0 top-0 z-20 h-3 w-3 cursor-nwse-resize bg-transparent before:absolute before:left-0.5 before:top-0.5 before:h-2 before:w-2 before:rounded-sm before:border-l-2 before:border-t-2 before:border-text-secondary/40 hover:before:border-accent-teal"
+        />
+      )}
       <Tabs
         value={activeTab}
         onValueChange={(value) => setActiveTab(value as DockTab)}
