@@ -21,10 +21,13 @@ const make = (overrides: Partial<ConnectionView> = {}): ConnectionView => ({
 describe('ConnectionRow', () => {
   const onTest = vi.fn();
   const onRevoke = vi.fn();
+  const onRename = vi.fn(async () => undefined);
 
   beforeEach(() => {
     onTest.mockReset();
     onRevoke.mockReset();
+    onRename.mockReset();
+    onRename.mockResolvedValue(undefined);
   });
 
   it('should render the connection name, provider label, and active status', () => {
@@ -35,6 +38,7 @@ describe('ConnectionRow', () => {
         isDeleting={false}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
@@ -51,6 +55,7 @@ describe('ConnectionRow', () => {
         isDeleting={false}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
@@ -66,6 +71,7 @@ describe('ConnectionRow', () => {
         isDeleting={false}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
@@ -84,6 +90,7 @@ describe('ConnectionRow', () => {
         isDeleting={false}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
@@ -100,6 +107,7 @@ describe('ConnectionRow', () => {
         isDeleting={true}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
@@ -115,6 +123,7 @@ describe('ConnectionRow', () => {
         isDeleting={false}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
@@ -130,6 +139,7 @@ describe('ConnectionRow', () => {
         isDeleting={false}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
@@ -144,6 +154,7 @@ describe('ConnectionRow', () => {
         isDeleting={false}
         onTest={onTest}
         onRevoke={onRevoke}
+        onRename={onRename}
       />,
     );
 
