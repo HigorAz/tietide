@@ -12,6 +12,11 @@ const POPUP_NAME = 'tietide-oauth';
 const BROADCAST_CHANNEL = 'tietide-oauth';
 const POLL_INTERVAL_MS = 500;
 const MAX_DURATION_MS = 5 * 60 * 1000;
+// Microsoft Entra closes the popup very fast after firing the success
+// postMessage. Without a grace period, the 500ms close-poll can detect
+// `popup.closed === true` BEFORE the parent's message listener runs and
+// false-fire `cancelled`. Wait for any in-flight message before giving up.
+const CLOSE_GRACE_MS = 250;
 
 export interface OAuthPopupApi {
   start: (params: StartOAuthParams) => Promise<OAuthPopupOutcome>;
@@ -77,11 +82,20 @@ export function useOAuthPopup(): OAuthPopupApi {
       const channel =
         typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(BROADCAST_CHANNEL) : null;
 
+      let settled = false;
+      let pendingCancelTimer: number | null = null;
+
       const finish = (outcome: OAuthPopupOutcome): void => {
+        if (settled) return;
+        settled = true;
         window.removeEventListener('message', handleMessage);
         channel?.removeEventListener('message', handleBroadcast);
         channel?.close();
         window.clearInterval(interval);
+        if (pendingCancelTimer !== null) {
+          window.clearTimeout(pendingCancelTimer);
+          pendingCancelTimer = null;
+        }
         inflightRef.current = false;
         resolve(outcome);
       };
@@ -121,7 +135,14 @@ export function useOAuthPopup(): OAuthPopupApi {
 
       const interval = window.setInterval(() => {
         if (popup.closed) {
-          finish({ status: 'cancelled' });
+          // Schedule cancellation after a grace period so a late postMessage
+          // or BroadcastChannel delivery can still win (Microsoft Entra closes
+          // the popup before the parent receives the success event).
+          if (pendingCancelTimer !== null) return;
+          window.clearInterval(interval);
+          pendingCancelTimer = window.setTimeout(() => {
+            finish({ status: 'cancelled' });
+          }, CLOSE_GRACE_MS);
           return;
         }
         if (Date.now() - startedAt > MAX_DURATION_MS) {
