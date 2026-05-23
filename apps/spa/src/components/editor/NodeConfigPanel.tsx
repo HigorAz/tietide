@@ -4,6 +4,7 @@ import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import { FORM_REGISTRY } from './config/formRegistry';
 import { getNodeIcon } from './nodes/nodeIcons';
+import { NodePreviewPanel } from './preview/NodePreviewPanel';
 
 export function NodeConfigPanel() {
   const selectedNodeId = useEditorStore((s) => s.selectedNodeId);
@@ -100,20 +101,8 @@ export function NodeConfigPanel() {
         </div>
       </div>
 
-      <footer className="border-t border-white/5 pt-3">
-        <button
-          type="button"
-          data-testid="node-preview-button"
-          disabled
-          title="Preview execution — coming soon"
-          className={cn(
-            'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-            'text-sm text-text-muted',
-            'disabled:cursor-not-allowed disabled:opacity-60',
-          )}
-        >
-          Preview (coming soon)
-        </button>
+      <footer data-testid="node-preview-panel">
+        <NodePreviewPanel nodeId={selectedNodeId} />
       </footer>
     </aside>
   );
