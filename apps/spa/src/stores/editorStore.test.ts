@@ -116,6 +116,57 @@ describe('editorStore', () => {
 
       expect(useEditorStore.getState().nodes[0].position).toEqual({ x: 100, y: 200 });
     });
+
+    it('should not dirty the store on a select-only change', () => {
+      const { addNode, onNodesChange } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+
+      useEditorStore.setState({ isDirty: false });
+      onNodesChange([{ id: nodeId, type: 'select', selected: true }]);
+
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('should not dirty the store on a dimensions change (React Flow auto-measure)', () => {
+      const { addNode, onNodesChange } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+
+      useEditorStore.setState({ isDirty: false });
+      onNodesChange([{ id: nodeId, type: 'dimensions', dimensions: { width: 100, height: 60 } }]);
+
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('should not dirty the store while dragging (only on drop-release)', () => {
+      const { addNode, onNodesChange } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+      useEditorStore.setState({ isDirty: false });
+
+      onNodesChange([{ id: nodeId, type: 'position', position: { x: 5, y: 5 }, dragging: true }]);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+
+      onNodesChange([{ id: nodeId, type: 'position', position: { x: 5, y: 5 }, dragging: false }]);
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+  });
+
+  describe('onEdgesChange', () => {
+    it('should not dirty the store on a select-only edge change', () => {
+      const { addNode, onConnect, onEdgesChange } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 200, y: 0 });
+      const [source, target] = useEditorStore.getState().nodes;
+      onConnect({ source: source.id, target: target.id, sourceHandle: null, targetHandle: null });
+      const edgeId = useEditorStore.getState().edges[0].id;
+
+      useEditorStore.setState({ isDirty: false });
+      onEdgesChange([{ id: edgeId, type: 'select', selected: true }]);
+
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
   });
 
   describe('onConnect', () => {

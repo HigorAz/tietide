@@ -24,6 +24,6 @@ import { InProcessRefreshService } from './in-process-refresh.service';
     OAuthRefreshDlqService,
     InProcessRefreshService,
   ],
-  exports: [InProcessRefreshService],
+  exports: [InProcessRefreshService, OAuthRefreshClient],
 })
 export class OAuthRefreshModule {}

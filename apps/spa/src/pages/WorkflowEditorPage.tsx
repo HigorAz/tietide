@@ -95,11 +95,62 @@ export function WorkflowEditorPage() {
   // When an `?execution=<id>` is present, seed the live store from the REST
   // steps endpoint and (only if the execution is still in flight) open the WS
   // and subscribe. Terminal executions render as a static replay.
+  //
+  // Polling watchdog: while the execution is in flight, re-fetch every 2.5s
+  // and re-seed the store. This guarantees convergence even if the WebSocket
+  // never connects (common when the API sits behind a Cloudflare tunnel that
+  // doesn't forward `/socket.io/`). Polling stops the moment status becomes
+  // terminal or after a 5-minute hard ceiling.
   useEffect(() => {
     if (!executionId) return;
     let cancelled = false;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    const startedAt = Date.now();
+    const HARD_CEILING_MS = 5 * 60 * 1000;
+    const POLL_INTERVAL_MS = 2500;
+
     resetExecutionLive();
     setExecutionStoreId(executionId);
+
+    const stopPolling = (): void => {
+      if (pollTimer !== null) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    };
+
+    const applyTerminalStatus = (status: string): void => {
+      if (status === 'SUCCESS') {
+        useExecutionLiveStore.getState().setStatus('success');
+      } else if (status === 'FAILED' || status === 'CANCELLED') {
+        useExecutionLiveStore.getState().setStatus('error');
+      }
+    };
+
+    const pollOnce = async (): Promise<void> => {
+      try {
+        const [execution, steps] = await Promise.all([
+          getExecution(executionId),
+          listExecutionSteps(executionId),
+        ]);
+        if (cancelled) return;
+        seedExecutionFromSteps(steps);
+
+        const isLive = execution.status === 'PENDING' || execution.status === 'RUNNING';
+        if (!isLive) {
+          applyTerminalStatus(execution.status);
+          setExecutionMode('replay');
+          stopPolling();
+          return;
+        }
+
+        if (Date.now() - startedAt > HARD_CEILING_MS) {
+          stopPolling();
+        }
+      } catch {
+        // Network blip / 404 — swallow; next tick may recover.
+      }
+    };
 
     (async () => {
       try {
@@ -112,10 +163,21 @@ export function WorkflowEditorPage() {
 
         const isLive = execution.status === 'PENDING' || execution.status === 'RUNNING';
         setExecutionMode(isLive ? 'live' : 'replay');
-        if (isLive && token) {
+
+        if (!isLive) {
+          applyTerminalStatus(execution.status);
+          return;
+        }
+
+        if (token) {
           executionSocket.connect(token);
           executionSocket.subscribe(executionId);
         }
+        // Even with WS connected, start the polling watchdog so a broken WS
+        // pipeline doesn't strand the UI on "running" forever.
+        pollTimer = setInterval(() => {
+          void pollOnce();
+        }, POLL_INTERVAL_MS);
       } catch {
         // Hydration failed (404, network) — leave the empty state in place.
       }
@@ -123,6 +185,7 @@ export function WorkflowEditorPage() {
 
     return () => {
       cancelled = true;
+      stopPolling();
       executionSocket.unsubscribe(executionId);
       executionSocket.disconnect();
       resetExecutionLive();

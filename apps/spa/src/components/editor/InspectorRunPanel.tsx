@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore, type NodeRunState } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
@@ -151,16 +151,50 @@ export function InspectorRunPanel(): JSX.Element {
           </div>
         )}
 
-        {selected.state.error && (
-          <div data-testid="run-node-error" className="space-y-1">
-            <div className="text-[11px] uppercase tracking-wide text-status-failed">Error</div>
-            <pre className="whitespace-pre-wrap break-words rounded bg-status-failed/10 p-2 text-[11px] leading-tight text-status-failed">
-              {selected.state.error.message}
-              {selected.state.error.code ? `\n[${selected.state.error.code}]` : ''}
-            </pre>
-          </div>
-        )}
+        {selected.state.error && <NodeRunError error={selected.state.error} />}
       </div>
+    </div>
+  );
+}
+
+interface NodeRunErrorProps {
+  error: { message: string; code: string | null };
+}
+
+function NodeRunError({ error }: NodeRunErrorProps): JSX.Element {
+  const [copied, setCopied] = useState(false);
+
+  const text = useMemo(
+    () => `${error.message}${error.code ? `\n[${error.code}]` : ''}`,
+    [error.message, error.code],
+  );
+
+  const handleCopy = useCallback(async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard API unavailable / permission denied — degrade silently.
+    }
+  }, [text]);
+
+  return (
+    <div data-testid="run-node-error" className="space-y-1">
+      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-status-failed">
+        <span>Error</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label="Copy error message"
+          className="rounded px-1.5 py-0.5 text-[10px] text-status-failed/80 hover:bg-white/5 hover:text-status-failed focus:outline-none focus-visible:ring-1 focus-visible:ring-status-failed"
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre className="whitespace-pre-wrap break-words rounded bg-status-failed/10 p-2 text-[11px] leading-tight text-status-failed select-text">
+        {text}
+      </pre>
     </div>
   );
 }

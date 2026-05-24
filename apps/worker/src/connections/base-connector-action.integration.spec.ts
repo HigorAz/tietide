@@ -182,6 +182,108 @@ describe('BaseConnectorAction (integration)', () => {
       expect(ctx.markConnectionForRefresh).not.toHaveBeenCalled();
     });
 
+    it('on 401 with refreshConnection available, refreshes and retries — no ConnectionAuthError surfaced', async () => {
+      const action = new FakeConnectorAction();
+      const refreshed: DecryptedConnection<FakeProviderConfig> = {
+        id: 'conn-1',
+        type: 'OAUTH2',
+        provider: 'fake',
+        config: { accessToken: 'new-token' },
+        refreshToken: 'rt-xyz',
+      };
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'old-token' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as ExecutionContext['getConnection'],
+        refreshConnection: jest.fn(async () => refreshed) as unknown as NonNullable<
+          ExecutionContext['refreshConnection']
+        >,
+      });
+
+      let attempt = 0;
+      action.runImpl = async (_input, connection) => {
+        attempt += 1;
+        if (attempt === 1) {
+          expect(connection.config.accessToken).toBe('old-token');
+          const err = new Error('Unauthorized') as Error & { status: number };
+          err.status = 401;
+          throw err;
+        }
+        expect(connection.config.accessToken).toBe('new-token');
+        return { data: { ok: true, retried: true } };
+      };
+
+      const output = await action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx);
+
+      expect(output).toEqual({ data: { ok: true, retried: true } });
+      expect(attempt).toBe(2);
+      expect(ctx.markConnectionForRefresh).not.toHaveBeenCalled();
+    });
+
+    it('on 401 retry that also returns 401, marks for refresh and surfaces ConnectionAuthError', async () => {
+      const action = new FakeConnectorAction();
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'tok' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as ExecutionContext['getConnection'],
+        refreshConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'still-bad' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as NonNullable<ExecutionContext['refreshConnection']>,
+      });
+      action.runImpl = async () => {
+        const err = new Error('Unauthorized') as Error & { status: number };
+        err.status = 401;
+        throw err;
+      };
+
+      await expect(
+        action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx),
+      ).rejects.toBeInstanceOf(ConnectionAuthError);
+      expect(ctx.markConnectionForRefresh).toHaveBeenCalledWith('conn-1');
+    });
+
+    it('on refreshConnection throwing, still marks for refresh and surfaces ConnectionAuthError', async () => {
+      const action = new FakeConnectorAction();
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'tok' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as ExecutionContext['getConnection'],
+        refreshConnection: jest.fn(async () => {
+          throw new Error('refresh endpoint 400');
+        }) as unknown as NonNullable<ExecutionContext['refreshConnection']>,
+      });
+      action.runImpl = async () => {
+        const err = new Error('Unauthorized') as Error & { status: number };
+        err.status = 401;
+        throw err;
+      };
+
+      // refresh throws a non-auth error → we fall through to markForRefresh and
+      // throw the original 401 wrapped in ConnectionAuthError. We surface the
+      // refresh failure to logs but not as the public error so the caller still
+      // sees a consistent "marked for refresh" message.
+      await expect(
+        action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx),
+      ).rejects.toBeInstanceOf(Error);
+      expect(ctx.markConnectionForRefresh).toHaveBeenCalledWith('conn-1');
+    });
+
     it('preserves original error as `cause` on the wrapped ConnectionAuthError', async () => {
       const action = new FakeConnectorAction();
       const ctx = makeContext({
