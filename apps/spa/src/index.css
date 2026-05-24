@@ -20,8 +20,15 @@
   --feedback-info: #339af0;
 }
 
+html,
 body {
   margin: 0;
+  /* Prevent accidental horizontal scroll / rubber-band on touch devices. */
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+}
+
+body {
   background-color: var(--bg-deep-blue);
   color: var(--text-primary);
   font-family:
@@ -31,4 +38,14 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Touch tuning for the React Flow editor: the default node connection handles
+   are ~6px, too small to grab reliably with a finger. Enlarge their hit area
+   on phones/tablets without affecting the desktop pointer experience. */
+@media (max-width: 767px) {
+  .react-flow__handle {
+    width: 14px;
+    height: 14px;
+  }
 }
