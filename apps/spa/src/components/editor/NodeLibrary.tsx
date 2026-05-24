@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type DragEvent } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, Library } from 'lucide-react';
 import {
   FORBIDDEN_NODE_TYPES,
   NODE_CATALOG,
@@ -16,6 +16,27 @@ import { BrandIcon } from './BrandIcon';
 import { APP_INFO, APP_ORDER, getAppIdForNodeType, type AppId } from './nodeApps';
 
 export const NODE_LIBRARY_DRAG_MIME = 'application/reactflow-node-type';
+
+const PANEL_COLLAPSED_STORAGE_KEY = 'tietide-nodelib-collapsed';
+
+const readPanelCollapsed = (): boolean => {
+  try {
+    const raw = localStorage.getItem(PANEL_COLLAPSED_STORAGE_KEY);
+    if (raw === null) return false;
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === 'boolean' ? parsed : false;
+  } catch {
+    return false;
+  }
+};
+
+const writePanelCollapsed = (value: boolean): void => {
+  try {
+    localStorage.setItem(PANEL_COLLAPSED_STORAGE_KEY, JSON.stringify(value));
+  } catch {
+    // ignore — storage unavailable
+  }
+};
 
 const RECENT_SECTION_ID = 'recent';
 const RECENT_SECTION_TITLE = 'Recently used';
@@ -83,6 +104,18 @@ export function NodeLibrary({ onPickNode }: NodeLibraryProps = {}) {
   const [query, setQuery] = useState('');
   const [recent, setRecent] = useState<NodeTypeDefinition['type'][]>(() => readRecentNodes(userId));
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => readCollapsedState());
+  // Panel-level collapse (separate from the per-section collapse state above).
+  // Only the desktop side-rail respects this — mobile (`onPickNode` provided)
+  // is already a bottom-sheet that the user opens/closes via the toolbox.
+  const [panelCollapsed, setPanelCollapsed] = useState<boolean>(() => readPanelCollapsed());
+
+  useEffect(() => {
+    writePanelCollapsed(panelCollapsed);
+  }, [panelCollapsed]);
+
+  const togglePanel = useCallback(() => {
+    setPanelCollapsed((current) => !current);
+  }, []);
 
   // Re-hydrate recents when the signed-in user changes (login/logout).
   useEffect(() => {
@@ -188,19 +221,57 @@ export function NodeLibrary({ onPickNode }: NodeLibraryProps = {}) {
 
   const showRecent = recentItems.length > 0;
 
+  // Desktop side-rail when collapsed: a 10-wide vertical strip with just a
+  // chevron + icon. Mobile (onPickNode provided) ignores the panel-collapse
+  // state because the toolbox already gates the library's visibility there.
+  if (!onPickNode && panelCollapsed) {
+    return (
+      <aside
+        data-testid="node-library"
+        data-collapsed="true"
+        className="flex h-full w-10 shrink-0 flex-col items-center gap-2 border-r border-white/5 bg-surface py-3"
+      >
+        <button
+          type="button"
+          onClick={togglePanel}
+          aria-label="Expand node library"
+          title="Expand node library"
+          className="rounded p-1 text-text-secondary transition hover:bg-white/5 hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-teal"
+        >
+          <ChevronRight className="h-4 w-4" aria-hidden />
+        </button>
+        <Library className="h-4 w-4 text-text-muted" aria-hidden />
+      </aside>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={150}>
       <aside
         data-testid="node-library"
+        data-collapsed="false"
         className={cn(
           'flex h-full flex-col gap-4 bg-surface p-4',
           onPickNode ? 'w-full' : 'w-72 border-r border-white/5',
         )}
       >
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-            Node Library
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+              Node Library
+            </h2>
+            {!onPickNode && (
+              <button
+                type="button"
+                onClick={togglePanel}
+                aria-label="Collapse node library"
+                title="Collapse node library"
+                className="rounded p-1 text-text-secondary transition hover:bg-white/5 hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-teal"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </button>
+            )}
+          </div>
           <input
             type="search"
             value={query}
