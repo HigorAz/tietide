@@ -40,18 +40,38 @@ export abstract class BaseConnectorAction<
     try {
       return await this.run(input, connection, context);
     } catch (error) {
-      if (this.isAuthError(error) && connection.refreshToken) {
-        await context.markConnectionForRefresh(connectionId);
-        throw new ConnectionAuthError(
-          `Connection "${connectionId}" returned auth error; marked for refresh`,
-          {
-            connectionId,
-            provider: connection.provider,
-            cause: error,
-          },
-        );
+      if (!this.isAuthError(error) || !connection.refreshToken) {
+        throw error;
       }
-      throw error;
+
+      // First auth-error path: if the host implements `refreshConnection`,
+      // attempt an OAuth token refresh and retry the action once before
+      // marking the connection as needing manual reconnection.
+      if (typeof context.refreshConnection === 'function') {
+        try {
+          const refreshed = await context.refreshConnection<TConfig>(connectionId);
+          return await this.run(input, refreshed, context);
+        } catch (retryError) {
+          // Refresh itself failed, or the retry call also hit an auth error.
+          // Fall through to the existing mark-for-refresh path below.
+          if (!this.isAuthError(retryError)) {
+            // Non-auth retry failure: surface the underlying error rather than
+            // masking it behind a generic ConnectionAuthError.
+            await context.markConnectionForRefresh(connectionId);
+            throw retryError;
+          }
+        }
+      }
+
+      await context.markConnectionForRefresh(connectionId);
+      throw new ConnectionAuthError(
+        `Connection "${connectionId}" returned auth error; marked for refresh`,
+        {
+          connectionId,
+          provider: connection.provider,
+          cause: error,
+        },
+      );
     }
   }
 

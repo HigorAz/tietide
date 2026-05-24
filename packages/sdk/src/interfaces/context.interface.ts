@@ -28,4 +28,13 @@ export interface ExecutionContext {
     connectionId: string,
   ): Promise<DecryptedConnection<TConfig>>;
   markConnectionForRefresh(connectionId: string): Promise<void>;
+  // Optional, added in @tietide/sdk 2.1.0. When provided, the host
+  // application can perform an in-flight OAuth refresh against the
+  // provider's token endpoint and return the new decrypted connection.
+  // `BaseConnectorAction` calls this on its first auth-error to give the
+  // node a single transparent retry before falling back to
+  // `markConnectionForRefresh`.
+  refreshConnection?<TConfig = Record<string, unknown>>(
+    connectionId: string,
+  ): Promise<DecryptedConnection<TConfig>>;
 }

@@ -3,6 +3,7 @@ import type { DecryptedConnection } from '@tietide/sdk';
 import { PROVIDER_CONFIG_SCHEMAS } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { OAuthRefreshClient } from './refresh/oauth-refresh.client';
 import { ConnectionNotFoundError, type ConnectionResolver } from './connection-resolver';
 
 interface ExecutionCache {
@@ -28,6 +29,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crypto: CryptoService,
+    private readonly oauthRefresh: OAuthRefreshClient,
   ) {}
 
   async getConnection<TConfig = Record<string, unknown>>(
@@ -77,6 +79,73 @@ export class PrismaConnectionResolver implements ConnectionResolver {
       { executionId, userId: entry.userId, connectionId },
       'connection.marked_for_refresh',
     );
+  }
+
+  async refreshConnection<TConfig = Record<string, unknown>>(
+    executionId: string,
+    connectionId: string,
+  ): Promise<DecryptedConnection<TConfig>> {
+    const entry = await this.loadExecution(executionId);
+
+    const row = (await this.prisma.connection.findFirst({
+      where: { id: connectionId, userId: entry.userId },
+    })) as ConnectionRow | null;
+    if (!row) {
+      throw new ConnectionNotFoundError(connectionId);
+    }
+    if (!this.oauthRefresh.supports(row.provider)) {
+      throw new Error(`Provider "${row.provider}" does not support inline OAuth refresh`);
+    }
+    if (!row.refreshTokenEncrypted || !row.refreshTokenNonce) {
+      throw new Error(`Connection "${connectionId}" has no stored refresh token`);
+    }
+
+    const currentConfigJson = this.crypto.decrypt(row.configEncrypted, row.configNonce);
+    const currentConfig = JSON.parse(currentConfigJson) as Record<string, unknown>;
+    const refreshTokenPlain = this.crypto.decrypt(row.refreshTokenEncrypted, row.refreshTokenNonce);
+
+    const result = await this.oauthRefresh.refresh(row.provider, refreshTokenPlain, currentConfig);
+
+    const encryptedConfig = this.crypto.encrypt(JSON.stringify(result.config));
+    const encryptedRefresh = this.crypto.encrypt(result.refreshToken);
+
+    await this.prisma.connection.update({
+      where: { id: connectionId },
+      data: {
+        configEncrypted: encryptedConfig.ciphertext,
+        configNonce: encryptedConfig.nonce,
+        refreshTokenEncrypted: encryptedRefresh.ciphertext,
+        refreshTokenNonce: encryptedRefresh.nonce,
+        expiresAt: result.expiresAt,
+        status: 'ACTIVE',
+        refreshFailureCount: 0,
+        lastUsedAt: new Date(),
+      },
+    });
+
+    // Validate the refreshed config against the per-provider schema before
+    // handing it back to the node — the schemas are the same ones used by
+    // `decrypt()` below, so we keep the in-memory cache shape consistent.
+    const schema = PROVIDER_CONFIG_SCHEMAS[row.provider as keyof typeof PROVIDER_CONFIG_SCHEMAS];
+    const validatedConfig = (
+      schema ? (schema.parse(result.config) as Record<string, unknown>) : result.config
+    ) as TConfig;
+
+    const refreshed: DecryptedConnection<TConfig> = {
+      id: row.id,
+      type: row.type,
+      provider: row.provider,
+      config: validatedConfig,
+      refreshToken: result.refreshToken,
+    };
+    entry.connections.set(connectionId, refreshed as DecryptedConnection);
+
+    this.log.log(
+      { executionId, userId: entry.userId, connectionId, provider: row.provider },
+      'connection.refreshed',
+    );
+
+    return refreshed;
   }
 
   releaseExecution(executionId: string): void {

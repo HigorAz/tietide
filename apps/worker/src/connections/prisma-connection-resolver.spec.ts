@@ -42,7 +42,15 @@ describe('PrismaConnectionResolver', () => {
       },
     };
 
-    resolver = new PrismaConnectionResolver(prisma as never, cryptoService as never);
+    const oauthRefreshStub = {
+      supports: jest.fn(() => false),
+      refresh: jest.fn(),
+    };
+    resolver = new PrismaConnectionResolver(
+      prisma as never,
+      cryptoService as never,
+      oauthRefreshStub as never,
+    );
   });
 
   const seedConnection = (

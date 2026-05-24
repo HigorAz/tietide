@@ -758,6 +758,8 @@ export class WorkflowRunner {
         connections.getConnection<TConfig>(executionId, connectionId),
       markConnectionForRefresh: (connectionId: string) =>
         connections.markForRefresh(executionId, connectionId),
+      refreshConnection: <TConfig = Record<string, unknown>>(connectionId: string) =>
+        connections.refreshConnection<TConfig>(executionId, connectionId),
     };
   }
 }
