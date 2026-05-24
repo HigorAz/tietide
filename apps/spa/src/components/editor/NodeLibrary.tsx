@@ -68,7 +68,17 @@ const matches = (def: NodeTypeDefinition, query: string): boolean => {
 const sectionKey = (id: SectionId): string => `section:${id}`;
 const appKey = (section: SectionId, appId: AppId): string => `app:${section}:${appId}`;
 
-export function NodeLibrary() {
+export interface NodeLibraryProps {
+  /**
+   * When provided (touch/mobile), library items become tap-to-add buttons that
+   * call this with the chosen node type instead of using HTML5 drag-and-drop
+   * (which does not work on touch). When omitted (desktop), items stay
+   * draggable.
+   */
+  onPickNode?: (type: NodeTypeDefinition['type']) => void;
+}
+
+export function NodeLibrary({ onPickNode }: NodeLibraryProps = {}) {
   const userId = useAuthStore((s) => s.user?.id ?? '');
   const [query, setQuery] = useState('');
   const [recent, setRecent] = useState<NodeTypeDefinition['type'][]>(() => readRecentNodes(userId));
@@ -182,7 +192,10 @@ export function NodeLibrary() {
     <TooltipProvider delayDuration={150}>
       <aside
         data-testid="node-library"
-        className="flex h-full w-72 flex-col gap-4 border-r border-white/5 bg-surface p-4"
+        className={cn(
+          'flex h-full flex-col gap-4 bg-surface p-4',
+          onPickNode ? 'w-full' : 'w-72 border-r border-white/5',
+        )}
       >
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
@@ -212,6 +225,7 @@ export function NodeLibrary() {
                   collapsed={Boolean(collapsed[RECENT_SECTION_ID])}
                   onToggle={toggleRecent}
                   onDragStart={handleDragStart}
+                  onPick={onPickNode}
                 />
               )}
               {sections.map((section) => (
@@ -223,6 +237,7 @@ export function NodeLibrary() {
                   onToggleSection={() => toggleSection(section.id)}
                   onToggleApp={(appId) => toggleApp(section.id, appId)}
                   onDragStart={handleDragStart}
+                  onPick={onPickNode}
                 />
               ))}
             </div>
@@ -238,9 +253,10 @@ interface RecentSectionProps {
   collapsed: boolean;
   onToggle: () => void;
   onDragStart: (def: NodeTypeDefinition, event: DragEvent<HTMLDivElement>) => void;
+  onPick?: (type: NodeTypeDefinition['type']) => void;
 }
 
-function RecentSection({ items, collapsed, onToggle, onDragStart }: RecentSectionProps) {
+function RecentSection({ items, collapsed, onToggle, onDragStart, onPick }: RecentSectionProps) {
   const listId = `node-library-section-${RECENT_SECTION_ID}`;
   return (
     <section aria-label={RECENT_SECTION_TITLE} className="flex flex-col gap-2">
@@ -266,7 +282,7 @@ function RecentSection({ items, collapsed, onToggle, onDragStart }: RecentSectio
         <ul id={listId} className="flex flex-col gap-1.5">
           {items.map((item) => (
             <li key={`${RECENT_SECTION_ID}-${item.type}`}>
-              <NodeLibraryItem item={item} onDragStart={onDragStart} />
+              <NodeLibraryItem item={item} onDragStart={onDragStart} onPick={onPick} />
             </li>
           ))}
         </ul>
@@ -282,6 +298,7 @@ interface SectionProps {
   onToggleSection: () => void;
   onToggleApp: (appId: AppId) => void;
   onDragStart: (def: NodeTypeDefinition, event: DragEvent<HTMLDivElement>) => void;
+  onPick?: (type: NodeTypeDefinition['type']) => void;
 }
 
 function NodeLibrarySection({
@@ -291,6 +308,7 @@ function NodeLibrarySection({
   onToggleSection,
   onToggleApp,
   onDragStart,
+  onPick,
 }: SectionProps) {
   const listId = `node-library-section-${section.id}`;
   return (
@@ -331,6 +349,7 @@ function NodeLibrarySection({
               collapsed={isAppCollapsed(app.appId)}
               onToggle={() => onToggleApp(app.appId)}
               onDragStart={onDragStart}
+              onPick={onPick}
             />
           ))}
         </div>
@@ -346,6 +365,7 @@ interface AppGroupProps {
   collapsed: boolean;
   onToggle: () => void;
   onDragStart: (def: NodeTypeDefinition, event: DragEvent<HTMLDivElement>) => void;
+  onPick?: (type: NodeTypeDefinition['type']) => void;
 }
 
 function NodeLibraryAppGroup({
@@ -355,6 +375,7 @@ function NodeLibraryAppGroup({
   collapsed,
   onToggle,
   onDragStart,
+  onPick,
 }: AppGroupProps) {
   const info = APP_INFO[appId];
   const listId = `node-library-app-${sectionId}-${appId}`;
@@ -386,7 +407,7 @@ function NodeLibraryAppGroup({
         <ul id={listId} className="flex flex-col gap-1.5 pl-1">
           {items.map((item) => (
             <li key={`${sectionId}-${appId}-${item.type}`}>
-              <NodeLibraryItem item={item} onDragStart={onDragStart} />
+              <NodeLibraryItem item={item} onDragStart={onDragStart} onPick={onPick} />
             </li>
           ))}
         </ul>
@@ -398,10 +419,37 @@ function NodeLibraryAppGroup({
 interface ItemProps {
   item: NodeTypeDefinition;
   onDragStart: (def: NodeTypeDefinition, event: DragEvent<HTMLDivElement>) => void;
+  onPick?: (type: NodeTypeDefinition['type']) => void;
 }
 
-function NodeLibraryItem({ item, onDragStart }: ItemProps) {
+function NodeLibraryItem({ item, onDragStart, onPick }: ItemProps) {
   const Icon = getNodeIcon(item.type);
+
+  // Touch/mobile: a plain tap-to-add button (no hover Tooltip, no HTML5 drag).
+  if (onPick) {
+    return (
+      <button
+        type="button"
+        data-testid="node-library-item"
+        onClick={() => onPick(item.type)}
+        title={item.description}
+        aria-label={item.name}
+        className={cn(
+          'group flex min-h-11 w-full items-center gap-3 rounded-md border border-white/5 bg-elevated px-3 py-2 text-left',
+          'transition hover:border-accent-teal hover:bg-elevated/80',
+          'focus:outline-none focus:ring-1 focus:ring-accent-teal',
+        )}
+      >
+        <span className="text-accent-teal">
+          <Icon size={18} strokeWidth={2} aria-hidden />
+        </span>
+        <p className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-text-primary">
+          {item.name}
+        </p>
+      </button>
+    );
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>

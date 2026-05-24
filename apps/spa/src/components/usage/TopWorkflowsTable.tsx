@@ -26,10 +26,45 @@ export function TopWorkflowsTable({ rows, onRowClick }: TopWorkflowsTableProps):
     }
   };
 
+  const handleCardKey = (e: KeyboardEvent<HTMLLIElement>, id: string): void => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onRowClick(id);
+    }
+  };
+
   return (
     <div className="rounded-lg border border-white/5 bg-surface p-4">
       <h2 className="mb-3 text-sm font-semibold text-text-primary">Top workflows</h2>
-      <table className="w-full table-auto text-sm">
+
+      {/* Mobile: stacked cards (the table reflows poorly on narrow screens). */}
+      <ul className="space-y-2 md:hidden">
+        {rows.map((row) => (
+          <li
+            key={row.id}
+            role="button"
+            tabIndex={0}
+            aria-label={`Open ${row.name}`}
+            onClick={() => onRowClick(row.id)}
+            onKeyDown={(e) => handleCardKey(e, row.id)}
+            className={cn(
+              'flex min-h-11 cursor-pointer flex-col gap-1 rounded-md border border-white/5 bg-elevated p-3 transition',
+              'hover:border-accent-teal/40 focus:outline-none focus:ring-1 focus:ring-accent-teal',
+            )}
+          >
+            <span className="truncate font-medium text-text-primary" title={row.name}>
+              {row.name}
+            </span>
+            <span className="flex justify-between text-xs text-text-secondary">
+              <span>{row.runs} runs</span>
+              <span className="tabular-nums">{formatPercent(row.successRate)} success</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop: full table. */}
+      <table className="hidden w-full table-auto text-sm md:table">
         <thead>
           <tr className="text-left text-xs uppercase tracking-wide text-text-secondary">
             <th className="py-2 font-medium">Name</th>

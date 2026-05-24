@@ -43,7 +43,7 @@ export function DashboardPage(): JSX.Element {
   return (
     <div className="flex flex-col">
       <header className="border-b border-white/5 bg-surface">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 md:px-6">
           <div>
             <h1 className="text-lg font-semibold">Usage</h1>
             <p className="text-xs text-text-secondary">

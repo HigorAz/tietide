@@ -103,7 +103,7 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
         <div
           role="dialog"
           aria-label="Workflow documentation"
-          className="absolute right-4 top-16 z-20 flex w-[28rem] max-w-[calc(100%-2rem)] flex-col gap-3 rounded-md border border-white/10 bg-surface p-4 shadow-xl shadow-black/40"
+          className="absolute inset-x-2 top-14 z-20 flex max-h-[70vh] w-auto max-w-none flex-col gap-3 rounded-md border border-white/10 bg-surface p-4 shadow-xl shadow-black/40 md:inset-x-auto md:right-4 md:top-16 md:max-h-none md:w-[28rem]"
         >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-text-primary">Documentation</h2>

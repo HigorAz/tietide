@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { NODE_CATALOG, NodeType } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
@@ -7,6 +7,7 @@ import {
   useExecutionLiveStore,
   type NodeRunState,
 } from '@/stores/executionLiveStore';
+import { mockViewport, restoreViewport } from '@/test/matchMedia';
 import { NodeConfigPanel } from './NodeConfigPanel';
 
 // Bypasses editorStore.addNode (which blocks forbidden types per FORBIDDEN_NODE_TYPES)
@@ -165,6 +166,34 @@ describe('NodeConfigPanel', () => {
       });
       render(<NodeConfigPanel />);
       expect(screen.getByText(/no node selected/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('mobile (bottom sheet)', () => {
+    beforeEach(() => mockViewport('mobile'));
+    afterEach(() => restoreViewport());
+
+    it('should render the panel as a dialog (bottom sheet) when a node is selected', () => {
+      seedNodeOfType(NodeType.HTTP_REQUEST);
+      render(<NodeConfigPanel />);
+      expect(screen.getByRole('dialog', { name: /http request/i })).toBeInTheDocument();
+      expect(screen.getByTestId('http-request-form')).toBeInTheDocument();
+    });
+
+    it('should clear the selection when the sheet close button is clicked', () => {
+      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
+      expect(useEditorStore.getState().selectedNodeId).toBe(nodeId);
+
+      render(<NodeConfigPanel />);
+      fireEvent.click(screen.getByRole('button', { name: /^close$/i }));
+
+      expect(useEditorStore.getState().selectedNodeId).toBeNull();
+    });
+
+    it('should still render the live Preview panel inside the sheet', () => {
+      seedNodeOfType(NodeType.HTTP_REQUEST);
+      render(<NodeConfigPanel />);
+      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
     });
   });
 
