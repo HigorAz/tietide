@@ -41,22 +41,27 @@ describe('DocumentationPanel', () => {
   });
 
   describe('initial mount', () => {
-    it('should render a Generate Documentation button when no docs exist', async () => {
+    it('should render a Generate Documentation button when no docs exist', () => {
       render(<DocumentationPanel workflowId="wf-1" />);
-      await waitFor(() => expect(mockedGet).toHaveBeenCalledWith('wf-1'));
       expect(screen.getByRole('button', { name: /generate documentation/i })).toBeInTheDocument();
     });
 
-    it('should silently load existing docs without firing a toast', async () => {
-      mockedGet.mockResolvedValueOnce(sample);
+    it('should NOT auto-fetch docs on mount (lazy until the dialog is opened)', () => {
+      render(<DocumentationPanel workflowId="wf-1" />);
+      // Fetch is deferred until handleRegenerate explicitly opens the dialog.
+      expect(mockedGet).not.toHaveBeenCalled();
+      expect(mockedRegenerate).not.toHaveBeenCalled();
+      expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+
+    it('should NOT auto-open the dialog when cached docs are available', () => {
+      // The store may already have docs from a prior session, but the floating
+      // dialog stays closed until the user clicks the toolbar button.
+      useDocumentationStore.setState({ status: 'ready', docs: sample, error: null });
 
       render(<DocumentationPanel workflowId="wf-1" />);
 
-      await waitFor(() =>
-        expect(screen.getByRole('heading', { name: /demo workflow/i })).toBeInTheDocument(),
-      );
-      expect(useToastStore.getState().toasts).toHaveLength(0);
-      expect(mockedRegenerate).not.toHaveBeenCalled();
+      expect(screen.queryByRole('heading', { name: /demo workflow/i })).not.toBeInTheDocument();
     });
   });
 
@@ -124,10 +129,13 @@ describe('DocumentationPanel', () => {
       expect(await screen.findByText(/copied/i)).toBeInTheDocument();
     });
 
-    it('should not render any "served from cache" indicator', async () => {
-      mockedGet.mockResolvedValueOnce(sample);
+    it('should not render any "served from cache" indicator after opening the dialog', async () => {
+      mockedRegenerate.mockResolvedValueOnce(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
+      const user = userEvent.setup();
+      const button = await screen.findByRole('button', { name: /generate documentation/i });
+      await user.click(button);
 
       await waitFor(() =>
         expect(screen.getByRole('heading', { name: /demo workflow/i })).toBeInTheDocument(),
@@ -197,22 +205,25 @@ describe('DocumentationPanel', () => {
       });
     });
 
-    it('should not fire a toast on initial idle mount', async () => {
+    it('should not fire a toast on initial mount (lazy fetch — no API call yet)', () => {
       render(<DocumentationPanel workflowId="wf-1" />);
-      await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-
+      expect(mockedGet).not.toHaveBeenCalled();
       expect(useToastStore.getState().toasts).toHaveLength(0);
     });
 
-    it('should not fire a toast when fetch silently loads existing docs', async () => {
-      mockedGet.mockResolvedValueOnce(sample);
+    it('should fire a success toast only after an explicit regenerate click', async () => {
+      mockedRegenerate.mockResolvedValueOnce(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
-
-      await waitFor(() =>
-        expect(screen.getByRole('heading', { name: /demo workflow/i })).toBeInTheDocument(),
-      );
+      const user = userEvent.setup();
+      // Mount alone fires no toast — cached-docs hydration was removed from
+      // the floating dialog in favour of the dock-tab path.
       expect(useToastStore.getState().toasts).toHaveLength(0);
+
+      const button = await screen.findByRole('button', { name: /generate documentation/i });
+      await user.click(button);
+
+      await waitFor(() => expect(useToastStore.getState().toasts).toHaveLength(1));
     });
   });
 

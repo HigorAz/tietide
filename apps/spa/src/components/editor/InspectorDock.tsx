@@ -6,13 +6,14 @@ import { useExecutionLiveStore, type ExecutionLiveStatus } from '@/stores/execut
 import { cn } from '@/utils/cn';
 import { InspectorRunPanel } from './InspectorRunPanel';
 import { InspectorLogsPanel } from './InspectorLogsPanel';
+import { InspectorDocumentationPanel } from './InspectorDocumentationPanel';
 import { ReplayScrubber } from './ReplayScrubber';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 
 export const INSPECTOR_DOCK_STORAGE_KEY = 'tietide-inspector-collapsed';
 export const INSPECTOR_DOCK_SIZE_STORAGE_KEY = 'tietide-inspector-size';
 
-type DockTab = 'overview' | 'run' | 'logs' | 'versions';
+type DockTab = 'overview' | 'run' | 'logs' | 'versions' | 'documentation';
 
 interface DockSize {
   width: number;
@@ -178,11 +179,12 @@ export function InspectorDock(): JSX.Element {
         className="flex h-full flex-col"
       >
         <div className="flex items-center justify-between border-b border-white/5 pr-1">
-          <TabsList aria-label="Inspector" className="border-b-0">
+          <TabsList aria-label="Inspector" className="overflow-x-auto border-b-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="run">Run</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
             <TabsTrigger value="versions">Versions</TabsTrigger>
+            <TabsTrigger value="documentation">Docs</TabsTrigger>
           </TabsList>
           <button
             type="button"
@@ -219,6 +221,9 @@ export function InspectorDock(): JSX.Element {
             </TabsContent>
             <TabsContent value="versions" className="min-h-0 flex-1">
               <VersionHistoryPanel />
+            </TabsContent>
+            <TabsContent value="documentation" className="min-h-0 flex-1">
+              <InspectorDocumentationPanel />
             </TabsContent>
           </>
         )}

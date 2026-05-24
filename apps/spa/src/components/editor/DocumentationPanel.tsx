@@ -26,15 +26,13 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
   const regenerateRequestedRef = useRef(false);
   const previousStatusRef = useRef<typeof status | null>(null);
 
-  useEffect(() => {
-    void fetch(workflowId);
-  }, [fetch, workflowId]);
-
-  useEffect(() => {
-    if (status === 'ready' || status === 'error' || status === 'loading') {
-      setOpen(true);
-    }
-  }, [status]);
+  // No automatic fetch / open. The floating dialog opens *only* when the
+  // user clicks the toolbar button (handleRegenerate). The cached-doc
+  // hydration use case is handled by the dock-tab variant
+  // (InspectorDocumentationPanel), which fetches the GET endpoint when its
+  // tab is selected. Removing the mount fetch + status-driven auto-open
+  // here is what fixed the "Documentation panel appears on every editor
+  // load" complaint.
 
   useEffect(() => {
     const previous = previousStatusRef.current;
@@ -59,6 +57,7 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
   const handleRegenerate = useCallback(() => {
     if (status === 'loading') return;
     setCopied(false);
+    setOpen(true);
     regenerateRequestedRef.current = true;
     void regenerate(workflowId);
   }, [regenerate, status, workflowId]);
