@@ -11,6 +11,7 @@ import { edgeTypes } from './edges';
 import { editorTouchProps } from './editorTouchProps';
 import { EditorContextMenu } from './EditorContextMenu';
 import { InspectorDock } from './InspectorDock';
+import { InkPlumeBackdrop } from './canvas/InkPlumeBackdrop';
 import { nodeTypes } from './nodes';
 import { NODE_LIBRARY_DRAG_MIME } from './NodeLibrary';
 import { useCanvasClipboard } from './useCanvasClipboard';
@@ -141,6 +142,7 @@ export function Canvas() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <InkPlumeBackdrop />
       <ReactFlow
         nodes={nodes}
         edges={edges}

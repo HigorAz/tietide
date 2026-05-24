@@ -44,14 +44,16 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
       data-skipped={skipped ? 'true' : 'false'}
       className={cn(
         'relative flex flex-col items-center gap-2 select-none',
-        selected && 'drop-shadow-[0_0_12px_rgba(0,212,179,0.45)]',
+        selected &&
+          'drop-shadow-[0_0_24px_rgba(0,212,179,0.55)] drop-shadow-[0_0_4px_rgba(0,212,179,0.9)]',
+        status === 'running' && 'drop-shadow-[0_0_18px_rgba(0,212,179,0.6)]',
         skipped && 'opacity-50 outline-dashed outline-1 outline-text-muted rounded-md',
       )}
     >
       <Handle
         type="target"
         position={Position.Top}
-        className="!w-2 !h-2 !bg-accent-teal !border-0"
+        className="!w-2.5 !h-2.5 !bg-accent-teal !border-0 !shadow-[0_0_6px_rgba(0,212,179,0.7)]"
       />
 
       {!isTrigger && (
@@ -123,7 +125,7 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!w-2 !h-2 !bg-accent-teal !border-0"
+        className="!w-2.5 !h-2.5 !bg-accent-teal !border-0 !shadow-[0_0_6px_rgba(0,212,179,0.7)]"
       />
 
       {hasErrorHandler && (
