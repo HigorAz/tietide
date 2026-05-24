@@ -16,7 +16,6 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
   const status = useDocumentationStore((s) => s.status);
   const docs = useDocumentationStore((s) => s.docs);
   const error = useDocumentationStore((s) => s.error);
-  const fetch = useDocumentationStore((s) => s.fetch);
   const regenerate = useDocumentationStore((s) => s.regenerate);
   const reset = useDocumentationStore((s) => s.reset);
   const toast = useToastStore((s) => s.show);
