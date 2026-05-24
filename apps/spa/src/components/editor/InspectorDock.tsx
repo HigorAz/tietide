@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { MiniMap } from 'reactflow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { useExecutionLiveStore, type ExecutionLiveStatus } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 import { InspectorRunPanel } from './InspectorRunPanel';
+import { InspectorLogsPanel } from './InspectorLogsPanel';
+import { InspectorDocumentationPanel } from './InspectorDocumentationPanel';
+import { InspectorOverviewPanel } from './InspectorOverviewPanel';
 import { ReplayScrubber } from './ReplayScrubber';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 
 export const INSPECTOR_DOCK_STORAGE_KEY = 'tietide-inspector-collapsed';
 export const INSPECTOR_DOCK_SIZE_STORAGE_KEY = 'tietide-inspector-size';
 
-type DockTab = 'overview' | 'run' | 'logs' | 'versions';
+type DockTab = 'overview' | 'run' | 'logs' | 'versions' | 'documentation';
 
 interface DockSize {
   width: number;
@@ -78,14 +80,6 @@ const writeSize = (size: DockSize): void => {
     // ignore
   }
 };
-
-function EmptyRunState({ message }: { message: string }): JSX.Element {
-  return (
-    <div className="flex h-full items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
-      {message}
-    </div>
-  );
-}
 
 export function InspectorDock(): JSX.Element {
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
@@ -185,11 +179,12 @@ export function InspectorDock(): JSX.Element {
         className="flex h-full flex-col"
       >
         <div className="flex items-center justify-between border-b border-white/5 pr-1">
-          <TabsList aria-label="Inspector" className="border-b-0">
+          <TabsList aria-label="Inspector" className="overflow-x-auto border-b-0">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="run">Run</TabsTrigger>
             <TabsTrigger value="logs">Logs</TabsTrigger>
             <TabsTrigger value="versions">Versions</TabsTrigger>
+            <TabsTrigger value="documentation">Docs</TabsTrigger>
           </TabsList>
           <button
             type="button"
@@ -214,18 +209,19 @@ export function InspectorDock(): JSX.Element {
               forceMount
               className={cn('min-h-0 flex-1', activeTab !== 'overview' && 'hidden')}
             >
-              <div className="relative h-full w-full">
-                <MiniMap pannable zoomable className="!relative !h-full !w-full" />
-              </div>
+              <InspectorOverviewPanel />
             </TabsContent>
             <TabsContent value="run" className="min-h-0 flex-1">
               <InspectorRunPanel />
             </TabsContent>
             <TabsContent value="logs" className="min-h-0 flex-1">
-              <EmptyRunState message="No run yet" />
+              <InspectorLogsPanel />
             </TabsContent>
             <TabsContent value="versions" className="min-h-0 flex-1">
               <VersionHistoryPanel />
+            </TabsContent>
+            <TabsContent value="documentation" className="min-h-0 flex-1">
+              <InspectorDocumentationPanel />
             </TabsContent>
           </>
         )}

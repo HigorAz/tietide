@@ -5,6 +5,25 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] — 2026-05-24
+
+### Added
+
+- `ExecutionContext.refreshConnection?<TConfig>(connectionId)` — optional
+  method letting the host perform an in-flight OAuth refresh against the
+  provider's token endpoint and return the new decrypted connection.
+- `BaseConnectorAction.execute()` now calls `context.refreshConnection`
+  (when available) on a first auth-error and retries the action once
+  before falling back to `markConnectionForRefresh`. This means an
+  expired access token recovers transparently without surfacing a
+  `ConnectionAuthError` to the user, provided the host implements the
+  optional method.
+
+Purely additive — the new method is optional. Existing 2.3.0 contexts
+keep compiling. Behavior on hosts that don't implement
+`refreshConnection` is unchanged (still throws `ConnectionAuthError` on
+auth errors).
+
 ## [2.3.0] — 2026-05-08
 
 ### Added

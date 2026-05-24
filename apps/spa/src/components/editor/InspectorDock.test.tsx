@@ -29,14 +29,15 @@ describe('InspectorDock', () => {
   });
 
   describe('rendering', () => {
-    it('should render four tabs labelled Overview, Run, Logs, Versions', () => {
+    it('should render five tabs labelled Overview, Run, Logs, Versions, Docs', () => {
       render(<InspectorDock />);
       const tabs = screen.getAllByRole('tab');
-      expect(tabs).toHaveLength(4);
+      expect(tabs).toHaveLength(5);
       expect(tabs[0]).toHaveAccessibleName(/overview/i);
       expect(tabs[1]).toHaveAccessibleName(/run/i);
       expect(tabs[2]).toHaveAccessibleName(/logs/i);
       expect(tabs[3]).toHaveAccessibleName(/versions/i);
+      expect(tabs[4]).toHaveAccessibleName(/docs/i);
     });
 
     it('should mount the VersionHistoryPanel when the Versions tab is selected', async () => {
@@ -48,11 +49,11 @@ describe('InspectorDock', () => {
       expect(screen.getByTestId('version-history-panel-stub')).toBeInTheDocument();
     });
 
-    it('should default to the Overview tab and render the React Flow MiniMap inside it', () => {
+    it('should default to the Overview tab and render the workflow stats dashboard', () => {
       render(<InspectorDock />);
       const tabs = screen.getAllByRole('tab');
       expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
-      expect(screen.getByTestId('reactflow-minimap-stub')).toBeInTheDocument();
+      expect(screen.getByTestId('inspector-overview-panel')).toBeInTheDocument();
     });
 
     it('should show the "No run yet" empty state in Run and Logs tabs while status is idle', async () => {

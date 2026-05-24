@@ -40,6 +40,16 @@ vi.mock('@/api/executions', () => ({
   getExecution: vi.fn(),
   listExecutionSteps: vi.fn(),
   executeWorkflow: vi.fn(),
+  // The Overview dock panel calls listExecutions(workflowId, { pageSize: 1 })
+  // on mount. Stub it with an empty page so the WorkflowEditorPage tests stay
+  // focused on routing / hydration behavior rather than dashboard data.
+  listExecutions: vi.fn(async () => ({
+    items: [],
+    total: 0,
+    page: 1,
+    pageSize: 1,
+    nextCursor: null,
+  })),
 }));
 
 vi.mock('@/lib/execution-socket', () => ({

@@ -56,7 +56,14 @@ export function Sidebar(): JSX.Element {
           collapsed ? 'justify-center' : 'justify-between',
         )}
       >
-        {!collapsed && <span className="text-sm font-semibold text-text-primary">TieTide</span>}
+        {!collapsed ? (
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-text-primary">
+            <img src="/logo.jpg" alt="" aria-hidden className="h-6 w-6 rounded-sm" />
+            TieTide
+          </span>
+        ) : (
+          <img src="/logo.jpg" alt="TieTide" className="h-6 w-6 rounded-sm" />
+        )}
         <button
           type="button"
           onClick={handleToggle}
