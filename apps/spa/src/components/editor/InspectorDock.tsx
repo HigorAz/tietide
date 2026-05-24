@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { MiniMap } from 'reactflow';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { useExecutionLiveStore, type ExecutionLiveStatus } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 import { InspectorRunPanel } from './InspectorRunPanel';
 import { InspectorLogsPanel } from './InspectorLogsPanel';
 import { InspectorDocumentationPanel } from './InspectorDocumentationPanel';
+import { InspectorOverviewPanel } from './InspectorOverviewPanel';
 import { ReplayScrubber } from './ReplayScrubber';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 
@@ -209,9 +209,7 @@ export function InspectorDock(): JSX.Element {
               forceMount
               className={cn('min-h-0 flex-1', activeTab !== 'overview' && 'hidden')}
             >
-              <div className="relative h-full w-full">
-                <MiniMap pannable zoomable className="!relative !h-full !w-full" />
-              </div>
+              <InspectorOverviewPanel />
             </TabsContent>
             <TabsContent value="run" className="min-h-0 flex-1">
               <InspectorRunPanel />
