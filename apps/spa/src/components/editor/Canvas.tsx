@@ -160,7 +160,11 @@ export function Canvas() {
         <Background gap={16} color="#1A3050" />
         <Controls />
       </ReactFlow>
-      <InspectorDock />
+      {/* The inspector dock (minimap / run / logs / versions) competes with the
+          bottom sheets and add-node button for the limited bottom area on a
+          phone, so it is desktop-only. Per-node run I/O remains available in
+          the node config panel. */}
+      {!isMobile && <InspectorDock />}
       {isDragActive && (
         <div
           aria-hidden

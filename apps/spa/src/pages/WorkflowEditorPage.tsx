@@ -3,6 +3,7 @@ import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
 import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
+import { EditorMobileToolbox } from '@/components/editor/EditorMobileToolbox';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
@@ -13,6 +14,7 @@ import { useUnsavedChangesGuard } from '@/components/editor/useUnsavedChangesGua
 import { getWorkflow } from '@/api/workflows';
 import { getExecution, listExecutionSteps } from '@/api/executions';
 import { useEditorHotkeys } from '@/hooks/useEditorHotkeys';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -38,6 +40,7 @@ export function WorkflowEditorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showCheatsheet, setShowCheatsheet] = useState(false);
+  const isMobile = useIsMobile();
 
   const blocker = useUnsavedChangesGuard(isDirty);
 
@@ -182,11 +185,15 @@ export function WorkflowEditorPage() {
   return (
     <div className="flex h-full w-full overflow-hidden">
       <ReactFlowProvider>
-        <NodeLibrary />
+        {/* Desktop: the node library is a left side panel. On mobile it opens
+            from the EditorMobileToolbox FAB as a bottom sheet instead, so the
+            canvas gets the full width. */}
+        {!isMobile && <NodeLibrary />}
         <div className="relative flex-1">
           <Canvas />
           <EditorToolbar workflowId={id} entryRoute={entryRoute} />
           <DocumentationPanel workflowId={id} />
+          {isMobile && <EditorMobileToolbox />}
         </div>
         <NodeConfigPanel />
       </ReactFlowProvider>
