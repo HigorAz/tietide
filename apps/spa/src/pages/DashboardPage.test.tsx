@@ -130,7 +130,8 @@ describe('DashboardPage', () => {
 
     renderDashboard();
 
-    await user.click(await screen.findByRole('button', { name: /open alpha/i }));
+    const table = await screen.findByRole('table');
+    await user.click(within(table).getByRole('button', { name: /open alpha/i }));
 
     expect(await screen.findByTestId('peek-from')).toHaveTextContent('/dashboard');
   });

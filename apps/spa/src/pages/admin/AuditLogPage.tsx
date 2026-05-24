@@ -287,8 +287,8 @@ export function AuditLogPage(): JSX.Element {
         )}
 
         {rows.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-white/5 bg-surface">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border border-white/5 bg-surface">
+            <table className="w-full min-w-[48rem] text-sm">
               <thead className="bg-deep-blue/40 text-left text-xs uppercase tracking-wide text-text-secondary">
                 <tr>
                   <th className="px-4 py-2 font-semibold">Timestamp</th>

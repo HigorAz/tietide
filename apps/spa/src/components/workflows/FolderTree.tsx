@@ -218,7 +218,7 @@ export function FolderTree({
   return (
     <aside
       aria-label="Folders"
-      className="flex w-60 shrink-0 flex-col gap-1 border-r border-white/5 bg-surface/40 p-3"
+      className="flex w-full flex-col gap-1 border-b border-white/5 bg-surface/40 p-3 md:w-60 md:shrink-0 md:border-b-0 md:border-r"
     >
       <DroppablePin
         id={ALL_DROP_ID}

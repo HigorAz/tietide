@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TopWorkflowsTable } from './TopWorkflowsTable';
 
@@ -15,15 +15,24 @@ describe('TopWorkflowsTable', () => {
     onRowClick.mockReset();
   });
 
-  it('renders one row per workflow with name, runs, and success rate', () => {
+  it('renders one table row per workflow with name, runs, and success rate (desktop)', () => {
     render(<TopWorkflowsTable rows={sampleRows} onRowClick={onRowClick} />);
+    const table = screen.getByRole('table');
 
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('42')).toBeInTheDocument();
-    expect(screen.getByText('95%')).toBeInTheDocument();
-    expect(screen.getByText('Beta')).toBeInTheDocument();
-    expect(screen.getByText('30')).toBeInTheDocument();
-    expect(screen.getByText('50%')).toBeInTheDocument();
+    expect(within(table).getByText('Alpha')).toBeInTheDocument();
+    expect(within(table).getByText('42')).toBeInTheDocument();
+    expect(within(table).getByText('95%')).toBeInTheDocument();
+    expect(within(table).getByText('Beta')).toBeInTheDocument();
+    expect(within(table).getByText('30')).toBeInTheDocument();
+    expect(within(table).getByText('50%')).toBeInTheDocument();
+  });
+
+  it('also renders a stacked card per workflow for mobile viewports', () => {
+    render(<TopWorkflowsTable rows={sampleRows} onRowClick={onRowClick} />);
+    // Both the table and the mobile card list carry an "Open X" button.
+    expect(screen.getAllByRole('button', { name: /open alpha/i })).toHaveLength(2);
+    expect(screen.getByText(/42 runs/i)).toBeInTheDocument();
+    expect(screen.getByText(/95% success/i)).toBeInTheDocument();
   });
 
   it('renders an empty-state message when there are no rows', () => {
@@ -35,8 +44,9 @@ describe('TopWorkflowsTable', () => {
   it('calls onRowClick with the workflow id when a row is clicked', async () => {
     const user = userEvent.setup();
     render(<TopWorkflowsTable rows={sampleRows} onRowClick={onRowClick} />);
+    const table = screen.getByRole('table');
 
-    await user.click(screen.getByRole('button', { name: /open alpha/i }));
+    await user.click(within(table).getByRole('button', { name: /open alpha/i }));
 
     expect(onRowClick).toHaveBeenCalledWith('wf-a');
   });
@@ -44,11 +54,22 @@ describe('TopWorkflowsTable', () => {
   it('calls onRowClick when Enter is pressed on a focused row', async () => {
     const user = userEvent.setup();
     render(<TopWorkflowsTable rows={sampleRows} onRowClick={onRowClick} />);
+    const table = screen.getByRole('table');
 
-    const row = screen.getByRole('button', { name: /open beta/i });
+    const row = within(table).getByRole('button', { name: /open beta/i });
     row.focus();
     await user.keyboard('{Enter}');
 
     expect(onRowClick).toHaveBeenCalledWith('wf-b');
+  });
+
+  it('calls onRowClick when a mobile card is activated', async () => {
+    const user = userEvent.setup();
+    render(<TopWorkflowsTable rows={sampleRows} onRowClick={onRowClick} />);
+    const cardList = screen.getByRole('list');
+
+    await user.click(within(cardList).getByRole('button', { name: /open alpha/i }));
+
+    expect(onRowClick).toHaveBeenCalledWith('wf-a');
   });
 });

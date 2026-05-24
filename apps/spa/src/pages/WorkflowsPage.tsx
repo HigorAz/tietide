@@ -520,7 +520,7 @@ export function WorkflowsPage(): JSX.Element {
           </div>
         </header>
 
-        <div className="mx-auto flex w-full max-w-6xl flex-1">
+        <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col md:flex-row">
           <FolderTree
             folders={folders}
             selectedFolderId={selectedFolderId}
@@ -529,8 +529,8 @@ export function WorkflowsPage(): JSX.Element {
             onRequestDelete={(folder) => setFolderToDelete(folder)}
           />
 
-          <main className="flex-1 px-6 py-8">
-            <div className="mb-4 flex items-center gap-3">
+          <main className="min-w-0 flex-1 px-4 py-6 md:px-6 md:py-8">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <label className="relative flex flex-1 items-center">
                 <Search
                   aria-hidden="true"
