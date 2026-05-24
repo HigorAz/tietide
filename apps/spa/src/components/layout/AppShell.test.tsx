@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { AppShell } from './AppShell';
 import { useAuthStore } from '@/stores/authStore';
@@ -46,5 +47,19 @@ describe('AppShell', () => {
     );
     expect(screen.getByTestId('sidebar')).toBeInTheDocument();
     expect(screen.getByText('Catch-all content')).toBeInTheDocument();
+  });
+
+  it('should render a mobile top bar with a hamburger alongside the desktop sidebar', () => {
+    renderAt('/dashboard', '/dashboard', <div>Dashboard content</div>);
+    expect(screen.getByTestId('mobile-top-bar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open navigation/i })).toBeInTheDocument();
+  });
+
+  it('should open the mobile nav drawer when the hamburger is clicked', async () => {
+    const user = userEvent.setup();
+    renderAt('/dashboard', '/dashboard', <div>Dashboard content</div>);
+    expect(screen.queryByRole('dialog', { name: /navigation/i })).toBeNull();
+    await user.click(screen.getByRole('button', { name: /open navigation/i }));
+    expect(screen.getByRole('dialog', { name: /navigation/i })).toBeInTheDocument();
   });
 });

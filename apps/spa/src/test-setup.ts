@@ -36,6 +36,29 @@ if (typeof elementProto.scrollIntoView !== 'function') {
   elementProto.scrollIntoView = (): void => {};
 }
 
+// jsdom does not implement matchMedia; the useMediaQuery hook calls it on
+// mount. Default to a DESKTOP viewport (1280px) so `(min-width: 768px)`
+// matches → useIsMobile() is false → the existing suite keeps rendering the
+// desktop layout unchanged. Mobile-specific tests override this per-test via
+// the mockViewport() helper in src/test/matchMedia.ts.
+if (typeof window.matchMedia !== 'function') {
+  const DEFAULT_WIDTH = 1280;
+  const minWidthRe = /\(min-width:\s*(\d+)px\)/;
+  window.matchMedia = ((query: string): MediaQueryList => {
+    const match = minWidthRe.exec(query);
+    return {
+      matches: match ? DEFAULT_WIDTH >= Number(match[1]) : false,
+      media: query,
+      onchange: null,
+      addEventListener: (): void => {},
+      removeEventListener: (): void => {},
+      addListener: (): void => {}, // deprecated, retained for older callers
+      removeListener: (): void => {}, // deprecated
+      dispatchEvent: (): boolean => false,
+    } as unknown as MediaQueryList;
+  }) as unknown as typeof window.matchMedia;
+}
+
 // Workaround for an incompatibility between jsdom and Node's native fetch
 // (undici): the React Router data router creates Request objects whose
 // AbortSignal comes from jsdom's realm, and undici rejects it with

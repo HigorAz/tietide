@@ -198,7 +198,7 @@ function ToolbarButton({ label, onClick, icon, disabled, primary, dataTour }: To
       disabled={disabled}
       data-tour={dataTour}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium',
+        'inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium sm:py-1',
         'transition focus:outline-none focus:ring-1 focus:ring-accent-teal',
         'disabled:cursor-not-allowed disabled:opacity-40',
         primary
@@ -207,7 +207,9 @@ function ToolbarButton({ label, onClick, icon, disabled, primary, dataTour }: To
       )}
     >
       {icon}
-      <span>{label}</span>
+      {/* Icon-only below `sm` to fit narrow phones; `sr-only` keeps the label in
+          the accessibility tree so the button stays named for screen readers. */}
+      <span className="sr-only sm:not-sr-only">{label}</span>
     </button>
   );
 }
