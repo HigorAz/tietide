@@ -197,9 +197,6 @@ function ToolbarButton({ label, onClick, icon, disabled, primary, dataTour }: To
       onClick={onClick}
       disabled={disabled}
       data-tour={dataTour}
-      // Labels collapse to icon-only below `sm` to fit narrow phones; aria-label
-      // keeps the accessible name regardless of the visible-text breakpoint.
-      aria-label={label}
       className={cn(
         'inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium sm:py-1',
         'transition focus:outline-none focus:ring-1 focus:ring-accent-teal',
@@ -210,7 +207,9 @@ function ToolbarButton({ label, onClick, icon, disabled, primary, dataTour }: To
       )}
     >
       {icon}
-      <span className="hidden sm:inline">{label}</span>
+      {/* Icon-only below `sm` to fit narrow phones; `sr-only` keeps the label in
+          the accessibility tree so the button stays named for screen readers. */}
+      <span className="sr-only sm:not-sr-only">{label}</span>
     </button>
   );
 }
