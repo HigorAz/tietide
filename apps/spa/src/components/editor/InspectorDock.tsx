@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { useExecutionLiveStore, type ExecutionLiveStatus } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 import { InspectorRunPanel } from './InspectorRunPanel';
+import { InspectorLogsPanel } from './InspectorLogsPanel';
 import { ReplayScrubber } from './ReplayScrubber';
 import { VersionHistoryPanel } from './VersionHistoryPanel';
 
@@ -78,14 +79,6 @@ const writeSize = (size: DockSize): void => {
     // ignore
   }
 };
-
-function EmptyRunState({ message }: { message: string }): JSX.Element {
-  return (
-    <div className="flex h-full items-center justify-center px-3 py-6 text-center text-xs text-text-secondary">
-      {message}
-    </div>
-  );
-}
 
 export function InspectorDock(): JSX.Element {
   const [collapsed, setCollapsed] = useState<boolean>(() => readCollapsed());
@@ -222,7 +215,7 @@ export function InspectorDock(): JSX.Element {
               <InspectorRunPanel />
             </TabsContent>
             <TabsContent value="logs" className="min-h-0 flex-1">
-              <EmptyRunState message="No run yet" />
+              <InspectorLogsPanel />
             </TabsContent>
             <TabsContent value="versions" className="min-h-0 flex-1">
               <VersionHistoryPanel />
