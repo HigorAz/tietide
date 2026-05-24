@@ -24,6 +24,17 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
   return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 };
 
+// True when the user has selected actual page text (not just a canvas node
+// "selection"). Without this check the global Ctrl+C handler intercepts every
+// copy attempt — including text selections inside the InspectorRunPanel error
+// block — and replaces it with the node-copy clipboard payload.
+const hasTextSelection = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const selection = window.getSelection();
+  if (selection === null) return false;
+  return selection.toString().length > 0;
+};
+
 /**
  * Encapsulates the editor canvas clipboard behavior — copy/paste/delete
  * keyboard shortcuts and the JSON copy/paste helpers used by the context menu.
@@ -100,6 +111,10 @@ export function useCanvasClipboard(): CanvasClipboard {
       if (event.metaKey || event.ctrlKey) {
         const key = event.key.toLowerCase();
         if (key === 'c') {
+          // Defer to native copy when the user has selected text on the page
+          // (e.g. an error message in the InspectorRunPanel). Only hijack
+          // Ctrl+C for the node-copy clipboard when no text is selected.
+          if (hasTextSelection()) return;
           event.preventDefault();
           void runCopy();
         } else if (key === 'v') {
