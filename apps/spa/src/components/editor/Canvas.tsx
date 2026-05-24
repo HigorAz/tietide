@@ -1,32 +1,23 @@
-import { useCallback, useEffect, useState, type DragEvent } from 'react';
+import { useCallback, useState, type DragEvent } from 'react';
 import ReactFlow, { Background, Controls, useReactFlow, type Node } from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { NodeType } from '@tietide/shared';
-import {
-  buildClipboardPayload,
-  ClipboardFormatError,
-  parseClipboardPayload,
-  serializeClipboardPayload,
-} from '@/lib/clipboard';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { cn } from '@/utils/cn';
 import { ClipboardJsonDialog, type ClipboardJsonDialogMode } from './ClipboardJsonDialog';
 import { edgeTypes } from './edges';
+import { editorTouchProps } from './editorTouchProps';
 import { EditorContextMenu } from './EditorContextMenu';
 import { InspectorDock } from './InspectorDock';
 import { nodeTypes } from './nodes';
 import { NODE_LIBRARY_DRAG_MIME } from './NodeLibrary';
+import { useCanvasClipboard } from './useCanvasClipboard';
 
 const FIT_VIEW_OPTIONS = { padding: 1.2, minZoom: 0.5, maxZoom: 0.85 } as const;
-const MULTI_SELECT_KEYS = ['Meta', 'Control', 'Shift'] as const;
 
 export const CANVAS_DROP_MIME = NODE_LIBRARY_DRAG_MIME;
-
-const isEditableTarget = (target: EventTarget | null): boolean => {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
-};
 
 interface MenuState {
   open: boolean;
@@ -52,9 +43,11 @@ export function Canvas() {
   const addNode = useEditorStore((s) => s.addNode);
   const selectNode = useEditorStore((s) => s.selectNode);
   const deleteSelected = useEditorStore((s) => s.deleteSelected);
-  const pasteFromClipboardPayload = useEditorStore((s) => s.pasteFromClipboardPayload);
   const showToast = useToastStore((s) => s.show);
   const { screenToFlowPosition } = useReactFlow();
+  const isMobile = useIsMobile();
+
+  const { runCopy, runPaste, applyPasteText, buildSelectedJson } = useCanvasClipboard();
 
   const [isDragActive, setIsDragActive] = useState(false);
   const [menu, setMenu] = useState<MenuState>(CLOSED_MENU);
@@ -105,92 +98,6 @@ export function Canvas() {
     },
     [addNode, screenToFlowPosition, showToast],
   );
-
-  const buildSelectedJson = useCallback((): string => {
-    const { nodes: curNodes, edges: curEdges } = useEditorStore.getState();
-    const selected = curNodes.filter((n) => n.selected);
-    return serializeClipboardPayload(buildClipboardPayload(selected, curEdges));
-  }, []);
-
-  const applyPasteText = useCallback(
-    (text: string): string | undefined => {
-      try {
-        const payload = parseClipboardPayload(text);
-        const ids = pasteFromClipboardPayload(payload);
-        const skipped = payload.nodes.length - ids.length;
-        if (skipped > 0) {
-          showToast({
-            tone: 'warning',
-            message: `Skipped ${skipped} trigger node${skipped === 1 ? '' : 's'} — workflow already has a trigger.`,
-          });
-        }
-        if (ids.length > 0) {
-          showToast({
-            tone: 'success',
-            message: `Pasted ${ids.length} node${ids.length === 1 ? '' : 's'}`,
-          });
-        }
-        return undefined;
-      } catch (err) {
-        if (err instanceof ClipboardFormatError) return err.message;
-        return 'Paste failed.';
-      }
-    },
-    [pasteFromClipboardPayload, showToast],
-  );
-
-  const runCopy = useCallback(async (): Promise<void> => {
-    const { nodes: curNodes, edges: curEdges } = useEditorStore.getState();
-    const selected = curNodes.filter((n) => n.selected);
-    if (selected.length === 0) return;
-    const payload = buildClipboardPayload(selected, curEdges);
-    try {
-      await navigator.clipboard.writeText(serializeClipboardPayload(payload));
-    } catch {
-      showToast({ tone: 'error', message: 'Could not write to clipboard.' });
-    }
-  }, [showToast]);
-
-  const runPaste = useCallback(async (): Promise<void> => {
-    let text: string;
-    try {
-      text = await navigator.clipboard.readText();
-    } catch {
-      showToast({
-        tone: 'error',
-        message: "Couldn't read clipboard. Use 'Paste from JSON' instead.",
-      });
-      return;
-    }
-    const error = applyPasteText(text);
-    if (error) showToast({ tone: 'error', message: error });
-  }, [applyPasteText, showToast]);
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent): void => {
-      if (isEditableTarget(event.target)) return;
-      if (event.metaKey || event.ctrlKey) {
-        const key = event.key.toLowerCase();
-        if (key === 'c') {
-          event.preventDefault();
-          void runCopy();
-        } else if (key === 'v') {
-          event.preventDefault();
-          void runPaste();
-        }
-        return;
-      }
-      if (event.key === 'Delete' || event.key === 'Backspace') {
-        const hasSelection = useEditorStore.getState().nodes.some((n) => n.selected === true);
-        if (!hasSelection) return;
-        event.preventDefault();
-        deleteSelected();
-      }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [runCopy, runPaste, deleteSelected]);
 
   const handlePaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
@@ -246,10 +153,9 @@ export function Canvas() {
         onNodeContextMenu={handleNodeContextMenu}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        multiSelectionKeyCode={[...MULTI_SELECT_KEYS]}
-        panActivationKeyCode="Space"
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
+        {...editorTouchProps(isMobile)}
       >
         <Background gap={16} color="#1A3050" />
         <Controls />
@@ -272,7 +178,9 @@ export function Canvas() {
           className="pointer-events-none absolute inset-0 flex items-center justify-center"
         >
           <span className="rounded-md border border-white/5 bg-deep-blue/70 px-4 py-2 text-sm font-medium text-text-secondary shadow-sm">
-            Drag a trigger from the Node Library to start.
+            {isMobile
+              ? 'Tap the + button to add a trigger.'
+              : 'Drag a trigger from the Node Library to start.'}
           </span>
         </div>
       )}
