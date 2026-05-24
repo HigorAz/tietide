@@ -97,6 +97,19 @@ const nodeChangeSnapshots = (changes: NodeChange[]): boolean =>
 const edgeChangeSnapshots = (changes: EdgeChange[]): boolean =>
   changes.some((c) => c.type === 'remove');
 
+// Reflects whether a batch of React Flow node changes represents an actual
+// edit (vs. transient UI state like selection / measurement / mid-drag).
+// Without this, simply clicking a node flips the workflow to dirty.
+const nodeChangeDirties = (changes: NodeChange[]): boolean =>
+  changes.some((c) => {
+    if (c.type === 'select' || c.type === 'dimensions' || c.type === 'reset') return false;
+    if (c.type === 'position' && c.dragging !== false) return false;
+    return true;
+  });
+
+const edgeChangeDirties = (changes: EdgeChange[]): boolean =>
+  changes.some((c) => c.type !== 'select' && c.type !== 'reset');
+
 export const useEditorStore = create<EditorStore>((set, get) => {
   const commit = (patch: Partial<EditorState>): void => {
     const { nodes, edges } = get();
@@ -158,6 +171,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         prev.selectedNodeId !== null &&
         changes.some((change) => change.type === 'remove' && change.id === prev.selectedNodeId);
       const nextSelection = selectionRemoved ? null : prev.selectedNodeId;
+      const dirties = nodeChangeDirties(changes);
 
       if (nodeChangeSnapshots(changes)) {
         set({
@@ -165,7 +179,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
           selectedNodeId: nextSelection,
           past: pushSnapshot(prev.past, { nodes: prev.nodes, edges: prev.edges }),
           future: [],
-          isDirty: true,
+          isDirty: dirties || prev.isDirty,
         });
         return;
       }
@@ -173,25 +187,26 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       set({
         nodes: nextNodes,
         selectedNodeId: nextSelection,
-        isDirty: true,
+        ...(dirties ? { isDirty: true } : {}),
       });
     },
 
     onEdgesChange: (changes) => {
       const prev = get();
       const nextEdges = applyEdgeChanges(changes, prev.edges);
+      const dirties = edgeChangeDirties(changes);
 
       if (edgeChangeSnapshots(changes)) {
         set({
           edges: nextEdges,
           past: pushSnapshot(prev.past, { nodes: prev.nodes, edges: prev.edges }),
           future: [],
-          isDirty: true,
+          isDirty: dirties || prev.isDirty,
         });
         return;
       }
 
-      set({ edges: nextEdges, isDirty: true });
+      set({ edges: nextEdges, ...(dirties ? { isDirty: true } : {}) });
     },
 
     onConnect: (connection) => {
