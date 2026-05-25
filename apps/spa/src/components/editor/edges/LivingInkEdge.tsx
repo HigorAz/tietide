@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { getBezierPath, type EdgeProps } from 'reactflow';
+import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 
@@ -22,7 +23,10 @@ function LivingInkEdgeImpl({
 }: EdgeProps) {
   const sourceStatus = useExecutionLiveStore((s) => s.nodes.get(source)?.status);
   const targetStatus = useExecutionLiveStore((s) => s.nodes.get(target)?.status);
-  const active = sourceStatus === 'success' && targetStatus === 'running';
+  // The animated flow only shows in the Result view, so Configure stays a clean
+  // editing canvas even with a run loaded.
+  const isResultView = useEditorStore((s) => s.viewMode === 'result');
+  const active = isResultView && sourceStatus === 'success' && targetStatus === 'running';
   const kind = (data as { kind?: 'success' | 'error' } | undefined)?.kind ?? 'success';
   const isError = kind === 'error';
   const gradientId = isError ? ERROR_GRADIENT_ID : GRADIENT_ID;

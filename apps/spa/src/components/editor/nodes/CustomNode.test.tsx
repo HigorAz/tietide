@@ -156,6 +156,8 @@ describe('CustomNode', () => {
   describe('live execution status override', () => {
     beforeEach(() => {
       useExecutionLiveStore.getState().reset();
+      // The live ring only shows in the Result view.
+      useEditorStore.setState({ ...initialEditorState, viewMode: 'result' });
     });
 
     it('should reflect status from executionLiveStore when present', () => {
@@ -166,6 +168,17 @@ describe('CustomNode', () => {
         data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
       });
       expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-status', 'running');
+    });
+
+    it('should ignore the live status in configure view (clean editing canvas)', () => {
+      useExecutionLiveStore.setState({
+        nodes: new Map([['node-1', baseRunState({ status: 'running' })]]),
+      });
+      useEditorStore.setState({ viewMode: 'configure' });
+      renderNode({
+        data: { label: 'n', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+      expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-status', 'idle');
     });
 
     it('should override data.status (success ring takes over after completion)', () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { ReactFlowProvider, Position, type EdgeProps } from 'reactflow';
 import { LivingInkEdge } from './LivingInkEdge';
+import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore, type NodeRunState } from '@/stores/executionLiveStore';
 
 const baseRunState = (overrides: Partial<NodeRunState>): NodeRunState => ({
@@ -59,6 +60,8 @@ const renderEdge = (overrides: Partial<EdgeProps> = {}) => {
 describe('LivingInkEdge', () => {
   beforeEach(() => {
     useExecutionLiveStore.getState().reset();
+    // The animated flow only shows in the Result view.
+    useEditorStore.setState({ ...initialEditorState, viewMode: 'result' });
   });
 
   describe('rendering', () => {
@@ -133,6 +136,16 @@ describe('LivingInkEdge', () => {
       const { container } = renderEdge();
       const path = container.querySelector('path.react-flow__edge-path');
       expect(path).toHaveAttribute('data-active', 'true');
+    });
+
+    it('should be inactive in configure view even when source=success and target=running', () => {
+      seedActiveSegment('node-a', 'node-b');
+      useEditorStore.setState({ viewMode: 'configure' });
+      const { container } = renderEdge();
+      expect(container.querySelector('path.react-flow__edge-path')).toHaveAttribute(
+        'data-active',
+        'false',
+      );
     });
 
     it('should be inactive when source is still running (not yet success)', () => {

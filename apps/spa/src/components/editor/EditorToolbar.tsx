@@ -48,12 +48,21 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const handleRun = useCallback(async () => {
     if (isRunning || isSaving) return;
     setIsRunning(true);
+    // Run executes the *saved* workflow and never auto-saves. When the canvas
+    // has unsaved edits we warn that they weren't included (use Test for the
+    // draft, or Save first).
+    const wasDirty = useEditorStore.getState().isDirty;
     try {
-      if (useEditorStore.getState().isDirty) {
-        await saveWorkflow(workflowId);
-      }
       const execution = await executeWorkflow(workflowId);
-      toast({ tone: 'success', message: 'Execution started' });
+      if (wasDirty) {
+        toast({
+          tone: 'warning',
+          message:
+            'Ran the last saved version — unsaved edits weren’t included. Save, or use Test to run your draft.',
+        });
+      } else {
+        toast({ tone: 'success', message: 'Execution started' });
+      }
       setSearchParams({ execution: execution.id });
     } catch {
       toast({ tone: 'error', message: 'Failed to start execution. Please try again.' });
@@ -139,13 +148,29 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           label={isRunning ? 'Running…' : 'Run'}
           onClick={handleRun}
           disabled={runDisabled}
-          icon={isRunning ? <Spinner size="sm" label="Running" /> : <Play size={16} aria-hidden />}
+          title="Runs the last saved version"
+          icon={
+            isRunning ? (
+              <Spinner size="sm" label="Running" />
+            ) : (
+              <span className="relative inline-flex">
+                <Play size={16} aria-hidden />
+                {isDirty && (
+                  <span
+                    aria-hidden
+                    className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-warning"
+                  />
+                )}
+              </span>
+            )
+          }
           dataTour="editor-run"
         />
         <ToolbarButton
           label={isTesting ? 'Testing…' : 'Test'}
           onClick={handleTest}
           disabled={testDisabled}
+          title="Runs your current canvas (no save)"
           icon={
             isTesting ? (
               <Spinner size="sm" label="Testing" />
@@ -188,14 +213,24 @@ interface ToolbarButtonProps {
   disabled?: boolean;
   primary?: boolean;
   dataTour?: string;
+  title?: string;
 }
 
-function ToolbarButton({ label, onClick, icon, disabled, primary, dataTour }: ToolbarButtonProps) {
+function ToolbarButton({
+  label,
+  onClick,
+  icon,
+  disabled,
+  primary,
+  dataTour,
+  title,
+}: ToolbarButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={title}
       data-tour={dataTour}
       className={cn(
         'inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs font-medium sm:py-1',

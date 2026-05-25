@@ -197,7 +197,7 @@ describe('NodeConfigPanel', () => {
     });
   });
 
-  describe('execution mode (dual-mode)', () => {
+  describe('view mode (configure vs result)', () => {
     const baseRunState = (overrides: Partial<NodeRunState> = {}): NodeRunState => ({
       status: 'success',
       nodeType: 'http-request',
@@ -210,74 +210,86 @@ describe('NodeConfigPanel', () => {
       ...overrides,
     });
 
-    it('should render the config form when the live store mode is null (editor mode)', () => {
+    // Switch the editor into the Result view, keeping the seeded node/selection.
+    const enterResultView = (): void => useEditorStore.setState({ viewMode: 'result' });
+
+    // Seed a live run for `nodeId` (used by the Result view's inspection).
+    const seedRun = (nodeId: string, overrides: Partial<NodeRunState> = {}): void => {
+      useExecutionLiveStore.setState({
+        ...initialExecutionLiveState,
+        mode: 'replay',
+        executionId: 'exec-1',
+        nodes: new Map([[nodeId, baseRunState(overrides)]]),
+      });
+    };
+
+    it('should render the editable config form in configure view (default)', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
       expect(screen.getByTestId('http-request-form')).toBeInTheDocument();
       expect(screen.queryByTestId('node-run-inspection')).not.toBeInTheDocument();
     });
 
-    it('should render the run inspection (not the form) when mode is "live"', () => {
+    it('should keep the config form editable in configure view even while a run is loaded', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
-      useExecutionLiveStore.setState({
-        ...initialExecutionLiveState,
-        mode: 'live',
-        nodes: new Map([
-          [
-            nodeId,
-            baseRunState({
-              input: { url: 'https://api.example.com' },
-              output: { ok: true, status: 200 },
-            }),
-          ],
-        ]),
+      // A run is loaded, but the user is on the Configure tab.
+      seedRun(nodeId, { input: { url: 'https://api.example.com' } });
+      // viewMode stays 'configure' (seedRun touches only the live store).
+
+      render(<NodeConfigPanel />);
+      // The editable form is present (not the read-only inspection) — editing
+      // is no longer blocked during/after a run.
+      expect(screen.getByTestId('http-request-form')).toBeInTheDocument();
+      expect(screen.queryByTestId('node-run-inspection')).not.toBeInTheDocument();
+    });
+
+    it('should dispatch config edits while a run is loaded in configure view', () => {
+      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
+      seedRun(nodeId);
+
+      render(<NodeConfigPanel />);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle');
+      fireEvent.click(toggle);
+
+      const node = useEditorStore.getState().nodes.find((n) => n.id === nodeId);
+      expect(node?.data.config?.hasErrorHandler).toBe(true);
+    });
+
+    it('should render the run inspection (not the form) in result view', () => {
+      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
+      seedRun(nodeId, {
+        input: { url: 'https://api.example.com' },
+        output: { ok: true, status: 200 },
       });
+      enterResultView();
 
       render(<NodeConfigPanel />);
       expect(screen.queryByTestId('http-request-form')).not.toBeInTheDocument();
       expect(screen.getByTestId('node-run-inspection')).toBeInTheDocument();
     });
 
-    it('should render the run inspection when mode is "replay"', () => {
+    it('should show this node’s input and output JSON in result view', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
-      useExecutionLiveStore.setState({
-        ...initialExecutionLiveState,
-        mode: 'replay',
-        nodes: new Map([[nodeId, baseRunState()]]),
+      seedRun(nodeId, {
+        input: { url: 'https://api.example.com' },
+        output: { ok: true, status: 201 },
       });
-
-      render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-run-inspection')).toBeInTheDocument();
-    });
-
-    it('should show this node’s input and output JSON when run data exists', () => {
-      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
-      useExecutionLiveStore.setState({
-        ...initialExecutionLiveState,
-        mode: 'replay',
-        nodes: new Map([
-          [
-            nodeId,
-            baseRunState({
-              input: { url: 'https://api.example.com' },
-              output: { ok: true, status: 201 },
-            }),
-          ],
-        ]),
-      });
+      enterResultView();
 
       render(<NodeConfigPanel />);
       expect(screen.getByTestId('node-run-input')).toHaveTextContent('api.example.com');
       expect(screen.getByTestId('node-run-output')).toHaveTextContent('"status": 201');
     });
 
-    it('should show a "not executed" hint when in execution mode but this node has no run data', () => {
+    it('should show a "not executed" hint in result view when this node has no run data', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       useExecutionLiveStore.setState({
         ...initialExecutionLiveState,
         mode: 'replay',
+        executionId: 'exec-1',
         nodes: new Map(),
       });
+      enterResultView();
 
       render(<NodeConfigPanel />);
       expect(screen.getByTestId('node-run-inspection')).toBeInTheDocument();
@@ -287,31 +299,20 @@ describe('NodeConfigPanel', () => {
     it('should render the read-only config block in run inspection', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       useEditorStore.getState().updateNodeConfig(nodeId, { url: 'https://example.com' });
-      useExecutionLiveStore.setState({
-        ...initialExecutionLiveState,
-        mode: 'replay',
-        nodes: new Map([[nodeId, baseRunState()]]),
-      });
+      seedRun(nodeId);
+      enterResultView();
 
       render(<NodeConfigPanel />);
       expect(screen.getByTestId('node-run-config')).toHaveTextContent('https://example.com');
     });
 
-    it('should render the error block when the selected node failed', () => {
+    it('should render the error block when the selected node failed (result view)', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
-      useExecutionLiveStore.setState({
-        ...initialExecutionLiveState,
-        mode: 'replay',
-        nodes: new Map([
-          [
-            nodeId,
-            baseRunState({
-              status: 'failed',
-              error: { message: 'Connection "abc-123" not found', code: 'CONN_MISSING' },
-            }),
-          ],
-        ]),
+      seedRun(nodeId, {
+        status: 'failed',
+        error: { message: 'Connection "abc-123" not found', code: 'CONN_MISSING' },
       });
+      enterResultView();
 
       render(<NodeConfigPanel />);
       const errorBlock = screen.getByTestId('node-run-error');
@@ -319,16 +320,22 @@ describe('NodeConfigPanel', () => {
       expect(errorBlock).toHaveTextContent('CONN_MISSING');
     });
 
-    it('should hide the live Preview panel in execution mode', () => {
+    it('should hide the live Preview panel in result view', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
-      useExecutionLiveStore.setState({
-        ...initialExecutionLiveState,
-        mode: 'replay',
-        nodes: new Map([[nodeId, baseRunState()]]),
-      });
+      seedRun(nodeId);
+      enterResultView();
 
       render(<NodeConfigPanel />);
       expect(screen.queryByTestId('node-preview-toggle')).not.toBeInTheDocument();
+    });
+
+    it('should show the live Preview panel in configure view while a run is loaded', () => {
+      const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
+      seedRun(nodeId);
+      // stays in configure view
+
+      render(<NodeConfigPanel />);
+      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
     });
   });
 });
