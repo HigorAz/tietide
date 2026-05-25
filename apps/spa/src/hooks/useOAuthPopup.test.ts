@@ -137,11 +137,11 @@ describe('useOAuthPopup', () => {
     });
 
     // Now simulate popup close — should yield cancelled (proves the bad message did not resolve).
-    // 500ms interval tick detects closed; then a 250ms grace period waits for a late
+    // 500ms interval tick detects closed; then a 1000ms grace period waits for a late
     // success postMessage before declaring cancellation.
     popup.closed = true;
     await act(async () => {
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(1600);
     });
 
     await expect(pending!).resolves.toEqual({ status: 'cancelled' });
@@ -161,7 +161,7 @@ describe('useOAuthPopup', () => {
 
     popup.closed = true;
     await act(async () => {
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(1600);
     });
 
     await expect(pending!).resolves.toEqual({ status: 'cancelled' });
