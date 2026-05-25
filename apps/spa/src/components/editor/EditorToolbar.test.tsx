@@ -227,7 +227,7 @@ describe('EditorToolbar', () => {
       createdAt: '2026-05-03T15:39:00.997Z',
     };
 
-    it('should be enabled when the workflow has unsaved changes (auto-saves on click)', () => {
+    it('should be enabled when the workflow has unsaved changes', () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
       render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
       expect(screen.getByRole('button', { name: /run/i })).toBeEnabled();
@@ -244,30 +244,44 @@ describe('EditorToolbar', () => {
       expect(mockNavigate).not.toHaveBeenCalled();
     });
 
-    it('should save before executing when the workflow is dirty', async () => {
+    it('should NOT auto-save before executing (runs the saved version)', async () => {
       useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 5, y: 5 });
-      mockedUpdate.mockResolvedValueOnce(savedResponse);
       mockedExecute.mockResolvedValueOnce(executionResponse);
       render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
       await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
-      expect(mockedUpdate).toHaveBeenCalledTimes(1);
-      expect(useEditorStore.getState().isDirty).toBe(false);
+      expect(mockedUpdate).not.toHaveBeenCalled();
+      // The draft is left untouched — nothing was persisted.
+      expect(useEditorStore.getState().isDirty).toBe(true);
       expect(mockSetSearchParams).toHaveBeenCalledWith({ execution: 'exec-1' });
     });
 
-    it('should not call executeWorkflow when the auto-save fails', async () => {
+    it('should warn that it ran the last saved version when the canvas is dirty', async () => {
       useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 5, y: 5 });
-      mockedUpdate.mockRejectedValueOnce(new Error('save boom'));
+      mockedExecute.mockResolvedValueOnce(executionResponse);
       render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
 
       await userEvent.click(screen.getByRole('button', { name: /run/i }));
 
-      await waitFor(() => expect(mockedUpdate).toHaveBeenCalledTimes(1));
-      expect(mockedExecute).not.toHaveBeenCalled();
-      expect(mockSetSearchParams).not.toHaveBeenCalled();
+      await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0]).toMatchObject({ tone: 'warning' });
+      expect(toasts[0].message).toMatch(/last saved version/i);
+    });
+
+    it('should not warn about unsaved edits when the canvas is clean', async () => {
+      mockedExecute.mockResolvedValueOnce(executionResponse);
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      await userEvent.click(screen.getByRole('button', { name: /run/i }));
+
+      await waitFor(() => expect(mockedExecute).toHaveBeenCalledTimes(1));
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0]).toMatchObject({ tone: 'success' });
     });
 
     it('should show an error toast and not change the URL when execution fails to enqueue', async () => {

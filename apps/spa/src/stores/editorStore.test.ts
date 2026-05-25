@@ -376,6 +376,34 @@ describe('editorStore', () => {
       useEditorStore.getState().resetEditor();
       expect(useEditorStore.getState().entryRoute).toBeNull();
     });
+
+    it('should reset viewMode back to configure', () => {
+      useEditorStore.setState({ viewMode: 'result' });
+      useEditorStore.getState().resetEditor();
+      expect(useEditorStore.getState().viewMode).toBe('configure');
+    });
+  });
+
+  describe('viewMode', () => {
+    it('should default to configure', () => {
+      expect(useEditorStore.getState().viewMode).toBe('configure');
+    });
+
+    it('should switch to result via setViewMode', () => {
+      useEditorStore.getState().setViewMode('result');
+      expect(useEditorStore.getState().viewMode).toBe('result');
+    });
+
+    it('should switch back to configure via setViewMode', () => {
+      useEditorStore.setState({ viewMode: 'result' });
+      useEditorStore.getState().setViewMode('configure');
+      expect(useEditorStore.getState().viewMode).toBe('configure');
+    });
+
+    it('should not be flipped to result by loadWorkflow', () => {
+      useEditorStore.getState().loadWorkflow({ id: 'wf-1', definition: { nodes: [], edges: [] } });
+      expect(useEditorStore.getState().viewMode).toBe('configure');
+    });
   });
 
   describe('onNodesChange — removal with selection', () => {

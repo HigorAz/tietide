@@ -24,7 +24,10 @@ const VERSION_STATE_RING_CLASS: Record<NodeVersionState, string> = {
 
 function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
   const liveStatus = useExecutionLiveStore((s) => selectNodeStateAt(s, id)?.status);
-  const status: NodeStatus = liveStatus ?? data.status ?? 'idle';
+  // The run overlay (live status ring) only shows in the Result view, so the
+  // Configure view stays a clean editing canvas even with a run loaded.
+  const isResultView = useEditorStore((s) => s.viewMode === 'result');
+  const status: NodeStatus = (isResultView ? liveStatus : undefined) ?? data.status ?? 'idle';
   const Icon = getNodeIcon(data.nodeType);
   const skipped = data.skipped === true;
   const isTrigger =

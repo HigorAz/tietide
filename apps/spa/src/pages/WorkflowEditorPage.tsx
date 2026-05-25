@@ -5,6 +5,7 @@ import { Canvas } from '@/components/editor/Canvas';
 import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
 import { EditorMobileToolbox } from '@/components/editor/EditorMobileToolbox';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
+import { EditorViewTabs } from '@/components/editor/EditorViewTabs';
 import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
 import { ShortcutCheatsheet } from '@/components/editor/ShortcutCheatsheet';
@@ -29,6 +30,7 @@ export function WorkflowEditorPage() {
   const location = useLocation();
   const loadWorkflow = useEditorStore((s) => s.loadWorkflow);
   const resetEditor = useEditorStore((s) => s.resetEditor);
+  const setViewMode = useEditorStore((s) => s.setViewMode);
   const isDirty = useEditorStore((s) => s.isDirty);
   const seedExecutionFromSteps = useExecutionLiveStore((s) => s.seedFromSteps);
   const setExecutionStoreId = useExecutionLiveStore((s) => s.setExecutionId);
@@ -84,6 +86,14 @@ export function WorkflowEditorPage() {
       resetEditor();
     };
   }, [resetEditor]);
+
+  // Land on the Result view whenever an execution is loaded (a Run/Test or a
+  // History replay link), and fall back to Configure when there is none. Keyed
+  // on executionId only, so flipping back to Configure mid-run sticks until a
+  // *new* run arrives (which changes executionId and re-shows the results).
+  useEffect(() => {
+    setViewMode(executionId ? 'result' : 'configure');
+  }, [executionId, setViewMode]);
 
   // Forward live execution events from the WS singleton into the live store.
   useEffect(() => {
@@ -255,6 +265,7 @@ export function WorkflowEditorPage() {
         <div className="relative flex-1">
           <Canvas />
           <EditorToolbar workflowId={id} entryRoute={entryRoute} />
+          <EditorViewTabs />
           <DocumentationPanel workflowId={id} />
           {isMobile && <EditorMobileToolbox />}
         </div>
