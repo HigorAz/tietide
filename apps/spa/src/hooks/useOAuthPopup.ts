@@ -16,7 +16,14 @@ const MAX_DURATION_MS = 5 * 60 * 1000;
 // postMessage. Without a grace period, the 500ms close-poll can detect
 // `popup.closed === true` BEFORE the parent's message listener runs and
 // false-fire `cancelled`. Wait for any in-flight message before giving up.
-const CLOSE_GRACE_MS = 250;
+//
+// 250ms was insufficient on slow connections / Chrome COOP-severed cases —
+// the popup's bridge effect (postMessage + BroadcastChannel) can run up to
+// ~600ms after the popup is technically "closed" from the parent's POV when
+// the provider redirect chain forced a COOP-isolated window. Bumped to 1000ms
+// to cover that worst case while staying well below the user's perception of
+// "cancelled" feedback latency.
+const CLOSE_GRACE_MS = 1000;
 
 export interface OAuthPopupApi {
   start: (params: StartOAuthParams) => Promise<OAuthPopupOutcome>;

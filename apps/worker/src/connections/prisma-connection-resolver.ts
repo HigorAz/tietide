@@ -85,18 +85,28 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     executionId: string,
     connectionId: string,
   ): Promise<DecryptedConnection<TConfig>> {
+    this.log.warn({ executionId, connectionId }, 'connection.refresh.start');
     const entry = await this.loadExecution(executionId);
 
     const row = (await this.prisma.connection.findFirst({
       where: { id: connectionId, userId: entry.userId },
     })) as ConnectionRow | null;
     if (!row) {
+      this.log.warn({ executionId, connectionId }, 'connection.refresh.not_found');
       throw new ConnectionNotFoundError(connectionId);
     }
     if (!this.oauthRefresh.supports(row.provider)) {
+      this.log.warn(
+        { executionId, connectionId, provider: row.provider },
+        'connection.refresh.unsupported_provider',
+      );
       throw new Error(`Provider "${row.provider}" does not support inline OAuth refresh`);
     }
     if (!row.refreshTokenEncrypted || !row.refreshTokenNonce) {
+      this.log.warn(
+        { executionId, connectionId, provider: row.provider },
+        'connection.refresh.no_token',
+      );
       throw new Error(`Connection "${connectionId}" has no stored refresh token`);
     }
 
@@ -104,7 +114,28 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     const currentConfig = JSON.parse(currentConfigJson) as Record<string, unknown>;
     const refreshTokenPlain = this.crypto.decrypt(row.refreshTokenEncrypted, row.refreshTokenNonce);
 
-    const result = await this.oauthRefresh.refresh(row.provider, refreshTokenPlain, currentConfig);
+    this.log.warn(
+      { executionId, connectionId, provider: row.provider },
+      'connection.refresh.calling_provider',
+    );
+    let result;
+    try {
+      result = await this.oauthRefresh.refresh(row.provider, refreshTokenPlain, currentConfig);
+    } catch (refreshErr) {
+      const e = refreshErr as Error & { response?: unknown };
+      this.log.warn(
+        {
+          executionId,
+          connectionId,
+          provider: row.provider,
+          errName: e.name,
+          errMessage: e.message,
+          errResponse: e.response ?? null,
+        },
+        'connection.refresh.provider_error',
+      );
+      throw refreshErr;
+    }
 
     const encryptedConfig = this.crypto.encrypt(JSON.stringify(result.config));
     const encryptedRefresh = this.crypto.encrypt(result.refreshToken);

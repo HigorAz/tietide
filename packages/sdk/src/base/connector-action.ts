@@ -44,14 +44,49 @@ export abstract class BaseConnectorAction<
         throw error;
       }
 
+      // Diagnostic: emit a structured log line on every auth-error catch so the
+      // operator can see which branch of the refresh-and-retry decision tree
+      // ran. Optional — degrades silently if the host doesn't expose `logger`.
+      const log = context.logger;
+      log?.warn?.('connector.auth_error_caught', {
+        nodeType: this.type,
+        connectionId,
+        provider: connection.provider,
+        hasRefreshFn: typeof context.refreshConnection === 'function',
+        errName: (error as { name?: unknown })?.name ?? null,
+        errStatus:
+          (error as { status?: unknown })?.status ??
+          (error as { response?: { status?: unknown } })?.response?.status ??
+          null,
+      });
+
       // First auth-error path: if the host implements `refreshConnection`,
       // attempt an OAuth token refresh and retry the action once before
       // marking the connection as needing manual reconnection.
       if (typeof context.refreshConnection === 'function') {
         try {
+          log?.warn?.('connector.refresh_attempt', { connectionId, provider: connection.provider });
           const refreshed = await context.refreshConnection<TConfig>(connectionId);
+          log?.warn?.('connector.refresh_success_retrying', {
+            connectionId,
+            provider: connection.provider,
+          });
           return await this.run(input, refreshed, context);
         } catch (retryError) {
+          const rName = (retryError as { name?: unknown })?.name ?? null;
+          const rMsg = (retryError as { message?: unknown })?.message ?? null;
+          const rStatus =
+            (retryError as { status?: unknown })?.status ??
+            (retryError as { response?: { status?: unknown } })?.response?.status ??
+            null;
+          log?.warn?.('connector.refresh_or_retry_failed', {
+            connectionId,
+            provider: connection.provider,
+            errName: rName,
+            errMessage: rMsg,
+            errStatus: rStatus,
+            isAuthError: this.isAuthError(retryError),
+          });
           // Refresh itself failed, or the retry call also hit an auth error.
           // Fall through to the existing mark-for-refresh path below.
           if (!this.isAuthError(retryError)) {
