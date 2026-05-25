@@ -63,6 +63,7 @@ export abstract class BaseConnectorAction<
       // First auth-error path: if the host implements `refreshConnection`,
       // attempt an OAuth token refresh and retry the action once before
       // marking the connection as needing manual reconnection.
+      let refreshedThenFailed = false;
       if (typeof context.refreshConnection === 'function') {
         try {
           log?.warn?.('connector.refresh_attempt', { connectionId, provider: connection.provider });
@@ -71,6 +72,7 @@ export abstract class BaseConnectorAction<
             connectionId,
             provider: connection.provider,
           });
+          refreshedThenFailed = true;
           return await this.run(input, refreshed, context);
         } catch (retryError) {
           const rName = (retryError as { name?: unknown })?.name ?? null;
@@ -86,6 +88,7 @@ export abstract class BaseConnectorAction<
             errMessage: rMsg,
             errStatus: rStatus,
             isAuthError: this.isAuthError(retryError),
+            refreshedThenFailed,
           });
           // Refresh itself failed, or the retry call also hit an auth error.
           // Fall through to the existing mark-for-refresh path below.
@@ -99,14 +102,20 @@ export abstract class BaseConnectorAction<
       }
 
       await context.markConnectionForRefresh(connectionId);
-      throw new ConnectionAuthError(
-        `Connection "${connectionId}" returned auth error; marked for refresh`,
-        {
-          connectionId,
-          provider: connection.provider,
-          cause: error,
-        },
-      );
+      // When refresh DID succeed but the retry still failed with 401/403, the
+      // problem isn't an expired token — it's almost always an insufficient-
+      // scope grant (the user authorized the connection without the scopes
+      // this node needs). Surface that distinction in the error message so
+      // the UI can guide them to reconnect rather than wait for an automatic
+      // recovery that will never come.
+      const message = refreshedThenFailed
+        ? `Connection "${connectionId}" still rejected after token refresh — the connection likely lacks the OAuth scope this action needs. Revoke and reconnect with the required permissions.`
+        : `Connection "${connectionId}" returned auth error; marked for refresh`;
+      throw new ConnectionAuthError(message, {
+        connectionId,
+        provider: connection.provider,
+        cause: error,
+      });
     }
   }
 
