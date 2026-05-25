@@ -1,0 +1,3 @@
+# These are bash scripts run on Linux/WSL — keep LF regardless of the
+# checkout platform so they don't break with CRLF line endings.
+*.sh text eol=lf
