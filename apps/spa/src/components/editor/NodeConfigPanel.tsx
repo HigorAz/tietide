@@ -1,7 +1,6 @@
 import { X } from 'lucide-react';
 import { NODE_CATALOG } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { cn } from '@/utils/cn';
 import { BottomSheet } from './BottomSheet';
@@ -18,11 +17,11 @@ export function NodeConfigPanel() {
   );
   const selectNode = useEditorStore((s) => s.selectNode);
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
-  // When viewing a run (live or replay) the panel flips into inspection mode:
-  // it shows the node's resolved config + the input/output/error from the
-  // execution instead of the editable config form.
-  const executionMode = useExecutionLiveStore((s) => s.mode);
-  const isExecutionMode = executionMode === 'live' || executionMode === 'replay';
+  // The global Configure/Result toggle drives this panel: in 'result' it flips
+  // into inspection mode (resolved config + the run's input/output/error); in
+  // 'configure' it stays the editable form — even while a run is loaded — so the
+  // user can edit and re-test without leaving the run view.
+  const isExecutionMode = useEditorStore((s) => s.viewMode === 'result');
 
   if (selectedNodeId === null) {
     return null;

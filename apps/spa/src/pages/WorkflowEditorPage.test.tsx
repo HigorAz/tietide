@@ -380,6 +380,30 @@ describe('WorkflowEditorPage', () => {
     });
   });
 
+  describe('global view mode (configure/result)', () => {
+    it('should stay in configure view when no execution is loaded', async () => {
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+
+      renderAtId('wf-abc');
+
+      await waitFor(() => expect(useEditorStore.getState().workflowId).toBe('wf-abc'));
+      expect(useEditorStore.getState().viewMode).toBe('configure');
+      expect(screen.queryByTestId('editor-view-tabs')).not.toBeInTheDocument();
+    });
+
+    it('should switch to result view and show the view tabs when opened with ?execution', async () => {
+      useAuthStore.setState({ token: 'jwt-token', user: null });
+      mockedGet.mockResolvedValueOnce(sampleWorkflow);
+      mockedGetExecution.mockResolvedValueOnce(sampleExecution('SUCCESS'));
+      mockedListSteps.mockResolvedValueOnce([sampleStep({ status: 'SUCCESS' })]);
+
+      renderAtId('wf-abc', undefined, '?execution=exec-1');
+
+      await waitFor(() => expect(useEditorStore.getState().viewMode).toBe('result'));
+      expect(screen.getByTestId('editor-view-tabs')).toBeInTheDocument();
+    });
+  });
+
   describe('unsaved changes guard (issue #104)', () => {
     const mountAndDirty = async () => {
       mockedGet.mockResolvedValueOnce(sampleWorkflow);

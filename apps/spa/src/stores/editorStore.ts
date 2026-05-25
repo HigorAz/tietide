@@ -30,6 +30,8 @@ export interface EditorSnapshot {
   edges: Edge[];
 }
 
+export type EditorViewMode = 'configure' | 'result';
+
 export interface EditorState {
   workflowId: string | null;
   nodes: Node<CustomNodeData>[];
@@ -39,6 +41,11 @@ export interface EditorState {
   past: EditorSnapshot[];
   future: EditorSnapshot[];
   entryRoute: string | null;
+  // Global editor view: 'configure' shows the editable workflow, 'result'
+  // overlays the loaded execution's per-node results. Both views read the same
+  // editorStore + executionLiveStore — only the presentation flips, so editing
+  // and inspecting never reload or clobber each other.
+  viewMode: EditorViewMode;
 }
 
 export interface EditorActions {
@@ -63,6 +70,7 @@ export interface EditorActions {
     entryRoute?: string;
   }) => void;
   markSaved: () => void;
+  setViewMode: (mode: EditorViewMode) => void;
   resetEditor: () => void;
 }
 
@@ -77,6 +85,7 @@ export const initialEditorState: EditorState = {
   past: [],
   future: [],
   entryRoute: null,
+  viewMode: 'configure',
 };
 
 const generateNodeId = (): string => {
@@ -386,6 +395,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     },
 
     markSaved: () => set({ isDirty: false }),
+
+    setViewMode: (mode) => set({ viewMode: mode }),
 
     resetEditor: () => set({ ...initialEditorState }),
   };
