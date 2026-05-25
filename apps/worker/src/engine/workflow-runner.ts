@@ -276,11 +276,29 @@ export class WorkflowRunner {
 
         this.propagateReachability(output, outgoingEdges.get(n.id) ?? [], reachable, 'success');
       } catch (err) {
-        const message = (err as Error).message ?? 'Unknown error';
+        const e = err as Error & {
+          stack?: string;
+          name?: string;
+          cause?: unknown;
+          response?: unknown;
+        };
+        const message = e.message ?? 'Unknown error';
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
         runLog.warn(
-          { executionId, workflowId, nodeId: n.id, nodeType: n.type },
+          {
+            executionId,
+            workflowId,
+            nodeId: n.id,
+            nodeType: n.type,
+            errName: e.name,
+            errStack: e.stack,
+            errCause:
+              e.cause instanceof Error
+                ? { name: e.cause.name, message: e.cause.message }
+                : (e.cause ?? null),
+            errResponse: e.response ?? null,
+          },
           `Node failed: ${message}`,
         );
         await this.prisma.executionStep.update({
