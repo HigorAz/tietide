@@ -107,6 +107,39 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
       defaultOn: true,
     },
   ],
+  hubspot: [
+    {
+      id: 'account',
+      label: 'Account',
+      description: 'Identify the HubSpot account',
+      // `oauth` is HubSpot's base scope — required for the token-introspection
+      // call that resolves the hubId. Locked-on so it's always granted.
+      scopes: ['oauth'],
+      defaultOn: true,
+      locked: true,
+    },
+    {
+      id: 'contacts',
+      label: 'Contacts',
+      description: 'Read and create contacts',
+      scopes: ['crm.objects.contacts.read', 'crm.objects.contacts.write'],
+      defaultOn: true,
+    },
+    {
+      id: 'deals',
+      label: 'Deals',
+      description: 'Read and create deals',
+      scopes: ['crm.objects.deals.read', 'crm.objects.deals.write'],
+      defaultOn: true,
+    },
+    {
+      id: 'companies',
+      label: 'Companies',
+      description: 'Read and write companies',
+      scopes: ['crm.objects.companies.read', 'crm.objects.companies.write'],
+      defaultOn: false,
+    },
+  ],
 };
 
 const inputClasses = cn(
