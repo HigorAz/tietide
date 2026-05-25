@@ -74,6 +74,39 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
       defaultOn: false,
     },
   ],
+  microsoft: [
+    {
+      id: 'profile',
+      label: 'Profile',
+      description: 'Sign in (name, email)',
+      // `offline_access` is required to get a refresh_token — without it the
+      // worker can't perform the inline OAuth refresh-and-retry on a 401.
+      scopes: ['openid', 'profile', 'email', 'offline_access', 'User.Read'],
+      defaultOn: true,
+      locked: true,
+    },
+    {
+      id: 'outlook',
+      label: 'Outlook',
+      description: 'Send and read email',
+      scopes: ['Mail.Send', 'Mail.Read'],
+      defaultOn: true,
+    },
+    {
+      id: 'calendar',
+      label: 'Calendar',
+      description: 'Read and create events',
+      scopes: ['Calendars.ReadWrite'],
+      defaultOn: true,
+    },
+    {
+      id: 'onedrive',
+      label: 'OneDrive',
+      description: 'Read and write files',
+      scopes: ['Files.ReadWrite'],
+      defaultOn: true,
+    },
+  ],
 };
 
 const inputClasses = cn(
