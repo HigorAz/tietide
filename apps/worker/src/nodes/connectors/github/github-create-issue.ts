@@ -6,7 +6,7 @@ import {
   type NodeInput,
   type NodeOutput,
 } from '@tietide/sdk';
-import { githubCreateIssueConfigSchema, type GitHubApiKeyConfig } from '@tietide/shared';
+import { githubCreateIssueConfigSchema, type GitHubOAuth2Config } from '@tietide/shared';
 import { GitHubClientFactory } from './github-client.factory';
 
 export const GITHUB_CREATE_ISSUE_TYPE = 'github-create-issue';
@@ -20,7 +20,7 @@ interface GitHubIssueResponse {
 }
 
 @Injectable()
-export class GitHubCreateIssueAction extends BaseConnectorAction<GitHubApiKeyConfig> {
+export class GitHubCreateIssueAction extends BaseConnectorAction<GitHubOAuth2Config> {
   readonly type = GITHUB_CREATE_ISSUE_TYPE;
   readonly name = 'GitHub: Create Issue';
   readonly description = 'Open a new issue in a GitHub repository';
@@ -32,7 +32,7 @@ export class GitHubCreateIssueAction extends BaseConnectorAction<GitHubApiKeyCon
 
   protected async run(
     input: NodeInput,
-    connection: DecryptedConnection<GitHubApiKeyConfig>,
+    connection: DecryptedConnection<GitHubOAuth2Config>,
     context: ExecutionContext,
   ): Promise<NodeOutput> {
     const params = githubCreateIssueConfigSchema.parse(input.params);

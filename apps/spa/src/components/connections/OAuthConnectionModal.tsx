@@ -140,6 +140,31 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
       defaultOn: false,
     },
   ],
+  github: [
+    {
+      id: 'account',
+      label: 'Account',
+      description: 'Identify the GitHub account',
+      // `read:user` backs the connection health check (/user) and is always granted.
+      scopes: ['read:user'],
+      defaultOn: true,
+      locked: true,
+    },
+    {
+      id: 'repos',
+      label: 'Repositories',
+      description: 'Read/write issues, pull requests, and comments (incl. private repos)',
+      scopes: ['repo'],
+      defaultOn: true,
+    },
+    {
+      id: 'public',
+      label: 'Public repositories only',
+      description: 'Limit access to public repositories',
+      scopes: ['public_repo'],
+      defaultOn: false,
+    },
+  ],
 };
 
 const inputClasses = cn(

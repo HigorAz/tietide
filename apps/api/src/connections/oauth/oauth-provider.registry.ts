@@ -4,6 +4,7 @@ import { MicrosoftOAuthProvider } from './providers/microsoft.provider';
 import { NotionOAuthProvider } from './providers/notion.provider';
 import { SlackOAuthProvider } from './providers/slack.provider';
 import { HubspotOAuthProvider } from './providers/hubspot.provider';
+import { GithubOAuthProvider } from './providers/github.provider';
 import type { OAuthProvider } from './providers/oauth-provider.interface';
 
 @Injectable()
@@ -16,9 +17,10 @@ export class OAuthProviderRegistry {
     slack: SlackOAuthProvider,
     notion: NotionOAuthProvider,
     hubspot: HubspotOAuthProvider,
+    github: GithubOAuthProvider,
   ) {
     const m = new Map<string, OAuthProvider>();
-    for (const p of [google, microsoft, slack, notion, hubspot]) {
+    for (const p of [google, microsoft, slack, notion, hubspot, github]) {
       m.set(p.id, p);
     }
     this.providers = m;
