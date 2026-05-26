@@ -5,13 +5,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { ConnectionsService } from '../connections/connections.service';
 import { ProviderTriggerRegistry } from './provider-trigger.registry';
-import { ActivationService, PUBLIC_API_URL_TOKEN } from './activation.service';
+import {
+  ActivationService,
+  PUBLIC_API_URL_TOKEN,
+  stableSubscriptionId,
+} from './activation.service';
 
 interface PrismaMock {
   providerSubscription: {
     findMany: jest.Mock;
     findUnique: jest.Mock;
     create: jest.Mock;
+    upsert: jest.Mock;
     update: jest.Mock;
     delete: jest.Mock;
     deleteMany: jest.Mock;
@@ -80,6 +85,10 @@ describe('ActivationService', () => {
           id: 'new-sub',
           ...args.data,
         })),
+        upsert: jest.fn(async (args: { create: { id?: string } }) => ({
+          id: args.create?.id ?? 'new-sub',
+          ...args.create,
+        })),
         update: jest.fn(async (args: { data: Record<string, unknown> }) => ({
           id: 'sub-1',
           ...args.data,
@@ -142,9 +151,14 @@ describe('ActivationService', () => {
       );
 
       expect(crypto.encrypt).toHaveBeenCalledWith('whsec_xyz');
-      expect(prisma.providerSubscription.create).toHaveBeenCalledWith(
+      const expectedId = stableSubscriptionId(workflowId, 'trigger-node-1');
+      // callbackUrl must embed the deterministic id
+      expect(args.callbackUrl).toBe(`${callbackBase}/v1/provider-webhooks/stripe/${expectedId}`);
+      expect(prisma.providerSubscription.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
+          where: { workflowId_nodeId: { workflowId, nodeId: 'trigger-node-1' } },
+          create: expect.objectContaining({
+            id: expectedId,
             workflowId,
             nodeId: 'trigger-node-1',
             provider: 'stripe',
@@ -152,8 +166,20 @@ describe('ActivationService', () => {
             secretEnc: 'sig-cipher',
             secretNonce: 'sig-nonce',
           }),
+          update: expect.objectContaining({ id: expectedId, providerSubId: 'we_111' }),
         }),
       );
+    });
+
+    it('should use a deterministic id that is stable across re-activations', async () => {
+      const a = stableSubscriptionId(workflowId, 'trigger-node-1');
+      const b = stableSubscriptionId(workflowId, 'trigger-node-1');
+      expect(a).toBe(b);
+      expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+      // different node → different id
+      expect(stableSubscriptionId(workflowId, 'other-node')).not.toBe(a);
+      // different workflow → different id
+      expect(stableSubscriptionId('wf-2', 'trigger-node-1')).not.toBe(a);
     });
 
     it('should propagate provider error so the surrounding transaction rolls back', async () => {
@@ -163,7 +189,7 @@ describe('ActivationService', () => {
         'Stripe down',
       );
 
-      expect(prisma.providerSubscription.create).not.toHaveBeenCalled();
+      expect(prisma.providerSubscription.upsert).not.toHaveBeenCalled();
     });
 
     it('should be a no-op when the definition has no push trigger nodes', async () => {
@@ -182,7 +208,7 @@ describe('ActivationService', () => {
 
       await service.activateForWorkflow({ workflowId, userId, definition: plain });
       expect(pushTrigger.onActivate).not.toHaveBeenCalled();
-      expect(prisma.providerSubscription.create).not.toHaveBeenCalled();
+      expect(prisma.providerSubscription.upsert).not.toHaveBeenCalled();
     });
 
     it('should throw when push trigger node config has no connectionId', async () => {

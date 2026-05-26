@@ -6,7 +6,7 @@ import {
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import type { Connection } from '@prisma/client';
 import type { DecryptedConnection } from '@tietide/sdk';
@@ -22,6 +22,26 @@ import { ConnectionsService } from '../connections/connections.service';
 import { ProviderTriggerRegistry } from './provider-trigger.registry';
 
 export const PUBLIC_API_URL_TOKEN = 'PUBLIC_API_URL';
+
+// Fixed namespace so a provider-subscription id is a deterministic UUIDv5 of
+// (workflowId, nodeId). This keeps the public callback URL (e.g. the Discord
+// Interactions Endpoint URL) STABLE across deactivate/reactivate cycles:
+// re-activating regenerates the SAME id instead of a fresh random one, so a URL
+// the user has already registered with the provider keeps working.
+const SUBSCRIPTION_ID_NAMESPACE = 'b6d6a3f2-1c4e-5a7b-9d0e-2f3a4b5c6d7e';
+
+export function stableSubscriptionId(workflowId: string, nodeId: string): string {
+  const ns = Buffer.from(SUBSCRIPTION_ID_NAMESPACE.replace(/-/g, ''), 'hex');
+  const name = Buffer.from(`${workflowId}:${nodeId}`, 'utf8');
+  const hash = createHash('sha1')
+    .update(Buffer.concat([ns, name]))
+    .digest();
+  const b = hash.subarray(0, 16);
+  b[6] = (b[6] & 0x0f) | 0x50; // version 5
+  b[8] = (b[8] & 0x3f) | 0x80; // RFC 4122 variant
+  const h = b.toString('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
 
 export interface ActivationArgs {
   workflowId: string;
@@ -79,7 +99,9 @@ export class ActivationService {
       }
 
       const decryptedConnection = this.toDecryptedConnection(connRow);
-      const subscriptionId = randomUUID();
+      // Deterministic id keyed on (workflowId, nodeId) so the callback URL is
+      // identical every time this node is (re)activated.
+      const subscriptionId = stableSubscriptionId(args.workflowId, node.nodeId);
       const callbackUrl = `${baseUrl.replace(/\/+$/, '')}/v1/provider-webhooks/${provider}/${subscriptionId}`;
 
       const result = await trigger.onActivate({
@@ -92,11 +114,24 @@ export class ActivationService {
       });
 
       const enc = this.crypto.encrypt(result.signingSecret);
-      await db.providerSubscription.create({
-        data: {
+      // Upsert on the (workflowId, nodeId) unique key. Normal flow deletes the
+      // row on deactivate so `create` runs; the `update` branch (and the
+      // explicit id) also migrate any pre-existing row to the deterministic id,
+      // keeping the row id == the id embedded in the callback URL.
+      await db.providerSubscription.upsert({
+        where: { workflowId_nodeId: { workflowId: args.workflowId, nodeId: node.nodeId } },
+        create: {
           id: subscriptionId,
           workflowId: args.workflowId,
           nodeId: node.nodeId,
+          provider,
+          providerSubId: result.providerSubId,
+          secretEnc: enc.ciphertext,
+          secretNonce: enc.nonce,
+          expiresAt: result.expiresAt ?? null,
+        },
+        update: {
+          id: subscriptionId,
           provider,
           providerSubId: result.providerSubId,
           secretEnc: enc.ciphertext,
