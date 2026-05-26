@@ -299,6 +299,60 @@ describe('ProviderWebhooksService — Communication integration', () => {
         }),
       );
     });
+
+    it('PONGs a verified PING (type 1) without enqueuing an execution', async () => {
+      const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+      const der = publicKey.export({ format: 'der', type: 'spki' });
+      const publicKeyHex = der.slice(der.length - 32).toString('hex');
+
+      prisma.providerSubscription.findUnique.mockResolvedValue(
+        activeSubscription({ provider: 'discord-bot', definitionType: 'discord-message-received' }),
+      );
+      crypto.decrypt.mockReturnValue(publicKeyHex);
+
+      const ts = '1717000000';
+      const rawBody = Buffer.from(JSON.stringify({ type: 1 }));
+      const message = Buffer.concat([Buffer.from(ts, 'utf8'), rawBody]);
+      const sigHex = sign(null, message, privateKey).toString('hex');
+
+      const result = await service.trigger({
+        provider: 'discord-bot',
+        subscriptionId,
+        rawBody,
+        headers: { 'x-signature-ed25519': sigHex, 'x-signature-timestamp': ts },
+      });
+
+      expect(result.ack).toEqual({
+        body: JSON.stringify({ type: 1 }),
+        contentType: 'application/json',
+      });
+      expect(result.executionId).toBe('');
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a PING carrying an invalid signature (Discord verification probe → 401)', async () => {
+      const { publicKey } = generateKeyPairSync('ed25519');
+      const der = publicKey.export({ format: 'der', type: 'spki' });
+      const publicKeyHex = der.slice(der.length - 32).toString('hex');
+
+      prisma.providerSubscription.findUnique.mockResolvedValue(
+        activeSubscription({ provider: 'discord-bot', definitionType: 'discord-message-received' }),
+      );
+      crypto.decrypt.mockReturnValue(publicKeyHex);
+
+      await expect(
+        service.trigger({
+          provider: 'discord-bot',
+          subscriptionId,
+          rawBody: Buffer.from(JSON.stringify({ type: 1 })),
+          headers: {
+            'x-signature-ed25519': 'ab'.repeat(64),
+            'x-signature-timestamp': '1717000000',
+          },
+        }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('Inactive workflow / missing subscription', () => {

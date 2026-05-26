@@ -120,30 +120,23 @@ describe('DiscordMessageReceivedTrigger', () => {
     });
   });
 
-  describe('handleValidation (PING handshake)', () => {
-    it('responds with PONG ({type:1}) for a PING body', () => {
-      const rawBody = Buffer.from(JSON.stringify({ type: 1 }));
-      const result = trigger.handleValidation!({ query: {}, headers: {}, rawBody });
-      expect(result).toEqual({
+  describe('ackHandshake (PING → PONG, post-verification)', () => {
+    it('does NOT implement handleValidation (PING must go through signature verification)', () => {
+      // Discord URL verification sends bad-signature probes that must 401; a
+      // pre-verification handleValidation would PONG them and fail verification.
+      expect(trigger.handleValidation).toBeUndefined();
+    });
+
+    it('responds with PONG ({type:1}) for a verified PING body', () => {
+      expect(trigger.ackHandshake({ type: 1 })).toEqual({
         body: JSON.stringify({ type: 1 }),
         contentType: 'application/json',
       });
     });
 
-    it('returns null for non-PING bodies (lets the normal flow run)', () => {
-      const rawBody = Buffer.from(JSON.stringify({ type: 2, data: { name: 'x' } }));
-      expect(trigger.handleValidation!({ query: {}, headers: {}, rawBody })).toBeNull();
-    });
-
-    it('returns null on malformed JSON', () => {
-      const rawBody = Buffer.from('{not-json');
-      expect(trigger.handleValidation!({ query: {}, headers: {}, rawBody })).toBeNull();
-    });
-
-    it('returns null on empty body', () => {
-      expect(
-        trigger.handleValidation!({ query: {}, headers: {}, rawBody: Buffer.from('') }),
-      ).toBeNull();
+    it('returns null for non-PING bodies (lets the normal execution flow run)', () => {
+      expect(trigger.ackHandshake({ type: 2, data: { name: 'x' } })).toBeNull();
+      expect(trigger.ackHandshake({})).toBeNull();
     });
   });
 

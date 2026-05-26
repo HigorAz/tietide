@@ -82,13 +82,23 @@ export class ProviderWebhooksController {
       }
     }
 
-    return this.providerWebhooks.trigger({
+    const result = await this.providerWebhooks.trigger({
       provider,
       subscriptionId,
       rawBody,
       headers,
       requestId: extractRequestId(req),
     });
+
+    // Verified handshake (e.g. Discord PING): reply with the PONG body and 200
+    // rather than the 202 ack envelope. The signature was already validated, so
+    // bad-signature probes never reach here (they 401 in the service).
+    if (result.ack) {
+      res.status(HttpStatus.OK).type(result.ack.contentType).send(result.ack.body);
+      return undefined;
+    }
+
+    return result;
   }
 }
 
