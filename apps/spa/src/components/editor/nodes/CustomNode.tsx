@@ -5,7 +5,7 @@ import { NODE_CATALOG, NodeCategory } from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { useEditorStore } from '@/stores/editorStore';
 import { selectNodeStateAt, useExecutionLiveStore } from '@/stores/executionLiveStore';
-import { getNodeIcon } from './nodeIcons';
+import { NodeGlyph } from '../NodeGlyph';
 import type { CustomNodeData, NodeStatus, NodeVersionState } from './CustomNode.types';
 
 const STATUS_RING_CLASS: Record<NodeStatus, string> = {
@@ -28,7 +28,6 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
   // Configure view stays a clean editing canvas even with a run loaded.
   const isResultView = useEditorStore((s) => s.viewMode === 'result');
   const status: NodeStatus = (isResultView ? liveStatus : undefined) ?? data.status ?? 'idle';
-  const Icon = getNodeIcon(data.nodeType);
   const skipped = data.skipped === true;
   const isTrigger =
     NODE_CATALOG.find((d) => d.type === data.nodeType)?.category === NodeCategory.TRIGGER;
@@ -94,7 +93,7 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
         )}
       >
         <div data-testid="custom-node-icon" className="text-accent-teal">
-          <Icon size={24} strokeWidth={2} aria-hidden />
+          <NodeGlyph type={data.nodeType} size={24} />
         </div>
       </div>
 
