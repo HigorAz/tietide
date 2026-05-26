@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@n
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
+import type { ValidationResponse } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
@@ -19,6 +20,20 @@ export interface ProviderWebhookTriggerInput {
 export interface ProviderWebhookTriggerResult {
   executionId: string;
   status: string;
+  // When set, the request was a verified provider handshake (e.g. a Discord
+  // PING). The controller replies with this body/200 instead of enqueuing.
+  ack?: ValidationResponse;
+}
+
+// Structural opt-in for triggers that ack a verified handshake request (e.g.
+// Discord PING → PONG) instead of producing an execution. Kept out of the
+// frozen SDK surface — checked duck-typed against the resolved trigger.
+interface HandshakeAckTrigger {
+  ackHandshake(triggerData: Record<string, unknown>): ValidationResponse | null;
+}
+
+function hasHandshakeAck(trigger: unknown): trigger is HandshakeAckTrigger {
+  return typeof (trigger as { ackHandshake?: unknown }).ackHandshake === 'function';
 }
 
 const MAX_ATTEMPTS = 3;
@@ -80,6 +95,20 @@ export class ProviderWebhooksService {
     }
 
     const triggerData = this.parseBody(input.rawBody);
+
+    // Verified handshake ack (e.g. Discord PING → PONG). Runs only after
+    // verifySignature passed, so bad-signature verification probes have already
+    // been rejected with 401. A handshake never creates an execution.
+    if (hasHandshakeAck(trigger)) {
+      const ack = trigger.ackHandshake(triggerData);
+      if (ack) {
+        this.log.debug(
+          { provider: input.provider, subscriptionId: input.subscriptionId },
+          'Provider webhook handshake verified and acked',
+        );
+        return { executionId: '', status: 'ACK', ack };
+      }
+    }
 
     // Per-trigger eventType filter (acceptance criteria for #143). If the
     // workflow's trigger-node config narrows to a specific provider event
