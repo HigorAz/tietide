@@ -1,6 +1,7 @@
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { discordMessageReceivedConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
+import { listProviderSubscriptions } from '@/api/providerSubscriptions';
 import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
@@ -13,8 +14,14 @@ const inputClass = cn(
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
+type UrlState =
+  | { status: 'idle' | 'loading' | 'error' }
+  | { status: 'ready'; url: string }
+  | { status: 'pending' }; // workflow saved but no subscription yet (not activated)
+
 export function DiscordMessageReceivedForm({ nodeId, config }: NodeConfigFormProps): JSX.Element {
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
+  const workflowId = useEditorStore((s) => s.workflowId);
 
   const connectionId = asString(config.connectionId);
   const commandName = asString(config.commandName) || 'tietide-trigger';
@@ -22,6 +29,38 @@ export function DiscordMessageReceivedForm({ nodeId, config }: NodeConfigFormPro
 
   const cmdInputId = useId();
   const guildInputId = useId();
+
+  const [urlState, setUrlState] = useState<UrlState>({ status: 'idle' });
+  const [copied, setCopied] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!workflowId) {
+      setUrlState({ status: 'idle' });
+      return;
+    }
+    let cancelled = false;
+    setUrlState({ status: 'loading' });
+    listProviderSubscriptions(workflowId)
+      .then((subs) => {
+        if (cancelled) return;
+        const match = subs.find((s) => s.nodeId === nodeId);
+        setUrlState(match ? { status: 'ready', url: match.callbackUrl } : { status: 'pending' });
+      })
+      .catch(() => {
+        if (!cancelled) setUrlState({ status: 'error' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workflowId, nodeId, reloadKey]);
+
+  const copyUrl = (url: string): void => {
+    void navigator.clipboard?.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const parsed = discordMessageReceivedConfigSchema.safeParse({
     connectionId: connectionId || undefined,
@@ -42,6 +81,63 @@ export function DiscordMessageReceivedForm({ nodeId, config }: NodeConfigFormPro
         Discord Developer Portal. The trigger fires on the registered slash command — not on every
         channel message (Discord limitation).
       </p>
+
+      <div data-testid="discord-interactions-endpoint-url" className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span className={labelClass}>Interactions Endpoint URL</span>
+          <button
+            type="button"
+            data-testid="discord-interactions-url-refresh"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="text-[11px] font-medium text-accent-teal hover:underline focus:outline-none"
+          >
+            Recheck
+          </button>
+        </div>
+
+        {urlState.status === 'ready' ? (
+          <>
+            <div className="flex items-center gap-2">
+              <input
+                data-testid="discord-interactions-url-input"
+                type="text"
+                readOnly
+                value={urlState.url}
+                onFocus={(e) => e.currentTarget.select()}
+                className={cn(inputClass, 'font-mono text-xs')}
+              />
+              <button
+                type="button"
+                data-testid="discord-interactions-url-copy"
+                onClick={() => copyUrl(urlState.url)}
+                className={cn(
+                  'shrink-0 rounded-md border border-white/10 px-3 py-2 text-xs font-semibold',
+                  'text-text-primary transition hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal',
+                )}
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <p className="text-xs text-text-muted">
+              Paste into Discord Developer Portal → General Information → Interactions Endpoint URL.
+            </p>
+          </>
+        ) : urlState.status === 'pending' ? (
+          <p data-testid="discord-interactions-url-pending" className="text-xs text-text-muted">
+            Activate this workflow to generate its Interactions Endpoint URL, then click Recheck.
+          </p>
+        ) : urlState.status === 'loading' ? (
+          <p className="text-xs text-text-muted">Loading…</p>
+        ) : urlState.status === 'error' ? (
+          <p data-testid="discord-interactions-url-error" className="text-xs text-red-400">
+            Could not load the URL. Click Recheck to retry.
+          </p>
+        ) : (
+          <p data-testid="discord-interactions-url-unsaved" className="text-xs text-text-muted">
+            Save and activate this workflow to generate its Interactions Endpoint URL.
+          </p>
+        )}
+      </div>
 
       <div className="flex flex-col gap-1.5">
         <span className={labelClass}>Discord bot connection</span>

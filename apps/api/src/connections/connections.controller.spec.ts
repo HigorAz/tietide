@@ -229,6 +229,33 @@ describe('ConnectionsController (integration)', () => {
       });
     });
 
+    it('should return 201 when type is CUSTOM (e.g. discord-bot)', async () => {
+      const discordBotBody = {
+        type: ConnectionType.CUSTOM,
+        provider: 'discord-bot',
+        name: 'My Discord Bot',
+        config: {
+          applicationId: '123456789012345678',
+          publicKey: 'a1b2c3d4'.repeat(8),
+          botToken: 'fake-bot-token',
+        },
+      };
+      const created = {
+        ...persisted,
+        type: ConnectionType.CUSTOM,
+        provider: 'discord-bot',
+        name: 'My Discord Bot',
+      };
+      connectionsService.create.mockResolvedValue(created);
+
+      await request(app.getHttpServer()).post('/connections').send(discordBotBody).expect(201);
+
+      expect(connectionsService.create).toHaveBeenCalledWith(
+        'owner-uuid',
+        expect.objectContaining({ type: ConnectionType.CUSTOM, provider: 'discord-bot' }),
+      );
+    });
+
     it('should return 400 when type is OAUTH2 (must use OAuth flow)', async () => {
       await request(app.getHttpServer())
         .post('/connections')

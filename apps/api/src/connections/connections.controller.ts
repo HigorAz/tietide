@@ -58,9 +58,9 @@ export class ConnectionsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateConnectionDto,
   ): Promise<ConnectionResponseDto> {
-    if (dto.type !== ConnectionType.API_KEY) {
+    if (dto.type === ConnectionType.OAUTH2) {
       throw new BadRequestException(
-        'Only API_KEY connections may be created here. Use /connections/oauth/start for OAuth.',
+        'OAuth connections must be created via /connections/oauth/start.',
       );
     }
     const schema = PROVIDER_CONFIG_SCHEMAS[dto.provider as keyof ProviderConfigMap];

@@ -6,7 +6,6 @@ import {
   type ActivationResult,
   type DeactivationContext,
   type SignatureInput,
-  type ValidationInput,
   type ValidationResponse,
 } from '@tietide/sdk';
 import { DiscordApiError, DiscordBotClientFactory } from './discord-bot-client.factory';
@@ -47,24 +46,15 @@ export class DiscordMessageReceivedTrigger extends BasePushTrigger {
     super();
   }
 
-  // Discord PING handshake: when the user saves the Interactions Endpoint URL
-  // in Discord's dashboard Discord sends a signed PING. Until our subscription
-  // is looked up we don't have the public key in this method, so we cannot
-  // verify the signature here. We respond with PONG anyway because Discord
-  // requires the handshake to succeed before they accept the URL. The signed
-  // path runs verifySignature on every subsequent interaction.
-  handleValidation(input: ValidationInput): ValidationResponse | null {
-    if (input.rawBody.byteLength === 0) return null;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(Buffer.from(input.rawBody).toString('utf8'));
-    } catch {
-      return null;
-    }
-    const obj = parsed as { type?: unknown } | null;
-    if (obj && obj.type === 1) {
-      // PONG response. Note: Discord verifies our endpoint signed-handshake
-      // semantics by re-issuing PING after each save; this branch covers both.
+  // Discord PING handshake (PONG). We deliberately do NOT implement
+  // handleValidation: that runs in the controller BEFORE the subscription (and
+  // thus the public key) is loaded, so it can't verify the signature — and
+  // Discord's URL verification sends bad-signature probes that MUST be rejected
+  // with 401. Instead the webhook service runs verifySignature first (bad sig →
+  // 401), then calls this to PONG a *verified* PING. Returns null for real
+  // interactions (type !== 1) so they flow through to workflow execution.
+  ackHandshake(triggerData: Record<string, unknown>): ValidationResponse | null {
+    if (triggerData.type === 1) {
       return { body: JSON.stringify({ type: 1 }), contentType: 'application/json' };
     }
     return null;

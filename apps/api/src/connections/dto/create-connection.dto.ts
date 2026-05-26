@@ -14,7 +14,7 @@ export class CreateConnectionDto {
     enum: Object.values(ConnectionType),
     example: ConnectionType.API_KEY,
     description:
-      'Only API_KEY is accepted here. OAuth connections are created via /connections/oauth/start.',
+      'Any non-OAuth type (API_KEY, CUSTOM, BASIC_AUTH, BEARER_TOKEN). OAuth (OAUTH2) connections are created via /connections/oauth/start.',
   })
   @IsEnum(ConnectionType)
   type!: ConnectionType;
