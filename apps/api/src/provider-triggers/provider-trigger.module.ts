@@ -6,6 +6,8 @@ import { CryptoModule } from '../crypto/crypto.module';
 import { ConnectionsModule } from '../connections/connections.module';
 import { ProviderTriggerRegistry } from './provider-trigger.registry';
 import { ActivationService, PUBLIC_API_URL_TOKEN } from './activation.service';
+import { ProviderSubscriptionsController } from './provider-subscriptions.controller';
+import { ProviderSubscriptionsService } from './provider-subscriptions.service';
 import {
   StripeEventReceivedTrigger,
   STRIPE_EVENT_RECEIVED_TYPE,
@@ -80,8 +82,10 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     ConnectionsModule,
     BullModule.registerQueue({ name: RENEWAL_QUEUE_NAME }),
   ],
+  controllers: [ProviderSubscriptionsController],
   providers: [
     ProviderTriggerRegistry,
+    ProviderSubscriptionsService,
     StripeClientFactory,
     StripeEventReceivedTrigger,
     GoogleClientFactory,
