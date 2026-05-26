@@ -14,14 +14,15 @@ export interface NodeGlyphProps {
 
 /**
  * The glyph shown for a workflow node: the provider's brand icon (Discord,
- * Gmail, Slack, …) for connector nodes, falling back to the per-type Lucide
- * icon for Core/Logic/annotation nodes. Brand icons render monochrome
- * (inherit `currentColor`) so they stay legible on the dark, teal-themed canvas.
+ * Gmail, Slack, …) in full brand colour for connector nodes, falling back to
+ * the per-type Lucide icon for Core/Logic/annotation nodes. `onDarkSurface`
+ * lightens near-black brand marks (GitHub, Notion) so they stay legible on the
+ * deep-blue canvas while every other brand keeps its true colour.
  */
 export function NodeGlyph({ type, size = 24, className }: NodeGlyphProps): React.ReactElement {
   const appId = getAppIdForNodeType(type);
   if (!GENERIC_APPS.has(appId)) {
-    return <BrandIcon appId={appId} size={size} colored={false} className={className} />;
+    return <BrandIcon appId={appId} size={size} colored onDarkSurface className={className} />;
   }
   const Icon = getNodeIcon(type);
   return <Icon size={size} strokeWidth={2} aria-hidden className={className} />;
