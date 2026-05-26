@@ -243,8 +243,10 @@ export {
 export {
   discordPostWebhookConfigSchema,
   discordMessageReceivedConfigSchema,
+  discordReplyToCommandConfigSchema,
   type DiscordPostWebhookConfig,
   type DiscordMessageReceivedConfig,
+  type DiscordReplyToCommandConfig,
 } from './schemas/discord.schema.js';
 export {
   twilioSendSmsConfigSchema,

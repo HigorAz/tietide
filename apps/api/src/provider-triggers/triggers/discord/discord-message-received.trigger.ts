@@ -60,6 +60,24 @@ export class DiscordMessageReceivedTrigger extends BasePushTrigger {
     return null;
   }
 
+  // Immediate interaction response for a slash command (type 2). Discord requires
+  // a valid response within ~3s, but the workflow runs async in the worker. So:
+  //   - if the workflow has a Discord reply action → DEFER (type 5, "thinking…")
+  //     and let that action edit the response once the workflow produces content;
+  //   - otherwise → resolve the command now with a plain acknowledgement (type 4).
+  // The execution is still enqueued either way (the webhook service calls this
+  // AFTER creating the execution). Returns null for non-command interactions.
+  interactionResponse(
+    triggerData: Record<string, unknown>,
+    opts: { hasReplyAction: boolean },
+  ): ValidationResponse | null {
+    if (triggerData.type !== 2) return null;
+    const body = opts.hasReplyAction
+      ? { type: 5 }
+      : { type: 4, data: { content: 'Workflow started ✅' } };
+    return { body: JSON.stringify(body), contentType: 'application/json' };
+  }
+
   // Ed25519 verify(timestamp || rawBody, signature, publicKey).
   verifySignature(input: SignatureInput): boolean {
     const sigHex = this.extractHeader(input.headers, 'x-signature-ed25519');

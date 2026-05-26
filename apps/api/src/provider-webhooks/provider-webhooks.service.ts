@@ -36,6 +36,24 @@ function hasHandshakeAck(trigger: unknown): trigger is HandshakeAckTrigger {
   return typeof (trigger as { ackHandshake?: unknown }).ackHandshake === 'function';
 }
 
+// Structural opt-in for triggers that produce an immediate provider response for
+// a real (verified, enqueued) event — e.g. Discord must reply to a slash command
+// within ~3s. Unlike ackHandshake, the execution is still created/enqueued.
+interface InteractionResponder {
+  interactionResponse(
+    triggerData: Record<string, unknown>,
+    opts: { hasReplyAction: boolean },
+  ): ValidationResponse | null;
+}
+
+function hasInteractionResponse(trigger: unknown): trigger is InteractionResponder {
+  return typeof (trigger as { interactionResponse?: unknown }).interactionResponse === 'function';
+}
+
+// The Discord reply action node type — its presence in the workflow definition
+// decides whether the webhook defers (type 5) or acks immediately (type 4).
+const DISCORD_REPLY_NODE_TYPE = 'discord-reply-to-command';
+
 const MAX_ATTEMPTS = 3;
 const BACKOFF_DELAY_MS = 1000;
 
@@ -171,6 +189,21 @@ export class ProviderWebhooksService {
       'Provider webhook accepted, execution enqueued',
     );
 
+    // Immediate provider response for interaction-style providers (Discord must
+    // reply to a slash command within ~3s). The execution above still runs; this
+    // only shapes the synchronous HTTP reply. Defers when the workflow has a
+    // reply action, otherwise acks the command outright.
+    if (hasInteractionResponse(trigger)) {
+      const hasReplyAction = this.definitionHasNodeType(
+        subscription.workflow.definition,
+        DISCORD_REPLY_NODE_TYPE,
+      );
+      const ack = trigger.interactionResponse(triggerData, { hasReplyAction });
+      if (ack) {
+        return { executionId: created.id, status: 'PENDING', ack };
+      }
+    }
+
     return { executionId: created.id, status: 'PENDING' };
   }
 
@@ -187,6 +220,19 @@ export class ProviderWebhooksService {
     } catch {
       return { raw: rawBody.toString('utf8') };
     }
+  }
+
+  private definitionHasNodeType(definition: Prisma.JsonValue | null, nodeType: string): boolean {
+    if (!definition || typeof definition !== 'object' || Array.isArray(definition)) return false;
+    const def = definition as { nodes?: unknown };
+    if (!Array.isArray(def.nodes)) return false;
+    return def.nodes.some(
+      (n) =>
+        n &&
+        typeof n === 'object' &&
+        !Array.isArray(n) &&
+        (n as { type?: unknown }).type === nodeType,
+    );
   }
 
   private findTriggerTypeInDefinition(

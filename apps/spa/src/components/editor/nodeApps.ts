@@ -220,6 +220,7 @@ export function getAppIdForNodeType(type: NodeType | string): AppId {
       return 'slack';
 
     case NodeType.DISCORD_POST_WEBHOOK:
+    case NodeType.DISCORD_REPLY_TO_COMMAND:
     case NodeType.DISCORD_MESSAGE_RECEIVED:
       return 'discord';
 
