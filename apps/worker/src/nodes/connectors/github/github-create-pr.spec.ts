@@ -1,5 +1,5 @@
 import { type DecryptedConnection, type ExecutionContext, type NodeInput } from '@tietide/sdk';
-import type { GitHubApiKeyConfig } from '@tietide/shared';
+import type { GitHubOAuth2Config } from '@tietide/shared';
 import { GitHubCreatePrAction } from './github-create-pr';
 import {
   GitHubHttpError,
@@ -36,11 +36,11 @@ const makeContext = (
   return ctx as unknown as ExecutionContext & { markConnectionForRefresh: jest.Mock };
 };
 
-const makeConnection = (): DecryptedConnection<GitHubApiKeyConfig> => ({
+const makeConnection = (): DecryptedConnection<GitHubOAuth2Config> => ({
   id: VALID_CONNECTION_ID,
-  type: 'API_KEY',
+  type: 'OAUTH2',
   provider: 'github',
-  config: { apiKey: 'ghp_AAAA1111BBBB2222' },
+  config: { accessToken: 'gho_AAAA1111BBBB2222', scope: 'repo,read:user', tokenType: 'bearer' },
   refreshToken: undefined,
 });
 

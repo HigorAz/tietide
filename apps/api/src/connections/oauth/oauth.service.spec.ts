@@ -129,7 +129,7 @@ describe('OAuthService', () => {
     it('throws BadRequest for an unknown provider', async () => {
       const { service } = makeService({});
 
-      await expect(service.start(USER_ID, { provider: 'github', label: 'X' })).rejects.toThrow(
+      await expect(service.start(USER_ID, { provider: 'dropbox', label: 'X' })).rejects.toThrow(
         BadRequestException,
       );
     });

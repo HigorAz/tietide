@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { DecryptedConnection } from '@tietide/sdk';
-import type { GitHubApiKeyConfig } from '@tietide/shared';
+import type { GitHubOAuth2Config } from '@tietide/shared';
 
 const DEFAULT_GITHUB_API_URL = 'https://api.github.com';
 
@@ -35,16 +35,16 @@ export class GitHubClientFactory {
     return base.replace(/\/+$/, '');
   }
 
-  buildAuthHeaders(connection: DecryptedConnection<GitHubApiKeyConfig>): Record<string, string> {
+  buildAuthHeaders(connection: DecryptedConnection<GitHubOAuth2Config>): Record<string, string> {
     return {
-      Authorization: `Bearer ${connection.config.apiKey}`,
+      Authorization: `Bearer ${connection.config.accessToken}`,
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
     };
   }
 
   async call<T = Record<string, unknown>>(
-    connection: DecryptedConnection<GitHubApiKeyConfig>,
+    connection: DecryptedConnection<GitHubOAuth2Config>,
     path: string,
     init: GitHubFetchInit = {},
   ): Promise<GitHubResponse<T>> {

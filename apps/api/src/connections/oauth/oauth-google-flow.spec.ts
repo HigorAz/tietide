@@ -19,6 +19,7 @@ import { MicrosoftOAuthProvider } from './providers/microsoft.provider';
 import { SlackOAuthProvider } from './providers/slack.provider';
 import { NotionOAuthProvider } from './providers/notion.provider';
 import { HubspotOAuthProvider } from './providers/hubspot.provider';
+import { GithubOAuthProvider } from './providers/github.provider';
 
 jest.setTimeout(20000);
 
@@ -146,6 +147,7 @@ describe('OAuth Google flow (fixture token server)', () => {
         SlackOAuthProvider,
         NotionOAuthProvider,
         HubspotOAuthProvider,
+        GithubOAuthProvider,
         ConnectionsService,
         { provide: AuditLogService, useValue: audit },
         { provide: PrismaService, useValue: prisma },
