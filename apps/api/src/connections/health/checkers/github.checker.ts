@@ -19,15 +19,15 @@ export class GitHubHealthChecker extends BaseHttpHealthChecker {
   }
 
   async check(config: unknown, signal: AbortSignal): Promise<ProviderHealthResult> {
-    const cfg = config as { apiKey?: unknown };
-    if (typeof cfg.apiKey !== 'string' || cfg.apiKey.length === 0) {
-      return { ok: false, message: 'Missing apiKey in stored config', latencyMs: 0 };
+    const cfg = config as { accessToken?: unknown };
+    if (typeof cfg.accessToken !== 'string' || cfg.accessToken.length === 0) {
+      return { ok: false, message: 'Missing accessToken in stored config', latencyMs: 0 };
     }
     return this.perform(
       {
         url: `${this.baseUrl}/user`,
         headers: {
-          Authorization: `Bearer ${cfg.apiKey}`,
+          Authorization: `Bearer ${cfg.accessToken}`,
           Accept: 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
         },

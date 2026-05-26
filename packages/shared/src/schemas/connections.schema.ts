@@ -134,16 +134,14 @@ export const linearApiKeyConfigSchema = z.object({
     .regex(/^lin_api_[A-Za-z0-9_-]+$/, { message: 'apiKey must be a Linear API key (lin_api_…)' }),
 });
 
-// GitHub tokens — accept fine-grained PATs (`github_pat_`), classic PATs (`ghp_`),
-// installation tokens (`ghs_`/`ghu_`/`ghr_`), and OAuth user-to-server tokens (`gho_`).
-export const githubApiKeyConfigSchema = z.object({
-  apiKey: z
-    .string()
-    .min(1)
-    .max(256)
-    .regex(/^(github_pat_|ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9_]+$/, {
-      message: 'apiKey must be a GitHub token (ghp_/gho_/ghu_/ghs_/ghr_/github_pat_…)',
-    }),
+// GitHub OAuth2 (OAuth App): a single non-expiring user access token (`gho_…`).
+// OAuth App tokens carry no refresh token and never expire, so — unlike Google/
+// Microsoft/HubSpot — there is no refreshToken/expiresAt to store (mirrors Notion).
+// `scope` is the comma-separated grant returned by the token endpoint.
+export const githubOAuth2ConfigSchema = z.object({
+  accessToken: z.string().min(1),
+  scope: z.string().optional(),
+  tokenType: z.string().min(1).optional(),
 });
 
 // Ollama: per-workspace pointer to a self-hosted Ollama server. baseUrl points at the
@@ -230,7 +228,7 @@ export type TelegramBotTokenConfig = z.infer<typeof telegramBotTokenConfigSchema
 export type TrelloApiKeyConfig = z.infer<typeof trelloApiKeyConfigSchema>;
 export type AirtableApiKeyConfig = z.infer<typeof airtableApiKeyConfigSchema>;
 export type LinearApiKeyConfig = z.infer<typeof linearApiKeyConfigSchema>;
-export type GitHubApiKeyConfig = z.infer<typeof githubApiKeyConfigSchema>;
+export type GitHubOAuth2Config = z.infer<typeof githubOAuth2ConfigSchema>;
 export type OllamaConfig = z.infer<typeof ollamaConfigSchema>;
 export type HubspotOAuth2Config = z.infer<typeof hubspotOAuth2ConfigSchema>;
 export type MailchimpApiKeyConfig = z.infer<typeof mailchimpApiKeyConfigSchema>;
@@ -254,7 +252,7 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.TRELLO]: trelloApiKeyConfigSchema,
   [ConnectionProvider.AIRTABLE]: airtableApiKeyConfigSchema,
   [ConnectionProvider.LINEAR]: linearApiKeyConfigSchema,
-  [ConnectionProvider.GITHUB]: githubApiKeyConfigSchema,
+  [ConnectionProvider.GITHUB]: githubOAuth2ConfigSchema,
   [ConnectionProvider.OLLAMA]: ollamaConfigSchema,
   [ConnectionProvider.HUBSPOT]: hubspotOAuth2ConfigSchema,
   [ConnectionProvider.MAILCHIMP]: mailchimpApiKeyConfigSchema,
@@ -279,7 +277,7 @@ export type ProviderConfigMap = {
   trello: TrelloApiKeyConfig;
   airtable: AirtableApiKeyConfig;
   linear: LinearApiKeyConfig;
-  github: GitHubApiKeyConfig;
+  github: GitHubOAuth2Config;
   ollama: OllamaConfig;
   hubspot: HubspotOAuth2Config;
   mailchimp: MailchimpApiKeyConfig;

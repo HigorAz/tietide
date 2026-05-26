@@ -13,6 +13,7 @@ import { MicrosoftOAuthProvider } from './providers/microsoft.provider';
 import { SlackOAuthProvider } from './providers/slack.provider';
 import { NotionOAuthProvider } from './providers/notion.provider';
 import { HubspotOAuthProvider } from './providers/hubspot.provider';
+import { GithubOAuthProvider } from './providers/github.provider';
 
 // ConnectionsService is consumed by OAuthService but NOT re-declared here.
 // It lives in ConnectionsModule along with its ProviderHealthRegistry factory
@@ -36,6 +37,7 @@ import { HubspotOAuthProvider } from './providers/hubspot.provider';
     SlackOAuthProvider,
     NotionOAuthProvider,
     HubspotOAuthProvider,
+    GithubOAuthProvider,
   ],
 })
 export class OAuthModule {}

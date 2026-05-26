@@ -1,7 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
-export const SUPPORTED_OAUTH_PROVIDERS = ['google', 'microsoft', 'slack', 'notion'] as const;
+export const SUPPORTED_OAUTH_PROVIDERS = [
+  'google',
+  'microsoft',
+  'slack',
+  'notion',
+  'hubspot',
+  'github',
+] as const;
 export type SupportedOAuthProvider = (typeof SUPPORTED_OAUTH_PROVIDERS)[number];
 
 export class StartOAuthDto {

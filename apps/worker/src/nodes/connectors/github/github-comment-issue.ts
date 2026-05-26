@@ -6,7 +6,7 @@ import {
   type NodeInput,
   type NodeOutput,
 } from '@tietide/sdk';
-import { githubCommentIssueConfigSchema, type GitHubApiKeyConfig } from '@tietide/shared';
+import { githubCommentIssueConfigSchema, type GitHubOAuth2Config } from '@tietide/shared';
 import { GitHubClientFactory } from './github-client.factory';
 
 export const GITHUB_COMMENT_ISSUE_TYPE = 'github-comment-issue';
@@ -18,7 +18,7 @@ interface GitHubCommentResponse {
 }
 
 @Injectable()
-export class GitHubCommentIssueAction extends BaseConnectorAction<GitHubApiKeyConfig> {
+export class GitHubCommentIssueAction extends BaseConnectorAction<GitHubOAuth2Config> {
   readonly type = GITHUB_COMMENT_ISSUE_TYPE;
   readonly name = 'GitHub: Comment on Issue';
   readonly description = 'Post a comment on a GitHub issue or pull request';
@@ -30,7 +30,7 @@ export class GitHubCommentIssueAction extends BaseConnectorAction<GitHubApiKeyCo
 
   protected async run(
     input: NodeInput,
-    connection: DecryptedConnection<GitHubApiKeyConfig>,
+    connection: DecryptedConnection<GitHubOAuth2Config>,
     context: ExecutionContext,
   ): Promise<NodeOutput> {
     const params = githubCommentIssueConfigSchema.parse(input.params);

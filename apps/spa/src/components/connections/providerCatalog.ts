@@ -123,9 +123,9 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
   {
     id: ConnectionProvider.GITHUB,
     label: 'GitHub',
-    type: ConnectionType.API_KEY,
+    type: ConnectionType.OAUTH2,
     iconUrl: githubIcon,
-    setupGuidePath: 'docs/Connection-setup/connection-github-setup.md',
+    setupGuidePath: 'docs/Connection-setup/oauth-github-setup.md',
   },
   {
     id: ConnectionProvider.HUBSPOT,

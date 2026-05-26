@@ -6,7 +6,7 @@ import {
   type NodeInput,
   type NodeOutput,
 } from '@tietide/sdk';
-import { githubCreatePrConfigSchema, type GitHubApiKeyConfig } from '@tietide/shared';
+import { githubCreatePrConfigSchema, type GitHubOAuth2Config } from '@tietide/shared';
 import { GitHubClientFactory } from './github-client.factory';
 
 export const GITHUB_CREATE_PR_TYPE = 'github-create-pr';
@@ -21,7 +21,7 @@ interface GitHubPullResponse {
 }
 
 @Injectable()
-export class GitHubCreatePrAction extends BaseConnectorAction<GitHubApiKeyConfig> {
+export class GitHubCreatePrAction extends BaseConnectorAction<GitHubOAuth2Config> {
   readonly type = GITHUB_CREATE_PR_TYPE;
   readonly name = 'GitHub: Create Pull Request';
   readonly description = 'Open a pull request from one branch into another';
@@ -33,7 +33,7 @@ export class GitHubCreatePrAction extends BaseConnectorAction<GitHubApiKeyConfig
 
   protected async run(
     input: NodeInput,
-    connection: DecryptedConnection<GitHubApiKeyConfig>,
+    connection: DecryptedConnection<GitHubOAuth2Config>,
     context: ExecutionContext,
   ): Promise<NodeOutput> {
     const params = githubCreatePrConfigSchema.parse(input.params);

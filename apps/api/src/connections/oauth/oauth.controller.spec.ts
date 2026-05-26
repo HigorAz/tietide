@@ -95,7 +95,7 @@ describe('OAuthController (integration)', () => {
     it('returns 400 for an unknown provider via DTO validation', async () => {
       await request(app.getHttpServer())
         .get('/connections/oauth/start')
-        .query({ provider: 'github', label: 'X' })
+        .query({ provider: 'dropbox', label: 'X' })
         .expect(400);
 
       expect(oauth.start).not.toHaveBeenCalled();

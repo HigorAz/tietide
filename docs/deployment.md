@@ -624,7 +624,7 @@ For `telegram-message-received`: TieTide calls `setWebhook` on activation with o
 
 ## 16. Productivity connector pack
 
-Five new providers covering writing, kanban, spreadsheets, issue tracking, and source control. Notion uses OAuth (already wired in §3.3); the other four use API keys exchanged at the provider's dashboard.
+Five new providers covering writing, kanban, spreadsheets, issue tracking, and source control. Notion and GitHub use OAuth (Notion wired in §3.3, GitHub in §16.5); the other three (Trello, Airtable, Linear) use API keys exchanged at the provider's dashboard.
 
 ### 16.1 Notion (OAuth — pages, databases, blocks)
 
@@ -672,16 +672,16 @@ Linear's API uses GraphQL exclusively. The TieTide client posts mutations to `ht
 
 Health check posts `{ viewer { id } }` and inspects `errors[]`.
 
-### 16.5 GitHub (Personal Access Token)
+### 16.5 GitHub (OAuth — issues, pull requests, comments)
 
-GitHub supports both classic PATs (`ghp_…`) and fine-grained PATs (`github_pat_…`). Fine-grained is preferred for least-privilege.
+GitHub is an OAuth connector (converted from the old paste-a-PAT flow). It uses a classic **OAuth App**, which issues a **non-expiring** user access token (`gho_…`) with **no refresh token** — so there is nothing to rotate; the token works until the user revokes it. Full step-by-step: [oauth-github-setup.md](Connection-setup/oauth-github-setup.md).
 
-1. Visit <https://github.com/settings/tokens?type=beta> for fine-grained, or `/settings/tokens` for classic.
-2. **Fine-grained**: pick the repositories the token can access; grant `Issues: Read & write`, `Pull requests: Read & write`, `Contents: Read-only` (PR creation needs to read commits) under **Repository permissions**.
-3. **Classic**: pick the `repo` scope (covers issues + PRs + comments).
-4. Copy the token. In TieTide, pick "GitHub" on `/connections` and paste it. The schema accepts any GitHub token prefix (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`).
+1. Register an OAuth App at <https://github.com/settings/developers> → **OAuth Apps** → **New OAuth App**. Set the **Authorization callback URL** to `${PUBLIC_API_URL}/v1/connections/oauth/callback` — it must match `GITHUB_OAUTH_REDIRECT_URI` (the env-default appends `?provider=github`; GitHub matches on host + path and allows the extra query param).
+2. **Generate a client secret**, then set `GITHUB_OAUTH_CLIENT_ID` and `GITHUB_OAUTH_CLIENT_SECRET`.
+3. **One callback URL per OAuth App** — unlike Google/Notion, a GitHub OAuth App allows only a single callback. TEST (`localhost:3031`) and PROD (`tietide.com`) therefore need **separate OAuth Apps**, each with its own client id/secret and `GITHUB_OAUTH_REDIRECT_URI`. Never register `localhost:3030`.
+4. In TieTide, pick "GitHub" on `/connections` → the OAuth modal opens a scope picker: **Account** (`read:user`, always granted, backs the health check), **Repositories** (`repo`, default — issues/PRs/comments incl. private repos), or **Public repositories only** (`public_repo`). Complete the consent flow.
 5. The actions take `owner`/`repo` strings (e.g. `octocat`/`hello-world`), not numeric IDs.
 
-For installation tokens (GitHub Apps): generate a token via your App and paste it the same way. Token rotates every hour; TieTide will surface 401s when it expires — re-paste a fresh token, or build an App-token-rotation flow as a follow-up.
+Existing connections from the old PAT model (`type=API_KEY`, `config.apiKey`) are not compatible — delete and reconnect via OAuth. If a user revokes the grant, actions return 401 and the connection flips to `EXPIRED`; reconnect to restore it (there is no refresh path, by design).
 
-Health check hits `GET /user` with `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`, and `X-GitHub-Api-Version: 2022-11-28`.
+Health check hits `GET /user` with `Authorization: Bearer <accessToken>`, `Accept: application/vnd.github+json`, and `X-GitHub-Api-Version: 2022-11-28`.

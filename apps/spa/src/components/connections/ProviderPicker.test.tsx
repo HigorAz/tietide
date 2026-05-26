@@ -36,13 +36,13 @@ describe('ProviderPicker', () => {
 
   it('should distinguish OAuth vs other providers in the card subtitle', () => {
     render(<ProviderPicker onPick={onPick} />);
-    // OAuth: Google, Microsoft, Slack, Notion, HubSpot = 5.
+    // OAuth: Google, Microsoft, Slack, Notion, HubSpot, GitHub = 6.
     // The picker labels both API_KEY and CUSTOM types as "API key" since users
     // see only one form-from-schema flow either way: OpenAI, Anthropic, Twilio,
     // Telegram, Discord (Webhook), Discord (Bot), Trello, Airtable, Linear,
-    // GitHub, Stripe, Mailchimp, Calendly, Postgres, MySQL, S3 = 16.
-    expect(screen.getAllByText(/^OAuth$/).length).toBe(5);
-    expect(screen.getAllByText(/^API key$/).length).toBe(16);
+    // Stripe, Mailchimp, Calendly, Postgres, MySQL, S3 = 15.
+    expect(screen.getAllByText(/^OAuth$/).length).toBe(6);
+    expect(screen.getAllByText(/^API key$/).length).toBe(15);
   });
 
   it('should call onPick with the provider entry when a card is clicked', async () => {
