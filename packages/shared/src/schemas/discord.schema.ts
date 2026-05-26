@@ -39,3 +39,19 @@ export const discordMessageReceivedConfigSchema = z.object({
     .optional(),
 });
 export type DiscordMessageReceivedConfig = z.infer<typeof discordMessageReceivedConfigSchema>;
+
+// Action config — reply to the slash-command interaction that triggered the workflow.
+// The interaction token + application id flow in from the trigger node's output, so both
+// are optional here; they can be overridden with data-pill templates (e.g. {{trigger.token}})
+// for advanced graphs where this action is not directly downstream of the trigger.
+export const discordReplyToCommandConfigSchema = z.object({
+  content: z.string().min(1).max(2000),
+  interactionToken: z.string().min(1).max(2000).optional(),
+  applicationId: z
+    .string()
+    .max(64)
+    .regex(/^\d+$/, { message: 'applicationId must be a Discord snowflake' })
+    .optional(),
+  mockOnDryRun,
+});
+export type DiscordReplyToCommandConfig = z.infer<typeof discordReplyToCommandConfigSchema>;

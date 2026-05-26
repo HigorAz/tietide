@@ -298,6 +298,50 @@ describe('ProviderWebhooksService — Communication integration', () => {
           data: expect.objectContaining({ triggerType: 'provider:discord-bot' }),
         }),
       );
+      // No reply action in the (single-node) definition → immediate type-4 ack.
+      expect(result.ack).toEqual({
+        body: JSON.stringify({ type: 4, data: { content: 'Workflow started ✅' } }),
+        contentType: 'application/json',
+      });
+    });
+
+    it('defers (type 5) and still enqueues when the workflow has a reply action', async () => {
+      const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+      const der = publicKey.export({ format: 'der', type: 'spki' });
+      const publicKeyHex = der.slice(der.length - 32).toString('hex');
+
+      const sub = activeSubscription({
+        provider: 'discord-bot',
+        definitionType: 'discord-message-received',
+      });
+      sub.workflow.definition = {
+        nodes: [
+          { id: 'trigger-1', type: 'discord-message-received', config: {} },
+          { id: 'reply-1', type: 'discord-reply-to-command', config: { content: 'hi' } },
+        ],
+        edges: [],
+      } as unknown as typeof sub.workflow.definition;
+      prisma.providerSubscription.findUnique.mockResolvedValue(sub);
+      crypto.decrypt.mockReturnValue(publicKeyHex);
+
+      const ts = '1717000000';
+      const rawBody = Buffer.from(JSON.stringify({ type: 2, data: { name: 'tietide-trigger' } }));
+      const message = Buffer.concat([Buffer.from(ts, 'utf8'), rawBody]);
+      const sigHex = sign(null, message, privateKey).toString('hex');
+
+      const result = await service.trigger({
+        provider: 'discord-bot',
+        subscriptionId,
+        rawBody,
+        headers: { 'x-signature-ed25519': sigHex, 'x-signature-timestamp': ts },
+      });
+
+      expect(result.ack).toEqual({
+        body: JSON.stringify({ type: 5 }),
+        contentType: 'application/json',
+      });
+      expect(result.executionId).toBe(executionId);
+      expect(prisma.workflowExecution.create).toHaveBeenCalled();
     });
 
     it('PONGs a verified PING (type 1) without enqueuing an execution', async () => {

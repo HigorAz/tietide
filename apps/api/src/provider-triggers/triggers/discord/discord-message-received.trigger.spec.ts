@@ -140,6 +140,28 @@ describe('DiscordMessageReceivedTrigger', () => {
     });
   });
 
+  describe('interactionResponse (slash command ack)', () => {
+    it('defers (type 5) for a command when the workflow has a reply action', () => {
+      expect(trigger.interactionResponse({ type: 2 }, { hasReplyAction: true })).toEqual({
+        body: JSON.stringify({ type: 5 }),
+        contentType: 'application/json',
+      });
+    });
+
+    it('acks immediately (type 4 message) for a command with no reply action', () => {
+      expect(trigger.interactionResponse({ type: 2 }, { hasReplyAction: false })).toEqual({
+        body: JSON.stringify({ type: 4, data: { content: 'Workflow started ✅' } }),
+        contentType: 'application/json',
+      });
+    });
+
+    it('returns null for non-command interactions (PING / components)', () => {
+      expect(trigger.interactionResponse({ type: 1 }, { hasReplyAction: true })).toBeNull();
+      expect(trigger.interactionResponse({ type: 3 }, { hasReplyAction: false })).toBeNull();
+      expect(trigger.interactionResponse({}, { hasReplyAction: true })).toBeNull();
+    });
+  });
+
   describe('onActivate', () => {
     const PUBLIC_KEY = 'a'.repeat(64);
 

@@ -43,6 +43,7 @@ import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-mes
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
 import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
+import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
 import { TwilioClientFactory } from '../nodes/connectors/twilio/twilio-client.factory';
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
@@ -145,6 +146,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     SlackPostToChannelAction,
     SlackUploadFileAction,
     DiscordPostWebhookAction,
+    DiscordReplyToCommandAction,
     TwilioClientFactory,
     TwilioSendSmsAction,
     TwilioSendWhatsAppAction,
@@ -250,6 +252,7 @@ export class EngineModule implements OnModuleInit {
     private readonly slackPostToChannel: SlackPostToChannelAction,
     private readonly slackUploadFile: SlackUploadFileAction,
     private readonly discordPostWebhook: DiscordPostWebhookAction,
+    private readonly discordReplyToCommand: DiscordReplyToCommandAction,
     private readonly twilioSendSms: TwilioSendSmsAction,
     private readonly twilioSendWhatsApp: TwilioSendWhatsAppAction,
     private readonly telegramSendMessage: TelegramSendMessageAction,
@@ -325,6 +328,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.slackPostToChannel);
     this.registry.register(this.slackUploadFile);
     this.registry.register(this.discordPostWebhook);
+    this.registry.register(this.discordReplyToCommand);
     this.registry.register(this.twilioSendSms);
     this.registry.register(this.twilioSendWhatsApp);
     this.registry.register(this.telegramSendMessage);
