@@ -128,6 +128,16 @@ export const driveCreateConfigSchema = z.object({
 });
 export type DriveCreateConfig = z.infer<typeof driveCreateConfigSchema>;
 
+export const driveGetFileConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  fileId: z.string().min(1).max(256),
+  downloadContent: z.boolean().optional(),
+  // Optional Drive fields mask; defaults to a useful subset when omitted.
+  fields: z.string().max(1024).optional(),
+  mockOnDryRun,
+});
+export type DriveGetFileConfig = z.infer<typeof driveGetFileConfigSchema>;
+
 export const driveListConfigSchema = z.object({
   connectionId: z.string().uuid(),
   folderId: z.string().min(1).max(128),
@@ -256,6 +266,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.GMAIL_CREATE_DRAFT]: 'https://www.googleapis.com/auth/gmail.modify',
   [NodeType.DRIVE_CREATE]: 'https://www.googleapis.com/auth/drive.file',
   [NodeType.DRIVE_LIST]: 'https://www.googleapis.com/auth/drive.readonly',
+  [NodeType.DRIVE_GET_FILE]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_APPEND]: 'https://www.googleapis.com/auth/spreadsheets',
   [NodeType.SHEETS_READ]: 'https://www.googleapis.com/auth/spreadsheets.readonly',
   [NodeType.SHEETS_FIND_ROW]: 'https://www.googleapis.com/auth/spreadsheets.readonly',

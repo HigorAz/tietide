@@ -17,6 +17,7 @@ import { GmailModifyLabelsForm } from './google/GmailModifyLabelsForm';
 import { GmailCreateDraftForm } from './google/GmailCreateDraftForm';
 import { DriveCreateForm } from './google/DriveCreateForm';
 import { DriveListForm } from './google/DriveListForm';
+import { DriveGetFileForm } from './google/DriveGetFileForm';
 import { SheetsAppendForm } from './google/SheetsAppendForm';
 import { SheetsReadForm } from './google/SheetsReadForm';
 import { SheetsFindRowForm } from './google/SheetsFindRowForm';
@@ -110,6 +111,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.GMAIL_CREATE_DRAFT]: GmailCreateDraftForm,
   [NodeType.DRIVE_CREATE]: DriveCreateForm,
   [NodeType.DRIVE_LIST]: DriveListForm,
+  [NodeType.DRIVE_GET_FILE]: DriveGetFileForm,
   [NodeType.SHEETS_APPEND]: SheetsAppendForm,
   [NodeType.SHEETS_READ]: SheetsReadForm,
   [NodeType.SHEETS_FIND_ROW]: SheetsFindRowForm,

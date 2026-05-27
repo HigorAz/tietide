@@ -56,8 +56,11 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
     {
       id: 'drive',
       label: 'Drive',
-      description: 'Access files this app creates',
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
+      description: 'Access app files and read your Drive files',
+      scopes: [
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.readonly',
+      ],
       defaultOn: true,
     },
     {

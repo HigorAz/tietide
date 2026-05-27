@@ -32,6 +32,7 @@ import { GmailModifyLabelsAction } from '../nodes/connectors/google/gmail-modify
 import { GmailCreateDraftAction } from '../nodes/connectors/google/gmail-create-draft';
 import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
 import { DriveListAction } from '../nodes/connectors/google/drive-list';
+import { DriveGetFileAction } from '../nodes/connectors/google/drive-get-file';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
 import { SheetsFindRowAction } from '../nodes/connectors/google/sheets-find-row';
@@ -145,6 +146,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     GmailCreateDraftAction,
     DriveCreateAction,
     DriveListAction,
+    DriveGetFileAction,
     SheetsAppendAction,
     SheetsReadAction,
     SheetsFindRowAction,
@@ -256,6 +258,7 @@ export class EngineModule implements OnModuleInit {
     private readonly gmailCreateDraft: GmailCreateDraftAction,
     private readonly driveCreate: DriveCreateAction,
     private readonly driveList: DriveListAction,
+    private readonly driveGetFile: DriveGetFileAction,
     private readonly sheetsAppend: SheetsAppendAction,
     private readonly sheetsRead: SheetsReadAction,
     private readonly sheetsFindRow: SheetsFindRowAction,
@@ -342,6 +345,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.gmailCreateDraft);
     this.registry.register(this.driveCreate);
     this.registry.register(this.driveList);
+    this.registry.register(this.driveGetFile);
     this.registry.register(this.sheetsAppend);
     this.registry.register(this.sheetsRead);
     this.registry.register(this.sheetsFindRow);

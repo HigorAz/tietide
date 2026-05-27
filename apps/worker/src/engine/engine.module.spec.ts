@@ -16,6 +16,7 @@ import { GmailModifyLabelsAction } from '../nodes/connectors/google/gmail-modify
 import { GmailCreateDraftAction } from '../nodes/connectors/google/gmail-create-draft';
 import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
 import { DriveListAction } from '../nodes/connectors/google/drive-list';
+import { DriveGetFileAction } from '../nodes/connectors/google/drive-get-file';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
 import { SheetsFindRowAction } from '../nodes/connectors/google/sheets-find-row';
@@ -109,6 +110,7 @@ describe('EngineModule', () => {
     const gmailCreateDraft = new GmailCreateDraftAction(undefined as never, undefined as never);
     const driveCreate = new DriveCreateAction(undefined as never, undefined as never);
     const driveList = new DriveListAction(undefined as never, undefined as never);
+    const driveGetFile = new DriveGetFileAction(undefined as never, undefined as never);
     const sheetsAppend = new SheetsAppendAction(undefined as never, undefined as never);
     const sheetsRead = new SheetsReadAction(undefined as never, undefined as never);
     const sheetsFindRow = new SheetsFindRowAction(undefined as never, undefined as never);
@@ -197,6 +199,7 @@ describe('EngineModule', () => {
       gmailCreateDraft,
       driveCreate,
       driveList,
+      driveGetFile,
       sheetsAppend,
       sheetsRead,
       sheetsFindRow,
@@ -283,6 +286,7 @@ describe('EngineModule', () => {
       gmailCreateDraft,
       driveCreate,
       driveList,
+      driveGetFile,
       sheetsAppend,
       sheetsRead,
       sheetsFindRow,
@@ -372,6 +376,7 @@ describe('EngineModule', () => {
       ['GmailCreateDraftAction', 'gmail-create-draft', 'gmailCreateDraft'],
       ['DriveCreateAction', 'drive-create', 'driveCreate'],
       ['DriveListAction', 'drive-list', 'driveList'],
+      ['DriveGetFileAction', 'drive-get-file', 'driveGetFile'],
       ['SheetsAppendAction', 'sheets-append', 'sheetsAppend'],
       ['SheetsReadAction', 'sheets-read', 'sheetsRead'],
       ['SheetsFindRowAction', 'sheets-find-row', 'sheetsFindRow'],
@@ -471,15 +476,15 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
       expect(counts.trigger).toBe(19);
       expect(counts.logic).toBe(4);
-      // 2 generic actions (http-request, code) + 18 Google connector actions +
+      // 2 generic actions (http-request, code) + 19 Google connector actions +
       // 5 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 60.
-      expect(counts.action).toBe(60);
+      //   calendly, postgres, mysql, s3, trello ×2) = 61.
+      expect(counts.action).toBe(61);
     });
   });
 });
