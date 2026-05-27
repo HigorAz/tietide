@@ -68,6 +68,7 @@ import { SlackSearchMessagesAction } from '../nodes/connectors/slack/slack-searc
 import { SlackAddReactionAction } from '../nodes/connectors/slack/slack-add-reaction';
 import { SlackCreateChannelAction } from '../nodes/connectors/slack/slack-create-channel';
 import { SlackInviteToChannelAction } from '../nodes/connectors/slack/slack-invite-to-channel';
+import { SlackGetChannelHistoryAction } from '../nodes/connectors/slack/slack-get-channel-history';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
 import { TwilioClientFactory } from '../nodes/connectors/twilio/twilio-client.factory';
@@ -227,6 +228,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     SlackAddReactionAction,
     SlackCreateChannelAction,
     SlackInviteToChannelAction,
+    SlackGetChannelHistoryAction,
     DiscordPostWebhookAction,
     DiscordReplyToCommandAction,
     TwilioClientFactory,
@@ -391,6 +393,7 @@ export class EngineModule implements OnModuleInit {
     private readonly slackAddReaction: SlackAddReactionAction,
     private readonly slackCreateChannel: SlackCreateChannelAction,
     private readonly slackInviteToChannel: SlackInviteToChannelAction,
+    private readonly slackGetChannelHistory: SlackGetChannelHistoryAction,
     private readonly discordPostWebhook: DiscordPostWebhookAction,
     private readonly discordReplyToCommand: DiscordReplyToCommandAction,
     private readonly twilioSendSms: TwilioSendSmsAction,
@@ -523,6 +526,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.slackAddReaction);
     this.registry.register(this.slackCreateChannel);
     this.registry.register(this.slackInviteToChannel);
+    this.registry.register(this.slackGetChannelHistory);
     this.registry.register(this.discordPostWebhook);
     this.registry.register(this.discordReplyToCommand);
     this.registry.register(this.twilioSendSms);
