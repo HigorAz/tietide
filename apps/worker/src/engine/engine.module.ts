@@ -149,6 +149,8 @@ import {
   MailchimpSubscriberAddedPassthrough,
   CalendlyEventScheduledPassthrough,
   TrelloCardChangedPassthrough,
+  GithubIssueOpenedPassthrough,
+  GithubPrOpenedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -262,6 +264,8 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     NotionDatabaseItemUpdatedTrigger,
     AirtableRecordCreatedTrigger,
     LinearIssueUpdatedTrigger,
+    GithubIssueOpenedPassthrough,
+    GithubPrOpenedPassthrough,
     ClaudeClientFactory,
     ClaudeMessagesAction,
     OpenaiClientFactory,
@@ -439,6 +443,8 @@ export class EngineModule implements OnModuleInit {
     private readonly notionDbItemUpdated: NotionDatabaseItemUpdatedTrigger,
     private readonly airtableRecordCreated: AirtableRecordCreatedTrigger,
     private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
+    private readonly githubIssueOpened: GithubIssueOpenedPassthrough,
+    private readonly githubPrOpened: GithubPrOpenedPassthrough,
   ) {}
 
   onModuleInit(): void {
@@ -564,5 +570,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.notionDbItemUpdated);
     this.registry.register(this.airtableRecordCreated);
     this.registry.register(this.linearIssueUpdated);
+    this.registry.register(this.githubIssueOpened);
+    this.registry.register(this.githubPrOpened);
   }
 }

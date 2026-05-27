@@ -94,6 +94,8 @@ import {
   MailchimpSubscriberAddedPassthrough,
   CalendlyEventScheduledPassthrough,
   TrelloCardChangedPassthrough,
+  GithubIssueOpenedPassthrough,
+  GithubPrOpenedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -262,6 +264,8 @@ describe('EngineModule', () => {
     const notionDbItemUpdated = new NotionDatabaseItemUpdatedTrigger(undefined as never);
     const airtableRecordCreated = new AirtableRecordCreatedTrigger(undefined as never);
     const linearIssueUpdated = new LinearIssueUpdatedTrigger(undefined as never);
+    const githubIssueOpened = new GithubIssueOpenedPassthrough();
+    const githubPrOpened = new GithubPrOpenedPassthrough();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -386,6 +390,8 @@ describe('EngineModule', () => {
       notionDbItemUpdated,
       airtableRecordCreated,
       linearIssueUpdated,
+      githubIssueOpened,
+      githubPrOpened,
     );
     return {
       registry,
@@ -631,7 +637,7 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated) = 24.
-      expect(counts.trigger).toBe(27);
+      expect(counts.trigger).toBe(29);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
