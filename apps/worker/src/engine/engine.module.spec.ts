@@ -61,6 +61,7 @@ import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms'
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
 import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
 import { TelegramSendPhotoAction } from '../nodes/connectors/telegram/telegram-send-photo';
+import { TelegramSendDocumentAction } from '../nodes/connectors/telegram/telegram-send-document';
 import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
 import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
 import { TrelloCreateCardAction } from '../nodes/connectors/trello/trello-create-card';
@@ -218,6 +219,7 @@ describe('EngineModule', () => {
     const twilioSendWhatsApp = new TwilioSendWhatsAppAction(undefined as never);
     const telegramSendMessage = new TelegramSendMessageAction(undefined as never);
     const telegramSendPhoto = new TelegramSendPhotoAction(undefined as never);
+    const telegramSendDocument = new TelegramSendDocumentAction(undefined as never);
     const slackMessageReceived = new SlackMessageReceivedPassthrough();
     const slackReactionAdded = new SlackReactionAddedPassthrough();
     const discordMessageReceived = new DiscordMessageReceivedPassthrough();
@@ -361,6 +363,7 @@ describe('EngineModule', () => {
       twilioSendWhatsApp,
       telegramSendMessage,
       telegramSendPhoto,
+      telegramSendDocument,
       slackMessageReceived,
       slackReactionAdded,
       discordMessageReceived,
@@ -499,6 +502,7 @@ describe('EngineModule', () => {
       twilioSendWhatsApp,
       telegramSendMessage,
       telegramSendPhoto,
+      telegramSendDocument,
       slackMessageReceived,
       slackReactionAdded,
       discordMessageReceived,
@@ -623,6 +627,7 @@ describe('EngineModule', () => {
       ['TwilioSendWhatsAppAction', 'twilio-send-whatsapp', 'twilioSendWhatsApp'],
       ['TelegramSendMessageAction', 'telegram-send-message', 'telegramSendMessage'],
       ['TelegramSendPhotoAction', 'telegram-send-photo', 'telegramSendPhoto'],
+      ['TelegramSendDocumentAction', 'telegram-send-document', 'telegramSendDocument'],
       ['SlackMessageReceivedPassthrough', 'slack-message-received', 'slackMessageReceived'],
       ['SlackReactionAddedPassthrough', 'slack-reaction-added', 'slackReactionAdded'],
       ['DiscordMessageReceivedPassthrough', 'discord-message-received', 'discordMessageReceived'],
@@ -700,13 +705,13 @@ describe('EngineModule', () => {
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
-      // 19 communication actions (slack ×10, discord ×5, twilio ×2, telegram ×2) +
+      // 20 communication actions (slack ×10, discord ×5, twilio ×2, telegram ×3) +
       // productivity actions (notion, trello, airtable, linear, github) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      expect(counts.action).toBe(102);
+      expect(counts.action).toBe(103);
     });
   });
 });

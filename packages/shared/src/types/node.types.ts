@@ -827,6 +827,14 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     provider: 'telegram',
   },
   {
+    type: NodeType.TELEGRAM_SEND_DOCUMENT,
+    name: 'Telegram: Send Document',
+    description: 'Send a document to a Telegram chat by URL, file_id, or base64 upload',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMUNICATION,
+    provider: 'telegram',
+  },
+  {
     type: NodeType.SLACK_MESSAGE_RECEIVED,
     name: 'Slack: Message Received',
     description: 'Trigger when a message is posted to a Slack channel (push, Slack Events API)',
