@@ -25,6 +25,12 @@ export const slackOAuth2ConfigSchema = z.object({
   // Required to verify inbound Slack Events API requests for slack-message-received /
   // slack-reaction-added triggers. Optional so connections work for actions only.
   signingSecret: z.string().min(1).optional(),
+  // Slack user token (xoxp) + its granted scopes, captured only when the connection
+  // opts into a user scope (search:read). search.messages requires a user token, not
+  // the bot token — slack-search-messages is the sole consumer. Optional/additive so
+  // existing bot-only connections remain valid.
+  userAccessToken: z.string().min(1).optional(),
+  userScope: z.string().optional(),
 });
 
 export const notionOAuth2ConfigSchema = z.object({

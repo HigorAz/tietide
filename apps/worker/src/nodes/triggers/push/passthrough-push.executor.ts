@@ -122,6 +122,39 @@ export class SlackReactionAddedPassthrough extends PassthroughPushExecutor {
 }
 
 @Injectable()
+export class SlackAppMentionPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'slack-app-mention',
+      'Slack: App Mention',
+      'Triggers when Slack delivers an app_mention event to the workflow',
+    );
+  }
+}
+
+@Injectable()
+export class SlackChannelCreatedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'slack-channel-created',
+      'Slack: Channel Created',
+      'Triggers when Slack delivers a channel_created event to the workflow',
+    );
+  }
+}
+
+@Injectable()
+export class TelegramCallbackQueryReceivedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'telegram-callback-query-received',
+      'Telegram: Callback Query Received',
+      'Triggers when a Telegram inline-keyboard button callback is delivered to the workflow',
+    );
+  }
+}
+
+@Injectable()
 export class DiscordMessageReceivedPassthrough extends PassthroughPushExecutor {
   constructor() {
     super(

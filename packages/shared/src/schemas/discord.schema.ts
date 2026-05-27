@@ -55,3 +55,37 @@ export const discordReplyToCommandConfigSchema = z.object({
   mockOnDryRun,
 });
 export type DiscordReplyToCommandConfig = z.infer<typeof discordReplyToCommandConfigSchema>;
+
+// Bot-token REST actions (S15 messaging pack). These use the `discord-bot`
+// connection (bot token) and the Discord REST API — distinct from the
+// webhook-URL post action above.
+const discordSnowflake = z
+  .string()
+  .min(1)
+  .max(32)
+  .regex(/^\d+$/, { message: 'must be a Discord snowflake (numeric id)' });
+
+export const discordBotSendMessageConfigSchema = z.object({
+  connectionId,
+  channelId: discordSnowflake,
+  content: z.string().min(1).max(2000),
+  embeds: z.array(discordEmbed).max(10).optional(),
+  mockOnDryRun,
+});
+export type DiscordBotSendMessageConfig = z.infer<typeof discordBotSendMessageConfigSchema>;
+
+export const discordGetChannelMessagesConfigSchema = z.object({
+  connectionId,
+  channelId: discordSnowflake,
+  limit: z.number().int().min(1).max(100).optional(),
+});
+export type DiscordGetChannelMessagesConfig = z.infer<typeof discordGetChannelMessagesConfigSchema>;
+
+export const discordAddRoleConfigSchema = z.object({
+  connectionId,
+  guildId: discordSnowflake,
+  userId: discordSnowflake,
+  roleId: discordSnowflake,
+  mockOnDryRun,
+});
+export type DiscordAddRoleConfig = z.infer<typeof discordAddRoleConfigSchema>;

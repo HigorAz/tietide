@@ -45,11 +45,28 @@ import { OnedriveListFilesAction } from '../nodes/connectors/microsoft/onedrive-
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
 import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
+import { SlackFindUserAction } from '../nodes/connectors/slack/slack-find-user';
+import { SlackSearchMessagesAction } from '../nodes/connectors/slack/slack-search-messages';
+import { SlackAddReactionAction } from '../nodes/connectors/slack/slack-add-reaction';
+import { SlackCreateChannelAction } from '../nodes/connectors/slack/slack-create-channel';
+import { SlackInviteToChannelAction } from '../nodes/connectors/slack/slack-invite-to-channel';
+import { SlackGetChannelHistoryAction } from '../nodes/connectors/slack/slack-get-channel-history';
+import { SlackUpdateMessageAction } from '../nodes/connectors/slack/slack-update-message';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
+import { DiscordBotSendMessageAction } from '../nodes/connectors/discord/discord-bot-send-message';
+import { DiscordGetChannelMessagesAction } from '../nodes/connectors/discord/discord-get-channel-messages';
+import { DiscordAddRoleAction } from '../nodes/connectors/discord/discord-add-role';
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
+import { TwilioGetMessageAction } from '../nodes/connectors/twilio/twilio-get-message';
+import { TwilioListMessagesAction } from '../nodes/connectors/twilio/twilio-list-messages';
+import { TwilioMakeCallAction } from '../nodes/connectors/twilio/twilio-make-call';
 import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
+import { TelegramSendPhotoAction } from '../nodes/connectors/telegram/telegram-send-photo';
+import { TelegramSendDocumentAction } from '../nodes/connectors/telegram/telegram-send-document';
+import { TelegramEditMessageAction } from '../nodes/connectors/telegram/telegram-edit-message';
+import { TelegramGetChatAction } from '../nodes/connectors/telegram/telegram-get-chat';
 import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
 import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
 import { TrelloCreateCardAction } from '../nodes/connectors/trello/trello-create-card';
@@ -87,8 +104,11 @@ import {
   OnedriveFileAddedPassthrough,
   SlackMessageReceivedPassthrough,
   SlackReactionAddedPassthrough,
+  SlackAppMentionPassthrough,
+  SlackChannelCreatedPassthrough,
   DiscordMessageReceivedPassthrough,
   TelegramMessageReceivedPassthrough,
+  TelegramCallbackQueryReceivedPassthrough,
   TwilioSmsReceivedPassthrough,
   HubspotContactChangedPassthrough,
   MailchimpSubscriberAddedPassthrough,
@@ -191,15 +211,35 @@ describe('EngineModule', () => {
     const slackPostMessage = new SlackPostMessageAction(undefined as never);
     const slackPostToChannel = new SlackPostToChannelAction(undefined as never);
     const slackUploadFile = new SlackUploadFileAction(undefined as never);
+    const slackFindUser = new SlackFindUserAction(undefined as never);
+    const slackSearchMessages = new SlackSearchMessagesAction(undefined as never);
+    const slackAddReaction = new SlackAddReactionAction(undefined as never);
+    const slackCreateChannel = new SlackCreateChannelAction(undefined as never);
+    const slackInviteToChannel = new SlackInviteToChannelAction(undefined as never);
+    const slackGetChannelHistory = new SlackGetChannelHistoryAction(undefined as never);
+    const slackUpdateMessage = new SlackUpdateMessageAction(undefined as never);
     const discordPostWebhook = new DiscordPostWebhookAction();
     const discordReplyToCommand = new DiscordReplyToCommandAction();
+    const discordBotSendMessage = new DiscordBotSendMessageAction(undefined as never);
+    const discordGetChannelMessages = new DiscordGetChannelMessagesAction(undefined as never);
+    const discordAddRole = new DiscordAddRoleAction(undefined as never);
     const twilioSendSms = new TwilioSendSmsAction(undefined as never);
     const twilioSendWhatsApp = new TwilioSendWhatsAppAction(undefined as never);
+    const twilioGetMessage = new TwilioGetMessageAction(undefined as never);
+    const twilioListMessages = new TwilioListMessagesAction(undefined as never);
+    const twilioMakeCall = new TwilioMakeCallAction(undefined as never);
     const telegramSendMessage = new TelegramSendMessageAction(undefined as never);
+    const telegramSendPhoto = new TelegramSendPhotoAction(undefined as never);
+    const telegramSendDocument = new TelegramSendDocumentAction(undefined as never);
+    const telegramEditMessage = new TelegramEditMessageAction(undefined as never);
+    const telegramGetChat = new TelegramGetChatAction(undefined as never);
     const slackMessageReceived = new SlackMessageReceivedPassthrough();
     const slackReactionAdded = new SlackReactionAddedPassthrough();
+    const slackAppMention = new SlackAppMentionPassthrough();
+    const slackChannelCreated = new SlackChannelCreatedPassthrough();
     const discordMessageReceived = new DiscordMessageReceivedPassthrough();
     const telegramMessageReceived = new TelegramMessageReceivedPassthrough();
+    const telegramCallbackQueryReceived = new TelegramCallbackQueryReceivedPassthrough();
     const twilioSmsReceived = new TwilioSmsReceivedPassthrough();
     const notionCreatePage = new NotionCreatePageAction(undefined as never);
     const notionQueryDatabase = new NotionQueryDatabaseAction(undefined as never);
@@ -323,15 +363,35 @@ describe('EngineModule', () => {
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
+      slackFindUser,
+      slackSearchMessages,
+      slackAddReaction,
+      slackCreateChannel,
+      slackInviteToChannel,
+      slackGetChannelHistory,
+      slackUpdateMessage,
       discordPostWebhook,
       discordReplyToCommand,
+      discordBotSendMessage,
+      discordGetChannelMessages,
+      discordAddRole,
       twilioSendSms,
       twilioSendWhatsApp,
+      twilioGetMessage,
+      twilioListMessages,
+      twilioMakeCall,
       telegramSendMessage,
+      telegramSendPhoto,
+      telegramSendDocument,
+      telegramEditMessage,
+      telegramGetChat,
       slackMessageReceived,
       slackReactionAdded,
+      slackAppMention,
+      slackChannelCreated,
       discordMessageReceived,
       telegramMessageReceived,
+      telegramCallbackQueryReceived,
       twilioSmsReceived,
       notionCreatePage,
       notionQueryDatabase,
@@ -450,15 +510,35 @@ describe('EngineModule', () => {
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
+      slackFindUser,
+      slackSearchMessages,
+      slackAddReaction,
+      slackCreateChannel,
+      slackInviteToChannel,
+      slackGetChannelHistory,
+      slackUpdateMessage,
       discordPostWebhook,
       discordReplyToCommand,
+      discordBotSendMessage,
+      discordGetChannelMessages,
+      discordAddRole,
       twilioSendSms,
       twilioSendWhatsApp,
+      twilioGetMessage,
+      twilioListMessages,
+      twilioMakeCall,
       telegramSendMessage,
+      telegramSendPhoto,
+      telegramSendDocument,
+      telegramEditMessage,
+      telegramGetChat,
       slackMessageReceived,
       slackReactionAdded,
+      slackAppMention,
+      slackChannelCreated,
       discordMessageReceived,
       telegramMessageReceived,
+      telegramCallbackQueryReceived,
       twilioSmsReceived,
       notionCreatePage,
       notionQueryDatabase,
@@ -559,18 +639,46 @@ describe('EngineModule', () => {
       ['SlackPostMessageAction', 'slack-post-message', 'slackPostMessage'],
       ['SlackPostToChannelAction', 'slack-post-to-channel', 'slackPostToChannel'],
       ['SlackUploadFileAction', 'slack-upload-file', 'slackUploadFile'],
+      ['SlackFindUserAction', 'slack-find-user', 'slackFindUser'],
+      ['SlackSearchMessagesAction', 'slack-search-messages', 'slackSearchMessages'],
+      ['SlackAddReactionAction', 'slack-add-reaction', 'slackAddReaction'],
+      ['SlackCreateChannelAction', 'slack-create-channel', 'slackCreateChannel'],
+      ['SlackInviteToChannelAction', 'slack-invite-to-channel', 'slackInviteToChannel'],
+      ['SlackGetChannelHistoryAction', 'slack-get-channel-history', 'slackGetChannelHistory'],
+      ['SlackUpdateMessageAction', 'slack-update-message', 'slackUpdateMessage'],
       ['DiscordPostWebhookAction', 'discord-post-webhook', 'discordPostWebhook'],
       ['DiscordReplyToCommandAction', 'discord-reply-to-command', 'discordReplyToCommand'],
+      ['DiscordBotSendMessageAction', 'discord-bot-send-message', 'discordBotSendMessage'],
+      [
+        'DiscordGetChannelMessagesAction',
+        'discord-get-channel-messages',
+        'discordGetChannelMessages',
+      ],
+      ['DiscordAddRoleAction', 'discord-add-role', 'discordAddRole'],
       ['TwilioSendSmsAction', 'twilio-send-sms', 'twilioSendSms'],
       ['TwilioSendWhatsAppAction', 'twilio-send-whatsapp', 'twilioSendWhatsApp'],
+      ['TwilioGetMessageAction', 'twilio-get-message', 'twilioGetMessage'],
+      ['TwilioListMessagesAction', 'twilio-list-messages', 'twilioListMessages'],
+      ['TwilioMakeCallAction', 'twilio-make-call', 'twilioMakeCall'],
       ['TelegramSendMessageAction', 'telegram-send-message', 'telegramSendMessage'],
+      ['TelegramSendPhotoAction', 'telegram-send-photo', 'telegramSendPhoto'],
+      ['TelegramSendDocumentAction', 'telegram-send-document', 'telegramSendDocument'],
+      ['TelegramEditMessageAction', 'telegram-edit-message', 'telegramEditMessage'],
+      ['TelegramGetChatAction', 'telegram-get-chat', 'telegramGetChat'],
       ['SlackMessageReceivedPassthrough', 'slack-message-received', 'slackMessageReceived'],
       ['SlackReactionAddedPassthrough', 'slack-reaction-added', 'slackReactionAdded'],
+      ['SlackAppMentionPassthrough', 'slack-app-mention', 'slackAppMention'],
+      ['SlackChannelCreatedPassthrough', 'slack-channel-created', 'slackChannelCreated'],
       ['DiscordMessageReceivedPassthrough', 'discord-message-received', 'discordMessageReceived'],
       [
         'TelegramMessageReceivedPassthrough',
         'telegram-message-received',
         'telegramMessageReceived',
+      ],
+      [
+        'TelegramCallbackQueryReceivedPassthrough',
+        'telegram-callback-query-received',
+        'telegramCallbackQueryReceived',
       ],
       ['TwilioSmsReceivedPassthrough', 'twilio-sms-received', 'twilioSmsReceived'],
       ['NotionCreatePageAction', 'notion-create-page', 'notionCreatePage'],
@@ -633,21 +741,21 @@ describe('EngineModule', () => {
       // 6 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
       // outlook-msg-with-attachment, onedrive-file-added, excel-row-added,
       // excel-row-updated) +
-      // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
+      // 8 communication push triggers (slack ×4, discord, telegram ×2, twilio) +
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
-      // 1 Google push trigger (drive-file-updated) = 24.
-      expect(counts.trigger).toBe(29);
+      // 1 Google push trigger (drive-file-updated). +messaging pack triggers (#245).
+      expect(counts.trigger).toBe(32);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
-      // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
+      // 25 communication actions (slack ×10, discord ×5, twilio ×5, telegram ×5) +
       // productivity actions (notion, trello, airtable, linear, github) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
-      // +notion read/update pack (#244).
-      expect(counts.action).toBe(91);
+      // +notion read/update pack (#244). +messaging read/manage pack (#245).
+      expect(counts.action).toBe(108);
     });
   });
 });

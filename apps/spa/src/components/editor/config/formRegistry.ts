@@ -60,16 +60,36 @@ import { ExcelRowUpdatedForm } from './microsoft/ExcelRowUpdatedForm';
 import { SlackPostMessageForm } from './slack/SlackPostMessageForm';
 import { SlackPostToChannelForm } from './slack/SlackPostToChannelForm';
 import { SlackUploadFileForm } from './slack/SlackUploadFileForm';
+import { SlackFindUserForm } from './slack/SlackFindUserForm';
+import { SlackSearchMessagesForm } from './slack/SlackSearchMessagesForm';
+import { SlackAddReactionForm } from './slack/SlackAddReactionForm';
+import { SlackCreateChannelForm } from './slack/SlackCreateChannelForm';
+import { SlackInviteToChannelForm } from './slack/SlackInviteToChannelForm';
+import { SlackGetChannelHistoryForm } from './slack/SlackGetChannelHistoryForm';
+import { SlackUpdateMessageForm } from './slack/SlackUpdateMessageForm';
 import { SlackMessageReceivedForm } from './slack/SlackMessageReceivedForm';
 import { SlackReactionAddedForm } from './slack/SlackReactionAddedForm';
+import { SlackAppMentionForm } from './slack/SlackAppMentionForm';
+import { SlackChannelCreatedForm } from './slack/SlackChannelCreatedForm';
 import { DiscordPostWebhookForm } from './discord/DiscordPostWebhookForm';
 import { DiscordReplyToCommandForm } from './discord/DiscordReplyToCommandForm';
 import { DiscordMessageReceivedForm } from './discord/DiscordMessageReceivedForm';
+import { DiscordBotSendMessageForm } from './discord/DiscordBotSendMessageForm';
+import { DiscordGetChannelMessagesForm } from './discord/DiscordGetChannelMessagesForm';
+import { DiscordAddRoleForm } from './discord/DiscordAddRoleForm';
 import { TwilioSendSmsForm } from './twilio/TwilioSendSmsForm';
 import { TwilioSendWhatsAppForm } from './twilio/TwilioSendWhatsAppForm';
 import { TwilioSmsReceivedForm } from './twilio/TwilioSmsReceivedForm';
+import { TwilioGetMessageForm } from './twilio/TwilioGetMessageForm';
+import { TwilioListMessagesForm } from './twilio/TwilioListMessagesForm';
+import { TwilioMakeCallForm } from './twilio/TwilioMakeCallForm';
 import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
+import { TelegramSendPhotoForm } from './telegram/TelegramSendPhotoForm';
+import { TelegramSendDocumentForm } from './telegram/TelegramSendDocumentForm';
+import { TelegramEditMessageForm } from './telegram/TelegramEditMessageForm';
+import { TelegramGetChatForm } from './telegram/TelegramGetChatForm';
 import { TelegramMessageReceivedForm } from './telegram/TelegramMessageReceivedForm';
+import { TelegramCallbackQueryReceivedForm } from './telegram/TelegramCallbackQueryReceivedForm';
 import { NotionCreatePageForm } from './notion/NotionCreatePageForm';
 import { NotionQueryDatabaseForm } from './notion/NotionQueryDatabaseForm';
 import { NotionGetPageForm } from './notion/NotionGetPageForm';
@@ -194,16 +214,36 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.SLACK_POST_MESSAGE]: SlackPostMessageForm,
   [NodeType.SLACK_POST_TO_CHANNEL]: SlackPostToChannelForm,
   [NodeType.SLACK_UPLOAD_FILE]: SlackUploadFileForm,
+  [NodeType.SLACK_FIND_USER]: SlackFindUserForm,
+  [NodeType.SLACK_SEARCH_MESSAGES]: SlackSearchMessagesForm,
+  [NodeType.SLACK_ADD_REACTION]: SlackAddReactionForm,
+  [NodeType.SLACK_CREATE_CHANNEL]: SlackCreateChannelForm,
+  [NodeType.SLACK_INVITE_TO_CHANNEL]: SlackInviteToChannelForm,
+  [NodeType.SLACK_GET_CHANNEL_HISTORY]: SlackGetChannelHistoryForm,
+  [NodeType.SLACK_UPDATE_MESSAGE]: SlackUpdateMessageForm,
   [NodeType.SLACK_MESSAGE_RECEIVED]: SlackMessageReceivedForm,
   [NodeType.SLACK_REACTION_ADDED]: SlackReactionAddedForm,
+  [NodeType.SLACK_APP_MENTION]: SlackAppMentionForm,
+  [NodeType.SLACK_CHANNEL_CREATED]: SlackChannelCreatedForm,
   [NodeType.DISCORD_POST_WEBHOOK]: DiscordPostWebhookForm,
   [NodeType.DISCORD_REPLY_TO_COMMAND]: DiscordReplyToCommandForm,
   [NodeType.DISCORD_MESSAGE_RECEIVED]: DiscordMessageReceivedForm,
+  [NodeType.DISCORD_BOT_SEND_MESSAGE]: DiscordBotSendMessageForm,
+  [NodeType.DISCORD_GET_CHANNEL_MESSAGES]: DiscordGetChannelMessagesForm,
+  [NodeType.DISCORD_ADD_ROLE]: DiscordAddRoleForm,
   [NodeType.TWILIO_SEND_SMS]: TwilioSendSmsForm,
   [NodeType.TWILIO_SEND_WHATSAPP]: TwilioSendWhatsAppForm,
   [NodeType.TWILIO_SMS_RECEIVED]: TwilioSmsReceivedForm,
+  [NodeType.TWILIO_GET_MESSAGE]: TwilioGetMessageForm,
+  [NodeType.TWILIO_LIST_MESSAGES]: TwilioListMessagesForm,
+  [NodeType.TWILIO_MAKE_CALL]: TwilioMakeCallForm,
   [NodeType.TELEGRAM_SEND_MESSAGE]: TelegramSendMessageForm,
+  [NodeType.TELEGRAM_SEND_PHOTO]: TelegramSendPhotoForm,
+  [NodeType.TELEGRAM_SEND_DOCUMENT]: TelegramSendDocumentForm,
+  [NodeType.TELEGRAM_EDIT_MESSAGE]: TelegramEditMessageForm,
+  [NodeType.TELEGRAM_GET_CHAT]: TelegramGetChatForm,
   [NodeType.TELEGRAM_MESSAGE_RECEIVED]: TelegramMessageReceivedForm,
+  [NodeType.TELEGRAM_CALLBACK_QUERY_RECEIVED]: TelegramCallbackQueryReceivedForm,
   [NodeType.NOTION_CREATE_PAGE]: NotionCreatePageForm,
   [NodeType.NOTION_QUERY_DATABASE]: NotionQueryDatabaseForm,
   [NodeType.NOTION_GET_PAGE]: NotionGetPageForm,
