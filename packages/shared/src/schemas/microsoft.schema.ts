@@ -128,6 +128,27 @@ export const excelFindRowConfigSchema = z.object({
 });
 export type ExcelFindRowConfig = z.infer<typeof excelFindRowConfigSchema>;
 
+export const excelUpdateRowConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    workbookId: z.string().min(1).max(128),
+    worksheet: z.string().min(1).max(255),
+    tableName: z.string().min(1).max(255).default('Table1'),
+    values: z.array(z.unknown()).min(1).max(256),
+    rowIndex: z.number().int().min(0).optional(),
+    // Resolve the target row by a unique exact match on a column instead of an
+    // index; the action errors if the lookup matches zero or multiple rows.
+    lookup: z
+      .object({ column: z.string().min(1).max(255), value: z.string().max(4096) })
+      .optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => (v.rowIndex !== undefined) !== (v.lookup !== undefined), {
+    message: 'Specify exactly one of rowIndex or lookup',
+    path: ['rowIndex'],
+  });
+export type ExcelUpdateRowConfig = z.infer<typeof excelUpdateRowConfigSchema>;
+
 export const outlookGetMessageConfigSchema = z.object({
   connectionId: z.string().uuid(),
   messageId: graphId(),
@@ -209,6 +230,7 @@ export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.EXCEL_APPEND]: 'Files.ReadWrite',
   [NodeType.EXCEL_READ]: 'Files.Read',
   [NodeType.EXCEL_FIND_ROW]: 'Files.Read',
+  [NodeType.EXCEL_UPDATE_ROW]: 'Files.ReadWrite',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',
 };
 
