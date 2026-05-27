@@ -45,6 +45,7 @@ import { OnedriveListFilesAction } from '../nodes/connectors/microsoft/onedrive-
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
 import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
+import { SlackFindUserAction } from '../nodes/connectors/slack/slack-find-user';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
@@ -191,6 +192,7 @@ describe('EngineModule', () => {
     const slackPostMessage = new SlackPostMessageAction(undefined as never);
     const slackPostToChannel = new SlackPostToChannelAction(undefined as never);
     const slackUploadFile = new SlackUploadFileAction(undefined as never);
+    const slackFindUser = new SlackFindUserAction(undefined as never);
     const discordPostWebhook = new DiscordPostWebhookAction();
     const discordReplyToCommand = new DiscordReplyToCommandAction();
     const twilioSendSms = new TwilioSendSmsAction(undefined as never);
@@ -323,6 +325,7 @@ describe('EngineModule', () => {
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
+      slackFindUser,
       discordPostWebhook,
       discordReplyToCommand,
       twilioSendSms,
@@ -450,6 +453,7 @@ describe('EngineModule', () => {
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
+      slackFindUser,
       discordPostWebhook,
       discordReplyToCommand,
       twilioSendSms,
@@ -559,6 +563,7 @@ describe('EngineModule', () => {
       ['SlackPostMessageAction', 'slack-post-message', 'slackPostMessage'],
       ['SlackPostToChannelAction', 'slack-post-to-channel', 'slackPostToChannel'],
       ['SlackUploadFileAction', 'slack-upload-file', 'slackUploadFile'],
+      ['SlackFindUserAction', 'slack-find-user', 'slackFindUser'],
       ['DiscordPostWebhookAction', 'discord-post-webhook', 'discordPostWebhook'],
       ['DiscordReplyToCommandAction', 'discord-reply-to-command', 'discordReplyToCommand'],
       ['TwilioSendSmsAction', 'twilio-send-sms', 'twilioSendSms'],
@@ -641,13 +646,13 @@ describe('EngineModule', () => {
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
-      // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
+      // 9 communication actions (slack ×4, discord ×2, twilio ×2, telegram) +
       // productivity actions (notion, trello, airtable, linear, github) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
-      // +notion read/update pack (#244).
-      expect(counts.action).toBe(91);
+      // +notion read/update pack (#244). +messaging read/manage pack (#245).
+      expect(counts.action).toBe(92);
     });
   });
 });

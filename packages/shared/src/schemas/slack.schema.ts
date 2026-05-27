@@ -63,6 +63,20 @@ export const slackUploadFileConfigSchema = z.object({
 });
 export type SlackUploadFileConfig = z.infer<typeof slackUploadFileConfigSchema>;
 
+// Read / manage actions (S15 messaging pack)
+
+export const SLACK_USER_LOOKUP_MODES = ['email', 'name'] as const;
+export type SlackUserLookupMode = (typeof SLACK_USER_LOOKUP_MODES)[number];
+
+export const slackFindUserConfigSchema = z.object({
+  connectionId,
+  mode: z.enum(SLACK_USER_LOOKUP_MODES),
+  // The email (mode=email) or name substring (mode=name) to search for.
+  query: z.string().min(1).max(255),
+  mockOnDryRun,
+});
+export type SlackFindUserConfig = z.infer<typeof slackFindUserConfigSchema>;
+
 // Trigger configs
 
 export const SLACK_MESSAGE_EVENT_TYPES = ['message.channels', 'app_mention'] as const;

@@ -63,6 +63,7 @@ import { SlackClientFactory } from '../nodes/connectors/slack/slack-client.facto
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
 import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
+import { SlackFindUserAction } from '../nodes/connectors/slack/slack-find-user';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
 import { TwilioClientFactory } from '../nodes/connectors/twilio/twilio-client.factory';
@@ -217,6 +218,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     SlackPostMessageAction,
     SlackPostToChannelAction,
     SlackUploadFileAction,
+    SlackFindUserAction,
     DiscordPostWebhookAction,
     DiscordReplyToCommandAction,
     TwilioClientFactory,
@@ -376,6 +378,7 @@ export class EngineModule implements OnModuleInit {
     private readonly slackPostMessage: SlackPostMessageAction,
     private readonly slackPostToChannel: SlackPostToChannelAction,
     private readonly slackUploadFile: SlackUploadFileAction,
+    private readonly slackFindUser: SlackFindUserAction,
     private readonly discordPostWebhook: DiscordPostWebhookAction,
     private readonly discordReplyToCommand: DiscordReplyToCommandAction,
     private readonly twilioSendSms: TwilioSendSmsAction,
@@ -503,6 +506,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.slackPostMessage);
     this.registry.register(this.slackPostToChannel);
     this.registry.register(this.slackUploadFile);
+    this.registry.register(this.slackFindUser);
     this.registry.register(this.discordPostWebhook);
     this.registry.register(this.discordReplyToCommand);
     this.registry.register(this.twilioSendSms);
