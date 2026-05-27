@@ -48,6 +48,7 @@ import { CalendarGetEventAction } from '../nodes/connectors/google/calendar-get-
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
+import { OutlookGetMessageAction } from '../nodes/connectors/microsoft/outlook-get-message';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
@@ -167,6 +168,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     MicrosoftAuthService,
     OutlookSendAction,
     OutlookSearchAction,
+    OutlookGetMessageAction,
     ExcelAppendAction,
     ExcelReadAction,
     OnedriveCreateAction,
@@ -283,6 +285,7 @@ export class EngineModule implements OnModuleInit {
     private readonly calendarGetEvent: CalendarGetEventAction,
     private readonly outlookSend: OutlookSendAction,
     private readonly outlookSearch: OutlookSearchAction,
+    private readonly outlookGetMessage: OutlookGetMessageAction,
     private readonly excelAppend: ExcelAppendAction,
     private readonly excelRead: ExcelReadAction,
     private readonly onedriveCreate: OnedriveCreateAction,
@@ -375,6 +378,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.calendarGetEvent);
     this.registry.register(this.outlookSend);
     this.registry.register(this.outlookSearch);
+    this.registry.register(this.outlookGetMessage);
     this.registry.register(this.excelAppend);
     this.registry.register(this.excelRead);
     this.registry.register(this.onedriveCreate);

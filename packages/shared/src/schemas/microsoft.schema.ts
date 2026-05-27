@@ -29,6 +29,16 @@ const a1RangePattern = /^[A-Z]+\d+(?::[A-Z]+\d+)?$/;
 // these would let a user write to a folder they don't intend.
 const onedriveItemNamePattern = /^[^\\/]+$/;
 
+// Graph resource IDs (message / attachment / driveItem). Long, URL-unsafe
+// base64-ish strings — the action encodeURIComponent()s them into the path, so
+// here we only reject control chars and cap the length.
+const graphId = (max = 512) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((v) => !/[\r\n]/.test(v), { message: 'must not contain newline characters' });
+
 export const outlookSendConfigSchema = z.object({
   connectionId: z.string().uuid(),
   to: headerString(),
@@ -105,12 +115,20 @@ export const onedriveCreateConfigSchema = z.object({
 });
 export type OnedriveCreateConfig = z.infer<typeof onedriveCreateConfigSchema>;
 
+export const outlookGetMessageConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  messageId: graphId(),
+  mockOnDryRun,
+});
+export type OutlookGetMessageConfig = z.infer<typeof outlookGetMessageConfigSchema>;
+
 // Map of Microsoft node types to the OAuth scope each requires. Mirrors
 // GOOGLE_NODE_REQUIRED_SCOPES so the SPA's ScopeReauthBanner can surface
 // missing-scope hints uniformly.
 export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.OUTLOOK_SEND]: 'Mail.Send',
   [NodeType.OUTLOOK_SEARCH]: 'Mail.Read',
+  [NodeType.OUTLOOK_GET_MESSAGE]: 'Mail.Read',
   [NodeType.EXCEL_APPEND]: 'Files.ReadWrite',
   [NodeType.EXCEL_READ]: 'Files.Read',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',

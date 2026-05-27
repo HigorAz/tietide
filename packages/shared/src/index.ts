@@ -236,6 +236,7 @@ export {
 export {
   outlookSendConfigSchema,
   outlookSearchConfigSchema,
+  outlookGetMessageConfigSchema,
   excelAppendConfigSchema,
   excelReadConfigSchema,
   onedriveCreateConfigSchema,
@@ -243,6 +244,7 @@ export {
   MICROSOFT_NODE_TYPES,
   type OutlookSendConfig,
   type OutlookSearchConfig,
+  type OutlookGetMessageConfig,
   type ExcelAppendConfig,
   type ExcelReadConfig,
   type OnedriveCreateConfig,

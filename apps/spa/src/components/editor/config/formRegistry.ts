@@ -40,6 +40,7 @@ import { CalendarEventCreatedForm } from './google/CalendarEventCreatedForm';
 import { CalendarEventUpdatedForm } from './google/CalendarEventUpdatedForm';
 import { OutlookSendForm } from './microsoft/OutlookSendForm';
 import { OutlookSearchForm } from './microsoft/OutlookSearchForm';
+import { OutlookGetMessageForm } from './microsoft/OutlookGetMessageForm';
 import { ExcelAppendForm } from './microsoft/ExcelAppendForm';
 import { ExcelReadForm } from './microsoft/ExcelReadForm';
 import { OneDriveCreateForm } from './microsoft/OneDriveCreateForm';
@@ -139,6 +140,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.CALENDAR_EVENT_UPDATED]: CalendarEventUpdatedForm,
   [NodeType.OUTLOOK_SEND]: OutlookSendForm,
   [NodeType.OUTLOOK_SEARCH]: OutlookSearchForm,
+  [NodeType.OUTLOOK_GET_MESSAGE]: OutlookGetMessageForm,
   [NodeType.EXCEL_APPEND]: ExcelAppendForm,
   [NodeType.EXCEL_READ]: ExcelReadForm,
   [NodeType.ONEDRIVE_CREATE]: OneDriveCreateForm,
