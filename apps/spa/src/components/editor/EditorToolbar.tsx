@@ -148,6 +148,10 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
         data-testid="editor-toolbar"
         className={cn(
           'pointer-events-auto absolute right-4 top-4 z-10 flex items-center gap-2',
+          // Stay within the canvas and wrap (right-aligned) instead of spilling
+          // over the node-library sidebar on narrow / split-view widths. The
+          // left reserve keeps wrapped rows clear of the absolute Back button.
+          'flex-wrap justify-end max-w-[calc(100%-5.5rem)]',
           'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
         )}
       >
