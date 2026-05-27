@@ -18,6 +18,30 @@ export interface OpenaiChatResponse {
   finishReason: string | null;
 }
 
+export interface OpenaiEmbeddingsRequest {
+  model: string;
+  input: string;
+}
+
+export interface OpenaiEmbeddingsResponse {
+  embedding: number[];
+  dimensions: number;
+  inputTokens: number;
+  model: string;
+}
+
+export interface OpenaiImageRequest {
+  model: string;
+  prompt: string;
+  size: string;
+  count: number;
+}
+
+export interface OpenaiImageResponse {
+  images: Array<{ url: string | null; b64Json: string | null }>;
+  model: string;
+}
+
 @Injectable()
 export class OpenaiClientFactory {
   buildClient(connection: DecryptedConnection<OpenAIApiKeyConfig>): OpenAI {
@@ -53,5 +77,43 @@ export class OpenaiClientFactory {
       model: response.model,
       finishReason: choice?.finish_reason ?? null,
     };
+  }
+
+  async createEmbeddings(
+    connection: DecryptedConnection<OpenAIApiKeyConfig>,
+    request: OpenaiEmbeddingsRequest,
+  ): Promise<OpenaiEmbeddingsResponse> {
+    const client = this.buildClient(connection);
+    const response = await client.embeddings.create({
+      model: request.model,
+      input: request.input,
+    });
+
+    const embedding = response.data[0]?.embedding ?? [];
+    return {
+      embedding,
+      dimensions: embedding.length,
+      inputTokens: response.usage?.prompt_tokens ?? 0,
+      model: response.model,
+    };
+  }
+
+  async createImage(
+    connection: DecryptedConnection<OpenAIApiKeyConfig>,
+    request: OpenaiImageRequest,
+  ): Promise<OpenaiImageResponse> {
+    const client = this.buildClient(connection);
+    const response = await client.images.generate({
+      model: request.model,
+      prompt: request.prompt,
+      size: request.size as OpenAI.ImageGenerateParams['size'],
+      n: request.count,
+    });
+
+    const images = (response.data ?? []).map((img) => ({
+      url: img.url ?? null,
+      b64Json: img.b64_json ?? null,
+    }));
+    return { images, model: request.model };
   }
 }

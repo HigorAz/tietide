@@ -131,23 +131,51 @@ import { OpenaiClientFactory } from '../nodes/connectors/openai/openai-client.fa
 import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-chat-completion';
 import { OllamaClientFactory } from '../nodes/connectors/ollama/ollama-client.factory';
 import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
+import { OpenaiEmbeddingsAction } from '../nodes/connectors/openai/openai-embeddings';
+import { OpenaiGenerateImageAction } from '../nodes/connectors/openai/openai-generate-image';
+import { AnthropicVisionAction } from '../nodes/connectors/anthropic/anthropic-vision';
+import { OllamaEmbeddingsAction } from '../nodes/connectors/ollama/ollama-embeddings';
 import { HubspotClientFactory } from '../nodes/connectors/hubspot/hubspot-client.factory';
 import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-create-contact';
 import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
+import { HubspotFindContactAction } from '../nodes/connectors/hubspot/hubspot-find-contact';
+import { HubspotGetContactAction } from '../nodes/connectors/hubspot/hubspot-get-contact';
+import { HubspotUpdateContactAction } from '../nodes/connectors/hubspot/hubspot-update-contact';
+import { HubspotUpdateDealAction } from '../nodes/connectors/hubspot/hubspot-update-deal';
+import { HubspotCreateCompanyAction } from '../nodes/connectors/hubspot/hubspot-create-company';
+import { HubspotCreateNoteAction } from '../nodes/connectors/hubspot/hubspot-create-note';
 import { StripeClientFactory } from '../nodes/connectors/stripe/stripe-client.factory';
 import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
 import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
+import { StripeGetCustomerAction } from '../nodes/connectors/stripe/stripe-get-customer';
+import { StripeFindCustomerAction } from '../nodes/connectors/stripe/stripe-find-customer';
+import { StripeCreatePaymentIntentAction } from '../nodes/connectors/stripe/stripe-create-payment-intent';
+import { StripeCreateRefundAction } from '../nodes/connectors/stripe/stripe-create-refund';
+import { StripeListInvoicesAction } from '../nodes/connectors/stripe/stripe-list-invoices';
+import { StripeCreateSubscriptionAction } from '../nodes/connectors/stripe/stripe-create-subscription';
 import { MailchimpClientFactory } from '../nodes/connectors/mailchimp/mailchimp-client.factory';
 import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
 import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
+import { MailchimpGetSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-get-subscriber';
+import { MailchimpUpdateSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-update-subscriber';
+import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailchimp-unsubscribe';
+import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
+import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
 import { CalendlyClientFactory } from '../nodes/connectors/calendly/calendly-client.factory';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
+import { CalendlyGetEventAction } from '../nodes/connectors/calendly/calendly-get-event';
+import { CalendlyCancelEventAction } from '../nodes/connectors/calendly/calendly-cancel-event';
+import { CalendlyListInviteesAction } from '../nodes/connectors/calendly/calendly-list-invitees';
 import { PostgresClientFactory } from '../nodes/connectors/postgres/postgres-client.factory';
 import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
 import { MysqlClientFactory } from '../nodes/connectors/mysql/mysql-client.factory';
 import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
 import { S3ClientFactory } from '../nodes/connectors/s3/s3-client.factory';
 import { S3UploadFileAction } from '../nodes/connectors/s3/s3-upload-file';
+import { S3DownloadFileAction } from '../nodes/connectors/s3/s3-download-file';
+import { S3ListObjectsAction } from '../nodes/connectors/s3/s3-list-objects';
+import { S3DeleteObjectAction } from '../nodes/connectors/s3/s3-delete-object';
+import { S3GetPresignedUrlAction } from '../nodes/connectors/s3/s3-get-presigned-url';
 import { TrelloAddCommentAction } from '../nodes/connectors/trello/trello-add-comment';
 import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update-card';
 import {
@@ -172,6 +200,8 @@ import {
   TrelloCardChangedPassthrough,
   GithubIssueOpenedPassthrough,
   GithubPrOpenedPassthrough,
+  StripeInvoicePaidPassthrough,
+  HubspotDealChangedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -181,6 +211,7 @@ import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-re
 import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
+import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -311,23 +342,54 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     OpenaiChatCompletionAction,
     OllamaClientFactory,
     OllamaGenerateAction,
+    OpenaiEmbeddingsAction,
+    OpenaiGenerateImageAction,
+    AnthropicVisionAction,
+    OllamaEmbeddingsAction,
+    StripeInvoicePaidPassthrough,
+    HubspotDealChangedPassthrough,
+    S3ObjectCreatedTrigger,
     HubspotClientFactory,
     HubspotCreateContactAction,
     HubspotCreateDealAction,
+    HubspotFindContactAction,
+    HubspotGetContactAction,
+    HubspotUpdateContactAction,
+    HubspotUpdateDealAction,
+    HubspotCreateCompanyAction,
+    HubspotCreateNoteAction,
     StripeClientFactory,
     StripeCreateCustomerAction,
     StripeListChargesAction,
+    StripeGetCustomerAction,
+    StripeFindCustomerAction,
+    StripeCreatePaymentIntentAction,
+    StripeCreateRefundAction,
+    StripeListInvoicesAction,
+    StripeCreateSubscriptionAction,
     MailchimpClientFactory,
     MailchimpAddSubscriberAction,
     MailchimpSendCampaignAction,
+    MailchimpGetSubscriberAction,
+    MailchimpUpdateSubscriberAction,
+    MailchimpUnsubscribeAction,
+    MailchimpAddTagAction,
+    MailchimpListCampaignsAction,
     CalendlyClientFactory,
     CalendlyListEventsAction,
+    CalendlyGetEventAction,
+    CalendlyCancelEventAction,
+    CalendlyListInviteesAction,
     PostgresClientFactory,
     PostgresRunQueryAction,
     MysqlClientFactory,
     MysqlRunQueryAction,
     S3ClientFactory,
     S3UploadFileAction,
+    S3DownloadFileAction,
+    S3ListObjectsAction,
+    S3DeleteObjectAction,
+    S3GetPresignedUrlAction,
     TrelloAddCommentAction,
     TrelloUpdateCardAction,
     StripeEventReceivedPassthrough,
@@ -507,6 +569,37 @@ export class EngineModule implements OnModuleInit {
     private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
     private readonly githubIssueOpened: GithubIssueOpenedPassthrough,
     private readonly githubPrOpened: GithubPrOpenedPassthrough,
+    private readonly stripeGetCustomer: StripeGetCustomerAction,
+    private readonly stripeFindCustomer: StripeFindCustomerAction,
+    private readonly stripeCreatePaymentIntent: StripeCreatePaymentIntentAction,
+    private readonly stripeCreateRefund: StripeCreateRefundAction,
+    private readonly stripeListInvoices: StripeListInvoicesAction,
+    private readonly stripeCreateSubscription: StripeCreateSubscriptionAction,
+    private readonly hubspotFindContact: HubspotFindContactAction,
+    private readonly hubspotGetContact: HubspotGetContactAction,
+    private readonly hubspotUpdateContact: HubspotUpdateContactAction,
+    private readonly hubspotUpdateDeal: HubspotUpdateDealAction,
+    private readonly hubspotCreateCompany: HubspotCreateCompanyAction,
+    private readonly hubspotCreateNote: HubspotCreateNoteAction,
+    private readonly mailchimpGetSubscriber: MailchimpGetSubscriberAction,
+    private readonly mailchimpUpdateSubscriber: MailchimpUpdateSubscriberAction,
+    private readonly mailchimpUnsubscribe: MailchimpUnsubscribeAction,
+    private readonly mailchimpAddTag: MailchimpAddTagAction,
+    private readonly mailchimpListCampaigns: MailchimpListCampaignsAction,
+    private readonly calendlyGetEvent: CalendlyGetEventAction,
+    private readonly calendlyCancelEvent: CalendlyCancelEventAction,
+    private readonly calendlyListInvitees: CalendlyListInviteesAction,
+    private readonly s3DownloadFile: S3DownloadFileAction,
+    private readonly s3ListObjects: S3ListObjectsAction,
+    private readonly s3DeleteObject: S3DeleteObjectAction,
+    private readonly s3GetPresignedUrl: S3GetPresignedUrlAction,
+    private readonly openaiEmbeddings: OpenaiEmbeddingsAction,
+    private readonly openaiGenerateImage: OpenaiGenerateImageAction,
+    private readonly anthropicVision: AnthropicVisionAction,
+    private readonly ollamaEmbeddings: OllamaEmbeddingsAction,
+    private readonly stripeInvoicePaid: StripeInvoicePaidPassthrough,
+    private readonly hubspotDealChanged: HubspotDealChangedPassthrough,
+    private readonly s3ObjectCreated: S3ObjectCreatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -654,5 +747,36 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.linearIssueUpdated);
     this.registry.register(this.githubIssueOpened);
     this.registry.register(this.githubPrOpened);
+    this.registry.register(this.stripeGetCustomer);
+    this.registry.register(this.stripeFindCustomer);
+    this.registry.register(this.stripeCreatePaymentIntent);
+    this.registry.register(this.stripeCreateRefund);
+    this.registry.register(this.stripeListInvoices);
+    this.registry.register(this.stripeCreateSubscription);
+    this.registry.register(this.hubspotFindContact);
+    this.registry.register(this.hubspotGetContact);
+    this.registry.register(this.hubspotUpdateContact);
+    this.registry.register(this.hubspotUpdateDeal);
+    this.registry.register(this.hubspotCreateCompany);
+    this.registry.register(this.hubspotCreateNote);
+    this.registry.register(this.mailchimpGetSubscriber);
+    this.registry.register(this.mailchimpUpdateSubscriber);
+    this.registry.register(this.mailchimpUnsubscribe);
+    this.registry.register(this.mailchimpAddTag);
+    this.registry.register(this.mailchimpListCampaigns);
+    this.registry.register(this.calendlyGetEvent);
+    this.registry.register(this.calendlyCancelEvent);
+    this.registry.register(this.calendlyListInvitees);
+    this.registry.register(this.s3DownloadFile);
+    this.registry.register(this.s3ListObjects);
+    this.registry.register(this.s3DeleteObject);
+    this.registry.register(this.s3GetPresignedUrl);
+    this.registry.register(this.openaiEmbeddings);
+    this.registry.register(this.openaiGenerateImage);
+    this.registry.register(this.anthropicVision);
+    this.registry.register(this.ollamaEmbeddings);
+    this.registry.register(this.stripeInvoicePaid);
+    this.registry.register(this.hubspotDealChanged);
+    this.registry.register(this.s3ObjectCreated);
   }
 }

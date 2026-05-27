@@ -14,3 +14,15 @@ export const ollamaGenerateConfigSchema = z.object({
 });
 
 export type OllamaGenerateConfig = z.infer<typeof ollamaGenerateConfigSchema>;
+
+// --- S15 commerce/data/storage read/update pack (#246): AI enrichment ---
+
+// Ollama embeddings (/api/embeddings). `model` falls back to the connection's
+// default when omitted, mirroring ollama-generate.
+export const ollamaEmbeddingsConfigSchema = z.object({
+  connectionId,
+  model: z.string().min(1).max(128).optional(),
+  prompt: promptText,
+  mockOnDryRun: z.boolean().optional(),
+});
+export type OllamaEmbeddingsConfig = z.infer<typeof ollamaEmbeddingsConfigSchema>;

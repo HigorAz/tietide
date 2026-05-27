@@ -322,6 +322,7 @@ const PREFIX_TO_APP: ReadonlyArray<readonly [string, AppId]> = [
   ['linear-', 'linear'],
   ['github-', 'github'],
   ['claude-', 'anthropic'],
+  ['anthropic-', 'anthropic'],
   ['openai-', 'openai'],
   ['ollama-', 'ollama'],
   ['hubspot-', 'hubspot'],

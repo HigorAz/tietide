@@ -128,22 +128,53 @@ import { GitHubMergePrForm } from './github/GitHubMergePrForm';
 import { GitHubIssueOpenedForm } from './github/GitHubIssueOpenedForm';
 import { GitHubPrOpenedForm } from './github/GitHubPrOpenedForm';
 import { ClaudeMessagesForm } from './anthropic/ClaudeMessagesForm';
+import { ClaudeVisionForm } from './anthropic/ClaudeVisionForm';
 import { OpenAIChatCompletionForm } from './openai/OpenAIChatCompletionForm';
+import { OpenAIEmbeddingsForm } from './openai/OpenAIEmbeddingsForm';
+import { OpenAIGenerateImageForm } from './openai/OpenAIGenerateImageForm';
 import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
+import { OllamaEmbeddingsForm } from './ollama/OllamaEmbeddingsForm';
 import { HubspotCreateContactForm } from './hubspot/HubspotCreateContactForm';
 import { HubspotCreateDealForm } from './hubspot/HubspotCreateDealForm';
 import { HubspotContactChangedForm } from './hubspot/HubspotContactChangedForm';
+import { HubspotFindContactForm } from './hubspot/HubspotFindContactForm';
+import { HubspotGetContactForm } from './hubspot/HubspotGetContactForm';
+import { HubspotUpdateContactForm } from './hubspot/HubspotUpdateContactForm';
+import { HubspotUpdateDealForm } from './hubspot/HubspotUpdateDealForm';
+import { HubspotCreateCompanyForm } from './hubspot/HubspotCreateCompanyForm';
+import { HubspotCreateNoteForm } from './hubspot/HubspotCreateNoteForm';
 import { StripeCreateCustomerForm } from './stripe/StripeCreateCustomerForm';
 import { StripeListChargesForm } from './stripe/StripeListChargesForm';
 import { StripeEventReceivedForm } from './stripe/StripeEventReceivedForm';
+import { StripeGetCustomerForm } from './stripe/StripeGetCustomerForm';
+import { StripeFindCustomerForm } from './stripe/StripeFindCustomerForm';
+import { StripeCreatePaymentIntentForm } from './stripe/StripeCreatePaymentIntentForm';
+import { StripeCreateRefundForm } from './stripe/StripeCreateRefundForm';
+import { StripeListInvoicesForm } from './stripe/StripeListInvoicesForm';
+import { StripeCreateSubscriptionForm } from './stripe/StripeCreateSubscriptionForm';
 import { MailchimpAddSubscriberForm } from './mailchimp/MailchimpAddSubscriberForm';
 import { MailchimpSendCampaignForm } from './mailchimp/MailchimpSendCampaignForm';
 import { MailchimpSubscriberAddedForm } from './mailchimp/MailchimpSubscriberAddedForm';
+import { MailchimpGetSubscriberForm } from './mailchimp/MailchimpGetSubscriberForm';
+import { MailchimpUpdateSubscriberForm } from './mailchimp/MailchimpUpdateSubscriberForm';
+import { MailchimpUnsubscribeForm } from './mailchimp/MailchimpUnsubscribeForm';
+import { MailchimpAddTagForm } from './mailchimp/MailchimpAddTagForm';
+import { MailchimpListCampaignsForm } from './mailchimp/MailchimpListCampaignsForm';
 import { CalendlyListEventsForm } from './calendly/CalendlyListEventsForm';
 import { CalendlyEventScheduledForm } from './calendly/CalendlyEventScheduledForm';
+import { CalendlyGetEventForm } from './calendly/CalendlyGetEventForm';
+import { CalendlyCancelEventForm } from './calendly/CalendlyCancelEventForm';
+import { CalendlyListInviteesForm } from './calendly/CalendlyListInviteesForm';
 import { PostgresRunQueryForm } from './postgres/PostgresRunQueryForm';
 import { MysqlRunQueryForm } from './mysql/MysqlRunQueryForm';
 import { S3UploadFileForm } from './s3/S3UploadFileForm';
+import { S3DownloadFileForm } from './s3/S3DownloadFileForm';
+import { S3ListObjectsForm } from './s3/S3ListObjectsForm';
+import { S3DeleteObjectForm } from './s3/S3DeleteObjectForm';
+import { S3GetPresignedUrlForm } from './s3/S3GetPresignedUrlForm';
+import { S3ObjectCreatedForm } from './s3/S3ObjectCreatedForm';
+import { StripeInvoicePaidForm } from './stripe/StripeInvoicePaidForm';
+import { HubspotDealChangedForm } from './hubspot/HubspotDealChangedForm';
 import { TrelloAddCommentForm } from './trello/TrelloAddCommentForm';
 import { TrelloUpdateCardForm } from './trello/TrelloUpdateCardForm';
 import { TrelloCardChangedForm } from './trello/TrelloCardChangedForm';
@@ -282,23 +313,54 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.GITHUB_ISSUE_OPENED]: GitHubIssueOpenedForm,
   [NodeType.GITHUB_PR_OPENED]: GitHubPrOpenedForm,
   [NodeType.CLAUDE_MESSAGES]: ClaudeMessagesForm,
+  [NodeType.ANTHROPIC_VISION]: ClaudeVisionForm,
   [NodeType.OPENAI_CHAT_COMPLETION]: OpenAIChatCompletionForm,
+  [NodeType.OPENAI_EMBEDDINGS]: OpenAIEmbeddingsForm,
+  [NodeType.OPENAI_GENERATE_IMAGE]: OpenAIGenerateImageForm,
   [NodeType.OLLAMA_GENERATE]: OllamaGenerateForm,
+  [NodeType.OLLAMA_EMBEDDINGS]: OllamaEmbeddingsForm,
   [NodeType.HUBSPOT_CREATE_CONTACT]: HubspotCreateContactForm,
   [NodeType.HUBSPOT_CREATE_DEAL]: HubspotCreateDealForm,
   [NodeType.HUBSPOT_CONTACT_CHANGED]: HubspotContactChangedForm,
+  [NodeType.HUBSPOT_FIND_CONTACT]: HubspotFindContactForm,
+  [NodeType.HUBSPOT_GET_CONTACT]: HubspotGetContactForm,
+  [NodeType.HUBSPOT_UPDATE_CONTACT]: HubspotUpdateContactForm,
+  [NodeType.HUBSPOT_UPDATE_DEAL]: HubspotUpdateDealForm,
+  [NodeType.HUBSPOT_CREATE_COMPANY]: HubspotCreateCompanyForm,
+  [NodeType.HUBSPOT_CREATE_NOTE]: HubspotCreateNoteForm,
   [NodeType.STRIPE_CREATE_CUSTOMER]: StripeCreateCustomerForm,
   [NodeType.STRIPE_LIST_CHARGES]: StripeListChargesForm,
   [NodeType.STRIPE_EVENT_RECEIVED]: StripeEventReceivedForm,
+  [NodeType.STRIPE_GET_CUSTOMER]: StripeGetCustomerForm,
+  [NodeType.STRIPE_FIND_CUSTOMER]: StripeFindCustomerForm,
+  [NodeType.STRIPE_CREATE_PAYMENT_INTENT]: StripeCreatePaymentIntentForm,
+  [NodeType.STRIPE_CREATE_REFUND]: StripeCreateRefundForm,
+  [NodeType.STRIPE_LIST_INVOICES]: StripeListInvoicesForm,
+  [NodeType.STRIPE_CREATE_SUBSCRIPTION]: StripeCreateSubscriptionForm,
   [NodeType.MAILCHIMP_ADD_SUBSCRIBER]: MailchimpAddSubscriberForm,
   [NodeType.MAILCHIMP_SEND_CAMPAIGN]: MailchimpSendCampaignForm,
   [NodeType.MAILCHIMP_SUBSCRIBER_ADDED]: MailchimpSubscriberAddedForm,
+  [NodeType.MAILCHIMP_GET_SUBSCRIBER]: MailchimpGetSubscriberForm,
+  [NodeType.MAILCHIMP_UPDATE_SUBSCRIBER]: MailchimpUpdateSubscriberForm,
+  [NodeType.MAILCHIMP_UNSUBSCRIBE]: MailchimpUnsubscribeForm,
+  [NodeType.MAILCHIMP_ADD_TAG]: MailchimpAddTagForm,
+  [NodeType.MAILCHIMP_LIST_CAMPAIGNS]: MailchimpListCampaignsForm,
   [NodeType.CALENDLY_LIST_EVENTS]: CalendlyListEventsForm,
   [NodeType.CALENDLY_EVENT_SCHEDULED]: CalendlyEventScheduledForm,
+  [NodeType.CALENDLY_GET_EVENT]: CalendlyGetEventForm,
+  [NodeType.CALENDLY_CANCEL_EVENT]: CalendlyCancelEventForm,
+  [NodeType.CALENDLY_LIST_INVITEES]: CalendlyListInviteesForm,
   [NodeType.POSTGRES_RUN_QUERY]: PostgresRunQueryForm,
   [NodeType.MYSQL_RUN_QUERY]: MysqlRunQueryForm,
   [NodeType.S3_UPLOAD_FILE]: S3UploadFileForm,
+  [NodeType.S3_DOWNLOAD_FILE]: S3DownloadFileForm,
+  [NodeType.S3_LIST_OBJECTS]: S3ListObjectsForm,
+  [NodeType.S3_DELETE_OBJECT]: S3DeleteObjectForm,
+  [NodeType.S3_GET_PRESIGNED_URL]: S3GetPresignedUrlForm,
   [NodeType.TRELLO_ADD_COMMENT]: TrelloAddCommentForm,
   [NodeType.TRELLO_UPDATE_CARD]: TrelloUpdateCardForm,
   [NodeType.TRELLO_CARD_CHANGED]: TrelloCardChangedForm,
+  [NodeType.STRIPE_INVOICE_PAID]: StripeInvoicePaidForm,
+  [NodeType.HUBSPOT_DEAL_CHANGED]: HubspotDealChangedForm,
+  [NodeType.S3_OBJECT_CREATED]: S3ObjectCreatedForm,
 };
