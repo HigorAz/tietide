@@ -60,6 +60,37 @@ export class TelegramClientFactory {
       body,
     });
 
+    return this.finish<T>(res);
+  }
+
+  // Multipart variant for base64 uploads (sendPhoto/sendDocument). `fields` are
+  // string form fields (chat_id, caption, parse_mode); `file` is the binary part.
+  async callMultipart<T = Record<string, unknown>>(
+    connection: DecryptedConnection<TelegramBotTokenConfig>,
+    method: string,
+    fields: Record<string, string>,
+    file: { field: string; filename: string; content: Buffer; contentType?: string },
+  ): Promise<TelegramResponse<T>> {
+    const url = this.endpoint(connection, method);
+    const form = new FormData();
+    for (const [k, v] of Object.entries(fields)) {
+      form.append(k, v);
+    }
+    const blob = new Blob([new Uint8Array(file.content)], {
+      type: file.contentType ?? 'application/octet-stream',
+    });
+    form.append(file.field, blob, file.filename);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: form,
+    });
+
+    return this.finish<T>(res);
+  }
+
+  private async finish<T>(res: Response): Promise<TelegramResponse<T>> {
     let data: unknown = null;
     try {
       data = await res.json();

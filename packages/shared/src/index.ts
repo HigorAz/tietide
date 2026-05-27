@@ -336,11 +336,21 @@ export {
 } from './schemas/twilio.schema.js';
 export {
   telegramSendMessageConfigSchema,
+  telegramSendPhotoConfigSchema,
+  telegramSendDocumentConfigSchema,
+  telegramEditMessageConfigSchema,
+  telegramGetChatConfigSchema,
   telegramMessageReceivedConfigSchema,
   TELEGRAM_PARSE_MODES,
+  TELEGRAM_MEDIA_SOURCES,
   type TelegramSendMessageConfig,
+  type TelegramSendPhotoConfig,
+  type TelegramSendDocumentConfig,
+  type TelegramEditMessageConfig,
+  type TelegramGetChatConfig,
   type TelegramMessageReceivedConfig,
   type TelegramParseMode,
+  type TelegramMediaSource,
 } from './schemas/telegram.schema.js';
 export {
   notionCreatePageConfigSchema,

@@ -81,6 +81,7 @@ import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms'
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
 import { TelegramClientFactory } from '../nodes/connectors/telegram/telegram-client.factory';
 import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
+import { TelegramSendPhotoAction } from '../nodes/connectors/telegram/telegram-send-photo';
 import { NotionClientFactory } from '../nodes/connectors/notion/notion-client.factory';
 import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
 import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
@@ -246,6 +247,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     TwilioSendWhatsAppAction,
     TelegramClientFactory,
     TelegramSendMessageAction,
+    TelegramSendPhotoAction,
     NotionClientFactory,
     NotionCreatePageAction,
     NotionQueryDatabaseAction,
@@ -413,6 +415,7 @@ export class EngineModule implements OnModuleInit {
     private readonly twilioSendSms: TwilioSendSmsAction,
     private readonly twilioSendWhatsApp: TwilioSendWhatsAppAction,
     private readonly telegramSendMessage: TelegramSendMessageAction,
+    private readonly telegramSendPhoto: TelegramSendPhotoAction,
     private readonly slackMessageReceived: SlackMessageReceivedPassthrough,
     private readonly slackReactionAdded: SlackReactionAddedPassthrough,
     private readonly discordMessageReceived: DiscordMessageReceivedPassthrough,
@@ -550,6 +553,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.twilioSendSms);
     this.registry.register(this.twilioSendWhatsApp);
     this.registry.register(this.telegramSendMessage);
+    this.registry.register(this.telegramSendPhoto);
     this.registry.register(this.slackMessageReceived);
     this.registry.register(this.slackReactionAdded);
     this.registry.register(this.discordMessageReceived);
