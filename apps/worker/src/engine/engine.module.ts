@@ -81,6 +81,7 @@ import { NotionFindDatabaseItemAction } from '../nodes/connectors/notion/notion-
 import { TrelloClientFactory } from '../nodes/connectors/trello/trello-client.factory';
 import { TrelloCreateCardAction } from '../nodes/connectors/trello/trello-create-card';
 import { TrelloMoveCardAction } from '../nodes/connectors/trello/trello-move-card';
+import { TrelloGetCardAction } from '../nodes/connectors/trello/trello-get-card';
 import { AirtableClientFactory } from '../nodes/connectors/airtable/airtable-client.factory';
 import { AirtableCreateRecordAction } from '../nodes/connectors/airtable/airtable-create-record';
 import { AirtableUpdateRecordAction } from '../nodes/connectors/airtable/airtable-update-record';
@@ -212,6 +213,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     NotionAppendBlocksAction,
     NotionGetBlockChildrenAction,
     NotionFindDatabaseItemAction,
+    TrelloGetCardAction,
     TrelloClientFactory,
     TrelloCreateCardAction,
     TrelloMoveCardAction,
@@ -385,6 +387,7 @@ export class EngineModule implements OnModuleInit {
     private readonly notionAppendBlocks: NotionAppendBlocksAction,
     private readonly notionGetBlockChildren: NotionGetBlockChildrenAction,
     private readonly notionFindDatabaseItem: NotionFindDatabaseItemAction,
+    private readonly trelloGetCard: TrelloGetCardAction,
   ) {}
 
   onModuleInit(): void {
@@ -492,5 +495,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.notionAppendBlocks);
     this.registry.register(this.notionGetBlockChildren);
     this.registry.register(this.notionFindDatabaseItem);
+    this.registry.register(this.trelloGetCard);
   }
 }
