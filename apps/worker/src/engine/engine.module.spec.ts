@@ -122,6 +122,7 @@ import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs'
 import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr';
 import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
 import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-record-created';
+import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -260,6 +261,7 @@ describe('EngineModule', () => {
     const githubMergePr = new GitHubMergePrAction(undefined as never);
     const notionDbItemUpdated = new NotionDatabaseItemUpdatedTrigger(undefined as never);
     const airtableRecordCreated = new AirtableRecordCreatedTrigger(undefined as never);
+    const linearIssueUpdated = new LinearIssueUpdatedTrigger(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -383,6 +385,7 @@ describe('EngineModule', () => {
       githubMergePr,
       notionDbItemUpdated,
       airtableRecordCreated,
+      linearIssueUpdated,
     );
     return {
       registry,
@@ -628,7 +631,7 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated) = 24.
-      expect(counts.trigger).toBe(26);
+      expect(counts.trigger).toBe(27);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +

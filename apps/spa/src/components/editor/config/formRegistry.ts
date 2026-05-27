@@ -95,6 +95,7 @@ import { LinearUpdateIssueStatusForm } from './linear/LinearUpdateIssueStatusFor
 import { LinearGetIssueForm } from './linear/LinearGetIssueForm';
 import { LinearSearchIssuesForm } from './linear/LinearSearchIssuesForm';
 import { LinearAddCommentForm } from './linear/LinearAddCommentForm';
+import { LinearIssueUpdatedForm } from './linear/LinearIssueUpdatedForm';
 import { GitHubCreateIssueForm } from './github/GitHubCreateIssueForm';
 import { GitHubCommentIssueForm } from './github/GitHubCommentIssueForm';
 import { GitHubCreatePrForm } from './github/GitHubCreatePrForm';
@@ -226,6 +227,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.LINEAR_GET_ISSUE]: LinearGetIssueForm,
   [NodeType.LINEAR_SEARCH_ISSUES]: LinearSearchIssuesForm,
   [NodeType.LINEAR_ADD_COMMENT]: LinearAddCommentForm,
+  [NodeType.LINEAR_ISSUE_UPDATED]: LinearIssueUpdatedForm,
   [NodeType.GITHUB_CREATE_ISSUE]: GitHubCreateIssueForm,
   [NodeType.GITHUB_COMMENT_ISSUE]: GitHubCommentIssueForm,
   [NodeType.GITHUB_CREATE_PR]: GitHubCreatePrForm,

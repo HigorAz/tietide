@@ -43,6 +43,11 @@ import {
   AIRTABLE_RECORD_CREATED_TYPE,
 } from '../nodes/triggers/poll/airtable-record-created';
 import { AirtableClientFactory } from '../nodes/connectors/airtable/airtable-client.factory';
+import {
+  LinearIssueUpdatedTrigger,
+  LINEAR_ISSUE_UPDATED_TYPE,
+} from '../nodes/triggers/poll/linear-issue-updated';
+import { LinearClientFactory } from '../nodes/connectors/linear/linear-client.factory';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import { PollSchedulerService } from './poll-scheduler.service';
@@ -76,6 +81,8 @@ import { PollConnectionLoader } from './poll-connection-loader';
     NotionDatabaseItemUpdatedTrigger,
     AirtableClientFactory,
     AirtableRecordCreatedTrigger,
+    LinearClientFactory,
+    LinearIssueUpdatedTrigger,
   ],
   exports: [PollTriggerRegistry],
 })
@@ -91,6 +98,7 @@ export class PollModule implements OnModuleInit {
     private readonly excelRowUpdated: ExcelRowUpdatedTrigger,
     private readonly notionDbItemUpdated: NotionDatabaseItemUpdatedTrigger,
     private readonly airtableRecordCreated: AirtableRecordCreatedTrigger,
+    private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -103,5 +111,6 @@ export class PollModule implements OnModuleInit {
     this.registry.register(EXCEL_ROW_UPDATED_TYPE, this.excelRowUpdated);
     this.registry.register(NOTION_DATABASE_ITEM_UPDATED_TYPE, this.notionDbItemUpdated);
     this.registry.register(AIRTABLE_RECORD_CREATED_TYPE, this.airtableRecordCreated);
+    this.registry.register(LINEAR_ISSUE_UPDATED_TYPE, this.linearIssueUpdated);
   }
 }
