@@ -502,8 +502,17 @@ export {
 } from './schemas/mysql.schema.js';
 export {
   s3UploadFileConfigSchema,
+  s3DownloadFileConfigSchema,
+  s3ListObjectsConfigSchema,
+  s3DeleteObjectConfigSchema,
+  s3GetPresignedUrlConfigSchema,
   S3_STREAMING_THRESHOLD_BYTES,
+  S3_MAX_PRESIGN_EXPIRY_SECONDS,
   type S3UploadFileConfig,
+  type S3DownloadFileConfig,
+  type S3ListObjectsConfig,
+  type S3DeleteObjectConfig,
+  type S3GetPresignedUrlConfig,
 } from './schemas/s3.schema.js';
 export {
   airtableCreateRecordConfigSchema,

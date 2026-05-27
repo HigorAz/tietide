@@ -164,6 +164,10 @@ import { CalendlyListInviteesForm } from './calendly/CalendlyListInviteesForm';
 import { PostgresRunQueryForm } from './postgres/PostgresRunQueryForm';
 import { MysqlRunQueryForm } from './mysql/MysqlRunQueryForm';
 import { S3UploadFileForm } from './s3/S3UploadFileForm';
+import { S3DownloadFileForm } from './s3/S3DownloadFileForm';
+import { S3ListObjectsForm } from './s3/S3ListObjectsForm';
+import { S3DeleteObjectForm } from './s3/S3DeleteObjectForm';
+import { S3GetPresignedUrlForm } from './s3/S3GetPresignedUrlForm';
 import { TrelloAddCommentForm } from './trello/TrelloAddCommentForm';
 import { TrelloUpdateCardForm } from './trello/TrelloUpdateCardForm';
 import { TrelloCardChangedForm } from './trello/TrelloCardChangedForm';
@@ -338,6 +342,10 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.POSTGRES_RUN_QUERY]: PostgresRunQueryForm,
   [NodeType.MYSQL_RUN_QUERY]: MysqlRunQueryForm,
   [NodeType.S3_UPLOAD_FILE]: S3UploadFileForm,
+  [NodeType.S3_DOWNLOAD_FILE]: S3DownloadFileForm,
+  [NodeType.S3_LIST_OBJECTS]: S3ListObjectsForm,
+  [NodeType.S3_DELETE_OBJECT]: S3DeleteObjectForm,
+  [NodeType.S3_GET_PRESIGNED_URL]: S3GetPresignedUrlForm,
   [NodeType.TRELLO_ADD_COMMENT]: TrelloAddCommentForm,
   [NodeType.TRELLO_UPDATE_CARD]: TrelloUpdateCardForm,
   [NodeType.TRELLO_CARD_CHANGED]: TrelloCardChangedForm,

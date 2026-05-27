@@ -168,6 +168,10 @@ import { MysqlClientFactory } from '../nodes/connectors/mysql/mysql-client.facto
 import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
 import { S3ClientFactory } from '../nodes/connectors/s3/s3-client.factory';
 import { S3UploadFileAction } from '../nodes/connectors/s3/s3-upload-file';
+import { S3DownloadFileAction } from '../nodes/connectors/s3/s3-download-file';
+import { S3ListObjectsAction } from '../nodes/connectors/s3/s3-list-objects';
+import { S3DeleteObjectAction } from '../nodes/connectors/s3/s3-delete-object';
+import { S3GetPresignedUrlAction } from '../nodes/connectors/s3/s3-get-presigned-url';
 import { TrelloAddCommentAction } from '../nodes/connectors/trello/trello-add-comment';
 import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update-card';
 import {
@@ -368,6 +372,10 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     MysqlRunQueryAction,
     S3ClientFactory,
     S3UploadFileAction,
+    S3DownloadFileAction,
+    S3ListObjectsAction,
+    S3DeleteObjectAction,
+    S3GetPresignedUrlAction,
     TrelloAddCommentAction,
     TrelloUpdateCardAction,
     StripeEventReceivedPassthrough,
@@ -567,6 +575,10 @@ export class EngineModule implements OnModuleInit {
     private readonly calendlyGetEvent: CalendlyGetEventAction,
     private readonly calendlyCancelEvent: CalendlyCancelEventAction,
     private readonly calendlyListInvitees: CalendlyListInviteesAction,
+    private readonly s3DownloadFile: S3DownloadFileAction,
+    private readonly s3ListObjects: S3ListObjectsAction,
+    private readonly s3DeleteObject: S3DeleteObjectAction,
+    private readonly s3GetPresignedUrl: S3GetPresignedUrlAction,
   ) {}
 
   onModuleInit(): void {
@@ -734,5 +746,9 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.calendlyGetEvent);
     this.registry.register(this.calendlyCancelEvent);
     this.registry.register(this.calendlyListInvitees);
+    this.registry.register(this.s3DownloadFile);
+    this.registry.register(this.s3ListObjects);
+    this.registry.register(this.s3DeleteObject);
+    this.registry.register(this.s3GetPresignedUrl);
   }
 }

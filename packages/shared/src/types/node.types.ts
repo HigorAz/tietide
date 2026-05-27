@@ -178,6 +178,10 @@ export const NodeType = {
   CALENDLY_GET_EVENT: 'calendly-get-event',
   CALENDLY_CANCEL_EVENT: 'calendly-cancel-event',
   CALENDLY_LIST_INVITEES: 'calendly-list-invitees',
+  S3_DOWNLOAD_FILE: 's3-download-file',
+  S3_LIST_OBJECTS: 's3-list-objects',
+  S3_DELETE_OBJECT: 's3-delete-object',
+  S3_GET_PRESIGNED_URL: 's3-get-presigned-url',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -1589,5 +1593,37 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.PRODUCTIVITY,
     provider: 'calendly',
+  },
+  {
+    type: NodeType.S3_DOWNLOAD_FILE,
+    name: 'S3: Download File',
+    description: 'Download an object from S3 / R2 / MinIO (returns base64 content)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.DATA,
+    provider: 's3',
+  },
+  {
+    type: NodeType.S3_LIST_OBJECTS,
+    name: 'S3: List Objects',
+    description: 'List objects in an S3 bucket by prefix (paginated via continuation token)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.DATA,
+    provider: 's3',
+  },
+  {
+    type: NodeType.S3_DELETE_OBJECT,
+    name: 'S3: Delete Object',
+    description: 'Delete an object from an S3 bucket',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.DATA,
+    provider: 's3',
+  },
+  {
+    type: NodeType.S3_GET_PRESIGNED_URL,
+    name: 'S3: Get Presigned URL',
+    description: 'Generate a time-limited signed GET or PUT URL for an S3 object',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.DATA,
+    provider: 's3',
   },
 ];

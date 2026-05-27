@@ -112,6 +112,10 @@ import { CalendlyListInviteesAction } from '../nodes/connectors/calendly/calendl
 import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
 import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
 import { S3UploadFileAction } from '../nodes/connectors/s3/s3-upload-file';
+import { S3DownloadFileAction } from '../nodes/connectors/s3/s3-download-file';
+import { S3ListObjectsAction } from '../nodes/connectors/s3/s3-list-objects';
+import { S3DeleteObjectAction } from '../nodes/connectors/s3/s3-delete-object';
+import { S3GetPresignedUrlAction } from '../nodes/connectors/s3/s3-get-presigned-url';
 import { TrelloAddCommentAction } from '../nodes/connectors/trello/trello-add-comment';
 import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update-card';
 import {
@@ -346,6 +350,10 @@ describe('EngineModule', () => {
     const calendlyGetEvent = new CalendlyGetEventAction(undefined as never);
     const calendlyCancelEvent = new CalendlyCancelEventAction(undefined as never);
     const calendlyListInvitees = new CalendlyListInviteesAction(undefined as never);
+    const s3DownloadFile = new S3DownloadFileAction(undefined as never);
+    const s3ListObjects = new S3ListObjectsAction(undefined as never);
+    const s3DeleteObject = new S3DeleteObjectAction(undefined as never);
+    const s3GetPresignedUrl = new S3GetPresignedUrlAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -512,6 +520,10 @@ describe('EngineModule', () => {
       calendlyGetEvent,
       calendlyCancelEvent,
       calendlyListInvitees,
+      s3DownloadFile,
+      s3ListObjects,
+      s3DeleteObject,
+      s3GetPresignedUrl,
     );
     return {
       registry,
@@ -654,6 +666,10 @@ describe('EngineModule', () => {
       calendlyGetEvent,
       calendlyCancelEvent,
       calendlyListInvitees,
+      s3DownloadFile,
+      s3ListObjects,
+      s3DeleteObject,
+      s3GetPresignedUrl,
       module,
     };
   };
@@ -827,6 +843,10 @@ describe('EngineModule', () => {
       ['CalendlyGetEventAction', 'calendly-get-event', 'calendlyGetEvent'],
       ['CalendlyCancelEventAction', 'calendly-cancel-event', 'calendlyCancelEvent'],
       ['CalendlyListInviteesAction', 'calendly-list-invitees', 'calendlyListInvitees'],
+      ['S3DownloadFileAction', 's3-download-file', 's3DownloadFile'],
+      ['S3ListObjectsAction', 's3-list-objects', 's3ListObjects'],
+      ['S3DeleteObjectAction', 's3-delete-object', 's3DeleteObject'],
+      ['S3GetPresignedUrlAction', 's3-get-presigned-url', 's3GetPresignedUrl'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -864,8 +884,8 @@ describe('EngineModule', () => {
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
       // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
-      // Mailchimp ×5 + Calendly ×3.
-      expect(counts.action).toBe(128);
+      // Mailchimp ×5 + Calendly ×3 + S3 ×4.
+      expect(counts.action).toBe(132);
     });
   });
 });

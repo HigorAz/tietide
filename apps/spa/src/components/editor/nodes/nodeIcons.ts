@@ -217,6 +217,10 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.CALENDLY_GET_EVENT]: Calendar,
   [NodeType.CALENDLY_CANCEL_EVENT]: CalendarClock,
   [NodeType.CALENDLY_LIST_INVITEES]: Users,
+  [NodeType.S3_DOWNLOAD_FILE]: HardDrive,
+  [NodeType.S3_LIST_OBJECTS]: Database,
+  [NodeType.S3_DELETE_OBJECT]: HardDrive,
+  [NodeType.S3_GET_PRESIGNED_URL]: CloudUpload,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;
