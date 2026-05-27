@@ -56,6 +56,7 @@ import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-po
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
 import { DiscordBotSendMessageAction } from '../nodes/connectors/discord/discord-bot-send-message';
 import { DiscordGetChannelMessagesAction } from '../nodes/connectors/discord/discord-get-channel-messages';
+import { DiscordAddRoleAction } from '../nodes/connectors/discord/discord-add-role';
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
 import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
@@ -211,6 +212,7 @@ describe('EngineModule', () => {
     const discordReplyToCommand = new DiscordReplyToCommandAction();
     const discordBotSendMessage = new DiscordBotSendMessageAction(undefined as never);
     const discordGetChannelMessages = new DiscordGetChannelMessagesAction(undefined as never);
+    const discordAddRole = new DiscordAddRoleAction(undefined as never);
     const twilioSendSms = new TwilioSendSmsAction(undefined as never);
     const twilioSendWhatsApp = new TwilioSendWhatsAppAction(undefined as never);
     const telegramSendMessage = new TelegramSendMessageAction(undefined as never);
@@ -352,6 +354,7 @@ describe('EngineModule', () => {
       discordReplyToCommand,
       discordBotSendMessage,
       discordGetChannelMessages,
+      discordAddRole,
       twilioSendSms,
       twilioSendWhatsApp,
       telegramSendMessage,
@@ -488,6 +491,7 @@ describe('EngineModule', () => {
       discordReplyToCommand,
       discordBotSendMessage,
       discordGetChannelMessages,
+      discordAddRole,
       twilioSendSms,
       twilioSendWhatsApp,
       telegramSendMessage,
@@ -610,6 +614,7 @@ describe('EngineModule', () => {
         'discord-get-channel-messages',
         'discordGetChannelMessages',
       ],
+      ['DiscordAddRoleAction', 'discord-add-role', 'discordAddRole'],
       ['TwilioSendSmsAction', 'twilio-send-sms', 'twilioSendSms'],
       ['TwilioSendWhatsAppAction', 'twilio-send-whatsapp', 'twilioSendWhatsApp'],
       ['TelegramSendMessageAction', 'telegram-send-message', 'telegramSendMessage'],
@@ -690,13 +695,13 @@ describe('EngineModule', () => {
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
-      // 17 communication actions (slack ×10, discord ×4, twilio ×2, telegram) +
+      // 18 communication actions (slack ×10, discord ×5, twilio ×2, telegram) +
       // productivity actions (notion, trello, airtable, linear, github) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      expect(counts.action).toBe(100);
+      expect(counts.action).toBe(101);
     });
   });
 });

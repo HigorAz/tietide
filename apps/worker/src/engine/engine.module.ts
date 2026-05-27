@@ -75,6 +75,7 @@ import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord
 import { DiscordBotClientFactory } from '../nodes/connectors/discord/discord-bot-client.factory';
 import { DiscordBotSendMessageAction } from '../nodes/connectors/discord/discord-bot-send-message';
 import { DiscordGetChannelMessagesAction } from '../nodes/connectors/discord/discord-get-channel-messages';
+import { DiscordAddRoleAction } from '../nodes/connectors/discord/discord-add-role';
 import { TwilioClientFactory } from '../nodes/connectors/twilio/twilio-client.factory';
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
@@ -239,6 +240,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     DiscordBotClientFactory,
     DiscordBotSendMessageAction,
     DiscordGetChannelMessagesAction,
+    DiscordAddRoleAction,
     TwilioClientFactory,
     TwilioSendSmsAction,
     TwilioSendWhatsAppAction,
@@ -407,6 +409,7 @@ export class EngineModule implements OnModuleInit {
     private readonly discordReplyToCommand: DiscordReplyToCommandAction,
     private readonly discordBotSendMessage: DiscordBotSendMessageAction,
     private readonly discordGetChannelMessages: DiscordGetChannelMessagesAction,
+    private readonly discordAddRole: DiscordAddRoleAction,
     private readonly twilioSendSms: TwilioSendSmsAction,
     private readonly twilioSendWhatsApp: TwilioSendWhatsAppAction,
     private readonly telegramSendMessage: TelegramSendMessageAction,
@@ -543,6 +546,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.discordReplyToCommand);
     this.registry.register(this.discordBotSendMessage);
     this.registry.register(this.discordGetChannelMessages);
+    this.registry.register(this.discordAddRole);
     this.registry.register(this.twilioSendSms);
     this.registry.register(this.twilioSendWhatsApp);
     this.registry.register(this.telegramSendMessage);
