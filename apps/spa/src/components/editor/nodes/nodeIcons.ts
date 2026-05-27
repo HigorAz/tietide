@@ -60,6 +60,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.GMAIL_SEND]: Mail,
   [NodeType.GMAIL_SEARCH]: Mail,
   [NodeType.GMAIL_GET_MESSAGE]: Mail,
+  [NodeType.GMAIL_GET_ATTACHMENT]: Mail,
   [NodeType.DRIVE_CREATE]: HardDrive,
   [NodeType.DRIVE_LIST]: HardDrive,
   [NodeType.SHEETS_APPEND]: Sheet,

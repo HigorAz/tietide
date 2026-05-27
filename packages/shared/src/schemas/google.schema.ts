@@ -62,6 +62,20 @@ export const gmailGetMessageConfigSchema = z.object({
 });
 export type GmailGetMessageConfig = z.infer<typeof gmailGetMessageConfigSchema>;
 
+// Gmail attachment IDs are long base64url tokens, well beyond a normal message
+// ID. filename/mimeType are echoed from the caller (usually mapped from a
+// gmail-get-message attachments[] entry) since attachments.get returns only
+// the raw data + size.
+export const gmailGetAttachmentConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  messageId: z.string().min(1).max(128),
+  attachmentId: z.string().min(1).max(4096),
+  filename: z.string().max(255).optional(),
+  mimeType: z.string().max(255).optional(),
+  mockOnDryRun,
+});
+export type GmailGetAttachmentConfig = z.infer<typeof gmailGetAttachmentConfigSchema>;
+
 export const driveCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   name: z.string().min(1).max(255),
@@ -130,6 +144,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.GMAIL_SEND]: 'https://www.googleapis.com/auth/gmail.send',
   [NodeType.GMAIL_SEARCH]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_GET_MESSAGE]: 'https://www.googleapis.com/auth/gmail.readonly',
+  [NodeType.GMAIL_GET_ATTACHMENT]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.DRIVE_CREATE]: 'https://www.googleapis.com/auth/drive.file',
   [NodeType.DRIVE_LIST]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_APPEND]: 'https://www.googleapis.com/auth/spreadsheets',

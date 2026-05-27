@@ -11,6 +11,7 @@ import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
 import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
 import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
 import { GmailGetMessageAction } from '../nodes/connectors/google/gmail-get-message';
+import { GmailGetAttachmentAction } from '../nodes/connectors/google/gmail-get-attachment';
 import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
 import { DriveListAction } from '../nodes/connectors/google/drive-list';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
@@ -95,6 +96,7 @@ describe('EngineModule', () => {
     const gmailSend = new GmailSendAction(undefined as never, undefined as never);
     const gmailSearch = new GmailSearchAction(undefined as never, undefined as never);
     const gmailGetMessage = new GmailGetMessageAction(undefined as never, undefined as never);
+    const gmailGetAttachment = new GmailGetAttachmentAction(undefined as never, undefined as never);
     const driveCreate = new DriveCreateAction(undefined as never, undefined as never);
     const driveList = new DriveListAction(undefined as never, undefined as never);
     const sheetsAppend = new SheetsAppendAction(undefined as never, undefined as never);
@@ -174,6 +176,7 @@ describe('EngineModule', () => {
       gmailSend,
       gmailSearch,
       gmailGetMessage,
+      gmailGetAttachment,
       driveCreate,
       driveList,
       sheetsAppend,
@@ -251,6 +254,7 @@ describe('EngineModule', () => {
       gmailSend,
       gmailSearch,
       gmailGetMessage,
+      gmailGetAttachment,
       driveCreate,
       driveList,
       sheetsAppend,
@@ -331,6 +335,7 @@ describe('EngineModule', () => {
       ['GmailSendAction', 'gmail-send', 'gmailSend'],
       ['GmailSearchAction', 'gmail-search', 'gmailSearch'],
       ['GmailGetMessageAction', 'gmail-get-message', 'gmailGetMessage'],
+      ['GmailGetAttachmentAction', 'gmail-get-attachment', 'gmailGetAttachment'],
       ['DriveCreateAction', 'drive-create', 'driveCreate'],
       ['DriveListAction', 'drive-list', 'driveList'],
       ['SheetsAppendAction', 'sheets-append', 'sheetsAppend'],
@@ -426,15 +431,15 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
       expect(counts.trigger).toBe(19);
       expect(counts.logic).toBe(4);
-      // 2 generic actions (http-request, code) + 9 Google connector actions +
+      // 2 generic actions (http-request, code) + 10 Google connector actions +
       // 5 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 51.
-      expect(counts.action).toBe(51);
+      //   calendly, postgres, mysql, s3, trello ×2) = 52.
+      expect(counts.action).toBe(52);
     });
   });
 });
