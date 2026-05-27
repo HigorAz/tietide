@@ -5,7 +5,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
 import { cn } from '@/utils/cn';
 import { BottomSheet } from './BottomSheet';
 import { FORM_REGISTRY } from './config/formRegistry';
-import { getNodeIcon } from './nodes/nodeIcons';
+import { NodeGlyph } from './NodeGlyph';
 import { NodePreviewPanel } from './preview/NodePreviewPanel';
 import { NodeRunInspection } from './NodeRunInspection';
 
@@ -52,7 +52,6 @@ export function NodeConfigPanel() {
   }
 
   const { data } = selectedNode;
-  const Icon = getNodeIcon(data.nodeType);
   const catalogEntry = NODE_CATALOG.find((d) => d.type === data.nodeType);
   const Form = FORM_REGISTRY[data.nodeType];
   const config = data.config ?? {};
@@ -123,7 +122,7 @@ export function NodeConfigPanel() {
       <header className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="mt-1 text-accent-teal">
-            <Icon size={18} strokeWidth={2} aria-hidden />
+            <NodeGlyph type={data.nodeType} size={18} />
           </span>
           <div className="min-w-0">
             <h2 className="truncate text-sm font-semibold text-text-primary">{data.label}</h2>
