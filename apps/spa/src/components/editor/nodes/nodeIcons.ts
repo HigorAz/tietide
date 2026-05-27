@@ -112,6 +112,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.SLACK_SEARCH_MESSAGES]: Search,
   [NodeType.SLACK_ADD_REACTION]: Smile,
   [NodeType.SLACK_CREATE_CHANNEL]: Hash,
+  [NodeType.SLACK_INVITE_TO_CHANNEL]: UserPlus,
   [NodeType.DISCORD_POST_WEBHOOK]: MessageSquare,
   [NodeType.DISCORD_REPLY_TO_COMMAND]: MessageSquare,
   [NodeType.TWILIO_SEND_SMS]: Phone,

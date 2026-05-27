@@ -67,6 +67,7 @@ import { SlackFindUserAction } from '../nodes/connectors/slack/slack-find-user';
 import { SlackSearchMessagesAction } from '../nodes/connectors/slack/slack-search-messages';
 import { SlackAddReactionAction } from '../nodes/connectors/slack/slack-add-reaction';
 import { SlackCreateChannelAction } from '../nodes/connectors/slack/slack-create-channel';
+import { SlackInviteToChannelAction } from '../nodes/connectors/slack/slack-invite-to-channel';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
 import { TwilioClientFactory } from '../nodes/connectors/twilio/twilio-client.factory';
@@ -225,6 +226,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     SlackSearchMessagesAction,
     SlackAddReactionAction,
     SlackCreateChannelAction,
+    SlackInviteToChannelAction,
     DiscordPostWebhookAction,
     DiscordReplyToCommandAction,
     TwilioClientFactory,
@@ -388,6 +390,7 @@ export class EngineModule implements OnModuleInit {
     private readonly slackSearchMessages: SlackSearchMessagesAction,
     private readonly slackAddReaction: SlackAddReactionAction,
     private readonly slackCreateChannel: SlackCreateChannelAction,
+    private readonly slackInviteToChannel: SlackInviteToChannelAction,
     private readonly discordPostWebhook: DiscordPostWebhookAction,
     private readonly discordReplyToCommand: DiscordReplyToCommandAction,
     private readonly twilioSendSms: TwilioSendSmsAction,
@@ -519,6 +522,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.slackSearchMessages);
     this.registry.register(this.slackAddReaction);
     this.registry.register(this.slackCreateChannel);
+    this.registry.register(this.slackInviteToChannel);
     this.registry.register(this.discordPostWebhook);
     this.registry.register(this.discordReplyToCommand);
     this.registry.register(this.twilioSendSms);
