@@ -136,6 +136,12 @@ import { HubspotContactChangedForm } from './hubspot/HubspotContactChangedForm';
 import { StripeCreateCustomerForm } from './stripe/StripeCreateCustomerForm';
 import { StripeListChargesForm } from './stripe/StripeListChargesForm';
 import { StripeEventReceivedForm } from './stripe/StripeEventReceivedForm';
+import { StripeGetCustomerForm } from './stripe/StripeGetCustomerForm';
+import { StripeFindCustomerForm } from './stripe/StripeFindCustomerForm';
+import { StripeCreatePaymentIntentForm } from './stripe/StripeCreatePaymentIntentForm';
+import { StripeCreateRefundForm } from './stripe/StripeCreateRefundForm';
+import { StripeListInvoicesForm } from './stripe/StripeListInvoicesForm';
+import { StripeCreateSubscriptionForm } from './stripe/StripeCreateSubscriptionForm';
 import { MailchimpAddSubscriberForm } from './mailchimp/MailchimpAddSubscriberForm';
 import { MailchimpSendCampaignForm } from './mailchimp/MailchimpSendCampaignForm';
 import { MailchimpSubscriberAddedForm } from './mailchimp/MailchimpSubscriberAddedForm';
@@ -290,6 +296,12 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.STRIPE_CREATE_CUSTOMER]: StripeCreateCustomerForm,
   [NodeType.STRIPE_LIST_CHARGES]: StripeListChargesForm,
   [NodeType.STRIPE_EVENT_RECEIVED]: StripeEventReceivedForm,
+  [NodeType.STRIPE_GET_CUSTOMER]: StripeGetCustomerForm,
+  [NodeType.STRIPE_FIND_CUSTOMER]: StripeFindCustomerForm,
+  [NodeType.STRIPE_CREATE_PAYMENT_INTENT]: StripeCreatePaymentIntentForm,
+  [NodeType.STRIPE_CREATE_REFUND]: StripeCreateRefundForm,
+  [NodeType.STRIPE_LIST_INVOICES]: StripeListInvoicesForm,
+  [NodeType.STRIPE_CREATE_SUBSCRIPTION]: StripeCreateSubscriptionForm,
   [NodeType.MAILCHIMP_ADD_SUBSCRIBER]: MailchimpAddSubscriberForm,
   [NodeType.MAILCHIMP_SEND_CAMPAIGN]: MailchimpSendCampaignForm,
   [NodeType.MAILCHIMP_SUBSCRIBER_ADDED]: MailchimpSubscriberAddedForm,

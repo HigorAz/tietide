@@ -157,6 +157,13 @@ export const NodeType = {
   LINEAR_ISSUE_UPDATED: 'linear-issue-updated',
   GITHUB_ISSUE_OPENED: 'github-issue-opened',
   GITHUB_PR_OPENED: 'github-pr-opened',
+  // S15 — commerce, data & storage read/update pack (#246)
+  STRIPE_GET_CUSTOMER: 'stripe-get-customer',
+  STRIPE_FIND_CUSTOMER: 'stripe-find-customer',
+  STRIPE_CREATE_PAYMENT_INTENT: 'stripe-create-payment-intent',
+  STRIPE_CREATE_REFUND: 'stripe-create-refund',
+  STRIPE_LIST_INVOICES: 'stripe-list-invoices',
+  STRIPE_CREATE_SUBSCRIPTION: 'stripe-create-subscription',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -1407,5 +1414,54 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.TRIGGER,
     group: NodeGroup.PRODUCTIVITY_TRIGGERS,
     provider: 'github',
+  },
+  // S15 — commerce, data & storage read/update pack (#246)
+  {
+    type: NodeType.STRIPE_GET_CUSTOMER,
+    name: 'Stripe: Get Customer',
+    description: 'Fetch a Stripe customer by ID',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'stripe',
+  },
+  {
+    type: NodeType.STRIPE_FIND_CUSTOMER,
+    name: 'Stripe: Find Customer',
+    description: 'Find a Stripe customer by email address (search API)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'stripe',
+  },
+  {
+    type: NodeType.STRIPE_CREATE_PAYMENT_INTENT,
+    name: 'Stripe: Create Payment Intent',
+    description: 'Create a Stripe PaymentIntent for a given amount and currency',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'stripe',
+  },
+  {
+    type: NodeType.STRIPE_CREATE_REFUND,
+    name: 'Stripe: Create Refund',
+    description: 'Refund a Stripe payment intent or charge (full or partial)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'stripe',
+  },
+  {
+    type: NodeType.STRIPE_LIST_INVOICES,
+    name: 'Stripe: List Invoices',
+    description: 'List Stripe invoices, optionally filtered by customer or status',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'stripe',
+  },
+  {
+    type: NodeType.STRIPE_CREATE_SUBSCRIPTION,
+    name: 'Stripe: Create Subscription',
+    description: 'Subscribe a customer to a recurring price',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'stripe',
   },
 ];

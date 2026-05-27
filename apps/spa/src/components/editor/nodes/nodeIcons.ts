@@ -195,6 +195,13 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.LINEAR_ISSUE_UPDATED]: CircleDot,
   [NodeType.GITHUB_ISSUE_OPENED]: Github,
   [NodeType.GITHUB_PR_OPENED]: GitPullRequest,
+  // S15 — commerce, data & storage read/update pack (#246)
+  [NodeType.STRIPE_GET_CUSTOMER]: CreditCard,
+  [NodeType.STRIPE_FIND_CUSTOMER]: CreditCard,
+  [NodeType.STRIPE_CREATE_PAYMENT_INTENT]: CreditCard,
+  [NodeType.STRIPE_CREATE_REFUND]: CreditCard,
+  [NodeType.STRIPE_LIST_INVOICES]: CreditCard,
+  [NodeType.STRIPE_CREATE_SUBSCRIPTION]: CreditCard,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

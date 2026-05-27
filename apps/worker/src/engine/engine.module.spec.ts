@@ -86,6 +86,12 @@ import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-
 import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
 import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
 import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
+import { StripeGetCustomerAction } from '../nodes/connectors/stripe/stripe-get-customer';
+import { StripeFindCustomerAction } from '../nodes/connectors/stripe/stripe-find-customer';
+import { StripeCreatePaymentIntentAction } from '../nodes/connectors/stripe/stripe-create-payment-intent';
+import { StripeCreateRefundAction } from '../nodes/connectors/stripe/stripe-create-refund';
+import { StripeListInvoicesAction } from '../nodes/connectors/stripe/stripe-list-invoices';
+import { StripeCreateSubscriptionAction } from '../nodes/connectors/stripe/stripe-create-subscription';
 import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
 import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
@@ -306,6 +312,12 @@ describe('EngineModule', () => {
     const linearIssueUpdated = new LinearIssueUpdatedTrigger(undefined as never);
     const githubIssueOpened = new GithubIssueOpenedPassthrough();
     const githubPrOpened = new GithubPrOpenedPassthrough();
+    const stripeGetCustomer = new StripeGetCustomerAction(undefined as never);
+    const stripeFindCustomer = new StripeFindCustomerAction(undefined as never);
+    const stripeCreatePaymentIntent = new StripeCreatePaymentIntentAction(undefined as never);
+    const stripeCreateRefund = new StripeCreateRefundAction(undefined as never);
+    const stripeListInvoices = new StripeListInvoicesAction(undefined as never);
+    const stripeCreateSubscription = new StripeCreateSubscriptionAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -452,6 +464,12 @@ describe('EngineModule', () => {
       linearIssueUpdated,
       githubIssueOpened,
       githubPrOpened,
+      stripeGetCustomer,
+      stripeFindCustomer,
+      stripeCreatePaymentIntent,
+      stripeCreateRefund,
+      stripeListInvoices,
+      stripeCreateSubscription,
     );
     return {
       registry,
@@ -574,6 +592,12 @@ describe('EngineModule', () => {
       calendarEventUpdated,
       gmailAttachmentReceived,
       driveFileUpdated,
+      stripeGetCustomer,
+      stripeFindCustomer,
+      stripeCreatePaymentIntent,
+      stripeCreateRefund,
+      stripeListInvoices,
+      stripeCreateSubscription,
       module,
     };
   };
@@ -719,6 +743,16 @@ describe('EngineModule', () => {
       ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
       ['GmailAttachmentReceivedTrigger', 'gmail-attachment-received', 'gmailAttachmentReceived'],
       ['DriveFileUpdatedPassthrough', 'drive-file-updated', 'driveFileUpdated'],
+      ['StripeGetCustomerAction', 'stripe-get-customer', 'stripeGetCustomer'],
+      ['StripeFindCustomerAction', 'stripe-find-customer', 'stripeFindCustomer'],
+      [
+        'StripeCreatePaymentIntentAction',
+        'stripe-create-payment-intent',
+        'stripeCreatePaymentIntent',
+      ],
+      ['StripeCreateRefundAction', 'stripe-create-refund', 'stripeCreateRefund'],
+      ['StripeListInvoicesAction', 'stripe-list-invoices', 'stripeListInvoices'],
+      ['StripeCreateSubscriptionAction', 'stripe-create-subscription', 'stripeCreateSubscription'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -755,7 +789,8 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      expect(counts.action).toBe(108);
+      // +commerce/data/storage read/update pack (#246): Stripe ×6 so far.
+      expect(counts.action).toBe(114);
     });
   });
 });

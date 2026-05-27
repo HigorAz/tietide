@@ -137,6 +137,12 @@ import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-cre
 import { StripeClientFactory } from '../nodes/connectors/stripe/stripe-client.factory';
 import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
 import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
+import { StripeGetCustomerAction } from '../nodes/connectors/stripe/stripe-get-customer';
+import { StripeFindCustomerAction } from '../nodes/connectors/stripe/stripe-find-customer';
+import { StripeCreatePaymentIntentAction } from '../nodes/connectors/stripe/stripe-create-payment-intent';
+import { StripeCreateRefundAction } from '../nodes/connectors/stripe/stripe-create-refund';
+import { StripeListInvoicesAction } from '../nodes/connectors/stripe/stripe-list-invoices';
+import { StripeCreateSubscriptionAction } from '../nodes/connectors/stripe/stripe-create-subscription';
 import { MailchimpClientFactory } from '../nodes/connectors/mailchimp/mailchimp-client.factory';
 import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
 import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
@@ -317,6 +323,12 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     StripeClientFactory,
     StripeCreateCustomerAction,
     StripeListChargesAction,
+    StripeGetCustomerAction,
+    StripeFindCustomerAction,
+    StripeCreatePaymentIntentAction,
+    StripeCreateRefundAction,
+    StripeListInvoicesAction,
+    StripeCreateSubscriptionAction,
     MailchimpClientFactory,
     MailchimpAddSubscriberAction,
     MailchimpSendCampaignAction,
@@ -507,6 +519,12 @@ export class EngineModule implements OnModuleInit {
     private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
     private readonly githubIssueOpened: GithubIssueOpenedPassthrough,
     private readonly githubPrOpened: GithubPrOpenedPassthrough,
+    private readonly stripeGetCustomer: StripeGetCustomerAction,
+    private readonly stripeFindCustomer: StripeFindCustomerAction,
+    private readonly stripeCreatePaymentIntent: StripeCreatePaymentIntentAction,
+    private readonly stripeCreateRefund: StripeCreateRefundAction,
+    private readonly stripeListInvoices: StripeListInvoicesAction,
+    private readonly stripeCreateSubscription: StripeCreateSubscriptionAction,
   ) {}
 
   onModuleInit(): void {
@@ -654,5 +672,11 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.linearIssueUpdated);
     this.registry.register(this.githubIssueOpened);
     this.registry.register(this.githubPrOpened);
+    this.registry.register(this.stripeGetCustomer);
+    this.registry.register(this.stripeFindCustomer);
+    this.registry.register(this.stripeCreatePaymentIntent);
+    this.registry.register(this.stripeCreateRefund);
+    this.registry.register(this.stripeListInvoices);
+    this.registry.register(this.stripeCreateSubscription);
   }
 }
