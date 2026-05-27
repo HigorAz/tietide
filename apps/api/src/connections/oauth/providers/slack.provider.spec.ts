@@ -55,6 +55,29 @@ describe('SlackOAuthProvider', () => {
     expect(url.searchParams.get('scope')).toBe('chat:write,channels:read');
   });
 
+  it('routes user scopes to user_scope and keeps bot scopes in scope', () => {
+    const url = new URL(
+      provider.buildAuthorizeUrl({
+        state: 'st',
+        scopes: ['chat:write', 'channels:read', 'search:read'],
+        redirectUri: provider.redirectUri(),
+      }),
+    );
+    expect(url.searchParams.get('scope')).toBe('chat:write,channels:read');
+    expect(url.searchParams.get('user_scope')).toBe('search:read');
+  });
+
+  it('omits user_scope entirely when no user scope is requested', () => {
+    const url = new URL(
+      provider.buildAuthorizeUrl({
+        state: 'st',
+        scopes: ['chat:write'],
+        redirectUri: provider.redirectUri(),
+      }),
+    );
+    expect(url.searchParams.has('user_scope')).toBe(false);
+  });
+
   it('parses team.id and bot_user_id from the nested response', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue(
       new Response(
@@ -82,6 +105,36 @@ describe('SlackOAuthProvider', () => {
     });
     expect(result.expiresAt).toBeNull();
     expect(result.refreshToken).toBeNull();
+  });
+
+  it('captures authed_user.access_token and scope as userAccessToken/userScope', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          access_token: 'xoxb-1',
+          scope: 'chat:write',
+          bot_user_id: 'U999',
+          team: { id: 'T123' },
+          authed_user: { id: 'U1', access_token: 'xoxp-1', scope: 'search:read' },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const result = await provider.exchangeCode({
+      code: 'c',
+      redirectUri: provider.redirectUri(),
+    });
+
+    expect(result.config).toEqual({
+      accessToken: 'xoxb-1',
+      teamId: 'T123',
+      botUserId: 'U999',
+      scope: 'chat:write',
+      userAccessToken: 'xoxp-1',
+      userScope: 'search:read',
+    });
   });
 
   it('throws on { ok: false } response', async () => {
