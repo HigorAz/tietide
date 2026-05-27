@@ -33,6 +33,11 @@ import {
   ExcelRowUpdatedTrigger,
   EXCEL_ROW_UPDATED_TYPE,
 } from '../nodes/triggers/poll/excel-row-updated';
+import {
+  NotionDatabaseItemUpdatedTrigger,
+  NOTION_DATABASE_ITEM_UPDATED_TYPE,
+} from '../nodes/triggers/poll/notion-database-item-updated';
+import { NotionClientFactory } from '../nodes/connectors/notion/notion-client.factory';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import { PollSchedulerService } from './poll-scheduler.service';
@@ -62,6 +67,8 @@ import { PollConnectionLoader } from './poll-connection-loader';
     MicrosoftAuthService,
     ExcelRowAddedTrigger,
     ExcelRowUpdatedTrigger,
+    NotionClientFactory,
+    NotionDatabaseItemUpdatedTrigger,
   ],
   exports: [PollTriggerRegistry],
 })
@@ -75,6 +82,7 @@ export class PollModule implements OnModuleInit {
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
     private readonly excelRowAdded: ExcelRowAddedTrigger,
     private readonly excelRowUpdated: ExcelRowUpdatedTrigger,
+    private readonly notionDbItemUpdated: NotionDatabaseItemUpdatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -85,5 +93,6 @@ export class PollModule implements OnModuleInit {
     this.registry.register(GMAIL_ATTACHMENT_RECEIVED_TYPE, this.gmailAttachmentReceived);
     this.registry.register(EXCEL_ROW_ADDED_TYPE, this.excelRowAdded);
     this.registry.register(EXCEL_ROW_UPDATED_TYPE, this.excelRowUpdated);
+    this.registry.register(NOTION_DATABASE_ITEM_UPDATED_TYPE, this.notionDbItemUpdated);
   }
 }

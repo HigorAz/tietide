@@ -153,6 +153,7 @@ import {
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
+import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 
@@ -256,6 +257,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     GitHubGetRepoAction,
     GitHubListPrsAction,
     GitHubMergePrAction,
+    NotionDatabaseItemUpdatedTrigger,
     ClaudeClientFactory,
     ClaudeMessagesAction,
     OpenaiClientFactory,
@@ -430,6 +432,7 @@ export class EngineModule implements OnModuleInit {
     private readonly githubGetRepo: GitHubGetRepoAction,
     private readonly githubListPrs: GitHubListPrsAction,
     private readonly githubMergePr: GitHubMergePrAction,
+    private readonly notionDbItemUpdated: NotionDatabaseItemUpdatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -552,5 +555,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.githubGetRepo);
     this.registry.register(this.githubListPrs);
     this.registry.register(this.githubMergePr);
+    this.registry.register(this.notionDbItemUpdated);
   }
 }

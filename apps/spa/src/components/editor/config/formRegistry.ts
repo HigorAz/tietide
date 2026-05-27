@@ -77,6 +77,7 @@ import { NotionUpdatePageForm } from './notion/NotionUpdatePageForm';
 import { NotionAppendBlocksForm } from './notion/NotionAppendBlocksForm';
 import { NotionGetBlockChildrenForm } from './notion/NotionGetBlockChildrenForm';
 import { NotionFindDatabaseItemForm } from './notion/NotionFindDatabaseItemForm';
+import { NotionDatabaseItemUpdatedForm } from './notion/NotionDatabaseItemUpdatedForm';
 import { TrelloGetCardForm } from './trello/TrelloGetCardForm';
 import { TrelloListCardsForm } from './trello/TrelloListCardsForm';
 import { TrelloCreateListForm } from './trello/TrelloCreateListForm';
@@ -206,6 +207,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.NOTION_APPEND_BLOCKS]: NotionAppendBlocksForm,
   [NodeType.NOTION_GET_BLOCK_CHILDREN]: NotionGetBlockChildrenForm,
   [NodeType.NOTION_FIND_DATABASE_ITEM]: NotionFindDatabaseItemForm,
+  [NodeType.NOTION_DATABASE_ITEM_UPDATED]: NotionDatabaseItemUpdatedForm,
   [NodeType.TRELLO_GET_CARD]: TrelloGetCardForm,
   [NodeType.TRELLO_LIST_CARDS]: TrelloListCardsForm,
   [NodeType.TRELLO_CREATE_LIST]: TrelloCreateListForm,

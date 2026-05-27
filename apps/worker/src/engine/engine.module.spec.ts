@@ -120,6 +120,7 @@ import { GitHubCloseIssueAction } from '../nodes/connectors/github/github-close-
 import { GitHubGetRepoAction } from '../nodes/connectors/github/github-get-repo';
 import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs';
 import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr';
+import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -256,6 +257,7 @@ describe('EngineModule', () => {
     const githubGetRepo = new GitHubGetRepoAction(undefined as never);
     const githubListPrs = new GitHubListPrsAction(undefined as never);
     const githubMergePr = new GitHubMergePrAction(undefined as never);
+    const notionDbItemUpdated = new NotionDatabaseItemUpdatedTrigger(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -377,6 +379,7 @@ describe('EngineModule', () => {
       githubGetRepo,
       githubListPrs,
       githubMergePr,
+      notionDbItemUpdated,
     );
     return {
       registry,
@@ -622,7 +625,7 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated) = 24.
-      expect(counts.trigger).toBe(24);
+      expect(counts.trigger).toBe(25);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
