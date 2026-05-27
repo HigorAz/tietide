@@ -128,8 +128,12 @@ import { GitHubMergePrForm } from './github/GitHubMergePrForm';
 import { GitHubIssueOpenedForm } from './github/GitHubIssueOpenedForm';
 import { GitHubPrOpenedForm } from './github/GitHubPrOpenedForm';
 import { ClaudeMessagesForm } from './anthropic/ClaudeMessagesForm';
+import { ClaudeVisionForm } from './anthropic/ClaudeVisionForm';
 import { OpenAIChatCompletionForm } from './openai/OpenAIChatCompletionForm';
+import { OpenAIEmbeddingsForm } from './openai/OpenAIEmbeddingsForm';
+import { OpenAIGenerateImageForm } from './openai/OpenAIGenerateImageForm';
 import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
+import { OllamaEmbeddingsForm } from './ollama/OllamaEmbeddingsForm';
 import { HubspotCreateContactForm } from './hubspot/HubspotCreateContactForm';
 import { HubspotCreateDealForm } from './hubspot/HubspotCreateDealForm';
 import { HubspotContactChangedForm } from './hubspot/HubspotContactChangedForm';
@@ -306,8 +310,12 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.GITHUB_ISSUE_OPENED]: GitHubIssueOpenedForm,
   [NodeType.GITHUB_PR_OPENED]: GitHubPrOpenedForm,
   [NodeType.CLAUDE_MESSAGES]: ClaudeMessagesForm,
+  [NodeType.ANTHROPIC_VISION]: ClaudeVisionForm,
   [NodeType.OPENAI_CHAT_COMPLETION]: OpenAIChatCompletionForm,
+  [NodeType.OPENAI_EMBEDDINGS]: OpenAIEmbeddingsForm,
+  [NodeType.OPENAI_GENERATE_IMAGE]: OpenAIGenerateImageForm,
   [NodeType.OLLAMA_GENERATE]: OllamaGenerateForm,
+  [NodeType.OLLAMA_EMBEDDINGS]: OllamaEmbeddingsForm,
   [NodeType.HUBSPOT_CREATE_CONTACT]: HubspotCreateContactForm,
   [NodeType.HUBSPOT_CREATE_DEAL]: HubspotCreateDealForm,
   [NodeType.HUBSPOT_CONTACT_CHANGED]: HubspotContactChangedForm,

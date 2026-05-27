@@ -221,6 +221,10 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.S3_LIST_OBJECTS]: Database,
   [NodeType.S3_DELETE_OBJECT]: HardDrive,
   [NodeType.S3_GET_PRESIGNED_URL]: CloudUpload,
+  [NodeType.OPENAI_EMBEDDINGS]: Bot,
+  [NodeType.OPENAI_GENERATE_IMAGE]: Bot,
+  [NodeType.ANTHROPIC_VISION]: Sparkles,
+  [NodeType.OLLAMA_EMBEDDINGS]: Cpu,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

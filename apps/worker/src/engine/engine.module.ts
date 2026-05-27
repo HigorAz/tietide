@@ -131,6 +131,10 @@ import { OpenaiClientFactory } from '../nodes/connectors/openai/openai-client.fa
 import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-chat-completion';
 import { OllamaClientFactory } from '../nodes/connectors/ollama/ollama-client.factory';
 import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
+import { OpenaiEmbeddingsAction } from '../nodes/connectors/openai/openai-embeddings';
+import { OpenaiGenerateImageAction } from '../nodes/connectors/openai/openai-generate-image';
+import { AnthropicVisionAction } from '../nodes/connectors/anthropic/anthropic-vision';
+import { OllamaEmbeddingsAction } from '../nodes/connectors/ollama/ollama-embeddings';
 import { HubspotClientFactory } from '../nodes/connectors/hubspot/hubspot-client.factory';
 import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-create-contact';
 import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
@@ -335,6 +339,10 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     OpenaiChatCompletionAction,
     OllamaClientFactory,
     OllamaGenerateAction,
+    OpenaiEmbeddingsAction,
+    OpenaiGenerateImageAction,
+    AnthropicVisionAction,
+    OllamaEmbeddingsAction,
     HubspotClientFactory,
     HubspotCreateContactAction,
     HubspotCreateDealAction,
@@ -579,6 +587,10 @@ export class EngineModule implements OnModuleInit {
     private readonly s3ListObjects: S3ListObjectsAction,
     private readonly s3DeleteObject: S3DeleteObjectAction,
     private readonly s3GetPresignedUrl: S3GetPresignedUrlAction,
+    private readonly openaiEmbeddings: OpenaiEmbeddingsAction,
+    private readonly openaiGenerateImage: OpenaiGenerateImageAction,
+    private readonly anthropicVision: AnthropicVisionAction,
+    private readonly ollamaEmbeddings: OllamaEmbeddingsAction,
   ) {}
 
   onModuleInit(): void {
@@ -750,5 +762,9 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.s3ListObjects);
     this.registry.register(this.s3DeleteObject);
     this.registry.register(this.s3GetPresignedUrl);
+    this.registry.register(this.openaiEmbeddings);
+    this.registry.register(this.openaiGenerateImage);
+    this.registry.register(this.anthropicVision);
+    this.registry.register(this.ollamaEmbeddings);
   }
 }

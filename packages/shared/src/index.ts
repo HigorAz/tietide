@@ -574,13 +574,26 @@ export {
 } from './schemas/github.schema.js';
 export {
   claudeMessagesConfigSchema,
+  anthropicVisionConfigSchema,
+  ANTHROPIC_VISION_MEDIA_TYPES,
   type ClaudeMessagesConfig,
+  type AnthropicVisionConfig,
 } from './schemas/anthropic.schema.js';
 export {
   openaiChatCompletionConfigSchema,
+  openaiEmbeddingsConfigSchema,
+  openaiGenerateImageConfigSchema,
+  OPENAI_IMAGE_SIZES,
   type OpenaiChatCompletionConfig,
+  type OpenaiEmbeddingsConfig,
+  type OpenaiGenerateImageConfig,
 } from './schemas/openai-actions.schema.js';
-export { ollamaGenerateConfigSchema, type OllamaGenerateConfig } from './schemas/ollama.schema.js';
+export {
+  ollamaGenerateConfigSchema,
+  ollamaEmbeddingsConfigSchema,
+  type OllamaGenerateConfig,
+  type OllamaEmbeddingsConfig,
+} from './schemas/ollama.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,

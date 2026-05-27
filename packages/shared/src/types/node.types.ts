@@ -182,6 +182,10 @@ export const NodeType = {
   S3_LIST_OBJECTS: 's3-list-objects',
   S3_DELETE_OBJECT: 's3-delete-object',
   S3_GET_PRESIGNED_URL: 's3-get-presigned-url',
+  OPENAI_EMBEDDINGS: 'openai-embeddings',
+  OPENAI_GENERATE_IMAGE: 'openai-generate-image',
+  ANTHROPIC_VISION: 'anthropic-vision',
+  OLLAMA_EMBEDDINGS: 'ollama-embeddings',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -1625,5 +1629,37 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.DATA,
     provider: 's3',
+  },
+  {
+    type: NodeType.OPENAI_EMBEDDINGS,
+    name: 'OpenAI: Embeddings',
+    description: 'Generate an embedding vector for a text input',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.AI,
+    provider: 'openai',
+  },
+  {
+    type: NodeType.OPENAI_GENERATE_IMAGE,
+    name: 'OpenAI: Generate Image',
+    description: 'Generate an image from a text prompt (DALL·E)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.AI,
+    provider: 'openai',
+  },
+  {
+    type: NodeType.ANTHROPIC_VISION,
+    name: 'Claude: Vision',
+    description: 'Analyze an image (URL or base64) with a Claude vision prompt',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.AI,
+    provider: 'anthropic',
+  },
+  {
+    type: NodeType.OLLAMA_EMBEDDINGS,
+    name: 'Ollama: Embeddings',
+    description: 'Generate an embedding vector from a self-hosted Ollama model',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.AI,
+    provider: 'ollama',
   },
 ];

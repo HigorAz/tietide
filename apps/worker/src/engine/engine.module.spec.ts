@@ -116,6 +116,10 @@ import { S3DownloadFileAction } from '../nodes/connectors/s3/s3-download-file';
 import { S3ListObjectsAction } from '../nodes/connectors/s3/s3-list-objects';
 import { S3DeleteObjectAction } from '../nodes/connectors/s3/s3-delete-object';
 import { S3GetPresignedUrlAction } from '../nodes/connectors/s3/s3-get-presigned-url';
+import { OpenaiEmbeddingsAction } from '../nodes/connectors/openai/openai-embeddings';
+import { OpenaiGenerateImageAction } from '../nodes/connectors/openai/openai-generate-image';
+import { AnthropicVisionAction } from '../nodes/connectors/anthropic/anthropic-vision';
+import { OllamaEmbeddingsAction } from '../nodes/connectors/ollama/ollama-embeddings';
 import { TrelloAddCommentAction } from '../nodes/connectors/trello/trello-add-comment';
 import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update-card';
 import {
@@ -354,6 +358,10 @@ describe('EngineModule', () => {
     const s3ListObjects = new S3ListObjectsAction(undefined as never);
     const s3DeleteObject = new S3DeleteObjectAction(undefined as never);
     const s3GetPresignedUrl = new S3GetPresignedUrlAction(undefined as never);
+    const openaiEmbeddings = new OpenaiEmbeddingsAction(undefined as never);
+    const openaiGenerateImage = new OpenaiGenerateImageAction(undefined as never);
+    const anthropicVision = new AnthropicVisionAction(undefined as never);
+    const ollamaEmbeddings = new OllamaEmbeddingsAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -524,6 +532,10 @@ describe('EngineModule', () => {
       s3ListObjects,
       s3DeleteObject,
       s3GetPresignedUrl,
+      openaiEmbeddings,
+      openaiGenerateImage,
+      anthropicVision,
+      ollamaEmbeddings,
     );
     return {
       registry,
@@ -670,6 +682,10 @@ describe('EngineModule', () => {
       s3ListObjects,
       s3DeleteObject,
       s3GetPresignedUrl,
+      openaiEmbeddings,
+      openaiGenerateImage,
+      anthropicVision,
+      ollamaEmbeddings,
       module,
     };
   };
@@ -847,6 +863,10 @@ describe('EngineModule', () => {
       ['S3ListObjectsAction', 's3-list-objects', 's3ListObjects'],
       ['S3DeleteObjectAction', 's3-delete-object', 's3DeleteObject'],
       ['S3GetPresignedUrlAction', 's3-get-presigned-url', 's3GetPresignedUrl'],
+      ['OpenaiEmbeddingsAction', 'openai-embeddings', 'openaiEmbeddings'],
+      ['OpenaiGenerateImageAction', 'openai-generate-image', 'openaiGenerateImage'],
+      ['AnthropicVisionAction', 'anthropic-vision', 'anthropicVision'],
+      ['OllamaEmbeddingsAction', 'ollama-embeddings', 'ollamaEmbeddings'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -884,8 +904,8 @@ describe('EngineModule', () => {
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
       // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
-      // Mailchimp ×5 + Calendly ×3 + S3 ×4.
-      expect(counts.action).toBe(132);
+      // Mailchimp ×5 + Calendly ×3 + S3 ×4 + AI enrichment ×4.
+      expect(counts.action).toBe(136);
     });
   });
 });
