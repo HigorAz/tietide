@@ -72,6 +72,8 @@ import { SlackGetChannelHistoryAction } from '../nodes/connectors/slack/slack-ge
 import { SlackUpdateMessageAction } from '../nodes/connectors/slack/slack-update-message';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
+import { DiscordBotClientFactory } from '../nodes/connectors/discord/discord-bot-client.factory';
+import { DiscordBotSendMessageAction } from '../nodes/connectors/discord/discord-bot-send-message';
 import { TwilioClientFactory } from '../nodes/connectors/twilio/twilio-client.factory';
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
@@ -233,6 +235,8 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     SlackUpdateMessageAction,
     DiscordPostWebhookAction,
     DiscordReplyToCommandAction,
+    DiscordBotClientFactory,
+    DiscordBotSendMessageAction,
     TwilioClientFactory,
     TwilioSendSmsAction,
     TwilioSendWhatsAppAction,
@@ -399,6 +403,7 @@ export class EngineModule implements OnModuleInit {
     private readonly slackUpdateMessage: SlackUpdateMessageAction,
     private readonly discordPostWebhook: DiscordPostWebhookAction,
     private readonly discordReplyToCommand: DiscordReplyToCommandAction,
+    private readonly discordBotSendMessage: DiscordBotSendMessageAction,
     private readonly twilioSendSms: TwilioSendSmsAction,
     private readonly twilioSendWhatsApp: TwilioSendWhatsAppAction,
     private readonly telegramSendMessage: TelegramSendMessageAction,
@@ -533,6 +538,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.slackUpdateMessage);
     this.registry.register(this.discordPostWebhook);
     this.registry.register(this.discordReplyToCommand);
+    this.registry.register(this.discordBotSendMessage);
     this.registry.register(this.twilioSendSms);
     this.registry.register(this.twilioSendWhatsApp);
     this.registry.register(this.telegramSendMessage);

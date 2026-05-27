@@ -314,9 +314,15 @@ export {
   discordPostWebhookConfigSchema,
   discordMessageReceivedConfigSchema,
   discordReplyToCommandConfigSchema,
+  discordBotSendMessageConfigSchema,
+  discordGetChannelMessagesConfigSchema,
+  discordAddRoleConfigSchema,
   type DiscordPostWebhookConfig,
   type DiscordMessageReceivedConfig,
   type DiscordReplyToCommandConfig,
+  type DiscordBotSendMessageConfig,
+  type DiscordGetChannelMessagesConfig,
+  type DiscordAddRoleConfig,
 } from './schemas/discord.schema.js';
 export {
   twilioSendSmsConfigSchema,
