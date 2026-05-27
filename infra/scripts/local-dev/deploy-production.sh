@@ -11,6 +11,32 @@ BRANCH="Production"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
+# pnpm is a standalone install, NOT in nvm's bin — so the systemd service's
+# minimal PATH can't find it and every rebuild dies with "pnpm: command not
+# found". Put it on PATH explicitly (idempotent).
+export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
+case ":$PATH:" in *":$PNPM_HOME/bin:"*) ;; *) export PATH="$PNPM_HOME/bin:$PATH" ;; esac
+
+# Rebuild all workspace packages + apps (prod serves built artifacts).
+rebuild_all() {
+  pnpm -r --filter "./packages/**" build
+  pnpm --filter @tietide/api build
+  pnpm --filter @tietide/worker build
+  pnpm --filter @tietide/spa build
+}
+
+# Restarting the prod services from here is safe when either:
+#   - we're run by hand (not under systemd) — nothing will reap our setsid'd
+#     services; or
+#   - we're under systemd but the unit's KillMode won't kill children when the
+#     oneshot exits. The default control-group WOULD, taking the site down.
+restart_is_safe() {
+  [ -z "${INVOCATION_ID:-}" ] && return 0
+  local km
+  km=$(systemctl show tietide-deploy.service --property=KillMode --value 2>/dev/null || true)
+  [ "$km" = "process" ] || [ "$km" = "none" ]
+}
+
 cd "${REPO_DIR}"
 
 # Switch to Production if we're somewhere else (main, feature, detached, etc.)
@@ -50,12 +76,28 @@ else
   echo "  No new migrations — skipping prisma migrate"
 fi
 
-# Rebuild every workspace package (in dep order) if anything under packages/ changed.
-# Catches new packages added to the workspace (e.g. @tietide/crypto) without needing
-# to edit this script every time.
-if ! git diff --quiet "${OLD_HEAD}" "${NEW_HEAD}" -- packages/; then
-  echo "→ Shared packages changed — rebuilding all in topological order"
-  pnpm -r --filter "./packages/**" build
+# Rebuild artifacts + restart when running CODE changed. Prod serves built
+# output (`node dist/main`, `vite preview` on dist/) with NO hot reload, so a
+# pull alone never goes live — dist/ must be rebuilt and the services restarted.
+if ! git diff --quiet "${OLD_HEAD}" "${NEW_HEAD}" -- apps/ packages/; then
+  echo "→ App/package code changed — rebuilding artifacts (services stay up during build)"
+  rebuild_all
+
+  if restart_is_safe; then
+    echo "→ Restarting prod services to load the new build (brief downtime)"
+    echo n | "${HOME}/tietide-scripts/stop-all.sh"
+    SKIP_BUILD=1 "${HOME}/tietide-scripts/start-prod.sh"
+  else
+    echo ""
+    echo "⚠ Rebuilt, but NOT auto-restarting under the systemd timer:"
+    echo "  tietide-deploy.service has KillMode=control-group, which would reap the"
+    echo "  freshly-started services when this oneshot exits — taking the site down."
+    echo "  Enable hands-off restarts by setting KillMode=process (see"
+    echo "  docs/guides/continuous-deployment.md), or restart manually now:"
+    echo "      ~/tietide-scripts/stop-all.sh && ~/tietide-scripts/start-prod.sh"
+  fi
+else
+  echo "  No app/package code changed — nothing to rebuild or restart"
 fi
 
 echo ""
@@ -63,8 +105,3 @@ echo "Files changed in this deploy:"
 git diff --stat "${OLD_HEAD}" "${NEW_HEAD}"
 echo ""
 echo "✓ Deploy complete at $(date -Iseconds)"
-echo ""
-echo "Next: glance at your pnpm dev windows."
-echo "  - HMR catches most code changes automatically."
-echo "  - Nest module / .env / prisma schema changes need a manual restart:"
-echo "      ~/tietide-scripts/stop-all.sh && ~/tietide-scripts/start-dev.sh"
