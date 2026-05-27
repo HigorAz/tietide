@@ -248,6 +248,14 @@ export const calendarListEventsConfigSchema = z.object({
 });
 export type CalendarListEventsConfig = z.infer<typeof calendarListEventsConfigSchema>;
 
+export const calendarGetEventConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  calendarId: z.string().min(1).max(255).default('primary'),
+  eventId: z.string().min(1).max(1024),
+  mockOnDryRun,
+});
+export type CalendarGetEventConfig = z.infer<typeof calendarGetEventConfigSchema>;
+
 export const calendarCreateConfigSchema = z
   .object({
     connectionId: z.string().uuid(),
@@ -289,6 +297,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.DOCS_REPLACE_TEXT]: 'https://www.googleapis.com/auth/documents',
   [NodeType.CALENDAR_CREATE]: 'https://www.googleapis.com/auth/calendar.events',
   [NodeType.CALENDAR_LIST_EVENTS]: 'https://www.googleapis.com/auth/calendar.events',
+  [NodeType.CALENDAR_GET_EVENT]: 'https://www.googleapis.com/auth/calendar.events',
 };
 
 export const GOOGLE_NODE_TYPES: ReadonlyArray<string> = Object.keys(GOOGLE_NODE_REQUIRED_SCOPES);

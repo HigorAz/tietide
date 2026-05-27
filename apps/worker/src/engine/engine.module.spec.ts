@@ -28,6 +28,7 @@ import { DocsInsertTextAction } from '../nodes/connectors/google/docs-insert-tex
 import { DocsReplaceTextAction } from '../nodes/connectors/google/docs-replace-text';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
 import { CalendarListEventsAction } from '../nodes/connectors/google/calendar-list-events';
+import { CalendarGetEventAction } from '../nodes/connectors/google/calendar-get-event';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
@@ -123,6 +124,7 @@ describe('EngineModule', () => {
     const docsReplaceText = new DocsReplaceTextAction(undefined as never, undefined as never);
     const calendarCreate = new CalendarCreateAction(undefined as never, undefined as never);
     const calendarListEvents = new CalendarListEventsAction(undefined as never, undefined as never);
+    const calendarGetEvent = new CalendarGetEventAction(undefined as never, undefined as never);
     const outlookSend = new OutlookSendAction(undefined as never);
     const outlookSearch = new OutlookSearchAction(undefined as never);
     const excelAppend = new ExcelAppendAction(undefined as never);
@@ -213,6 +215,7 @@ describe('EngineModule', () => {
       docsReplaceText,
       calendarCreate,
       calendarListEvents,
+      calendarGetEvent,
       outlookSend,
       outlookSearch,
       excelAppend,
@@ -301,6 +304,7 @@ describe('EngineModule', () => {
       docsReplaceText,
       calendarCreate,
       calendarListEvents,
+      calendarGetEvent,
       outlookSend,
       outlookSearch,
       excelAppend,
@@ -392,6 +396,7 @@ describe('EngineModule', () => {
       ['DocsReplaceTextAction', 'docs-replace-text', 'docsReplaceText'],
       ['CalendarCreateAction', 'calendar-create', 'calendarCreate'],
       ['CalendarListEventsAction', 'calendar-list-events', 'calendarListEvents'],
+      ['CalendarGetEventAction', 'calendar-get-event', 'calendarGetEvent'],
       ['OutlookSendAction', 'outlook-send', 'outlookSend'],
       ['OutlookSearchAction', 'outlook-search', 'outlookSearch'],
       ['ExcelAppendAction', 'excel-append', 'excelAppend'],
@@ -481,15 +486,15 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
       expect(counts.trigger).toBe(19);
       expect(counts.logic).toBe(4);
-      // 2 generic actions (http-request, code) + 20 Google connector actions +
+      // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 5 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 62.
-      expect(counts.action).toBe(62);
+      //   calendly, postgres, mysql, s3, trello ×2) = 63.
+      expect(counts.action).toBe(63);
     });
   });
 });
