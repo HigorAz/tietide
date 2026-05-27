@@ -1,7 +1,6 @@
 import { useId } from 'react';
 import { slackAddReactionConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
