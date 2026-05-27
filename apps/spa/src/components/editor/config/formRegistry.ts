@@ -79,6 +79,7 @@ import { NotionGetBlockChildrenForm } from './notion/NotionGetBlockChildrenForm'
 import { NotionFindDatabaseItemForm } from './notion/NotionFindDatabaseItemForm';
 import { TrelloGetCardForm } from './trello/TrelloGetCardForm';
 import { TrelloListCardsForm } from './trello/TrelloListCardsForm';
+import { TrelloCreateListForm } from './trello/TrelloCreateListForm';
 import { TrelloCreateCardForm } from './trello/TrelloCreateCardForm';
 import { TrelloMoveCardForm } from './trello/TrelloMoveCardForm';
 import { AirtableCreateRecordForm } from './airtable/AirtableCreateRecordForm';
@@ -195,6 +196,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.NOTION_FIND_DATABASE_ITEM]: NotionFindDatabaseItemForm,
   [NodeType.TRELLO_GET_CARD]: TrelloGetCardForm,
   [NodeType.TRELLO_LIST_CARDS]: TrelloListCardsForm,
+  [NodeType.TRELLO_CREATE_LIST]: TrelloCreateListForm,
   [NodeType.TRELLO_CREATE_CARD]: TrelloCreateCardForm,
   [NodeType.TRELLO_MOVE_CARD]: TrelloMoveCardForm,
   [NodeType.AIRTABLE_CREATE_RECORD]: AirtableCreateRecordForm,
