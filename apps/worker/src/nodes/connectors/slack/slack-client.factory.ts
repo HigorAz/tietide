@@ -10,6 +10,10 @@ export interface SlackFetchInit {
   body?: BodyInit | null;
   contentType?: string;
   headers?: Record<string, string>;
+  // Some Slack methods (search.messages) require a user token (xoxp) rather than
+  // the bot token. When set and the connection carries a userAccessToken, the
+  // Authorization header is overridden with the user token.
+  useUserToken?: boolean;
 }
 
 export interface SlackResponse<T = unknown> {
@@ -56,6 +60,9 @@ export class SlackClientFactory {
       ...this.buildAuthHeader(connection),
       ...(init.headers ?? {}),
     };
+    if (init.useUserToken && connection.config.userAccessToken) {
+      headers.Authorization = `Bearer ${connection.config.userAccessToken}`;
+    }
     if (init.body !== undefined && init.body !== null) {
       // Empty string ⇒ caller is sending FormData and wants fetch to set the
       // multipart boundary header itself.

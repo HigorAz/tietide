@@ -146,6 +146,60 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
       defaultOn: false,
     },
   ],
+  slack: [
+    {
+      id: 'base',
+      label: 'Base',
+      description: 'Post messages and list channels (required)',
+      scopes: ['chat:write', 'channels:read'],
+      defaultOn: true,
+      locked: true,
+    },
+    {
+      id: 'channels',
+      label: 'Channels',
+      description: 'Read history, create and manage channels',
+      scopes: ['channels:history', 'channels:manage'],
+      defaultOn: true,
+    },
+    {
+      id: 'users',
+      label: 'Users',
+      description: 'Look up users by name or email',
+      scopes: ['users:read', 'users:read.email'],
+      defaultOn: true,
+    },
+    {
+      id: 'reactions',
+      label: 'Reactions',
+      description: 'Add and read emoji reactions',
+      scopes: ['reactions:read', 'reactions:write'],
+      defaultOn: true,
+    },
+    {
+      id: 'files',
+      label: 'Files',
+      description: 'Upload and read files',
+      scopes: ['files:read', 'files:write'],
+      defaultOn: false,
+    },
+    {
+      id: 'mentions',
+      label: 'Mentions',
+      description: 'Receive @-mention events (for the app-mention trigger)',
+      scopes: ['app_mentions:read'],
+      defaultOn: false,
+    },
+    {
+      id: 'search',
+      label: 'Search (authorizes as you)',
+      // search.messages needs a user token — selecting this requests a Slack
+      // user_scope and grants an xoxp token tied to the installing user.
+      description: 'Search messages — grants a user token tied to your account',
+      scopes: ['search:read'],
+      defaultOn: false,
+    },
+  ],
   github: [
     {
       id: 'account',

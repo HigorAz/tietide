@@ -43,6 +43,43 @@ export const twilioSendWhatsAppConfigSchema = z.object({
 });
 export type TwilioSendWhatsAppConfig = z.infer<typeof twilioSendWhatsAppConfigSchema>;
 
+// Read / manage actions (S15 messaging pack).
+
+// Message SIDs are SM… (SMS) or MM… (MMS) followed by 32 chars.
+const TWILIO_MESSAGE_SID_REGEX = /^(SM|MM)[A-Za-z0-9_-]{32}$/;
+
+export const twilioGetMessageConfigSchema = z.object({
+  connectionId,
+  messageSid: z.string().regex(TWILIO_MESSAGE_SID_REGEX, {
+    message: 'messageSid must be a Twilio SM…/MM… SID',
+  }),
+});
+export type TwilioGetMessageConfig = z.infer<typeof twilioGetMessageConfigSchema>;
+
+export const twilioListMessagesConfigSchema = z.object({
+  connectionId,
+  to: e164.optional(),
+  from: e164.optional(),
+  pageSize: z.number().int().min(1).max(1000).optional(),
+});
+export type TwilioListMessagesConfig = z.infer<typeof twilioListMessagesConfigSchema>;
+
+// A call needs an instruction source: either a TwiML URL Twilio will fetch, or
+// inline TwiML. Exactly one is required (refine).
+export const twilioMakeCallConfigSchema = z
+  .object({
+    connectionId,
+    from: e164,
+    to: e164,
+    url: z.string().url().max(2000).optional(),
+    twiml: z.string().min(1).max(4000).optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => (v.url ? !v.twiml : !!v.twiml), {
+    message: 'provide exactly one of url or twiml',
+  });
+export type TwilioMakeCallConfig = z.infer<typeof twilioMakeCallConfigSchema>;
+
 // Trigger config — Twilio inbound message webhook attached to a Twilio phone number.
 // phoneNumberSid is Twilio's PN… SID for the IncomingPhoneNumber resource we'll
 // update to point its sms_url at our /v1/provider-webhooks/twilio/<id> endpoint.

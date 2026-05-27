@@ -26,6 +26,7 @@ const ALLOWED_SCOPES = new Set([
   'chat:write.public',
   'channels:read',
   'channels:history',
+  'channels:manage',
   'groups:read',
   'groups:history',
   'im:read',
@@ -39,7 +40,15 @@ const ALLOWED_SCOPES = new Set([
   'reactions:read',
   'reactions:write',
   'app_mentions:read',
+  // User-token scope (granted to authed_user, not the bot). search.messages
+  // requires a user token, so search:read is requested via Slack's user_scope.
+  'search:read',
 ]);
+
+// Scopes that must be requested as Slack `user_scope` (granted to the installing
+// user, returning an xoxp user token) rather than bot `scope`. buildAuthorizeUrl
+// partitions the requested scopes accordingly.
+const USER_SCOPES = new Set(['search:read']);
 
 interface SlackTokenResponse {
   ok?: unknown;
@@ -48,6 +57,7 @@ interface SlackTokenResponse {
   scope?: unknown;
   bot_user_id?: unknown;
   team?: { id?: unknown };
+  authed_user?: { id?: unknown; access_token?: unknown; scope?: unknown };
 }
 
 @Injectable()
@@ -62,12 +72,21 @@ export class SlackOAuthProvider extends BaseOAuthProvider implements OAuthProvid
   }
 
   buildAuthorizeUrl(args: AuthorizeUrlArgs): string {
+    // Slack v2 separates bot scopes (`scope`) from user scopes (`user_scope`).
+    // Partition the requested scopes so search:read lands on user_scope.
+    const botScopes = args.scopes.filter((s) => !USER_SCOPES.has(s));
+    const userScopes = args.scopes.filter((s) => USER_SCOPES.has(s));
     const params = new URLSearchParams({
       client_id: this.env('SLACK_OAUTH_CLIENT_ID'),
-      scope: args.scopes.join(','),
+      scope: botScopes.join(','),
       redirect_uri: args.redirectUri,
       state: args.state,
     });
+    // Only request a user token when a user scope was selected, so the consent
+    // screen is unchanged for bot-only connections.
+    if (userScopes.length > 0) {
+      params.set('user_scope', userScopes.join(','));
+    }
     return `${AUTHORIZE_URL}?${params.toString()}`;
   }
 
@@ -96,11 +115,23 @@ export class SlackOAuthProvider extends BaseOAuthProvider implements OAuthProvid
       throw new InternalServerErrorException('Slack token response missing required fields');
     }
 
+    // Slack returns authed_user.access_token (xoxp) only when user_scope was
+    // requested. Capture it so slack-search-messages can call search.messages.
+    const authedUser = raw.authed_user;
+    const userAccessToken =
+      authedUser && typeof authedUser.access_token === 'string'
+        ? authedUser.access_token
+        : undefined;
+    const userScope =
+      authedUser && typeof authedUser.scope === 'string' ? authedUser.scope : undefined;
+
     const config: SlackOAuth2Config = slackOAuth2ConfigSchema.parse({
       accessToken,
       teamId,
       botUserId,
       scope: typeof raw.scope === 'string' ? raw.scope : '',
+      ...(userAccessToken ? { userAccessToken } : {}),
+      ...(userScope ? { userScope } : {}),
     });
 
     return {

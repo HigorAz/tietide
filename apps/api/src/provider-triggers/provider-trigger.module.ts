@@ -51,6 +51,10 @@ import {
   TELEGRAM_MESSAGE_RECEIVED_TYPE,
 } from './triggers/telegram/telegram-message-received.trigger';
 import {
+  TelegramCallbackQueryReceivedTrigger,
+  TELEGRAM_CALLBACK_QUERY_RECEIVED_TYPE,
+} from './triggers/telegram/telegram-callback-query-received.trigger';
+import {
   SlackMessageReceivedTrigger,
   SLACK_MESSAGE_RECEIVED_TYPE,
 } from './triggers/slack/slack-message-received.trigger';
@@ -58,6 +62,14 @@ import {
   SlackReactionAddedTrigger,
   SLACK_REACTION_ADDED_TYPE,
 } from './triggers/slack/slack-reaction-added.trigger';
+import {
+  SlackAppMentionTrigger,
+  SLACK_APP_MENTION_TYPE,
+} from './triggers/slack/slack-app-mention.trigger';
+import {
+  SlackChannelCreatedTrigger,
+  SLACK_CHANNEL_CREATED_TYPE,
+} from './triggers/slack/slack-channel-created.trigger';
 import { DiscordBotClientFactory } from './triggers/discord/discord-bot-client.factory';
 import {
   DiscordMessageReceivedTrigger,
@@ -117,8 +129,11 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     TwilioSmsReceivedTrigger,
     TelegramApiFactory,
     TelegramMessageReceivedTrigger,
+    TelegramCallbackQueryReceivedTrigger,
     SlackMessageReceivedTrigger,
     SlackReactionAddedTrigger,
+    SlackAppMentionTrigger,
+    SlackChannelCreatedTrigger,
     DiscordBotClientFactory,
     DiscordMessageReceivedTrigger,
     HubspotContactChangedTrigger,
@@ -152,8 +167,11 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly onedriveFileAdded: OnedriveFileAddedTrigger,
     private readonly twilioSmsReceived: TwilioSmsReceivedTrigger,
     private readonly telegramMessageReceived: TelegramMessageReceivedTrigger,
+    private readonly telegramCallbackQueryReceived: TelegramCallbackQueryReceivedTrigger,
     private readonly slackMessageReceived: SlackMessageReceivedTrigger,
     private readonly slackReactionAdded: SlackReactionAddedTrigger,
+    private readonly slackAppMention: SlackAppMentionTrigger,
+    private readonly slackChannelCreated: SlackChannelCreatedTrigger,
     private readonly discordMessageReceived: DiscordMessageReceivedTrigger,
     private readonly hubspotContactChanged: HubspotContactChangedTrigger,
     private readonly mailchimpSubscriberAdded: MailchimpSubscriberAddedTrigger,
@@ -174,8 +192,14 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(ONEDRIVE_FILE_ADDED_TYPE, this.onedriveFileAdded);
     this.registry.register(TWILIO_SMS_RECEIVED_TYPE, this.twilioSmsReceived);
     this.registry.register(TELEGRAM_MESSAGE_RECEIVED_TYPE, this.telegramMessageReceived);
+    this.registry.register(
+      TELEGRAM_CALLBACK_QUERY_RECEIVED_TYPE,
+      this.telegramCallbackQueryReceived,
+    );
     this.registry.register(SLACK_MESSAGE_RECEIVED_TYPE, this.slackMessageReceived);
     this.registry.register(SLACK_REACTION_ADDED_TYPE, this.slackReactionAdded);
+    this.registry.register(SLACK_APP_MENTION_TYPE, this.slackAppMention);
+    this.registry.register(SLACK_CHANNEL_CREATED_TYPE, this.slackChannelCreated);
     this.registry.register(DISCORD_MESSAGE_RECEIVED_TYPE, this.discordMessageReceived);
     this.registry.register(HUBSPOT_CONTACT_CHANGED_TYPE, this.hubspotContactChanged);
     this.registry.register(MAILCHIMP_SUBSCRIBER_ADDED_TYPE, this.mailchimpSubscriberAdded);

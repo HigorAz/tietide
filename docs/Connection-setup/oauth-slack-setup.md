@@ -27,6 +27,7 @@ Slack also has a **third** credential — `signingSecret` — that you paste int
 
 1. Left nav → **OAuth & Permissions**.
 2. Scroll to **Redirect URLs** → **Add New Redirect URL**. Slack lets you list multiple URLs on a single app — add one per environment you plan to run so you don't have to come back later:
+
    ```
    http://localhost:3030/v1/connections/oauth/callback?provider=slack
    https://<your-domain>/v1/connections/oauth/callback?provider=slack
@@ -35,6 +36,7 @@ Slack also has a **third** credential — `signingSecret` — that you paste int
    - Each URL must match the `SLACK_OAUTH_REDIRECT_URI` of its own environment byte-for-byte.
    - **HTTPS is required** for any non-localhost URL; Slack rejects plain `http://` for real domains.
    - Skip the second URL for now if you don't have a domain yet — you can add it later on the same page.
+
 3. **Save URLs**.
 4. Scroll to **Bot Token Scopes** → **Add an OAuth Scope** → add each of:
    - `chat:write` — post messages
@@ -45,7 +47,18 @@ Slack also has a **third** credential — `signingSecret` — that you paste int
    - `files:write` — for the `slack-upload-file` action
    - `users:read` — resolve user IDs to display names
 
-You can add more later; these are the minimum for the actions/triggers in `apps/worker/src/nodes/connectors/slack/`.
+You can add more later; these are the minimum for the actions/triggers in `apps/worker/src/nodes/connectors/slack/`. The read/manage pack also uses `channels:history` + `channels:manage` (read history, create/invite/manage channels), `users:read.email` (find a user by email), and `reactions:write` (add reactions) — add the ones you intend to use.
+
+#### User Token Scopes (only for `slack-search-messages`)
+
+Slack's `search.messages` API can **only** be called with a **user token** (`xoxp`), never a bot token. So `search:read` is a _user_ scope, configured separately from the bot scopes above:
+
+1. Still on **OAuth & Permissions**, scroll to **User Token Scopes** (a distinct section below Bot Token Scopes) → **Add an OAuth Scope** → add `search:read`.
+2. That's all on the Slack side. In TieTide's connection modal, enable the **"Search (authorizes as you)"** scope group before connecting.
+
+When that group is enabled, TieTide requests `search:read` via Slack's `user_scope` parameter, the consent screen shows an extra "act on behalf of you" grant, and the exchange returns `authed_user.access_token`. TieTide stores it as `userAccessToken` in the (encrypted) connection config, and **only** `slack-search-messages` uses it.
+
+> **Existing connections must reconnect.** A Slack connection created before this scope was added has no user token — the `slack-search-messages` node will error with "reconnect this Slack connection with the search:read scope enabled" until you re-run the OAuth flow with the Search group on.
 
 ### 3. Grab the client credentials
 
@@ -78,7 +91,7 @@ Then in the SPA:
 2. Go to **Connections** → pick **Slack** → label it (e.g. "My Workspace") → **Connect**.
 3. Browser redirects to `slack.com/oauth/v2/authorize?...` — Slack shows the consent screen with the scopes from step 2.
 4. **Allow** → Slack redirects back to `localhost:3030/v1/connections/oauth/callback?provider=slack&code=...` → TieTide exchanges the code → SPA lands on `/connections?status=success&id=<connection-uuid>`.
-5. A new `Connection` row exists with encrypted `access_token`, `teamId`, `botUserId`, and `scope`.
+5. A new `Connection` row exists with encrypted `access_token`, `teamId`, `botUserId`, and `scope` (plus `userAccessToken` + `userScope` if you enabled the Search group).
 
 If step 3 errors with `bad_redirect_uri`, the URL in step 2 of Slack's app config doesn't match `SLACK_OAUTH_REDIRECT_URI` exactly. Slack compares strictly — trailing slashes, http vs https, and query strings all count.
 
