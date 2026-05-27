@@ -160,6 +160,29 @@ export const outlookUpdateMessageConfigSchema = z
   );
 export type OutlookUpdateMessageConfig = z.infer<typeof outlookUpdateMessageConfigSchema>;
 
+export const outlookCreateDraftConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    // When set, a reply draft is created against this message; `body` becomes
+    // the reply comment and to/subject are inherited from the original.
+    replyToMessageId: graphId().optional(),
+    to: optionalHeaderString(),
+    cc: optionalHeaderString(),
+    subject: optionalHeaderString(255),
+    body: z.string().min(1).max(1_000_000),
+    isHtml: z.boolean().optional(),
+    mockOnDryRun,
+  })
+  .refine(
+    (v) =>
+      v.replyToMessageId !== undefined || ((v.to?.length ?? 0) > 0 && (v.subject?.length ?? 0) > 0),
+    {
+      message: 'to and subject are required for a standalone draft',
+      path: ['to'],
+    },
+  );
+export type OutlookCreateDraftConfig = z.infer<typeof outlookCreateDraftConfigSchema>;
+
 // Map of Microsoft node types to the OAuth scope each requires. Mirrors
 // GOOGLE_NODE_REQUIRED_SCOPES so the SPA's ScopeReauthBanner can surface
 // missing-scope hints uniformly.
@@ -169,6 +192,7 @@ export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.OUTLOOK_GET_MESSAGE]: 'Mail.Read',
   [NodeType.OUTLOOK_GET_ATTACHMENT]: 'Mail.Read',
   [NodeType.OUTLOOK_UPDATE_MESSAGE]: 'Mail.ReadWrite',
+  [NodeType.OUTLOOK_CREATE_DRAFT]: 'Mail.ReadWrite',
   [NodeType.EXCEL_APPEND]: 'Files.ReadWrite',
   [NodeType.EXCEL_READ]: 'Files.Read',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',
