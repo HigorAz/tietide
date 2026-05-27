@@ -79,6 +79,14 @@ import {
   TrelloCardChangedTrigger,
   TRELLO_CARD_CHANGED_TYPE,
 } from './triggers/trello/trello-card-changed.trigger';
+import {
+  GithubIssueOpenedTrigger,
+  GITHUB_ISSUE_OPENED_TYPE,
+} from './triggers/github/github-issue-opened.trigger';
+import {
+  GithubPrOpenedTrigger,
+  GITHUB_PR_OPENED_TYPE,
+} from './triggers/github/github-pr-opened.trigger';
 import { RENEWAL_QUEUE_NAME } from './renewal/subscription-renewer.constants';
 import { SubscriptionRenewerProcessor } from './renewal/subscription-renewer.processor';
 import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-bootstrap.service';
@@ -117,6 +125,8 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     MailchimpSubscriberAddedTrigger,
     CalendlyEventScheduledTrigger,
     TrelloCardChangedTrigger,
+    GithubIssueOpenedTrigger,
+    GithubPrOpenedTrigger,
     ActivationService,
     SubscriptionRenewerProcessor,
     SubscriptionRenewerBootstrap,
@@ -149,6 +159,8 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly mailchimpSubscriberAdded: MailchimpSubscriberAddedTrigger,
     private readonly calendlyEventScheduled: CalendlyEventScheduledTrigger,
     private readonly trelloCardChanged: TrelloCardChangedTrigger,
+    private readonly githubIssueOpened: GithubIssueOpenedTrigger,
+    private readonly githubPrOpened: GithubPrOpenedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -169,5 +181,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(MAILCHIMP_SUBSCRIBER_ADDED_TYPE, this.mailchimpSubscriberAdded);
     this.registry.register(CALENDLY_EVENT_SCHEDULED_TYPE, this.calendlyEventScheduled);
     this.registry.register(TRELLO_CARD_CHANGED_TYPE, this.trelloCardChanged);
+    this.registry.register(GITHUB_ISSUE_OPENED_TYPE, this.githubIssueOpened);
+    this.registry.register(GITHUB_PR_OPENED_TYPE, this.githubPrOpened);
   }
 }

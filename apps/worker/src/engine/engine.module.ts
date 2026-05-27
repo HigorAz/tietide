@@ -73,20 +73,40 @@ import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram
 import { NotionClientFactory } from '../nodes/connectors/notion/notion-client.factory';
 import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
 import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
+import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page';
+import { NotionUpdatePageAction } from '../nodes/connectors/notion/notion-update-page';
+import { NotionAppendBlocksAction } from '../nodes/connectors/notion/notion-append-blocks';
+import { NotionGetBlockChildrenAction } from '../nodes/connectors/notion/notion-get-block-children';
+import { NotionFindDatabaseItemAction } from '../nodes/connectors/notion/notion-find-database-item';
 import { TrelloClientFactory } from '../nodes/connectors/trello/trello-client.factory';
 import { TrelloCreateCardAction } from '../nodes/connectors/trello/trello-create-card';
 import { TrelloMoveCardAction } from '../nodes/connectors/trello/trello-move-card';
+import { TrelloGetCardAction } from '../nodes/connectors/trello/trello-get-card';
+import { TrelloListCardsAction } from '../nodes/connectors/trello/trello-list-cards';
+import { TrelloCreateListAction } from '../nodes/connectors/trello/trello-create-list';
 import { AirtableClientFactory } from '../nodes/connectors/airtable/airtable-client.factory';
 import { AirtableCreateRecordAction } from '../nodes/connectors/airtable/airtable-create-record';
 import { AirtableUpdateRecordAction } from '../nodes/connectors/airtable/airtable-update-record';
 import { AirtableListRecordsAction } from '../nodes/connectors/airtable/airtable-list-records';
+import { AirtableGetRecordAction } from '../nodes/connectors/airtable/airtable-get-record';
+import { AirtableFindRecordsAction } from '../nodes/connectors/airtable/airtable-find-records';
+import { AirtableDeleteRecordAction } from '../nodes/connectors/airtable/airtable-delete-record';
 import { LinearClientFactory } from '../nodes/connectors/linear/linear-client.factory';
 import { LinearCreateIssueAction } from '../nodes/connectors/linear/linear-create-issue';
 import { LinearUpdateIssueStatusAction } from '../nodes/connectors/linear/linear-update-issue-status';
+import { LinearGetIssueAction } from '../nodes/connectors/linear/linear-get-issue';
+import { LinearSearchIssuesAction } from '../nodes/connectors/linear/linear-search-issues';
+import { LinearAddCommentAction } from '../nodes/connectors/linear/linear-add-comment';
 import { GitHubClientFactory } from '../nodes/connectors/github/github-client.factory';
 import { GitHubCreateIssueAction } from '../nodes/connectors/github/github-create-issue';
 import { GitHubCommentIssueAction } from '../nodes/connectors/github/github-comment-issue';
 import { GitHubCreatePrAction } from '../nodes/connectors/github/github-create-pr';
+import { GitHubGetIssueAction } from '../nodes/connectors/github/github-get-issue';
+import { GitHubListIssuesAction } from '../nodes/connectors/github/github-list-issues';
+import { GitHubCloseIssueAction } from '../nodes/connectors/github/github-close-issue';
+import { GitHubGetRepoAction } from '../nodes/connectors/github/github-get-repo';
+import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs';
+import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr';
 import { ClaudeClientFactory } from '../nodes/connectors/anthropic/claude-client.factory';
 import { ClaudeMessagesAction } from '../nodes/connectors/anthropic/claude-messages';
 import { OpenaiClientFactory } from '../nodes/connectors/openai/openai-client.factory';
@@ -129,10 +149,15 @@ import {
   MailchimpSubscriberAddedPassthrough,
   CalendlyEventScheduledPassthrough,
   TrelloCardChangedPassthrough,
+  GithubIssueOpenedPassthrough,
+  GithubPrOpenedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
+import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
+import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-record-created';
+import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 
@@ -202,6 +227,14 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     NotionClientFactory,
     NotionCreatePageAction,
     NotionQueryDatabaseAction,
+    NotionGetPageAction,
+    NotionUpdatePageAction,
+    NotionAppendBlocksAction,
+    NotionGetBlockChildrenAction,
+    NotionFindDatabaseItemAction,
+    TrelloGetCardAction,
+    TrelloListCardsAction,
+    TrelloCreateListAction,
     TrelloClientFactory,
     TrelloCreateCardAction,
     TrelloMoveCardAction,
@@ -209,13 +242,30 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     AirtableCreateRecordAction,
     AirtableUpdateRecordAction,
     AirtableListRecordsAction,
+    AirtableGetRecordAction,
+    AirtableFindRecordsAction,
+    AirtableDeleteRecordAction,
     LinearClientFactory,
     LinearCreateIssueAction,
     LinearUpdateIssueStatusAction,
+    LinearGetIssueAction,
+    LinearSearchIssuesAction,
+    LinearAddCommentAction,
     GitHubClientFactory,
     GitHubCreateIssueAction,
     GitHubCommentIssueAction,
     GitHubCreatePrAction,
+    GitHubGetIssueAction,
+    GitHubListIssuesAction,
+    GitHubCloseIssueAction,
+    GitHubGetRepoAction,
+    GitHubListPrsAction,
+    GitHubMergePrAction,
+    NotionDatabaseItemUpdatedTrigger,
+    AirtableRecordCreatedTrigger,
+    LinearIssueUpdatedTrigger,
+    GithubIssueOpenedPassthrough,
+    GithubPrOpenedPassthrough,
     ClaudeClientFactory,
     ClaudeMessagesAction,
     OpenaiClientFactory,
@@ -370,6 +420,31 @@ export class EngineModule implements OnModuleInit {
     private readonly calendarEventUpdated: CalendarEventUpdatedTrigger,
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
     private readonly driveFileUpdated: DriveFileUpdatedPassthrough,
+    private readonly notionGetPage: NotionGetPageAction,
+    private readonly notionUpdatePage: NotionUpdatePageAction,
+    private readonly notionAppendBlocks: NotionAppendBlocksAction,
+    private readonly notionGetBlockChildren: NotionGetBlockChildrenAction,
+    private readonly notionFindDatabaseItem: NotionFindDatabaseItemAction,
+    private readonly trelloGetCard: TrelloGetCardAction,
+    private readonly trelloListCards: TrelloListCardsAction,
+    private readonly trelloCreateList: TrelloCreateListAction,
+    private readonly airtableGetRecord: AirtableGetRecordAction,
+    private readonly airtableFindRecords: AirtableFindRecordsAction,
+    private readonly airtableDeleteRecord: AirtableDeleteRecordAction,
+    private readonly linearGetIssue: LinearGetIssueAction,
+    private readonly linearSearchIssues: LinearSearchIssuesAction,
+    private readonly linearAddComment: LinearAddCommentAction,
+    private readonly githubGetIssue: GitHubGetIssueAction,
+    private readonly githubListIssues: GitHubListIssuesAction,
+    private readonly githubCloseIssue: GitHubCloseIssueAction,
+    private readonly githubGetRepo: GitHubGetRepoAction,
+    private readonly githubListPrs: GitHubListPrsAction,
+    private readonly githubMergePr: GitHubMergePrAction,
+    private readonly notionDbItemUpdated: NotionDatabaseItemUpdatedTrigger,
+    private readonly airtableRecordCreated: AirtableRecordCreatedTrigger,
+    private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
+    private readonly githubIssueOpened: GithubIssueOpenedPassthrough,
+    private readonly githubPrOpened: GithubPrOpenedPassthrough,
   ) {}
 
   onModuleInit(): void {
@@ -472,5 +547,30 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.calendarEventUpdated);
     this.registry.register(this.gmailAttachmentReceived);
     this.registry.register(this.driveFileUpdated);
+    this.registry.register(this.notionGetPage);
+    this.registry.register(this.notionUpdatePage);
+    this.registry.register(this.notionAppendBlocks);
+    this.registry.register(this.notionGetBlockChildren);
+    this.registry.register(this.notionFindDatabaseItem);
+    this.registry.register(this.trelloGetCard);
+    this.registry.register(this.trelloListCards);
+    this.registry.register(this.trelloCreateList);
+    this.registry.register(this.airtableGetRecord);
+    this.registry.register(this.airtableFindRecords);
+    this.registry.register(this.airtableDeleteRecord);
+    this.registry.register(this.linearGetIssue);
+    this.registry.register(this.linearSearchIssues);
+    this.registry.register(this.linearAddComment);
+    this.registry.register(this.githubGetIssue);
+    this.registry.register(this.githubListIssues);
+    this.registry.register(this.githubCloseIssue);
+    this.registry.register(this.githubGetRepo);
+    this.registry.register(this.githubListPrs);
+    this.registry.register(this.githubMergePr);
+    this.registry.register(this.notionDbItemUpdated);
+    this.registry.register(this.airtableRecordCreated);
+    this.registry.register(this.linearIssueUpdated);
+    this.registry.register(this.githubIssueOpened);
+    this.registry.register(this.githubPrOpened);
   }
 }

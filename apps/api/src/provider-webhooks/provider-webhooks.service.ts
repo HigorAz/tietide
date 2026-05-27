@@ -285,6 +285,13 @@ export function shouldEmitForEventType(
   triggerData: Record<string, unknown>,
   nodeConfig?: Record<string, unknown>,
 ): boolean {
+  // GitHub repo webhooks deliver every action for a subscribed event
+  // (opened / closed / edited / reopened …). The *-opened trigger types only
+  // fire on `action === 'opened'`, regardless of any node-level filter.
+  if (triggerType === 'github-issue-opened' || triggerType === 'github-pr-opened') {
+    return (triggerData as { action?: unknown }).action === 'opened';
+  }
+
   if (!nodeConfig) return true;
   const filter = nodeConfig.eventType;
   if (typeof filter !== 'string' || filter.length === 0) return true;

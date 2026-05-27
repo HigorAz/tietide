@@ -46,8 +46,9 @@ The Microsoft provider in `apps/api/src/connections/oauth/providers/microsoft.pr
 2. Pick **Microsoft Graph** → **Delegated permissions**.
 3. Search and add:
    - `Mail.Send` — send Outlook messages
-   - `Mail.Read` — read Outlook messages (for the `outlook-message-received` and `outlook-message-flagged` triggers)
-   - `Files.ReadWrite` — OneDrive create/list/read
+   - `Mail.Read` — read Outlook messages (`outlook-get-message`, `outlook-get-attachment`, and the `outlook-message-received` / `outlook-message-flagged` / `outlook-message-with-attachment` triggers)
+   - `Mail.ReadWrite` — flag/categorize/mark-read/move messages and create drafts (`outlook-update-message`, `outlook-create-draft`)
+   - `Files.ReadWrite` — OneDrive create/get/list and Excel append/read/find/update (`excel-update-row` plus the `excel-row-added` / `excel-row-updated` triggers; also covers the `Files.Read` reads)
    - `Calendars.ReadWrite` — Outlook Calendar
    - `offline_access` — required so Microsoft returns a refresh token
    - `User.Read` — base profile (granted by default)
