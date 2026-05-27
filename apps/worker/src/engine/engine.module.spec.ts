@@ -115,6 +115,7 @@ import { LinearGetIssueAction } from '../nodes/connectors/linear/linear-get-issu
 import { LinearSearchIssuesAction } from '../nodes/connectors/linear/linear-search-issues';
 import { LinearAddCommentAction } from '../nodes/connectors/linear/linear-add-comment';
 import { GitHubGetIssueAction } from '../nodes/connectors/github/github-get-issue';
+import { GitHubListIssuesAction } from '../nodes/connectors/github/github-list-issues';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -246,6 +247,7 @@ describe('EngineModule', () => {
     const linearSearchIssues = new LinearSearchIssuesAction(undefined as never);
     const linearAddComment = new LinearAddCommentAction(undefined as never);
     const githubGetIssue = new GitHubGetIssueAction(undefined as never);
+    const githubListIssues = new GitHubListIssuesAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -362,6 +364,7 @@ describe('EngineModule', () => {
       linearSearchIssues,
       linearAddComment,
       githubGetIssue,
+      githubListIssues,
     );
     return {
       registry,
@@ -617,7 +620,7 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244).
-      expect(counts.action).toBe(86);
+      expect(counts.action).toBe(87);
     });
   });
 });
