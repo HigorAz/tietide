@@ -412,7 +412,9 @@ export {
   hubspotUpdateDealConfigSchema,
   hubspotCreateCompanyConfigSchema,
   hubspotCreateNoteConfigSchema,
+  hubspotDealChangedConfigSchema,
   HUBSPOT_CONTACT_EVENT_TYPES,
+  HUBSPOT_DEAL_EVENT_TYPES,
   type HubspotCreateContactConfig,
   type HubspotCreateDealConfig,
   type HubspotContactChangedConfig,
@@ -423,6 +425,8 @@ export {
   type HubspotUpdateDealConfig,
   type HubspotCreateCompanyConfig,
   type HubspotCreateNoteConfig,
+  type HubspotDealChangedConfig,
+  type HubspotDealEventType,
 } from './schemas/hubspot.schema.js';
 export {
   stripeCreateCustomerConfigSchema,
@@ -444,6 +448,8 @@ export {
   type StripeCreateRefundConfig,
   type StripeListInvoicesConfig,
   type StripeCreateSubscriptionConfig,
+  stripeInvoicePaidConfigSchema,
+  type StripeInvoicePaidConfig,
 } from './schemas/stripe-actions.schema.js';
 export {
   mailchimpAddSubscriberConfigSchema,
@@ -506,6 +512,7 @@ export {
   s3ListObjectsConfigSchema,
   s3DeleteObjectConfigSchema,
   s3GetPresignedUrlConfigSchema,
+  s3ObjectCreatedConfigSchema,
   S3_STREAMING_THRESHOLD_BYTES,
   S3_MAX_PRESIGN_EXPIRY_SECONDS,
   type S3UploadFileConfig,
@@ -513,6 +520,7 @@ export {
   type S3ListObjectsConfig,
   type S3DeleteObjectConfig,
   type S3GetPresignedUrlConfig,
+  type S3ObjectCreatedConfig,
 } from './schemas/s3.schema.js';
 export {
   airtableCreateRecordConfigSchema,

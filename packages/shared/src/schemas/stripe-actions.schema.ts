@@ -53,6 +53,14 @@ export const stripeEventReceivedConfigSchema = z.object({
 });
 export type StripeEventReceivedConfig = z.infer<typeof stripeEventReceivedConfigSchema>;
 
+// Filtered convenience trigger over stripe-event-received: activation pins the
+// Stripe webhook endpoint to the `invoice.paid` event and delivery is guarded to
+// that type. No extra node config beyond the connection.
+export const stripeInvoicePaidConfigSchema = z.object({
+  connectionId,
+});
+export type StripeInvoicePaidConfig = z.infer<typeof stripeInvoicePaidConfigSchema>;
+
 // 3-letter ISO currency code (Stripe accepts lowercase; the action lowercases).
 const stripeCurrency = z
   .string()

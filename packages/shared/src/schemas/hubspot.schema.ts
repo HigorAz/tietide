@@ -58,6 +58,23 @@ export const hubspotContactChangedConfigSchema = z.object({
 });
 export type HubspotContactChangedConfig = z.infer<typeof hubspotContactChangedConfigSchema>;
 
+// Subscription event types HubSpot emits for the deal-changed trigger (#246).
+export const HUBSPOT_DEAL_EVENT_TYPES = [
+  'deal.creation',
+  'deal.deletion',
+  'deal.propertyChange',
+  'deal.merge',
+  'deal.restore',
+] as const;
+export type HubspotDealEventType = (typeof HUBSPOT_DEAL_EVENT_TYPES)[number];
+
+export const hubspotDealChangedConfigSchema = z.object({
+  connectionId,
+  eventTypes: z.array(z.enum(HUBSPOT_DEAL_EVENT_TYPES)).max(5).optional(),
+  propertyName: z.string().max(255).optional(),
+});
+export type HubspotDealChangedConfig = z.infer<typeof hubspotDealChangedConfigSchema>;
+
 // --- S15 commerce/data/storage read/update pack (#246) ---
 
 export const hubspotFindContactConfigSchema = z.object({

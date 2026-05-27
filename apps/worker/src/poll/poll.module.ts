@@ -48,6 +48,11 @@ import {
   LINEAR_ISSUE_UPDATED_TYPE,
 } from '../nodes/triggers/poll/linear-issue-updated';
 import { LinearClientFactory } from '../nodes/connectors/linear/linear-client.factory';
+import {
+  S3ObjectCreatedTrigger,
+  S3_OBJECT_CREATED_TYPE,
+} from '../nodes/triggers/poll/s3-object-created';
+import { S3ClientFactory } from '../nodes/connectors/s3/s3-client.factory';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import { PollSchedulerService } from './poll-scheduler.service';
@@ -83,6 +88,8 @@ import { PollConnectionLoader } from './poll-connection-loader';
     AirtableRecordCreatedTrigger,
     LinearClientFactory,
     LinearIssueUpdatedTrigger,
+    S3ClientFactory,
+    S3ObjectCreatedTrigger,
   ],
   exports: [PollTriggerRegistry],
 })
@@ -99,6 +106,7 @@ export class PollModule implements OnModuleInit {
     private readonly notionDbItemUpdated: NotionDatabaseItemUpdatedTrigger,
     private readonly airtableRecordCreated: AirtableRecordCreatedTrigger,
     private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
+    private readonly s3ObjectCreated: S3ObjectCreatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -112,5 +120,6 @@ export class PollModule implements OnModuleInit {
     this.registry.register(NOTION_DATABASE_ITEM_UPDATED_TYPE, this.notionDbItemUpdated);
     this.registry.register(AIRTABLE_RECORD_CREATED_TYPE, this.airtableRecordCreated);
     this.registry.register(LINEAR_ISSUE_UPDATED_TYPE, this.linearIssueUpdated);
+    this.registry.register(S3_OBJECT_CREATED_TYPE, this.s3ObjectCreated);
   }
 }

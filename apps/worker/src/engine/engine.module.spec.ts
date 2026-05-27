@@ -144,8 +144,11 @@ import {
   TrelloCardChangedPassthrough,
   GithubIssueOpenedPassthrough,
   GithubPrOpenedPassthrough,
+  StripeInvoicePaidPassthrough,
+  HubspotDealChangedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
+import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
@@ -362,6 +365,9 @@ describe('EngineModule', () => {
     const openaiGenerateImage = new OpenaiGenerateImageAction(undefined as never);
     const anthropicVision = new AnthropicVisionAction(undefined as never);
     const ollamaEmbeddings = new OllamaEmbeddingsAction(undefined as never);
+    const stripeInvoicePaid = new StripeInvoicePaidPassthrough();
+    const hubspotDealChanged = new HubspotDealChangedPassthrough();
+    const s3ObjectCreated = new S3ObjectCreatedTrigger(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -536,6 +542,9 @@ describe('EngineModule', () => {
       openaiGenerateImage,
       anthropicVision,
       ollamaEmbeddings,
+      stripeInvoicePaid,
+      hubspotDealChanged,
+      s3ObjectCreated,
     );
     return {
       registry,
@@ -686,6 +695,9 @@ describe('EngineModule', () => {
       openaiGenerateImage,
       anthropicVision,
       ollamaEmbeddings,
+      stripeInvoicePaid,
+      hubspotDealChanged,
+      s3ObjectCreated,
       module,
     };
   };
@@ -867,6 +879,9 @@ describe('EngineModule', () => {
       ['OpenaiGenerateImageAction', 'openai-generate-image', 'openaiGenerateImage'],
       ['AnthropicVisionAction', 'anthropic-vision', 'anthropicVision'],
       ['OllamaEmbeddingsAction', 'ollama-embeddings', 'ollamaEmbeddings'],
+      ['StripeInvoicePaidPassthrough', 'stripe-invoice-paid', 'stripeInvoicePaid'],
+      ['HubspotDealChangedPassthrough', 'hubspot-deal-changed', 'hubspotDealChanged'],
+      ['S3ObjectCreatedTrigger', 's3-object-created', 's3ObjectCreated'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -893,7 +908,8 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated). +messaging pack triggers (#245).
-      expect(counts.trigger).toBe(32);
+      // +#246 triggers: stripe-invoice-paid + hubspot-deal-changed (push) + s3-object-created (poll).
+      expect(counts.trigger).toBe(35);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +

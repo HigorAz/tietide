@@ -292,6 +292,13 @@ export function shouldEmitForEventType(
     return (triggerData as { action?: unknown }).action === 'opened';
   }
 
+  // stripe-invoice-paid is a filtered variant of stripe-event-received: even though
+  // activation pins the endpoint to invoice.paid, guard delivery to that type so a
+  // shared/legacy endpoint can't leak other events into this trigger.
+  if (triggerType === 'stripe-invoice-paid') {
+    return (triggerData as { type?: unknown }).type === 'invoice.paid';
+  }
+
   if (!nodeConfig) return true;
   const filter = nodeConfig.eventType;
   if (typeof filter !== 'string' || filter.length === 0) return true;

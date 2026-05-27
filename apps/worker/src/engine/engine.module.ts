@@ -200,6 +200,8 @@ import {
   TrelloCardChangedPassthrough,
   GithubIssueOpenedPassthrough,
   GithubPrOpenedPassthrough,
+  StripeInvoicePaidPassthrough,
+  HubspotDealChangedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -209,6 +211,7 @@ import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-re
 import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
+import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -343,6 +346,9 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     OpenaiGenerateImageAction,
     AnthropicVisionAction,
     OllamaEmbeddingsAction,
+    StripeInvoicePaidPassthrough,
+    HubspotDealChangedPassthrough,
+    S3ObjectCreatedTrigger,
     HubspotClientFactory,
     HubspotCreateContactAction,
     HubspotCreateDealAction,
@@ -591,6 +597,9 @@ export class EngineModule implements OnModuleInit {
     private readonly openaiGenerateImage: OpenaiGenerateImageAction,
     private readonly anthropicVision: AnthropicVisionAction,
     private readonly ollamaEmbeddings: OllamaEmbeddingsAction,
+    private readonly stripeInvoicePaid: StripeInvoicePaidPassthrough,
+    private readonly hubspotDealChanged: HubspotDealChangedPassthrough,
+    private readonly s3ObjectCreated: S3ObjectCreatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -766,5 +775,8 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.openaiGenerateImage);
     this.registry.register(this.anthropicVision);
     this.registry.register(this.ollamaEmbeddings);
+    this.registry.register(this.stripeInvoicePaid);
+    this.registry.register(this.hubspotDealChanged);
+    this.registry.register(this.s3ObjectCreated);
   }
 }

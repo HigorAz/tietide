@@ -99,6 +99,14 @@ import {
   GithubPrOpenedTrigger,
   GITHUB_PR_OPENED_TYPE,
 } from './triggers/github/github-pr-opened.trigger';
+import {
+  StripeInvoicePaidTrigger,
+  STRIPE_INVOICE_PAID_TYPE,
+} from './triggers/stripe-invoice-paid.trigger';
+import {
+  HubspotDealChangedTrigger,
+  HUBSPOT_DEAL_CHANGED_TYPE,
+} from './triggers/hubspot/hubspot-deal-changed.trigger';
 import { RENEWAL_QUEUE_NAME } from './renewal/subscription-renewer.constants';
 import { SubscriptionRenewerProcessor } from './renewal/subscription-renewer.processor';
 import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-bootstrap.service';
@@ -142,6 +150,8 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     TrelloCardChangedTrigger,
     GithubIssueOpenedTrigger,
     GithubPrOpenedTrigger,
+    StripeInvoicePaidTrigger,
+    HubspotDealChangedTrigger,
     ActivationService,
     SubscriptionRenewerProcessor,
     SubscriptionRenewerBootstrap,
@@ -179,6 +189,8 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly trelloCardChanged: TrelloCardChangedTrigger,
     private readonly githubIssueOpened: GithubIssueOpenedTrigger,
     private readonly githubPrOpened: GithubPrOpenedTrigger,
+    private readonly stripeInvoicePaid: StripeInvoicePaidTrigger,
+    private readonly hubspotDealChanged: HubspotDealChangedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -207,5 +219,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(TRELLO_CARD_CHANGED_TYPE, this.trelloCardChanged);
     this.registry.register(GITHUB_ISSUE_OPENED_TYPE, this.githubIssueOpened);
     this.registry.register(GITHUB_PR_OPENED_TYPE, this.githubPrOpened);
+    this.registry.register(STRIPE_INVOICE_PAID_TYPE, this.stripeInvoicePaid);
+    this.registry.register(HUBSPOT_DEAL_CHANGED_TYPE, this.hubspotDealChanged);
   }
 }

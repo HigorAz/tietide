@@ -172,6 +172,9 @@ import { S3DownloadFileForm } from './s3/S3DownloadFileForm';
 import { S3ListObjectsForm } from './s3/S3ListObjectsForm';
 import { S3DeleteObjectForm } from './s3/S3DeleteObjectForm';
 import { S3GetPresignedUrlForm } from './s3/S3GetPresignedUrlForm';
+import { S3ObjectCreatedForm } from './s3/S3ObjectCreatedForm';
+import { StripeInvoicePaidForm } from './stripe/StripeInvoicePaidForm';
+import { HubspotDealChangedForm } from './hubspot/HubspotDealChangedForm';
 import { TrelloAddCommentForm } from './trello/TrelloAddCommentForm';
 import { TrelloUpdateCardForm } from './trello/TrelloUpdateCardForm';
 import { TrelloCardChangedForm } from './trello/TrelloCardChangedForm';
@@ -357,4 +360,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TRELLO_ADD_COMMENT]: TrelloAddCommentForm,
   [NodeType.TRELLO_UPDATE_CARD]: TrelloUpdateCardForm,
   [NodeType.TRELLO_CARD_CHANGED]: TrelloCardChangedForm,
+  [NodeType.STRIPE_INVOICE_PAID]: StripeInvoicePaidForm,
+  [NodeType.HUBSPOT_DEAL_CHANGED]: HubspotDealChangedForm,
+  [NodeType.S3_OBJECT_CREATED]: S3ObjectCreatedForm,
 };

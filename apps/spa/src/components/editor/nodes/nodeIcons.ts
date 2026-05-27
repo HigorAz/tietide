@@ -225,6 +225,9 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.OPENAI_GENERATE_IMAGE]: Bot,
   [NodeType.ANTHROPIC_VISION]: Sparkles,
   [NodeType.OLLAMA_EMBEDDINGS]: Cpu,
+  [NodeType.STRIPE_INVOICE_PAID]: CreditCard,
+  [NodeType.HUBSPOT_DEAL_CHANGED]: Target,
+  [NodeType.S3_OBJECT_CREATED]: CloudUpload,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

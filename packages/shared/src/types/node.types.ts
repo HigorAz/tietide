@@ -186,6 +186,9 @@ export const NodeType = {
   OPENAI_GENERATE_IMAGE: 'openai-generate-image',
   ANTHROPIC_VISION: 'anthropic-vision',
   OLLAMA_EMBEDDINGS: 'ollama-embeddings',
+  STRIPE_INVOICE_PAID: 'stripe-invoice-paid',
+  HUBSPOT_DEAL_CHANGED: 'hubspot-deal-changed',
+  S3_OBJECT_CREATED: 's3-object-created',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -1661,5 +1664,30 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.AI,
     provider: 'ollama',
+  },
+  {
+    type: NodeType.STRIPE_INVOICE_PAID,
+    name: 'Stripe: Invoice Paid',
+    description: 'Trigger when a Stripe invoice is paid (push, filtered invoice.paid event)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMERCE_TRIGGERS,
+    provider: 'stripe',
+  },
+  {
+    type: NodeType.HUBSPOT_DEAL_CHANGED,
+    name: 'HubSpot: Deal Changed',
+    description:
+      'Trigger when a HubSpot deal is created, updated, or deleted (push, X-HubSpot-Signature-v3)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMERCE_TRIGGERS,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.S3_OBJECT_CREATED,
+    name: 'S3: Object Created',
+    description: 'Trigger when a new object appears under an S3 bucket/prefix (poll, list-objects)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMERCE_TRIGGERS,
+    provider: 's3',
   },
 ];

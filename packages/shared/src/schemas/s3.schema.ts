@@ -96,3 +96,12 @@ export const s3GetPresignedUrlConfigSchema = z.object({
   mockOnDryRun,
 });
 export type S3GetPresignedUrlConfig = z.infer<typeof s3GetPresignedUrlConfigSchema>;
+
+// Poll trigger: fires once per new object key under a bucket/prefix. Uses a
+// list-objects watermark cursor — no bucket-notification dependency.
+export const s3ObjectCreatedConfigSchema = z.object({
+  connectionId,
+  bucket: s3BucketName,
+  prefix: z.string().max(1024).optional(),
+});
+export type S3ObjectCreatedConfig = z.infer<typeof s3ObjectCreatedConfigSchema>;
