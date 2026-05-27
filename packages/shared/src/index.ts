@@ -242,6 +242,7 @@ export {
   outlookCreateDraftConfigSchema,
   excelAppendConfigSchema,
   excelReadConfigSchema,
+  excelFindRowConfigSchema,
   onedriveCreateConfigSchema,
   MICROSOFT_NODE_REQUIRED_SCOPES,
   MICROSOFT_NODE_TYPES,
@@ -253,6 +254,7 @@ export {
   type OutlookCreateDraftConfig,
   type ExcelAppendConfig,
   type ExcelReadConfig,
+  type ExcelFindRowConfig,
   type OnedriveCreateConfig,
 } from './schemas/microsoft.schema.js';
 export {

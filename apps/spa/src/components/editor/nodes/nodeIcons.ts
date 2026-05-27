@@ -94,6 +94,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.OUTLOOK_CREATE_DRAFT]: Mail,
   [NodeType.EXCEL_APPEND]: Sheet,
   [NodeType.EXCEL_READ]: Sheet,
+  [NodeType.EXCEL_FIND_ROW]: Sheet,
   [NodeType.ONEDRIVE_CREATE]: HardDrive,
   [NodeType.OUTLOOK_MESSAGE_RECEIVED]: Mail,
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: Mail,

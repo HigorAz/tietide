@@ -115,6 +115,19 @@ export const onedriveCreateConfigSchema = z.object({
 });
 export type OnedriveCreateConfig = z.infer<typeof onedriveCreateConfigSchema>;
 
+export const excelFindRowConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  workbookId: z.string().min(1).max(128),
+  worksheet: z.string().min(1).max(255),
+  tableName: z.string().min(1).max(255).default('Table1'),
+  column: z.string().min(1).max(255),
+  value: z.string().max(4096),
+  matchMode: z.enum(['exact', 'contains', 'startsWith']).default('exact'),
+  maxMatches: z.number().int().positive().max(500).optional(),
+  mockOnDryRun,
+});
+export type ExcelFindRowConfig = z.infer<typeof excelFindRowConfigSchema>;
+
 export const outlookGetMessageConfigSchema = z.object({
   connectionId: z.string().uuid(),
   messageId: graphId(),
@@ -195,6 +208,7 @@ export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.OUTLOOK_CREATE_DRAFT]: 'Mail.ReadWrite',
   [NodeType.EXCEL_APPEND]: 'Files.ReadWrite',
   [NodeType.EXCEL_READ]: 'Files.Read',
+  [NodeType.EXCEL_FIND_ROW]: 'Files.Read',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',
 };
 

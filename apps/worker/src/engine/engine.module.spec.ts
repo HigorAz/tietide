@@ -37,6 +37,7 @@ import { OutlookUpdateMessageAction } from '../nodes/connectors/microsoft/outloo
 import { OutlookCreateDraftAction } from '../nodes/connectors/microsoft/outlook-create-draft';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
+import { ExcelFindRowAction } from '../nodes/connectors/microsoft/excel-find-row';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
@@ -140,6 +141,7 @@ describe('EngineModule', () => {
     const outlookCreateDraft = new OutlookCreateDraftAction(undefined as never);
     const excelAppend = new ExcelAppendAction(undefined as never);
     const excelRead = new ExcelReadAction(undefined as never);
+    const excelFindRow = new ExcelFindRowAction(undefined as never);
     const onedriveCreate = new OnedriveCreateAction(undefined as never);
     const stripeEventReceived = new StripeEventReceivedPassthrough();
     const driveFileAdded = new DriveFileAddedPassthrough();
@@ -244,6 +246,7 @@ describe('EngineModule', () => {
       outlookCreateDraft,
       excelAppend,
       excelRead,
+      excelFindRow,
       onedriveCreate,
       stripeEventReceived,
       driveFileAdded,
@@ -340,6 +343,7 @@ describe('EngineModule', () => {
       outlookCreateDraft,
       excelAppend,
       excelRead,
+      excelFindRow,
       onedriveCreate,
       stripeEventReceived,
       driveFileAdded,
@@ -439,6 +443,7 @@ describe('EngineModule', () => {
       ['OutlookCreateDraftAction', 'outlook-create-draft', 'outlookCreateDraft'],
       ['ExcelAppendAction', 'excel-append', 'excelAppend'],
       ['ExcelReadAction', 'excel-read', 'excelRead'],
+      ['ExcelFindRowAction', 'excel-find-row', 'excelFindRow'],
       ['OnedriveCreateAction', 'onedrive-create', 'onedriveCreate'],
       ['StripeEventReceivedPassthrough', 'stripe-event-received', 'stripeEventReceived'],
       ['DriveFileAddedPassthrough', 'drive-file-added', 'driveFileAdded'],
@@ -530,14 +535,14 @@ describe('EngineModule', () => {
       expect(counts.trigger).toBe(22);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
-      // 9 Microsoft connector actions +
+      // 10 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 67.
-      expect(counts.action).toBe(67);
+      //   calendly, postgres, mysql, s3, trello ×2) = 68.
+      expect(counts.action).toBe(68);
     });
   });
 });

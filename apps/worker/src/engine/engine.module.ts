@@ -54,6 +54,7 @@ import { OutlookUpdateMessageAction } from '../nodes/connectors/microsoft/outloo
 import { OutlookCreateDraftAction } from '../nodes/connectors/microsoft/outlook-create-draft';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
+import { ExcelFindRowAction } from '../nodes/connectors/microsoft/excel-find-row';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
 import { SlackClientFactory } from '../nodes/connectors/slack/slack-client.factory';
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
@@ -177,6 +178,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     OutlookCreateDraftAction,
     ExcelAppendAction,
     ExcelReadAction,
+    ExcelFindRowAction,
     OnedriveCreateAction,
     SlackClientFactory,
     SlackPostMessageAction,
@@ -297,6 +299,7 @@ export class EngineModule implements OnModuleInit {
     private readonly outlookCreateDraft: OutlookCreateDraftAction,
     private readonly excelAppend: ExcelAppendAction,
     private readonly excelRead: ExcelReadAction,
+    private readonly excelFindRow: ExcelFindRowAction,
     private readonly onedriveCreate: OnedriveCreateAction,
     private readonly stripeEventReceived: StripeEventReceivedPassthrough,
     private readonly driveFileAdded: DriveFileAddedPassthrough,
@@ -393,6 +396,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.outlookCreateDraft);
     this.registry.register(this.excelAppend);
     this.registry.register(this.excelRead);
+    this.registry.register(this.excelFindRow);
     this.registry.register(this.onedriveCreate);
     this.registry.register(this.stripeEventReceived);
     this.registry.register(this.driveFileAdded);

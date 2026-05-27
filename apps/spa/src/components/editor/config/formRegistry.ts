@@ -46,6 +46,7 @@ import { OutlookUpdateMessageForm } from './microsoft/OutlookUpdateMessageForm';
 import { OutlookCreateDraftForm } from './microsoft/OutlookCreateDraftForm';
 import { ExcelAppendForm } from './microsoft/ExcelAppendForm';
 import { ExcelReadForm } from './microsoft/ExcelReadForm';
+import { ExcelFindRowForm } from './microsoft/ExcelFindRowForm';
 import { OneDriveCreateForm } from './microsoft/OneDriveCreateForm';
 import { OutlookMessageReceivedForm } from './microsoft/OutlookMessageReceivedForm';
 import { OutlookMessageFlaggedForm } from './microsoft/OutlookMessageFlaggedForm';
@@ -149,6 +150,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.OUTLOOK_CREATE_DRAFT]: OutlookCreateDraftForm,
   [NodeType.EXCEL_APPEND]: ExcelAppendForm,
   [NodeType.EXCEL_READ]: ExcelReadForm,
+  [NodeType.EXCEL_FIND_ROW]: ExcelFindRowForm,
   [NodeType.ONEDRIVE_CREATE]: OneDriveCreateForm,
   [NodeType.OUTLOOK_MESSAGE_RECEIVED]: OutlookMessageReceivedForm,
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: OutlookMessageFlaggedForm,
