@@ -21,6 +21,7 @@ import { SheetsAppendForm } from './google/SheetsAppendForm';
 import { SheetsReadForm } from './google/SheetsReadForm';
 import { SheetsFindRowForm } from './google/SheetsFindRowForm';
 import { SheetsUpdateRowForm } from './google/SheetsUpdateRowForm';
+import { SheetsClearRangeForm } from './google/SheetsClearRangeForm';
 import { DocsCreateForm } from './google/DocsCreateForm';
 import { CalendarCreateForm } from './google/CalendarCreateForm';
 import { SheetsRowAddedForm } from './google/SheetsRowAddedForm';
@@ -110,6 +111,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.SHEETS_READ]: SheetsReadForm,
   [NodeType.SHEETS_FIND_ROW]: SheetsFindRowForm,
   [NodeType.SHEETS_UPDATE_ROW]: SheetsUpdateRowForm,
+  [NodeType.SHEETS_CLEAR_RANGE]: SheetsClearRangeForm,
   [NodeType.DOCS_CREATE]: DocsCreateForm,
   [NodeType.CALENDAR_CREATE]: CalendarCreateForm,
   [NodeType.SHEETS_ROW_ADDED]: SheetsRowAddedForm,

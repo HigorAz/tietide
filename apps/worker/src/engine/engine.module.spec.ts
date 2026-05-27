@@ -20,6 +20,7 @@ import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
 import { SheetsFindRowAction } from '../nodes/connectors/google/sheets-find-row';
 import { SheetsUpdateRowAction } from '../nodes/connectors/google/sheets-update-row';
+import { SheetsClearRangeAction } from '../nodes/connectors/google/sheets-clear-range';
 import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
@@ -109,6 +110,7 @@ describe('EngineModule', () => {
     const sheetsRead = new SheetsReadAction(undefined as never, undefined as never);
     const sheetsFindRow = new SheetsFindRowAction(undefined as never, undefined as never);
     const sheetsUpdateRow = new SheetsUpdateRowAction(undefined as never, undefined as never);
+    const sheetsClearRange = new SheetsClearRangeAction(undefined as never, undefined as never);
     const docsCreate = new DocsCreateAction(undefined as never, undefined as never);
     const calendarCreate = new CalendarCreateAction(undefined as never, undefined as never);
     const outlookSend = new OutlookSendAction(undefined as never);
@@ -193,6 +195,7 @@ describe('EngineModule', () => {
       sheetsRead,
       sheetsFindRow,
       sheetsUpdateRow,
+      sheetsClearRange,
       docsCreate,
       calendarCreate,
       outlookSend,
@@ -275,6 +278,7 @@ describe('EngineModule', () => {
       sheetsRead,
       sheetsFindRow,
       sheetsUpdateRow,
+      sheetsClearRange,
       docsCreate,
       calendarCreate,
       outlookSend,
@@ -360,6 +364,7 @@ describe('EngineModule', () => {
       ['SheetsReadAction', 'sheets-read', 'sheetsRead'],
       ['SheetsFindRowAction', 'sheets-find-row', 'sheetsFindRow'],
       ['SheetsUpdateRowAction', 'sheets-update-row', 'sheetsUpdateRow'],
+      ['SheetsClearRangeAction', 'sheets-clear-range', 'sheetsClearRange'],
       ['DocsCreateAction', 'docs-create', 'docsCreate'],
       ['CalendarCreateAction', 'calendar-create', 'calendarCreate'],
       ['OutlookSendAction', 'outlook-send', 'outlookSend'],
@@ -451,15 +456,15 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
       expect(counts.trigger).toBe(19);
       expect(counts.logic).toBe(4);
-      // 2 generic actions (http-request, code) + 14 Google connector actions +
+      // 2 generic actions (http-request, code) + 15 Google connector actions +
       // 5 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 56.
-      expect(counts.action).toBe(56);
+      //   calendly, postgres, mysql, s3, trello ×2) = 57.
+      expect(counts.action).toBe(57);
     });
   });
 });
