@@ -76,6 +76,35 @@ export const gmailGetAttachmentConfigSchema = z.object({
 });
 export type GmailGetAttachmentConfig = z.infer<typeof gmailGetAttachmentConfigSchema>;
 
+const labelId = z.string().min(1).max(128);
+export const gmailModifyLabelsConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    messageId: z.string().min(1).max(128),
+    addLabelIds: z.array(labelId).max(100).optional(),
+    removeLabelIds: z.array(labelId).max(100).optional(),
+    // Convenience flags layered onto the label deltas: archive → remove INBOX,
+    // markRead → remove UNREAD, markUnread → add UNREAD.
+    archive: z.boolean().optional(),
+    markRead: z.boolean().optional(),
+    markUnread: z.boolean().optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => !(v.markRead && v.markUnread), {
+    message: 'markRead and markUnread are mutually exclusive',
+    path: ['markUnread'],
+  })
+  .refine(
+    (v) =>
+      (v.addLabelIds?.length ?? 0) > 0 ||
+      (v.removeLabelIds?.length ?? 0) > 0 ||
+      v.archive === true ||
+      v.markRead === true ||
+      v.markUnread === true,
+    { message: 'Specify at least one label change', path: ['addLabelIds'] },
+  );
+export type GmailModifyLabelsConfig = z.infer<typeof gmailModifyLabelsConfigSchema>;
+
 export const driveCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   name: z.string().min(1).max(255),
@@ -145,6 +174,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.GMAIL_SEARCH]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_GET_MESSAGE]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_GET_ATTACHMENT]: 'https://www.googleapis.com/auth/gmail.readonly',
+  [NodeType.GMAIL_MODIFY_LABELS]: 'https://www.googleapis.com/auth/gmail.modify',
   [NodeType.DRIVE_CREATE]: 'https://www.googleapis.com/auth/drive.file',
   [NodeType.DRIVE_LIST]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_APPEND]: 'https://www.googleapis.com/auth/spreadsheets',

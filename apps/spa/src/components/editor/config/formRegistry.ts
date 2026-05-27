@@ -13,6 +13,7 @@ import { GmailSendForm } from './google/GmailSendForm';
 import { GmailSearchForm } from './google/GmailSearchForm';
 import { GmailGetMessageForm } from './google/GmailGetMessageForm';
 import { GmailGetAttachmentForm } from './google/GmailGetAttachmentForm';
+import { GmailModifyLabelsForm } from './google/GmailModifyLabelsForm';
 import { DriveCreateForm } from './google/DriveCreateForm';
 import { DriveListForm } from './google/DriveListForm';
 import { SheetsAppendForm } from './google/SheetsAppendForm';
@@ -98,6 +99,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.GMAIL_SEARCH]: GmailSearchForm,
   [NodeType.GMAIL_GET_MESSAGE]: GmailGetMessageForm,
   [NodeType.GMAIL_GET_ATTACHMENT]: GmailGetAttachmentForm,
+  [NodeType.GMAIL_MODIFY_LABELS]: GmailModifyLabelsForm,
   [NodeType.DRIVE_CREATE]: DriveCreateForm,
   [NodeType.DRIVE_LIST]: DriveListForm,
   [NodeType.SHEETS_APPEND]: SheetsAppendForm,
