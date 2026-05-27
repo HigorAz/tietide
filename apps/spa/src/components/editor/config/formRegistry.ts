@@ -81,6 +81,7 @@ import { TwilioSmsReceivedForm } from './twilio/TwilioSmsReceivedForm';
 import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
 import { TelegramSendPhotoForm } from './telegram/TelegramSendPhotoForm';
 import { TelegramSendDocumentForm } from './telegram/TelegramSendDocumentForm';
+import { TelegramEditMessageForm } from './telegram/TelegramEditMessageForm';
 import { TelegramMessageReceivedForm } from './telegram/TelegramMessageReceivedForm';
 import { NotionCreatePageForm } from './notion/NotionCreatePageForm';
 import { NotionQueryDatabaseForm } from './notion/NotionQueryDatabaseForm';
@@ -227,6 +228,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TELEGRAM_SEND_MESSAGE]: TelegramSendMessageForm,
   [NodeType.TELEGRAM_SEND_PHOTO]: TelegramSendPhotoForm,
   [NodeType.TELEGRAM_SEND_DOCUMENT]: TelegramSendDocumentForm,
+  [NodeType.TELEGRAM_EDIT_MESSAGE]: TelegramEditMessageForm,
   [NodeType.TELEGRAM_MESSAGE_RECEIVED]: TelegramMessageReceivedForm,
   [NodeType.NOTION_CREATE_PAGE]: NotionCreatePageForm,
   [NodeType.NOTION_QUERY_DATABASE]: NotionQueryDatabaseForm,

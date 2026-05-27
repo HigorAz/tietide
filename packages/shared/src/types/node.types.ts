@@ -835,6 +835,14 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     provider: 'telegram',
   },
   {
+    type: NodeType.TELEGRAM_EDIT_MESSAGE,
+    name: 'Telegram: Edit Message',
+    description: 'Edit the text of a previously sent Telegram message',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMUNICATION,
+    provider: 'telegram',
+  },
+  {
     type: NodeType.SLACK_MESSAGE_RECEIVED,
     name: 'Slack: Message Received',
     description: 'Trigger when a message is posted to a Slack channel (push, Slack Events API)',
