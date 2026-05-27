@@ -22,6 +22,7 @@ export const isPushTriggerType = (value: string): value is PushTriggerType =>
 export const POLL_TRIGGER_TYPES = [
   'sheets-row-added',
   'gmail-label-added',
+  'gmail-attachment-received',
   'calendar-event-created',
   'calendar-event-updated',
   'excel-row-added',

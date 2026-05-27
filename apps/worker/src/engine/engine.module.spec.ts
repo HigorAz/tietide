@@ -88,6 +88,7 @@ import {
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
+import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -189,6 +190,10 @@ describe('EngineModule', () => {
       undefined as never,
       undefined as never,
     );
+    const gmailAttachmentReceived = new GmailAttachmentReceivedTrigger(
+      undefined as never,
+      undefined as never,
+    );
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -278,6 +283,7 @@ describe('EngineModule', () => {
       calendlyEventScheduled,
       trelloCardChanged,
       calendarEventUpdated,
+      gmailAttachmentReceived,
     );
     return {
       registry,
@@ -368,6 +374,7 @@ describe('EngineModule', () => {
       calendlyEventScheduled,
       trelloCardChanged,
       calendarEventUpdated,
+      gmailAttachmentReceived,
       module,
     };
   };
@@ -469,6 +476,7 @@ describe('EngineModule', () => {
       ['CalendlyEventScheduledPassthrough', 'calendly-event-scheduled', 'calendlyEventScheduled'],
       ['TrelloCardChangedPassthrough', 'trello-card-changed', 'trelloCardChanged'],
       ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
+      ['GmailAttachmentReceivedTrigger', 'gmail-attachment-received', 'gmailAttachmentReceived'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -492,8 +500,8 @@ describe('EngineModule', () => {
       // onedrive-file-added, excel-row-added) +
       // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
-      // 1 Google poll trigger (calendar-event-updated) = 20.
-      expect(counts.trigger).toBe(20);
+      // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) = 21.
+      expect(counts.trigger).toBe(21);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 5 Microsoft connector actions +

@@ -217,6 +217,7 @@ export {
 export {
   gmailMessageReceivedConfigSchema,
   gmailLabelAddedConfigSchema,
+  gmailAttachmentReceivedConfigSchema,
   driveFileAddedConfigSchema,
   sheetsRowAddedConfigSchema,
   calendarEventCreatedConfigSchema,
@@ -224,6 +225,7 @@ export {
   GOOGLE_TRIGGER_REQUIRED_SCOPES,
   type GmailMessageReceivedConfig,
   type GmailLabelAddedConfig,
+  type GmailAttachmentReceivedConfig,
   type DriveFileAddedConfig,
   type SheetsRowAddedConfig,
   type CalendarEventCreatedConfig,

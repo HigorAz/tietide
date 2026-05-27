@@ -123,6 +123,7 @@ import {
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
+import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -238,6 +239,7 @@ import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-eve
     GmailMessageReceivedExecutor,
     ExcelRowAddedTrigger,
     CalendarEventUpdatedTrigger,
+    GmailAttachmentReceivedTrigger,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -334,6 +336,7 @@ export class EngineModule implements OnModuleInit {
     private readonly calendlyEventScheduled: CalendlyEventScheduledPassthrough,
     private readonly trelloCardChanged: TrelloCardChangedPassthrough,
     private readonly calendarEventUpdated: CalendarEventUpdatedTrigger,
+    private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -424,5 +427,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.calendlyEventScheduled);
     this.registry.register(this.trelloCardChanged);
     this.registry.register(this.calendarEventUpdated);
+    this.registry.register(this.gmailAttachmentReceived);
   }
 }
