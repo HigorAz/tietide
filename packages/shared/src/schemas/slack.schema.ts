@@ -177,3 +177,14 @@ export const slackReactionAddedConfigSchema = z.object({
   emoji: z.string().min(1).max(64).optional(),
 });
 export type SlackReactionAddedConfig = z.infer<typeof slackReactionAddedConfigSchema>;
+
+export const slackAppMentionConfigSchema = z.object({
+  connectionId,
+  channelId: slackChannelId.optional(),
+});
+export type SlackAppMentionConfig = z.infer<typeof slackAppMentionConfigSchema>;
+
+export const slackChannelCreatedConfigSchema = z.object({
+  connectionId,
+});
+export type SlackChannelCreatedConfig = z.infer<typeof slackChannelCreatedConfigSchema>;

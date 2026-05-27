@@ -160,6 +160,7 @@ import {
   OnedriveFileAddedPassthrough,
   SlackMessageReceivedPassthrough,
   SlackReactionAddedPassthrough,
+  SlackAppMentionPassthrough,
   DiscordMessageReceivedPassthrough,
   TelegramMessageReceivedPassthrough,
   TwilioSmsReceivedPassthrough,
@@ -336,6 +337,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     OnedriveFileAddedPassthrough,
     SlackMessageReceivedPassthrough,
     SlackReactionAddedPassthrough,
+    SlackAppMentionPassthrough,
     DiscordMessageReceivedPassthrough,
     TelegramMessageReceivedPassthrough,
     TwilioSmsReceivedPassthrough,
@@ -436,6 +438,7 @@ export class EngineModule implements OnModuleInit {
     private readonly telegramGetChat: TelegramGetChatAction,
     private readonly slackMessageReceived: SlackMessageReceivedPassthrough,
     private readonly slackReactionAdded: SlackReactionAddedPassthrough,
+    private readonly slackAppMention: SlackAppMentionPassthrough,
     private readonly discordMessageReceived: DiscordMessageReceivedPassthrough,
     private readonly telegramMessageReceived: TelegramMessageReceivedPassthrough,
     private readonly twilioSmsReceived: TwilioSmsReceivedPassthrough,
@@ -580,6 +583,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.telegramGetChat);
     this.registry.register(this.slackMessageReceived);
     this.registry.register(this.slackReactionAdded);
+    this.registry.register(this.slackAppMention);
     this.registry.register(this.discordMessageReceived);
     this.registry.register(this.telegramMessageReceived);
     this.registry.register(this.twilioSmsReceived);
