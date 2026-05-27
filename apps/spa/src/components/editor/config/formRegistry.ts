@@ -72,6 +72,7 @@ import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
 import { TelegramMessageReceivedForm } from './telegram/TelegramMessageReceivedForm';
 import { NotionCreatePageForm } from './notion/NotionCreatePageForm';
 import { NotionQueryDatabaseForm } from './notion/NotionQueryDatabaseForm';
+import { NotionGetPageForm } from './notion/NotionGetPageForm';
 import { TrelloCreateCardForm } from './trello/TrelloCreateCardForm';
 import { TrelloMoveCardForm } from './trello/TrelloMoveCardForm';
 import { AirtableCreateRecordForm } from './airtable/AirtableCreateRecordForm';
@@ -181,6 +182,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TELEGRAM_MESSAGE_RECEIVED]: TelegramMessageReceivedForm,
   [NodeType.NOTION_CREATE_PAGE]: NotionCreatePageForm,
   [NodeType.NOTION_QUERY_DATABASE]: NotionQueryDatabaseForm,
+  [NodeType.NOTION_GET_PAGE]: NotionGetPageForm,
   [NodeType.TRELLO_CREATE_CARD]: TrelloCreateCardForm,
   [NodeType.TRELLO_MOVE_CARD]: TrelloMoveCardForm,
   [NodeType.AIRTABLE_CREATE_RECORD]: AirtableCreateRecordForm,

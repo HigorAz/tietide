@@ -100,6 +100,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
+import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -216,6 +217,7 @@ describe('EngineModule', () => {
       undefined as never,
     );
     const driveFileUpdated = new DriveFileUpdatedPassthrough();
+    const notionGetPage = new NotionGetPageAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -317,6 +319,7 @@ describe('EngineModule', () => {
       calendarEventUpdated,
       gmailAttachmentReceived,
       driveFileUpdated,
+      notionGetPage,
     );
     return {
       registry,
@@ -567,12 +570,12 @@ describe('EngineModule', () => {
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
-      // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
-      //   linear ×2, github ×3) +
+      // productivity actions (notion, trello, airtable, linear, github) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 71.
-      expect(counts.action).toBe(71);
+      //   calendly, postgres, mysql, s3, trello ×2).
+      // +1 notion-get-page (#244).
+      expect(counts.action).toBe(72);
     });
   });
 });
