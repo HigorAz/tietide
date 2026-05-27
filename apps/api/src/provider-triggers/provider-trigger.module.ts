@@ -62,6 +62,10 @@ import {
   SlackAppMentionTrigger,
   SLACK_APP_MENTION_TYPE,
 } from './triggers/slack/slack-app-mention.trigger';
+import {
+  SlackChannelCreatedTrigger,
+  SLACK_CHANNEL_CREATED_TYPE,
+} from './triggers/slack/slack-channel-created.trigger';
 import { DiscordBotClientFactory } from './triggers/discord/discord-bot-client.factory';
 import {
   DiscordMessageReceivedTrigger,
@@ -124,6 +128,7 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     SlackMessageReceivedTrigger,
     SlackReactionAddedTrigger,
     SlackAppMentionTrigger,
+    SlackChannelCreatedTrigger,
     DiscordBotClientFactory,
     DiscordMessageReceivedTrigger,
     HubspotContactChangedTrigger,
@@ -160,6 +165,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly slackMessageReceived: SlackMessageReceivedTrigger,
     private readonly slackReactionAdded: SlackReactionAddedTrigger,
     private readonly slackAppMention: SlackAppMentionTrigger,
+    private readonly slackChannelCreated: SlackChannelCreatedTrigger,
     private readonly discordMessageReceived: DiscordMessageReceivedTrigger,
     private readonly hubspotContactChanged: HubspotContactChangedTrigger,
     private readonly mailchimpSubscriberAdded: MailchimpSubscriberAddedTrigger,
@@ -183,6 +189,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(SLACK_MESSAGE_RECEIVED_TYPE, this.slackMessageReceived);
     this.registry.register(SLACK_REACTION_ADDED_TYPE, this.slackReactionAdded);
     this.registry.register(SLACK_APP_MENTION_TYPE, this.slackAppMention);
+    this.registry.register(SLACK_CHANNEL_CREATED_TYPE, this.slackChannelCreated);
     this.registry.register(DISCORD_MESSAGE_RECEIVED_TYPE, this.discordMessageReceived);
     this.registry.register(HUBSPOT_CONTACT_CHANGED_TYPE, this.hubspotContactChanged);
     this.registry.register(MAILCHIMP_SUBSCRIBER_ADDED_TYPE, this.mailchimpSubscriberAdded);
