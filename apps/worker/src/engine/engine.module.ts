@@ -90,6 +90,7 @@ import { AirtableUpdateRecordAction } from '../nodes/connectors/airtable/airtabl
 import { AirtableListRecordsAction } from '../nodes/connectors/airtable/airtable-list-records';
 import { AirtableGetRecordAction } from '../nodes/connectors/airtable/airtable-get-record';
 import { AirtableFindRecordsAction } from '../nodes/connectors/airtable/airtable-find-records';
+import { AirtableDeleteRecordAction } from '../nodes/connectors/airtable/airtable-delete-record';
 import { LinearClientFactory } from '../nodes/connectors/linear/linear-client.factory';
 import { LinearCreateIssueAction } from '../nodes/connectors/linear/linear-create-issue';
 import { LinearUpdateIssueStatusAction } from '../nodes/connectors/linear/linear-update-issue-status';
@@ -229,6 +230,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     AirtableListRecordsAction,
     AirtableGetRecordAction,
     AirtableFindRecordsAction,
+    AirtableDeleteRecordAction,
     LinearClientFactory,
     LinearCreateIssueAction,
     LinearUpdateIssueStatusAction,
@@ -400,6 +402,7 @@ export class EngineModule implements OnModuleInit {
     private readonly trelloCreateList: TrelloCreateListAction,
     private readonly airtableGetRecord: AirtableGetRecordAction,
     private readonly airtableFindRecords: AirtableFindRecordsAction,
+    private readonly airtableDeleteRecord: AirtableDeleteRecordAction,
   ) {}
 
   onModuleInit(): void {
@@ -512,5 +515,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.trelloCreateList);
     this.registry.register(this.airtableGetRecord);
     this.registry.register(this.airtableFindRecords);
+    this.registry.register(this.airtableDeleteRecord);
   }
 }
