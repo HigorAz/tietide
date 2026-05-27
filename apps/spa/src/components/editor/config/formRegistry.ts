@@ -75,6 +75,7 @@ import { NotionQueryDatabaseForm } from './notion/NotionQueryDatabaseForm';
 import { NotionGetPageForm } from './notion/NotionGetPageForm';
 import { NotionUpdatePageForm } from './notion/NotionUpdatePageForm';
 import { NotionAppendBlocksForm } from './notion/NotionAppendBlocksForm';
+import { NotionGetBlockChildrenForm } from './notion/NotionGetBlockChildrenForm';
 import { TrelloCreateCardForm } from './trello/TrelloCreateCardForm';
 import { TrelloMoveCardForm } from './trello/TrelloMoveCardForm';
 import { AirtableCreateRecordForm } from './airtable/AirtableCreateRecordForm';
@@ -187,6 +188,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.NOTION_GET_PAGE]: NotionGetPageForm,
   [NodeType.NOTION_UPDATE_PAGE]: NotionUpdatePageForm,
   [NodeType.NOTION_APPEND_BLOCKS]: NotionAppendBlocksForm,
+  [NodeType.NOTION_GET_BLOCK_CHILDREN]: NotionGetBlockChildrenForm,
   [NodeType.TRELLO_CREATE_CARD]: TrelloCreateCardForm,
   [NodeType.TRELLO_MOVE_CARD]: TrelloMoveCardForm,
   [NodeType.AIRTABLE_CREATE_RECORD]: AirtableCreateRecordForm,
