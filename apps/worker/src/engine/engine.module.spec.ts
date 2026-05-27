@@ -118,6 +118,7 @@ import { GitHubGetIssueAction } from '../nodes/connectors/github/github-get-issu
 import { GitHubListIssuesAction } from '../nodes/connectors/github/github-list-issues';
 import { GitHubCloseIssueAction } from '../nodes/connectors/github/github-close-issue';
 import { GitHubGetRepoAction } from '../nodes/connectors/github/github-get-repo';
+import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -252,6 +253,7 @@ describe('EngineModule', () => {
     const githubListIssues = new GitHubListIssuesAction(undefined as never);
     const githubCloseIssue = new GitHubCloseIssueAction(undefined as never);
     const githubGetRepo = new GitHubGetRepoAction(undefined as never);
+    const githubListPrs = new GitHubListPrsAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -371,6 +373,7 @@ describe('EngineModule', () => {
       githubListIssues,
       githubCloseIssue,
       githubGetRepo,
+      githubListPrs,
     );
     return {
       registry,
@@ -626,7 +629,7 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244).
-      expect(counts.action).toBe(89);
+      expect(counts.action).toBe(90);
     });
   });
 });
