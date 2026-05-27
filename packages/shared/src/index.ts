@@ -179,6 +179,7 @@ export {
   driveListConfigSchema,
   sheetsAppendConfigSchema,
   sheetsReadConfigSchema,
+  sheetsFindRowConfigSchema,
   docsCreateConfigSchema,
   calendarCreateConfigSchema,
   GOOGLE_NODE_REQUIRED_SCOPES,
@@ -193,6 +194,7 @@ export {
   type DriveListConfig,
   type SheetsAppendConfig,
   type SheetsReadConfig,
+  type SheetsFindRowConfig,
   type DocsCreateConfig,
   type CalendarCreateConfig,
 } from './schemas/google.schema.js';

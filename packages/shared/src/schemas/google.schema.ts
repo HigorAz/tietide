@@ -154,6 +154,22 @@ export const sheetsReadConfigSchema = z.object({
 });
 export type SheetsReadConfig = z.infer<typeof sheetsReadConfigSchema>;
 
+// Look up rows where a column equals a value. The Sheets API has no
+// server-side query, so the worker reads the range and filters in memory;
+// scanning is capped (see SheetsFindRow action) and reported via `truncated`.
+// `column` is a header name (requires hasHeaderRow) or a 0-based column index.
+export const sheetsFindRowConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  spreadsheetId: z.string().min(1).max(128),
+  range: z.string().min(1).max(255),
+  column: z.union([z.string().min(1).max(255), z.number().int().min(0).max(1000)]),
+  value: z.string().max(10_000),
+  hasHeaderRow: z.boolean().optional(),
+  firstMatchOnly: z.boolean().optional(),
+  mockOnDryRun,
+});
+export type SheetsFindRowConfig = z.infer<typeof sheetsFindRowConfigSchema>;
+
 export const docsCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   templateId: z.string().min(1).max(128),
@@ -193,6 +209,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.DRIVE_LIST]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_APPEND]: 'https://www.googleapis.com/auth/spreadsheets',
   [NodeType.SHEETS_READ]: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+  [NodeType.SHEETS_FIND_ROW]: 'https://www.googleapis.com/auth/spreadsheets.readonly',
   [NodeType.DOCS_CREATE]: 'https://www.googleapis.com/auth/documents',
   [NodeType.CALENDAR_CREATE]: 'https://www.googleapis.com/auth/calendar.events',
 };

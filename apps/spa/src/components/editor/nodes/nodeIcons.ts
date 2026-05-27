@@ -67,6 +67,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.DRIVE_LIST]: HardDrive,
   [NodeType.SHEETS_APPEND]: Sheet,
   [NodeType.SHEETS_READ]: Sheet,
+  [NodeType.SHEETS_FIND_ROW]: Sheet,
   [NodeType.DOCS_CREATE]: FileText,
   [NodeType.CALENDAR_CREATE]: Calendar,
   [NodeType.GMAIL_MESSAGE_RECEIVED]: Mail,
