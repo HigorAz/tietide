@@ -8,6 +8,7 @@ import {
   Play,
   Redo2,
   Save,
+  Sparkles,
   Undo2,
 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
@@ -176,7 +177,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           icon={<Download size={16} aria-hidden />}
         />
         <ToolbarButton
-          label={docStatus === 'loading' ? 'Generating…' : 'Docs'}
+          label={docStatus === 'loading' ? 'Generating…' : 'AI Docs'}
           onClick={handleDocs}
           disabled={docsDisabled}
           title="Generate AI documentation for this workflow"
@@ -184,7 +185,14 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
             docStatus === 'loading' ? (
               <Spinner size="sm" label="Generating" />
             ) : (
-              <FileText size={16} aria-hidden />
+              <span className="relative inline-flex">
+                <FileText size={16} aria-hidden />
+                <Sparkles
+                  size={9}
+                  aria-hidden
+                  className="absolute -right-1.5 -top-1.5 fill-accent-teal text-accent-teal"
+                />
+              </span>
             )
           }
         />
