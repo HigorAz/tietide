@@ -64,6 +64,7 @@ export const NodeType = {
   OUTLOOK_MESSAGE_FLAGGED: 'outlook-message-flagged',
   ONEDRIVE_FILE_ADDED: 'onedrive-file-added',
   EXCEL_ROW_ADDED: 'excel-row-added',
+  EXCEL_ROW_UPDATED: 'excel-row-updated',
   SLACK_POST_MESSAGE: 'slack-post-message',
   SLACK_POST_TO_CHANNEL: 'slack-post-to-channel',
   SLACK_UPLOAD_FILE: 'slack-upload-file',
@@ -607,6 +608,15 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     name: 'Excel: Row Added',
     description:
       'Trigger when a new row is added to an Excel Online table (poll, row-index cursor)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.MICROSOFT_TRIGGERS,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.EXCEL_ROW_UPDATED,
+    name: 'Excel: Row Updated',
+    description:
+      'Trigger when an existing Excel Online table row changes (poll, per-row value hash)',
     category: NodeCategory.TRIGGER,
     group: NodeGroup.MICROSOFT_TRIGGERS,
     provider: 'microsoft',

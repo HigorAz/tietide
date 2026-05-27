@@ -103,6 +103,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: Mail,
   [NodeType.ONEDRIVE_FILE_ADDED]: HardDrive,
   [NodeType.EXCEL_ROW_ADDED]: Sheet,
+  [NodeType.EXCEL_ROW_UPDATED]: Sheet,
   [NodeType.SLACK_POST_MESSAGE]: MessageSquare,
   [NodeType.SLACK_POST_TO_CHANNEL]: Hash,
   [NodeType.SLACK_UPLOAD_FILE]: Upload,

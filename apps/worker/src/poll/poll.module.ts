@@ -29,6 +29,10 @@ import {
   GMAIL_ATTACHMENT_RECEIVED_TYPE,
 } from '../nodes/triggers/poll/gmail-attachment-received';
 import { ExcelRowAddedTrigger, EXCEL_ROW_ADDED_TYPE } from '../nodes/triggers/poll/excel-row-added';
+import {
+  ExcelRowUpdatedTrigger,
+  EXCEL_ROW_UPDATED_TYPE,
+} from '../nodes/triggers/poll/excel-row-updated';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import { PollSchedulerService } from './poll-scheduler.service';
@@ -57,6 +61,7 @@ import { PollConnectionLoader } from './poll-connection-loader';
     GmailAttachmentReceivedTrigger,
     MicrosoftAuthService,
     ExcelRowAddedTrigger,
+    ExcelRowUpdatedTrigger,
   ],
   exports: [PollTriggerRegistry],
 })
@@ -69,6 +74,7 @@ export class PollModule implements OnModuleInit {
     private readonly gmailLabelAdded: GmailLabelAddedTrigger,
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
     private readonly excelRowAdded: ExcelRowAddedTrigger,
+    private readonly excelRowUpdated: ExcelRowUpdatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -78,5 +84,6 @@ export class PollModule implements OnModuleInit {
     this.registry.register(GMAIL_LABEL_ADDED_TYPE, this.gmailLabelAdded);
     this.registry.register(GMAIL_ATTACHMENT_RECEIVED_TYPE, this.gmailAttachmentReceived);
     this.registry.register(EXCEL_ROW_ADDED_TYPE, this.excelRowAdded);
+    this.registry.register(EXCEL_ROW_UPDATED_TYPE, this.excelRowUpdated);
   }
 }

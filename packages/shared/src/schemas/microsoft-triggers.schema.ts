@@ -67,6 +67,17 @@ export const excelRowAddedConfigSchema = z.object({
 });
 export type ExcelRowAddedConfig = z.infer<typeof excelRowAddedConfigSchema>;
 
+// Same shape as excel-row-added; the difference is the cursor strategy (per-row
+// value hash map) so the trigger fires on CHANGES to existing rows, not inserts.
+export const excelRowUpdatedConfigSchema = z.object({
+  connectionId,
+  workbookId: driveItemId,
+  worksheet: excelLabel('worksheet', 255),
+  tableName: excelLabel('tableName', 255).default('Table1'),
+  intervalSeconds: z.number().int().positive().max(3600).optional(),
+});
+export type ExcelRowUpdatedConfig = z.infer<typeof excelRowUpdatedConfigSchema>;
+
 // Required Microsoft Graph delegated scope for each trigger. Mirrors
 // GOOGLE_TRIGGER_REQUIRED_SCOPES so the SPA's ScopeReauthBanner surfaces
 // missing-scope hints uniformly.
@@ -75,4 +86,5 @@ export const MICROSOFT_TRIGGER_REQUIRED_SCOPES: Readonly<Record<string, string>>
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: 'Mail.Read',
   [NodeType.ONEDRIVE_FILE_ADDED]: 'Files.Read',
   [NodeType.EXCEL_ROW_ADDED]: 'Files.Read',
+  [NodeType.EXCEL_ROW_UPDATED]: 'Files.Read',
 };

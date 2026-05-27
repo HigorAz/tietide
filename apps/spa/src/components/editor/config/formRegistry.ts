@@ -55,6 +55,7 @@ import { OutlookMessageReceivedForm } from './microsoft/OutlookMessageReceivedFo
 import { OutlookMessageFlaggedForm } from './microsoft/OutlookMessageFlaggedForm';
 import { OneDriveFileAddedForm } from './microsoft/OneDriveFileAddedForm';
 import { ExcelRowAddedForm } from './microsoft/ExcelRowAddedForm';
+import { ExcelRowUpdatedForm } from './microsoft/ExcelRowUpdatedForm';
 import { SlackPostMessageForm } from './slack/SlackPostMessageForm';
 import { SlackPostToChannelForm } from './slack/SlackPostToChannelForm';
 import { SlackUploadFileForm } from './slack/SlackUploadFileForm';
@@ -162,6 +163,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: OutlookMessageFlaggedForm,
   [NodeType.ONEDRIVE_FILE_ADDED]: OneDriveFileAddedForm,
   [NodeType.EXCEL_ROW_ADDED]: ExcelRowAddedForm,
+  [NodeType.EXCEL_ROW_UPDATED]: ExcelRowUpdatedForm,
   [NodeType.SLACK_POST_MESSAGE]: SlackPostMessageForm,
   [NodeType.SLACK_POST_TO_CHANNEL]: SlackPostToChannelForm,
   [NodeType.SLACK_UPLOAD_FILE]: SlackUploadFileForm,

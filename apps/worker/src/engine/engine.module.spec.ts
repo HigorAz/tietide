@@ -96,6 +96,7 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
+import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 import { EngineModule } from './engine.module';
@@ -159,6 +160,7 @@ describe('EngineModule', () => {
     const outlookMessageFlagged = new OutlookMessageFlaggedPassthrough();
     const onedriveFileAdded = new OnedriveFileAddedPassthrough();
     const excelRowAdded = new ExcelRowAddedTrigger(undefined as never);
+    const excelRowUpdated = new ExcelRowUpdatedTrigger(undefined as never);
     const slackPostMessage = new SlackPostMessageAction(undefined as never);
     const slackPostToChannel = new SlackPostToChannelAction(undefined as never);
     const slackUploadFile = new SlackUploadFileAction(undefined as never);
@@ -264,6 +266,7 @@ describe('EngineModule', () => {
       outlookMessageFlagged,
       onedriveFileAdded,
       excelRowAdded,
+      excelRowUpdated,
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
@@ -364,6 +367,7 @@ describe('EngineModule', () => {
       outlookMessageFlagged,
       onedriveFileAdded,
       excelRowAdded,
+      excelRowUpdated,
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
@@ -467,6 +471,7 @@ describe('EngineModule', () => {
       ['OutlookMessageFlaggedPassthrough', 'outlook-message-flagged', 'outlookMessageFlagged'],
       ['OnedriveFileAddedPassthrough', 'onedrive-file-added', 'onedriveFileAdded'],
       ['ExcelRowAddedTrigger', 'excel-row-added', 'excelRowAdded'],
+      ['ExcelRowUpdatedTrigger', 'excel-row-updated', 'excelRowUpdated'],
       ['SlackPostMessageAction', 'slack-post-message', 'slackPostMessage'],
       ['SlackPostToChannelAction', 'slack-post-to-channel', 'slackPostToChannel'],
       ['SlackUploadFileAction', 'slack-upload-file', 'slackUploadFile'],
@@ -541,13 +546,13 @@ describe('EngineModule', () => {
         return acc;
       }, {});
       // 6 baseline triggers (manual, cron, webhook, stripe, drive, gmail) +
-      // 4 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
-      // onedrive-file-added, excel-row-added) +
+      // 5 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
+      // onedrive-file-added, excel-row-added, excel-row-updated) +
       // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
-      // 1 Google push trigger (drive-file-updated) = 22.
-      expect(counts.trigger).toBe(22);
+      // 1 Google push trigger (drive-file-updated) = 23.
+      expect(counts.trigger).toBe(23);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +

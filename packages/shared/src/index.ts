@@ -268,11 +268,13 @@ export {
   outlookMessageFlaggedConfigSchema,
   onedriveFileAddedConfigSchema,
   excelRowAddedConfigSchema,
+  excelRowUpdatedConfigSchema,
   MICROSOFT_TRIGGER_REQUIRED_SCOPES,
   type OutlookMessageReceivedConfig,
   type OutlookMessageFlaggedConfig,
   type OnedriveFileAddedConfig,
   type ExcelRowAddedConfig,
+  type ExcelRowUpdatedConfig,
 } from './schemas/microsoft-triggers.schema.js';
 export {
   slackPostMessageConfigSchema,

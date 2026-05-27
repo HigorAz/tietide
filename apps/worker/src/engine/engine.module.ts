@@ -131,6 +131,7 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
+import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 
@@ -256,6 +257,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     TrelloCardChangedPassthrough,
     GmailMessageReceivedExecutor,
     ExcelRowAddedTrigger,
+    ExcelRowUpdatedTrigger,
     CalendarEventUpdatedTrigger,
     GmailAttachmentReceivedTrigger,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
@@ -317,6 +319,7 @@ export class EngineModule implements OnModuleInit {
     private readonly outlookMessageFlagged: OutlookMessageFlaggedPassthrough,
     private readonly onedriveFileAdded: OnedriveFileAddedPassthrough,
     private readonly excelRowAdded: ExcelRowAddedTrigger,
+    private readonly excelRowUpdated: ExcelRowUpdatedTrigger,
     private readonly slackPostMessage: SlackPostMessageAction,
     private readonly slackPostToChannel: SlackPostToChannelAction,
     private readonly slackUploadFile: SlackUploadFileAction,
@@ -417,6 +420,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.outlookMessageFlagged);
     this.registry.register(this.onedriveFileAdded);
     this.registry.register(this.excelRowAdded);
+    this.registry.register(this.excelRowUpdated);
     this.registry.register(this.slackPostMessage);
     this.registry.register(this.slackPostToChannel);
     this.registry.register(this.slackUploadFile);

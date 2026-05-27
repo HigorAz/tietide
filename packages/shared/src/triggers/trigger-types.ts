@@ -27,6 +27,7 @@ export const POLL_TRIGGER_TYPES = [
   'calendar-event-created',
   'calendar-event-updated',
   'excel-row-added',
+  'excel-row-updated',
 ] as const;
 export type PollTriggerType = (typeof POLL_TRIGGER_TYPES)[number];
 export const isPollTriggerType = (value: string): value is PollTriggerType =>
