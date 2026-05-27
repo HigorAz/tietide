@@ -10,12 +10,25 @@ import { CronTrigger } from '../nodes/triggers/cron-trigger';
 import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
 import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
 import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
+import { GmailGetMessageAction } from '../nodes/connectors/google/gmail-get-message';
+import { GmailGetAttachmentAction } from '../nodes/connectors/google/gmail-get-attachment';
+import { GmailModifyLabelsAction } from '../nodes/connectors/google/gmail-modify-labels';
+import { GmailCreateDraftAction } from '../nodes/connectors/google/gmail-create-draft';
 import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
 import { DriveListAction } from '../nodes/connectors/google/drive-list';
+import { DriveGetFileAction } from '../nodes/connectors/google/drive-get-file';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
+import { SheetsFindRowAction } from '../nodes/connectors/google/sheets-find-row';
+import { SheetsUpdateRowAction } from '../nodes/connectors/google/sheets-update-row';
+import { SheetsClearRangeAction } from '../nodes/connectors/google/sheets-clear-range';
 import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
+import { DocsGetAction } from '../nodes/connectors/google/docs-get';
+import { DocsInsertTextAction } from '../nodes/connectors/google/docs-insert-text';
+import { DocsReplaceTextAction } from '../nodes/connectors/google/docs-replace-text';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
+import { CalendarListEventsAction } from '../nodes/connectors/google/calendar-list-events';
+import { CalendarGetEventAction } from '../nodes/connectors/google/calendar-get-event';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
@@ -59,6 +72,7 @@ import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
+  DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
   OnedriveFileAddedPassthrough,
@@ -74,6 +88,8 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
+import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
+import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -93,12 +109,25 @@ describe('EngineModule', () => {
     const subworkflowAction = new SubworkflowAction(undefined as never, undefined as never);
     const gmailSend = new GmailSendAction(undefined as never, undefined as never);
     const gmailSearch = new GmailSearchAction(undefined as never, undefined as never);
+    const gmailGetMessage = new GmailGetMessageAction(undefined as never, undefined as never);
+    const gmailGetAttachment = new GmailGetAttachmentAction(undefined as never, undefined as never);
+    const gmailModifyLabels = new GmailModifyLabelsAction(undefined as never, undefined as never);
+    const gmailCreateDraft = new GmailCreateDraftAction(undefined as never, undefined as never);
     const driveCreate = new DriveCreateAction(undefined as never, undefined as never);
     const driveList = new DriveListAction(undefined as never, undefined as never);
+    const driveGetFile = new DriveGetFileAction(undefined as never, undefined as never);
     const sheetsAppend = new SheetsAppendAction(undefined as never, undefined as never);
     const sheetsRead = new SheetsReadAction(undefined as never, undefined as never);
+    const sheetsFindRow = new SheetsFindRowAction(undefined as never, undefined as never);
+    const sheetsUpdateRow = new SheetsUpdateRowAction(undefined as never, undefined as never);
+    const sheetsClearRange = new SheetsClearRangeAction(undefined as never, undefined as never);
     const docsCreate = new DocsCreateAction(undefined as never, undefined as never);
+    const docsGet = new DocsGetAction(undefined as never, undefined as never);
+    const docsInsertText = new DocsInsertTextAction(undefined as never, undefined as never);
+    const docsReplaceText = new DocsReplaceTextAction(undefined as never, undefined as never);
     const calendarCreate = new CalendarCreateAction(undefined as never, undefined as never);
+    const calendarListEvents = new CalendarListEventsAction(undefined as never, undefined as never);
+    const calendarGetEvent = new CalendarGetEventAction(undefined as never, undefined as never);
     const outlookSend = new OutlookSendAction(undefined as never);
     const outlookSearch = new OutlookSearchAction(undefined as never);
     const excelAppend = new ExcelAppendAction(undefined as never);
@@ -158,6 +187,15 @@ describe('EngineModule', () => {
     const mailchimpSubscriberAdded = new MailchimpSubscriberAddedPassthrough();
     const calendlyEventScheduled = new CalendlyEventScheduledPassthrough();
     const trelloCardChanged = new TrelloCardChangedPassthrough();
+    const calendarEventUpdated = new CalendarEventUpdatedTrigger(
+      undefined as never,
+      undefined as never,
+    );
+    const gmailAttachmentReceived = new GmailAttachmentReceivedTrigger(
+      undefined as never,
+      undefined as never,
+    );
+    const driveFileUpdated = new DriveFileUpdatedPassthrough();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -171,12 +209,25 @@ describe('EngineModule', () => {
       subworkflowAction,
       gmailSend,
       gmailSearch,
+      gmailGetMessage,
+      gmailGetAttachment,
+      gmailModifyLabels,
+      gmailCreateDraft,
       driveCreate,
       driveList,
+      driveGetFile,
       sheetsAppend,
       sheetsRead,
+      sheetsFindRow,
+      sheetsUpdateRow,
+      sheetsClearRange,
       docsCreate,
+      docsGet,
+      docsInsertText,
+      docsReplaceText,
       calendarCreate,
+      calendarListEvents,
+      calendarGetEvent,
       outlookSend,
       outlookSearch,
       excelAppend,
@@ -233,6 +284,9 @@ describe('EngineModule', () => {
       mailchimpSubscriberAdded,
       calendlyEventScheduled,
       trelloCardChanged,
+      calendarEventUpdated,
+      gmailAttachmentReceived,
+      driveFileUpdated,
     );
     return {
       registry,
@@ -247,12 +301,25 @@ describe('EngineModule', () => {
       subworkflowAction,
       gmailSend,
       gmailSearch,
+      gmailGetMessage,
+      gmailGetAttachment,
+      gmailModifyLabels,
+      gmailCreateDraft,
       driveCreate,
       driveList,
+      driveGetFile,
       sheetsAppend,
       sheetsRead,
+      sheetsFindRow,
+      sheetsUpdateRow,
+      sheetsClearRange,
       docsCreate,
+      docsGet,
+      docsInsertText,
+      docsReplaceText,
       calendarCreate,
+      calendarListEvents,
+      calendarGetEvent,
       outlookSend,
       outlookSearch,
       excelAppend,
@@ -309,6 +376,9 @@ describe('EngineModule', () => {
       mailchimpSubscriberAdded,
       calendlyEventScheduled,
       trelloCardChanged,
+      calendarEventUpdated,
+      gmailAttachmentReceived,
+      driveFileUpdated,
       module,
     };
   };
@@ -326,12 +396,25 @@ describe('EngineModule', () => {
       ['SubworkflowAction', 'subworkflow', 'subworkflowAction'],
       ['GmailSendAction', 'gmail-send', 'gmailSend'],
       ['GmailSearchAction', 'gmail-search', 'gmailSearch'],
+      ['GmailGetMessageAction', 'gmail-get-message', 'gmailGetMessage'],
+      ['GmailGetAttachmentAction', 'gmail-get-attachment', 'gmailGetAttachment'],
+      ['GmailModifyLabelsAction', 'gmail-modify-labels', 'gmailModifyLabels'],
+      ['GmailCreateDraftAction', 'gmail-create-draft', 'gmailCreateDraft'],
       ['DriveCreateAction', 'drive-create', 'driveCreate'],
       ['DriveListAction', 'drive-list', 'driveList'],
+      ['DriveGetFileAction', 'drive-get-file', 'driveGetFile'],
       ['SheetsAppendAction', 'sheets-append', 'sheetsAppend'],
       ['SheetsReadAction', 'sheets-read', 'sheetsRead'],
+      ['SheetsFindRowAction', 'sheets-find-row', 'sheetsFindRow'],
+      ['SheetsUpdateRowAction', 'sheets-update-row', 'sheetsUpdateRow'],
+      ['SheetsClearRangeAction', 'sheets-clear-range', 'sheetsClearRange'],
       ['DocsCreateAction', 'docs-create', 'docsCreate'],
+      ['DocsGetAction', 'docs-get', 'docsGet'],
+      ['DocsInsertTextAction', 'docs-insert-text', 'docsInsertText'],
+      ['DocsReplaceTextAction', 'docs-replace-text', 'docsReplaceText'],
       ['CalendarCreateAction', 'calendar-create', 'calendarCreate'],
+      ['CalendarListEventsAction', 'calendar-list-events', 'calendarListEvents'],
+      ['CalendarGetEventAction', 'calendar-get-event', 'calendarGetEvent'],
       ['OutlookSendAction', 'outlook-send', 'outlookSend'],
       ['OutlookSearchAction', 'outlook-search', 'outlookSearch'],
       ['ExcelAppendAction', 'excel-append', 'excelAppend'],
@@ -396,6 +479,9 @@ describe('EngineModule', () => {
       ],
       ['CalendlyEventScheduledPassthrough', 'calendly-event-scheduled', 'calendlyEventScheduled'],
       ['TrelloCardChangedPassthrough', 'trello-card-changed', 'trelloCardChanged'],
+      ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
+      ['GmailAttachmentReceivedTrigger', 'gmail-attachment-received', 'gmailAttachmentReceived'],
+      ['DriveFileUpdatedPassthrough', 'drive-file-updated', 'driveFileUpdated'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -418,18 +504,20 @@ describe('EngineModule', () => {
       // 4 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
       // onedrive-file-added, excel-row-added) +
       // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
-      // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
-      expect(counts.trigger).toBe(19);
+      // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
+      // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
+      // 1 Google push trigger (drive-file-updated) = 22.
+      expect(counts.trigger).toBe(22);
       expect(counts.logic).toBe(4);
-      // 2 generic actions (http-request, code) + 8 Google connector actions +
+      // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 5 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 50.
-      expect(counts.action).toBe(50);
+      //   calendly, postgres, mysql, s3, trello ×2) = 63.
+      expect(counts.action).toBe(63);
     });
   });
 });

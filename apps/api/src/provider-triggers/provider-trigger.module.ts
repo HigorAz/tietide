@@ -15,6 +15,10 @@ import {
 import { StripeClientFactory } from './triggers/stripe-client.factory';
 import { DriveFileAddedTrigger, DRIVE_FILE_ADDED_TYPE } from './triggers/drive-file-added.trigger';
 import {
+  DriveFileUpdatedTrigger,
+  DRIVE_FILE_UPDATED_TYPE,
+} from './triggers/drive-file-updated.trigger';
+import {
   GmailMessageReceivedTrigger,
   GMAIL_MESSAGE_RECEIVED_TYPE,
 } from './triggers/gmail-message-received.trigger';
@@ -90,6 +94,7 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     StripeEventReceivedTrigger,
     GoogleClientFactory,
     DriveFileAddedTrigger,
+    DriveFileUpdatedTrigger,
     GmailMessageReceivedTrigger,
     MicrosoftGraphFactory,
     OutlookMessageReceivedTrigger,
@@ -124,6 +129,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly registry: ProviderTriggerRegistry,
     private readonly stripeTrigger: StripeEventReceivedTrigger,
     private readonly driveFileAdded: DriveFileAddedTrigger,
+    private readonly driveFileUpdated: DriveFileUpdatedTrigger,
     private readonly gmailMessageReceived: GmailMessageReceivedTrigger,
     private readonly outlookMessageReceived: OutlookMessageReceivedTrigger,
     private readonly outlookMessageFlagged: OutlookMessageFlaggedTrigger,
@@ -142,6 +148,7 @@ export class ProviderTriggerModule implements OnModuleInit {
   onModuleInit(): void {
     this.registry.register(STRIPE_EVENT_RECEIVED_TYPE, this.stripeTrigger);
     this.registry.register(DRIVE_FILE_ADDED_TYPE, this.driveFileAdded);
+    this.registry.register(DRIVE_FILE_UPDATED_TYPE, this.driveFileUpdated);
     this.registry.register(GMAIL_MESSAGE_RECEIVED_TYPE, this.gmailMessageReceived);
     this.registry.register(OUTLOOK_MESSAGE_RECEIVED_TYPE, this.outlookMessageReceived);
     this.registry.register(OUTLOOK_MESSAGE_FLAGGED_TYPE, this.outlookMessageFlagged);

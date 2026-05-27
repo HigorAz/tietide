@@ -38,10 +38,11 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
     {
       id: 'gmail',
       label: 'Gmail',
-      description: 'Send and read email',
+      description: 'Send, read, and organize email (labels, drafts, archive)',
       scopes: [
         'https://www.googleapis.com/auth/gmail.send',
         'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.modify',
       ],
       defaultOn: true,
     },
@@ -55,8 +56,11 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
     {
       id: 'drive',
       label: 'Drive',
-      description: 'Access files this app creates',
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
+      description: 'Access app files and read your Drive files',
+      scopes: [
+        'https://www.googleapis.com/auth/drive.file',
+        'https://www.googleapis.com/auth/drive.readonly',
+      ],
       defaultOn: true,
     },
     {

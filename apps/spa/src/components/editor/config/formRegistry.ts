@@ -11,17 +11,33 @@ import { SubworkflowForm } from './SubworkflowForm';
 import { WebhookForm } from './WebhookForm';
 import { GmailSendForm } from './google/GmailSendForm';
 import { GmailSearchForm } from './google/GmailSearchForm';
+import { GmailGetMessageForm } from './google/GmailGetMessageForm';
+import { GmailGetAttachmentForm } from './google/GmailGetAttachmentForm';
+import { GmailModifyLabelsForm } from './google/GmailModifyLabelsForm';
+import { GmailCreateDraftForm } from './google/GmailCreateDraftForm';
 import { DriveCreateForm } from './google/DriveCreateForm';
 import { DriveListForm } from './google/DriveListForm';
+import { DriveGetFileForm } from './google/DriveGetFileForm';
 import { SheetsAppendForm } from './google/SheetsAppendForm';
 import { SheetsReadForm } from './google/SheetsReadForm';
+import { SheetsFindRowForm } from './google/SheetsFindRowForm';
+import { SheetsUpdateRowForm } from './google/SheetsUpdateRowForm';
+import { SheetsClearRangeForm } from './google/SheetsClearRangeForm';
 import { DocsCreateForm } from './google/DocsCreateForm';
+import { DocsGetForm } from './google/DocsGetForm';
+import { DocsInsertTextForm } from './google/DocsInsertTextForm';
+import { DocsReplaceTextForm } from './google/DocsReplaceTextForm';
 import { CalendarCreateForm } from './google/CalendarCreateForm';
+import { CalendarListEventsForm } from './google/CalendarListEventsForm';
+import { CalendarGetEventForm } from './google/CalendarGetEventForm';
 import { SheetsRowAddedForm } from './google/SheetsRowAddedForm';
 import { GmailMessageReceivedForm } from './google/GmailMessageReceivedForm';
 import { GmailLabelAddedForm } from './google/GmailLabelAddedForm';
+import { GmailAttachmentReceivedForm } from './google/GmailAttachmentReceivedForm';
 import { DriveFileAddedForm } from './google/DriveFileAddedForm';
+import { DriveFileUpdatedForm } from './google/DriveFileUpdatedForm';
 import { CalendarEventCreatedForm } from './google/CalendarEventCreatedForm';
+import { CalendarEventUpdatedForm } from './google/CalendarEventUpdatedForm';
 import { OutlookSendForm } from './microsoft/OutlookSendForm';
 import { OutlookSearchForm } from './microsoft/OutlookSearchForm';
 import { ExcelAppendForm } from './microsoft/ExcelAppendForm';
@@ -94,17 +110,33 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.RETURN]: ReturnForm,
   [NodeType.GMAIL_SEND]: GmailSendForm,
   [NodeType.GMAIL_SEARCH]: GmailSearchForm,
+  [NodeType.GMAIL_GET_MESSAGE]: GmailGetMessageForm,
+  [NodeType.GMAIL_GET_ATTACHMENT]: GmailGetAttachmentForm,
+  [NodeType.GMAIL_MODIFY_LABELS]: GmailModifyLabelsForm,
+  [NodeType.GMAIL_CREATE_DRAFT]: GmailCreateDraftForm,
   [NodeType.DRIVE_CREATE]: DriveCreateForm,
   [NodeType.DRIVE_LIST]: DriveListForm,
+  [NodeType.DRIVE_GET_FILE]: DriveGetFileForm,
   [NodeType.SHEETS_APPEND]: SheetsAppendForm,
   [NodeType.SHEETS_READ]: SheetsReadForm,
+  [NodeType.SHEETS_FIND_ROW]: SheetsFindRowForm,
+  [NodeType.SHEETS_UPDATE_ROW]: SheetsUpdateRowForm,
+  [NodeType.SHEETS_CLEAR_RANGE]: SheetsClearRangeForm,
   [NodeType.DOCS_CREATE]: DocsCreateForm,
+  [NodeType.DOCS_GET]: DocsGetForm,
+  [NodeType.DOCS_INSERT_TEXT]: DocsInsertTextForm,
+  [NodeType.DOCS_REPLACE_TEXT]: DocsReplaceTextForm,
   [NodeType.CALENDAR_CREATE]: CalendarCreateForm,
+  [NodeType.CALENDAR_LIST_EVENTS]: CalendarListEventsForm,
+  [NodeType.CALENDAR_GET_EVENT]: CalendarGetEventForm,
   [NodeType.SHEETS_ROW_ADDED]: SheetsRowAddedForm,
   [NodeType.GMAIL_MESSAGE_RECEIVED]: GmailMessageReceivedForm,
   [NodeType.GMAIL_LABEL_ADDED]: GmailLabelAddedForm,
+  [NodeType.GMAIL_ATTACHMENT_RECEIVED]: GmailAttachmentReceivedForm,
   [NodeType.DRIVE_FILE_ADDED]: DriveFileAddedForm,
+  [NodeType.DRIVE_FILE_UPDATED]: DriveFileUpdatedForm,
   [NodeType.CALENDAR_EVENT_CREATED]: CalendarEventCreatedForm,
+  [NodeType.CALENDAR_EVENT_UPDATED]: CalendarEventUpdatedForm,
   [NodeType.OUTLOOK_SEND]: OutlookSendForm,
   [NodeType.OUTLOOK_SEARCH]: OutlookSearchForm,
   [NodeType.EXCEL_APPEND]: ExcelAppendForm,

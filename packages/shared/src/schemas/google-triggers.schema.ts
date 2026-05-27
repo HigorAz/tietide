@@ -31,12 +31,24 @@ export const gmailLabelAddedConfigSchema = z.object({
 });
 export type GmailLabelAddedConfig = z.infer<typeof gmailLabelAddedConfigSchema>;
 
+export const gmailAttachmentReceivedConfigSchema = z.object({
+  connectionId,
+  intervalSeconds: z.number().int().positive().max(3600).optional(),
+});
+export type GmailAttachmentReceivedConfig = z.infer<typeof gmailAttachmentReceivedConfigSchema>;
+
 export const driveFileAddedConfigSchema = z.object({
   connectionId,
   parentFolderId: z.string().min(1).max(128),
   mimeType: z.string().max(255).optional(),
 });
 export type DriveFileAddedConfig = z.infer<typeof driveFileAddedConfigSchema>;
+
+export const driveFileUpdatedConfigSchema = z.object({
+  connectionId,
+  fileId: z.string().min(1).max(128),
+});
+export type DriveFileUpdatedConfig = z.infer<typeof driveFileUpdatedConfigSchema>;
 
 export const sheetsRowAddedConfigSchema = z.object({
   connectionId,
@@ -53,10 +65,20 @@ export const calendarEventCreatedConfigSchema = z.object({
 });
 export type CalendarEventCreatedConfig = z.infer<typeof calendarEventCreatedConfigSchema>;
 
+export const calendarEventUpdatedConfigSchema = z.object({
+  connectionId,
+  calendarId: z.string().min(1).max(255).default('primary'),
+  intervalSeconds: z.number().int().positive().max(3600).optional(),
+});
+export type CalendarEventUpdatedConfig = z.infer<typeof calendarEventUpdatedConfigSchema>;
+
 export const GOOGLE_TRIGGER_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.GMAIL_MESSAGE_RECEIVED]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_LABEL_ADDED]: 'https://www.googleapis.com/auth/gmail.readonly',
+  [NodeType.GMAIL_ATTACHMENT_RECEIVED]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.DRIVE_FILE_ADDED]: 'https://www.googleapis.com/auth/drive.readonly',
+  [NodeType.DRIVE_FILE_UPDATED]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_ROW_ADDED]: 'https://www.googleapis.com/auth/spreadsheets.readonly',
   [NodeType.CALENDAR_EVENT_CREATED]: 'https://www.googleapis.com/auth/calendar.readonly',
+  [NodeType.CALENDAR_EVENT_UPDATED]: 'https://www.googleapis.com/auth/calendar.readonly',
 };
