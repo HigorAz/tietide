@@ -29,6 +29,7 @@ import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
 import { GmailGetMessageAction } from '../nodes/connectors/google/gmail-get-message';
 import { GmailGetAttachmentAction } from '../nodes/connectors/google/gmail-get-attachment';
 import { GmailModifyLabelsAction } from '../nodes/connectors/google/gmail-modify-labels';
+import { GmailCreateDraftAction } from '../nodes/connectors/google/gmail-create-draft';
 import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
 import { DriveListAction } from '../nodes/connectors/google/drive-list';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
@@ -135,6 +136,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     GmailGetMessageAction,
     GmailGetAttachmentAction,
     GmailModifyLabelsAction,
+    GmailCreateDraftAction,
     DriveCreateAction,
     DriveListAction,
     SheetsAppendAction,
@@ -239,6 +241,7 @@ export class EngineModule implements OnModuleInit {
     private readonly gmailGetMessage: GmailGetMessageAction,
     private readonly gmailGetAttachment: GmailGetAttachmentAction,
     private readonly gmailModifyLabels: GmailModifyLabelsAction,
+    private readonly gmailCreateDraft: GmailCreateDraftAction,
     private readonly driveCreate: DriveCreateAction,
     private readonly driveList: DriveListAction,
     private readonly sheetsAppend: SheetsAppendAction,
@@ -318,6 +321,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.gmailGetMessage);
     this.registry.register(this.gmailGetAttachment);
     this.registry.register(this.gmailModifyLabels);
+    this.registry.register(this.gmailCreateDraft);
     this.registry.register(this.driveCreate);
     this.registry.register(this.driveList);
     this.registry.register(this.sheetsAppend);

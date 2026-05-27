@@ -105,6 +105,19 @@ export const gmailModifyLabelsConfigSchema = z
   );
 export type GmailModifyLabelsConfig = z.infer<typeof gmailModifyLabelsConfigSchema>;
 
+export const gmailCreateDraftConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  to: headerString(),
+  subject: headerString(),
+  body: z.string().min(1).max(1_000_000),
+  cc: optionalHeaderString(),
+  bcc: optionalHeaderString(),
+  // Set to thread an existing conversation as a reply draft.
+  threadId: z.string().min(1).max(128).optional(),
+  mockOnDryRun,
+});
+export type GmailCreateDraftConfig = z.infer<typeof gmailCreateDraftConfigSchema>;
+
 export const driveCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   name: z.string().min(1).max(255),
@@ -175,6 +188,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.GMAIL_GET_MESSAGE]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_GET_ATTACHMENT]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_MODIFY_LABELS]: 'https://www.googleapis.com/auth/gmail.modify',
+  [NodeType.GMAIL_CREATE_DRAFT]: 'https://www.googleapis.com/auth/gmail.modify',
   [NodeType.DRIVE_CREATE]: 'https://www.googleapis.com/auth/drive.file',
   [NodeType.DRIVE_LIST]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_APPEND]: 'https://www.googleapis.com/auth/spreadsheets',
