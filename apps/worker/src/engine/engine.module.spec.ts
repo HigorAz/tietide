@@ -84,14 +84,42 @@ import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-ch
 import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
 import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-create-contact';
 import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
+import { HubspotFindContactAction } from '../nodes/connectors/hubspot/hubspot-find-contact';
+import { HubspotGetContactAction } from '../nodes/connectors/hubspot/hubspot-get-contact';
+import { HubspotUpdateContactAction } from '../nodes/connectors/hubspot/hubspot-update-contact';
+import { HubspotUpdateDealAction } from '../nodes/connectors/hubspot/hubspot-update-deal';
+import { HubspotCreateCompanyAction } from '../nodes/connectors/hubspot/hubspot-create-company';
+import { HubspotCreateNoteAction } from '../nodes/connectors/hubspot/hubspot-create-note';
 import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
 import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
+import { StripeGetCustomerAction } from '../nodes/connectors/stripe/stripe-get-customer';
+import { StripeFindCustomerAction } from '../nodes/connectors/stripe/stripe-find-customer';
+import { StripeCreatePaymentIntentAction } from '../nodes/connectors/stripe/stripe-create-payment-intent';
+import { StripeCreateRefundAction } from '../nodes/connectors/stripe/stripe-create-refund';
+import { StripeListInvoicesAction } from '../nodes/connectors/stripe/stripe-list-invoices';
+import { StripeCreateSubscriptionAction } from '../nodes/connectors/stripe/stripe-create-subscription';
 import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
 import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
+import { MailchimpGetSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-get-subscriber';
+import { MailchimpUpdateSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-update-subscriber';
+import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailchimp-unsubscribe';
+import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
+import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
+import { CalendlyGetEventAction } from '../nodes/connectors/calendly/calendly-get-event';
+import { CalendlyCancelEventAction } from '../nodes/connectors/calendly/calendly-cancel-event';
+import { CalendlyListInviteesAction } from '../nodes/connectors/calendly/calendly-list-invitees';
 import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
 import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
 import { S3UploadFileAction } from '../nodes/connectors/s3/s3-upload-file';
+import { S3DownloadFileAction } from '../nodes/connectors/s3/s3-download-file';
+import { S3ListObjectsAction } from '../nodes/connectors/s3/s3-list-objects';
+import { S3DeleteObjectAction } from '../nodes/connectors/s3/s3-delete-object';
+import { S3GetPresignedUrlAction } from '../nodes/connectors/s3/s3-get-presigned-url';
+import { OpenaiEmbeddingsAction } from '../nodes/connectors/openai/openai-embeddings';
+import { OpenaiGenerateImageAction } from '../nodes/connectors/openai/openai-generate-image';
+import { AnthropicVisionAction } from '../nodes/connectors/anthropic/anthropic-vision';
+import { OllamaEmbeddingsAction } from '../nodes/connectors/ollama/ollama-embeddings';
 import { TrelloAddCommentAction } from '../nodes/connectors/trello/trello-add-comment';
 import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update-card';
 import {
@@ -116,8 +144,11 @@ import {
   TrelloCardChangedPassthrough,
   GithubIssueOpenedPassthrough,
   GithubPrOpenedPassthrough,
+  StripeInvoicePaidPassthrough,
+  HubspotDealChangedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
+import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
@@ -306,6 +337,37 @@ describe('EngineModule', () => {
     const linearIssueUpdated = new LinearIssueUpdatedTrigger(undefined as never);
     const githubIssueOpened = new GithubIssueOpenedPassthrough();
     const githubPrOpened = new GithubPrOpenedPassthrough();
+    const stripeGetCustomer = new StripeGetCustomerAction(undefined as never);
+    const stripeFindCustomer = new StripeFindCustomerAction(undefined as never);
+    const stripeCreatePaymentIntent = new StripeCreatePaymentIntentAction(undefined as never);
+    const stripeCreateRefund = new StripeCreateRefundAction(undefined as never);
+    const stripeListInvoices = new StripeListInvoicesAction(undefined as never);
+    const stripeCreateSubscription = new StripeCreateSubscriptionAction(undefined as never);
+    const hubspotFindContact = new HubspotFindContactAction(undefined as never);
+    const hubspotGetContact = new HubspotGetContactAction(undefined as never);
+    const hubspotUpdateContact = new HubspotUpdateContactAction(undefined as never);
+    const hubspotUpdateDeal = new HubspotUpdateDealAction(undefined as never);
+    const hubspotCreateCompany = new HubspotCreateCompanyAction(undefined as never);
+    const hubspotCreateNote = new HubspotCreateNoteAction(undefined as never);
+    const mailchimpGetSubscriber = new MailchimpGetSubscriberAction(undefined as never);
+    const mailchimpUpdateSubscriber = new MailchimpUpdateSubscriberAction(undefined as never);
+    const mailchimpUnsubscribe = new MailchimpUnsubscribeAction(undefined as never);
+    const mailchimpAddTag = new MailchimpAddTagAction(undefined as never);
+    const mailchimpListCampaigns = new MailchimpListCampaignsAction(undefined as never);
+    const calendlyGetEvent = new CalendlyGetEventAction(undefined as never);
+    const calendlyCancelEvent = new CalendlyCancelEventAction(undefined as never);
+    const calendlyListInvitees = new CalendlyListInviteesAction(undefined as never);
+    const s3DownloadFile = new S3DownloadFileAction(undefined as never);
+    const s3ListObjects = new S3ListObjectsAction(undefined as never);
+    const s3DeleteObject = new S3DeleteObjectAction(undefined as never);
+    const s3GetPresignedUrl = new S3GetPresignedUrlAction(undefined as never);
+    const openaiEmbeddings = new OpenaiEmbeddingsAction(undefined as never);
+    const openaiGenerateImage = new OpenaiGenerateImageAction(undefined as never);
+    const anthropicVision = new AnthropicVisionAction(undefined as never);
+    const ollamaEmbeddings = new OllamaEmbeddingsAction(undefined as never);
+    const stripeInvoicePaid = new StripeInvoicePaidPassthrough();
+    const hubspotDealChanged = new HubspotDealChangedPassthrough();
+    const s3ObjectCreated = new S3ObjectCreatedTrigger(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -452,6 +514,37 @@ describe('EngineModule', () => {
       linearIssueUpdated,
       githubIssueOpened,
       githubPrOpened,
+      stripeGetCustomer,
+      stripeFindCustomer,
+      stripeCreatePaymentIntent,
+      stripeCreateRefund,
+      stripeListInvoices,
+      stripeCreateSubscription,
+      hubspotFindContact,
+      hubspotGetContact,
+      hubspotUpdateContact,
+      hubspotUpdateDeal,
+      hubspotCreateCompany,
+      hubspotCreateNote,
+      mailchimpGetSubscriber,
+      mailchimpUpdateSubscriber,
+      mailchimpUnsubscribe,
+      mailchimpAddTag,
+      mailchimpListCampaigns,
+      calendlyGetEvent,
+      calendlyCancelEvent,
+      calendlyListInvitees,
+      s3DownloadFile,
+      s3ListObjects,
+      s3DeleteObject,
+      s3GetPresignedUrl,
+      openaiEmbeddings,
+      openaiGenerateImage,
+      anthropicVision,
+      ollamaEmbeddings,
+      stripeInvoicePaid,
+      hubspotDealChanged,
+      s3ObjectCreated,
     );
     return {
       registry,
@@ -574,6 +667,37 @@ describe('EngineModule', () => {
       calendarEventUpdated,
       gmailAttachmentReceived,
       driveFileUpdated,
+      stripeGetCustomer,
+      stripeFindCustomer,
+      stripeCreatePaymentIntent,
+      stripeCreateRefund,
+      stripeListInvoices,
+      stripeCreateSubscription,
+      hubspotFindContact,
+      hubspotGetContact,
+      hubspotUpdateContact,
+      hubspotUpdateDeal,
+      hubspotCreateCompany,
+      hubspotCreateNote,
+      mailchimpGetSubscriber,
+      mailchimpUpdateSubscriber,
+      mailchimpUnsubscribe,
+      mailchimpAddTag,
+      mailchimpListCampaigns,
+      calendlyGetEvent,
+      calendlyCancelEvent,
+      calendlyListInvitees,
+      s3DownloadFile,
+      s3ListObjects,
+      s3DeleteObject,
+      s3GetPresignedUrl,
+      openaiEmbeddings,
+      openaiGenerateImage,
+      anthropicVision,
+      ollamaEmbeddings,
+      stripeInvoicePaid,
+      hubspotDealChanged,
+      s3ObjectCreated,
       module,
     };
   };
@@ -719,6 +843,45 @@ describe('EngineModule', () => {
       ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
       ['GmailAttachmentReceivedTrigger', 'gmail-attachment-received', 'gmailAttachmentReceived'],
       ['DriveFileUpdatedPassthrough', 'drive-file-updated', 'driveFileUpdated'],
+      ['StripeGetCustomerAction', 'stripe-get-customer', 'stripeGetCustomer'],
+      ['StripeFindCustomerAction', 'stripe-find-customer', 'stripeFindCustomer'],
+      [
+        'StripeCreatePaymentIntentAction',
+        'stripe-create-payment-intent',
+        'stripeCreatePaymentIntent',
+      ],
+      ['StripeCreateRefundAction', 'stripe-create-refund', 'stripeCreateRefund'],
+      ['StripeListInvoicesAction', 'stripe-list-invoices', 'stripeListInvoices'],
+      ['StripeCreateSubscriptionAction', 'stripe-create-subscription', 'stripeCreateSubscription'],
+      ['HubspotFindContactAction', 'hubspot-find-contact', 'hubspotFindContact'],
+      ['HubspotGetContactAction', 'hubspot-get-contact', 'hubspotGetContact'],
+      ['HubspotUpdateContactAction', 'hubspot-update-contact', 'hubspotUpdateContact'],
+      ['HubspotUpdateDealAction', 'hubspot-update-deal', 'hubspotUpdateDeal'],
+      ['HubspotCreateCompanyAction', 'hubspot-create-company', 'hubspotCreateCompany'],
+      ['HubspotCreateNoteAction', 'hubspot-create-note', 'hubspotCreateNote'],
+      ['MailchimpGetSubscriberAction', 'mailchimp-get-subscriber', 'mailchimpGetSubscriber'],
+      [
+        'MailchimpUpdateSubscriberAction',
+        'mailchimp-update-subscriber',
+        'mailchimpUpdateSubscriber',
+      ],
+      ['MailchimpUnsubscribeAction', 'mailchimp-unsubscribe', 'mailchimpUnsubscribe'],
+      ['MailchimpAddTagAction', 'mailchimp-add-tag', 'mailchimpAddTag'],
+      ['MailchimpListCampaignsAction', 'mailchimp-list-campaigns', 'mailchimpListCampaigns'],
+      ['CalendlyGetEventAction', 'calendly-get-event', 'calendlyGetEvent'],
+      ['CalendlyCancelEventAction', 'calendly-cancel-event', 'calendlyCancelEvent'],
+      ['CalendlyListInviteesAction', 'calendly-list-invitees', 'calendlyListInvitees'],
+      ['S3DownloadFileAction', 's3-download-file', 's3DownloadFile'],
+      ['S3ListObjectsAction', 's3-list-objects', 's3ListObjects'],
+      ['S3DeleteObjectAction', 's3-delete-object', 's3DeleteObject'],
+      ['S3GetPresignedUrlAction', 's3-get-presigned-url', 's3GetPresignedUrl'],
+      ['OpenaiEmbeddingsAction', 'openai-embeddings', 'openaiEmbeddings'],
+      ['OpenaiGenerateImageAction', 'openai-generate-image', 'openaiGenerateImage'],
+      ['AnthropicVisionAction', 'anthropic-vision', 'anthropicVision'],
+      ['OllamaEmbeddingsAction', 'ollama-embeddings', 'ollamaEmbeddings'],
+      ['StripeInvoicePaidPassthrough', 'stripe-invoice-paid', 'stripeInvoicePaid'],
+      ['HubspotDealChangedPassthrough', 'hubspot-deal-changed', 'hubspotDealChanged'],
+      ['S3ObjectCreatedTrigger', 's3-object-created', 's3ObjectCreated'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -745,7 +908,8 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated). +messaging pack triggers (#245).
-      expect(counts.trigger).toBe(32);
+      // +#246 triggers: stripe-invoice-paid + hubspot-deal-changed (push) + s3-object-created (poll).
+      expect(counts.trigger).toBe(35);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
@@ -755,7 +919,9 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      expect(counts.action).toBe(108);
+      // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
+      // Mailchimp ×5 + Calendly ×3 + S3 ×4 + AI enrichment ×4.
+      expect(counts.action).toBe(136);
     });
   });
 });

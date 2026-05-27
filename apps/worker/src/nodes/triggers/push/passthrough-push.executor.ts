@@ -252,3 +252,25 @@ export class GithubPrOpenedPassthrough extends PassthroughPushExecutor {
     );
   }
 }
+
+@Injectable()
+export class StripeInvoicePaidPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'stripe-invoice-paid',
+      'Stripe: Invoice Paid',
+      'Triggers when Stripe delivers an invoice.paid webhook event to the workflow',
+    );
+  }
+}
+
+@Injectable()
+export class HubspotDealChangedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'hubspot-deal-changed',
+      'HubSpot: Deal Changed',
+      'Triggers when a HubSpot deal is created, updated, or deleted',
+    );
+  }
+}
