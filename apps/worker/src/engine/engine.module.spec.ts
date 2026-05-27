@@ -31,9 +31,17 @@ import { CalendarListEventsAction } from '../nodes/connectors/google/calendar-li
 import { CalendarGetEventAction } from '../nodes/connectors/google/calendar-get-event';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
+import { OutlookGetMessageAction } from '../nodes/connectors/microsoft/outlook-get-message';
+import { OutlookGetAttachmentAction } from '../nodes/connectors/microsoft/outlook-get-attachment';
+import { OutlookUpdateMessageAction } from '../nodes/connectors/microsoft/outlook-update-message';
+import { OutlookCreateDraftAction } from '../nodes/connectors/microsoft/outlook-create-draft';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
+import { ExcelFindRowAction } from '../nodes/connectors/microsoft/excel-find-row';
+import { ExcelUpdateRowAction } from '../nodes/connectors/microsoft/excel-update-row';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { OnedriveGetFileAction } from '../nodes/connectors/microsoft/onedrive-get-file';
+import { OnedriveListFilesAction } from '../nodes/connectors/microsoft/onedrive-list-files';
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
 import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
@@ -75,6 +83,7 @@ import {
   DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
+  OutlookMessageWithAttachmentPassthrough,
   OnedriveFileAddedPassthrough,
   SlackMessageReceivedPassthrough,
   SlackReactionAddedPassthrough,
@@ -88,6 +97,7 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
+import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 import { EngineModule } from './engine.module';
@@ -130,9 +140,17 @@ describe('EngineModule', () => {
     const calendarGetEvent = new CalendarGetEventAction(undefined as never, undefined as never);
     const outlookSend = new OutlookSendAction(undefined as never);
     const outlookSearch = new OutlookSearchAction(undefined as never);
+    const outlookGetMessage = new OutlookGetMessageAction(undefined as never);
+    const outlookGetAttachment = new OutlookGetAttachmentAction(undefined as never);
+    const outlookUpdateMessage = new OutlookUpdateMessageAction(undefined as never);
+    const outlookCreateDraft = new OutlookCreateDraftAction(undefined as never);
     const excelAppend = new ExcelAppendAction(undefined as never);
     const excelRead = new ExcelReadAction(undefined as never);
+    const excelFindRow = new ExcelFindRowAction(undefined as never);
+    const excelUpdateRow = new ExcelUpdateRowAction(undefined as never);
     const onedriveCreate = new OnedriveCreateAction(undefined as never);
+    const onedriveGetFile = new OnedriveGetFileAction(undefined as never);
+    const onedriveListFiles = new OnedriveListFilesAction(undefined as never);
     const stripeEventReceived = new StripeEventReceivedPassthrough();
     const driveFileAdded = new DriveFileAddedPassthrough();
     const gmailMessageReceived = new GmailMessageReceivedExecutor(
@@ -141,8 +159,10 @@ describe('EngineModule', () => {
     );
     const outlookMessageReceived = new OutlookMessageReceivedPassthrough();
     const outlookMessageFlagged = new OutlookMessageFlaggedPassthrough();
+    const outlookMessageWithAttachment = new OutlookMessageWithAttachmentPassthrough();
     const onedriveFileAdded = new OnedriveFileAddedPassthrough();
     const excelRowAdded = new ExcelRowAddedTrigger(undefined as never);
+    const excelRowUpdated = new ExcelRowUpdatedTrigger(undefined as never);
     const slackPostMessage = new SlackPostMessageAction(undefined as never);
     const slackPostToChannel = new SlackPostToChannelAction(undefined as never);
     const slackUploadFile = new SlackUploadFileAction(undefined as never);
@@ -230,16 +250,26 @@ describe('EngineModule', () => {
       calendarGetEvent,
       outlookSend,
       outlookSearch,
+      outlookGetMessage,
+      outlookGetAttachment,
+      outlookUpdateMessage,
+      outlookCreateDraft,
       excelAppend,
       excelRead,
+      excelFindRow,
+      excelUpdateRow,
       onedriveCreate,
+      onedriveGetFile,
+      onedriveListFiles,
       stripeEventReceived,
       driveFileAdded,
       gmailMessageReceived,
       outlookMessageReceived,
       outlookMessageFlagged,
+      outlookMessageWithAttachment,
       onedriveFileAdded,
       excelRowAdded,
+      excelRowUpdated,
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
@@ -322,16 +352,26 @@ describe('EngineModule', () => {
       calendarGetEvent,
       outlookSend,
       outlookSearch,
+      outlookGetMessage,
+      outlookGetAttachment,
+      outlookUpdateMessage,
+      outlookCreateDraft,
       excelAppend,
       excelRead,
+      excelFindRow,
+      excelUpdateRow,
       onedriveCreate,
+      onedriveGetFile,
+      onedriveListFiles,
       stripeEventReceived,
       driveFileAdded,
       gmailMessageReceived,
       outlookMessageReceived,
       outlookMessageFlagged,
+      outlookMessageWithAttachment,
       onedriveFileAdded,
       excelRowAdded,
+      excelRowUpdated,
       slackPostMessage,
       slackPostToChannel,
       slackUploadFile,
@@ -417,16 +457,30 @@ describe('EngineModule', () => {
       ['CalendarGetEventAction', 'calendar-get-event', 'calendarGetEvent'],
       ['OutlookSendAction', 'outlook-send', 'outlookSend'],
       ['OutlookSearchAction', 'outlook-search', 'outlookSearch'],
+      ['OutlookGetMessageAction', 'outlook-get-message', 'outlookGetMessage'],
+      ['OutlookGetAttachmentAction', 'outlook-get-attachment', 'outlookGetAttachment'],
+      ['OutlookUpdateMessageAction', 'outlook-update-message', 'outlookUpdateMessage'],
+      ['OutlookCreateDraftAction', 'outlook-create-draft', 'outlookCreateDraft'],
       ['ExcelAppendAction', 'excel-append', 'excelAppend'],
       ['ExcelReadAction', 'excel-read', 'excelRead'],
+      ['ExcelFindRowAction', 'excel-find-row', 'excelFindRow'],
+      ['ExcelUpdateRowAction', 'excel-update-row', 'excelUpdateRow'],
       ['OnedriveCreateAction', 'onedrive-create', 'onedriveCreate'],
+      ['OnedriveGetFileAction', 'onedrive-get-file', 'onedriveGetFile'],
+      ['OnedriveListFilesAction', 'onedrive-list-files', 'onedriveListFiles'],
       ['StripeEventReceivedPassthrough', 'stripe-event-received', 'stripeEventReceived'],
       ['DriveFileAddedPassthrough', 'drive-file-added', 'driveFileAdded'],
       ['GmailMessageReceivedExecutor', 'gmail-message-received', 'gmailMessageReceived'],
       ['OutlookMessageReceivedPassthrough', 'outlook-message-received', 'outlookMessageReceived'],
       ['OutlookMessageFlaggedPassthrough', 'outlook-message-flagged', 'outlookMessageFlagged'],
+      [
+        'OutlookMessageWithAttachmentPassthrough',
+        'outlook-message-with-attachment',
+        'outlookMessageWithAttachment',
+      ],
       ['OnedriveFileAddedPassthrough', 'onedrive-file-added', 'onedriveFileAdded'],
       ['ExcelRowAddedTrigger', 'excel-row-added', 'excelRowAdded'],
+      ['ExcelRowUpdatedTrigger', 'excel-row-updated', 'excelRowUpdated'],
       ['SlackPostMessageAction', 'slack-post-message', 'slackPostMessage'],
       ['SlackPostToChannelAction', 'slack-post-to-channel', 'slackPostToChannel'],
       ['SlackUploadFileAction', 'slack-upload-file', 'slackUploadFile'],
@@ -501,23 +555,24 @@ describe('EngineModule', () => {
         return acc;
       }, {});
       // 6 baseline triggers (manual, cron, webhook, stripe, drive, gmail) +
-      // 4 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
-      // onedrive-file-added, excel-row-added) +
+      // 6 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
+      // outlook-msg-with-attachment, onedrive-file-added, excel-row-added,
+      // excel-row-updated) +
       // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
-      // 1 Google push trigger (drive-file-updated) = 22.
-      expect(counts.trigger).toBe(22);
+      // 1 Google push trigger (drive-file-updated) = 24.
+      expect(counts.trigger).toBe(24);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
-      // 5 Microsoft connector actions +
+      // 13 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 63.
-      expect(counts.action).toBe(63);
+      //   calendly, postgres, mysql, s3, trello ×2) = 71.
+      expect(counts.action).toBe(71);
     });
   });
 });

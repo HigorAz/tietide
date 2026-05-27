@@ -40,13 +40,23 @@ import { CalendarEventCreatedForm } from './google/CalendarEventCreatedForm';
 import { CalendarEventUpdatedForm } from './google/CalendarEventUpdatedForm';
 import { OutlookSendForm } from './microsoft/OutlookSendForm';
 import { OutlookSearchForm } from './microsoft/OutlookSearchForm';
+import { OutlookGetMessageForm } from './microsoft/OutlookGetMessageForm';
+import { OutlookGetAttachmentForm } from './microsoft/OutlookGetAttachmentForm';
+import { OutlookUpdateMessageForm } from './microsoft/OutlookUpdateMessageForm';
+import { OutlookCreateDraftForm } from './microsoft/OutlookCreateDraftForm';
 import { ExcelAppendForm } from './microsoft/ExcelAppendForm';
 import { ExcelReadForm } from './microsoft/ExcelReadForm';
+import { ExcelFindRowForm } from './microsoft/ExcelFindRowForm';
+import { ExcelUpdateRowForm } from './microsoft/ExcelUpdateRowForm';
 import { OneDriveCreateForm } from './microsoft/OneDriveCreateForm';
+import { OneDriveGetFileForm } from './microsoft/OneDriveGetFileForm';
+import { OneDriveListFilesForm } from './microsoft/OneDriveListFilesForm';
 import { OutlookMessageReceivedForm } from './microsoft/OutlookMessageReceivedForm';
 import { OutlookMessageFlaggedForm } from './microsoft/OutlookMessageFlaggedForm';
+import { OutlookMessageWithAttachmentForm } from './microsoft/OutlookMessageWithAttachmentForm';
 import { OneDriveFileAddedForm } from './microsoft/OneDriveFileAddedForm';
 import { ExcelRowAddedForm } from './microsoft/ExcelRowAddedForm';
+import { ExcelRowUpdatedForm } from './microsoft/ExcelRowUpdatedForm';
 import { SlackPostMessageForm } from './slack/SlackPostMessageForm';
 import { SlackPostToChannelForm } from './slack/SlackPostToChannelForm';
 import { SlackUploadFileForm } from './slack/SlackUploadFileForm';
@@ -139,13 +149,23 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.CALENDAR_EVENT_UPDATED]: CalendarEventUpdatedForm,
   [NodeType.OUTLOOK_SEND]: OutlookSendForm,
   [NodeType.OUTLOOK_SEARCH]: OutlookSearchForm,
+  [NodeType.OUTLOOK_GET_MESSAGE]: OutlookGetMessageForm,
+  [NodeType.OUTLOOK_GET_ATTACHMENT]: OutlookGetAttachmentForm,
+  [NodeType.OUTLOOK_UPDATE_MESSAGE]: OutlookUpdateMessageForm,
+  [NodeType.OUTLOOK_CREATE_DRAFT]: OutlookCreateDraftForm,
   [NodeType.EXCEL_APPEND]: ExcelAppendForm,
   [NodeType.EXCEL_READ]: ExcelReadForm,
+  [NodeType.EXCEL_FIND_ROW]: ExcelFindRowForm,
+  [NodeType.EXCEL_UPDATE_ROW]: ExcelUpdateRowForm,
   [NodeType.ONEDRIVE_CREATE]: OneDriveCreateForm,
+  [NodeType.ONEDRIVE_GET_FILE]: OneDriveGetFileForm,
+  [NodeType.ONEDRIVE_LIST_FILES]: OneDriveListFilesForm,
   [NodeType.OUTLOOK_MESSAGE_RECEIVED]: OutlookMessageReceivedForm,
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: OutlookMessageFlaggedForm,
+  [NodeType.OUTLOOK_MESSAGE_WITH_ATTACHMENT]: OutlookMessageWithAttachmentForm,
   [NodeType.ONEDRIVE_FILE_ADDED]: OneDriveFileAddedForm,
   [NodeType.EXCEL_ROW_ADDED]: ExcelRowAddedForm,
+  [NodeType.EXCEL_ROW_UPDATED]: ExcelRowUpdatedForm,
   [NodeType.SLACK_POST_MESSAGE]: SlackPostMessageForm,
   [NodeType.SLACK_POST_TO_CHANNEL]: SlackPostToChannelForm,
   [NodeType.SLACK_UPLOAD_FILE]: SlackUploadFileForm,

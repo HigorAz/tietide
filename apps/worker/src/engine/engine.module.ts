@@ -48,9 +48,17 @@ import { CalendarGetEventAction } from '../nodes/connectors/google/calendar-get-
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
+import { OutlookGetMessageAction } from '../nodes/connectors/microsoft/outlook-get-message';
+import { OutlookGetAttachmentAction } from '../nodes/connectors/microsoft/outlook-get-attachment';
+import { OutlookUpdateMessageAction } from '../nodes/connectors/microsoft/outlook-update-message';
+import { OutlookCreateDraftAction } from '../nodes/connectors/microsoft/outlook-create-draft';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
+import { ExcelFindRowAction } from '../nodes/connectors/microsoft/excel-find-row';
+import { ExcelUpdateRowAction } from '../nodes/connectors/microsoft/excel-update-row';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { OnedriveGetFileAction } from '../nodes/connectors/microsoft/onedrive-get-file';
+import { OnedriveListFilesAction } from '../nodes/connectors/microsoft/onedrive-list-files';
 import { SlackClientFactory } from '../nodes/connectors/slack/slack-client.factory';
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
@@ -110,6 +118,7 @@ import {
   DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
+  OutlookMessageWithAttachmentPassthrough,
   OnedriveFileAddedPassthrough,
   SlackMessageReceivedPassthrough,
   SlackReactionAddedPassthrough,
@@ -123,6 +132,7 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
+import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 
@@ -167,9 +177,17 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     MicrosoftAuthService,
     OutlookSendAction,
     OutlookSearchAction,
+    OutlookGetMessageAction,
+    OutlookGetAttachmentAction,
+    OutlookUpdateMessageAction,
+    OutlookCreateDraftAction,
     ExcelAppendAction,
     ExcelReadAction,
+    ExcelFindRowAction,
+    ExcelUpdateRowAction,
     OnedriveCreateAction,
+    OnedriveGetFileAction,
+    OnedriveListFilesAction,
     SlackClientFactory,
     SlackPostMessageAction,
     SlackPostToChannelAction,
@@ -228,6 +246,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     DriveFileUpdatedPassthrough,
     OutlookMessageReceivedPassthrough,
     OutlookMessageFlaggedPassthrough,
+    OutlookMessageWithAttachmentPassthrough,
     OnedriveFileAddedPassthrough,
     SlackMessageReceivedPassthrough,
     SlackReactionAddedPassthrough,
@@ -240,6 +259,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     TrelloCardChangedPassthrough,
     GmailMessageReceivedExecutor,
     ExcelRowAddedTrigger,
+    ExcelRowUpdatedTrigger,
     CalendarEventUpdatedTrigger,
     GmailAttachmentReceivedTrigger,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
@@ -283,16 +303,26 @@ export class EngineModule implements OnModuleInit {
     private readonly calendarGetEvent: CalendarGetEventAction,
     private readonly outlookSend: OutlookSendAction,
     private readonly outlookSearch: OutlookSearchAction,
+    private readonly outlookGetMessage: OutlookGetMessageAction,
+    private readonly outlookGetAttachment: OutlookGetAttachmentAction,
+    private readonly outlookUpdateMessage: OutlookUpdateMessageAction,
+    private readonly outlookCreateDraft: OutlookCreateDraftAction,
     private readonly excelAppend: ExcelAppendAction,
     private readonly excelRead: ExcelReadAction,
+    private readonly excelFindRow: ExcelFindRowAction,
+    private readonly excelUpdateRow: ExcelUpdateRowAction,
     private readonly onedriveCreate: OnedriveCreateAction,
+    private readonly onedriveGetFile: OnedriveGetFileAction,
+    private readonly onedriveListFiles: OnedriveListFilesAction,
     private readonly stripeEventReceived: StripeEventReceivedPassthrough,
     private readonly driveFileAdded: DriveFileAddedPassthrough,
     private readonly gmailMessageReceived: GmailMessageReceivedExecutor,
     private readonly outlookMessageReceived: OutlookMessageReceivedPassthrough,
     private readonly outlookMessageFlagged: OutlookMessageFlaggedPassthrough,
+    private readonly outlookMessageWithAttachment: OutlookMessageWithAttachmentPassthrough,
     private readonly onedriveFileAdded: OnedriveFileAddedPassthrough,
     private readonly excelRowAdded: ExcelRowAddedTrigger,
+    private readonly excelRowUpdated: ExcelRowUpdatedTrigger,
     private readonly slackPostMessage: SlackPostMessageAction,
     private readonly slackPostToChannel: SlackPostToChannelAction,
     private readonly slackUploadFile: SlackUploadFileAction,
@@ -375,16 +405,26 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.calendarGetEvent);
     this.registry.register(this.outlookSend);
     this.registry.register(this.outlookSearch);
+    this.registry.register(this.outlookGetMessage);
+    this.registry.register(this.outlookGetAttachment);
+    this.registry.register(this.outlookUpdateMessage);
+    this.registry.register(this.outlookCreateDraft);
     this.registry.register(this.excelAppend);
     this.registry.register(this.excelRead);
+    this.registry.register(this.excelFindRow);
+    this.registry.register(this.excelUpdateRow);
     this.registry.register(this.onedriveCreate);
+    this.registry.register(this.onedriveGetFile);
+    this.registry.register(this.onedriveListFiles);
     this.registry.register(this.stripeEventReceived);
     this.registry.register(this.driveFileAdded);
     this.registry.register(this.gmailMessageReceived);
     this.registry.register(this.outlookMessageReceived);
     this.registry.register(this.outlookMessageFlagged);
+    this.registry.register(this.outlookMessageWithAttachment);
     this.registry.register(this.onedriveFileAdded);
     this.registry.register(this.excelRowAdded);
+    this.registry.register(this.excelRowUpdated);
     this.registry.register(this.slackPostMessage);
     this.registry.register(this.slackPostToChannel);
     this.registry.register(this.slackUploadFile);

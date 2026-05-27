@@ -24,6 +24,7 @@ const ALLOWED_SCOPES = new Set([
   'offline_access',
   'User.Read',
   'Mail.Read',
+  'Mail.ReadWrite',
   'Mail.Send',
   'Calendars.Read',
   'Calendars.ReadWrite',

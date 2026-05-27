@@ -33,6 +33,10 @@ import {
   OUTLOOK_MESSAGE_FLAGGED_TYPE,
 } from './triggers/outlook-message-flagged.trigger';
 import {
+  OutlookMessageWithAttachmentTrigger,
+  OUTLOOK_MESSAGE_WITH_ATTACHMENT_TYPE,
+} from './triggers/outlook-message-with-attachment.trigger';
+import {
   OnedriveFileAddedTrigger,
   ONEDRIVE_FILE_ADDED_TYPE,
 } from './triggers/onedrive-file-added.trigger';
@@ -99,6 +103,7 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     MicrosoftGraphFactory,
     OutlookMessageReceivedTrigger,
     OutlookMessageFlaggedTrigger,
+    OutlookMessageWithAttachmentTrigger,
     OnedriveFileAddedTrigger,
     TwilioApiFactory,
     TwilioSmsReceivedTrigger,
@@ -133,6 +138,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly gmailMessageReceived: GmailMessageReceivedTrigger,
     private readonly outlookMessageReceived: OutlookMessageReceivedTrigger,
     private readonly outlookMessageFlagged: OutlookMessageFlaggedTrigger,
+    private readonly outlookMessageWithAttachment: OutlookMessageWithAttachmentTrigger,
     private readonly onedriveFileAdded: OnedriveFileAddedTrigger,
     private readonly twilioSmsReceived: TwilioSmsReceivedTrigger,
     private readonly telegramMessageReceived: TelegramMessageReceivedTrigger,
@@ -152,6 +158,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(GMAIL_MESSAGE_RECEIVED_TYPE, this.gmailMessageReceived);
     this.registry.register(OUTLOOK_MESSAGE_RECEIVED_TYPE, this.outlookMessageReceived);
     this.registry.register(OUTLOOK_MESSAGE_FLAGGED_TYPE, this.outlookMessageFlagged);
+    this.registry.register(OUTLOOK_MESSAGE_WITH_ATTACHMENT_TYPE, this.outlookMessageWithAttachment);
     this.registry.register(ONEDRIVE_FILE_ADDED_TYPE, this.onedriveFileAdded);
     this.registry.register(TWILIO_SMS_RECEIVED_TYPE, this.twilioSmsReceived);
     this.registry.register(TELEGRAM_MESSAGE_RECEIVED_TYPE, this.telegramMessageReceived);
