@@ -28,6 +28,7 @@ import { DocsGetForm } from './google/DocsGetForm';
 import { DocsInsertTextForm } from './google/DocsInsertTextForm';
 import { DocsReplaceTextForm } from './google/DocsReplaceTextForm';
 import { CalendarCreateForm } from './google/CalendarCreateForm';
+import { CalendarListEventsForm } from './google/CalendarListEventsForm';
 import { SheetsRowAddedForm } from './google/SheetsRowAddedForm';
 import { GmailMessageReceivedForm } from './google/GmailMessageReceivedForm';
 import { GmailLabelAddedForm } from './google/GmailLabelAddedForm';
@@ -122,6 +123,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.DOCS_INSERT_TEXT]: DocsInsertTextForm,
   [NodeType.DOCS_REPLACE_TEXT]: DocsReplaceTextForm,
   [NodeType.CALENDAR_CREATE]: CalendarCreateForm,
+  [NodeType.CALENDAR_LIST_EVENTS]: CalendarListEventsForm,
   [NodeType.SHEETS_ROW_ADDED]: SheetsRowAddedForm,
   [NodeType.GMAIL_MESSAGE_RECEIVED]: GmailMessageReceivedForm,
   [NodeType.GMAIL_LABEL_ADDED]: GmailLabelAddedForm,

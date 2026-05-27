@@ -188,6 +188,7 @@ export {
   docsReplaceTextConfigSchema,
   docsCreateConfigSchema,
   calendarCreateConfigSchema,
+  calendarListEventsConfigSchema,
   GOOGLE_NODE_REQUIRED_SCOPES,
   GOOGLE_NODE_TYPES,
   type GmailSendConfig,
@@ -209,6 +210,7 @@ export {
   type DocsReplaceTextConfig,
   type DocsCreateConfig,
   type CalendarCreateConfig,
+  type CalendarListEventsConfig,
 } from './schemas/google.schema.js';
 export {
   gmailMessageReceivedConfigSchema,

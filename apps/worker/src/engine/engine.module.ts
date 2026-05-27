@@ -43,6 +43,7 @@ import { DocsGetAction } from '../nodes/connectors/google/docs-get';
 import { DocsInsertTextAction } from '../nodes/connectors/google/docs-insert-text';
 import { DocsReplaceTextAction } from '../nodes/connectors/google/docs-replace-text';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
+import { CalendarListEventsAction } from '../nodes/connectors/google/calendar-list-events';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
@@ -157,6 +158,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     DocsInsertTextAction,
     DocsReplaceTextAction,
     CalendarCreateAction,
+    CalendarListEventsAction,
     MicrosoftAuthService,
     OutlookSendAction,
     OutlookSearchAction,
@@ -269,6 +271,7 @@ export class EngineModule implements OnModuleInit {
     private readonly docsInsertText: DocsInsertTextAction,
     private readonly docsReplaceText: DocsReplaceTextAction,
     private readonly calendarCreate: CalendarCreateAction,
+    private readonly calendarListEvents: CalendarListEventsAction,
     private readonly outlookSend: OutlookSendAction,
     private readonly outlookSearch: OutlookSearchAction,
     private readonly excelAppend: ExcelAppendAction,
@@ -356,6 +359,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.docsInsertText);
     this.registry.register(this.docsReplaceText);
     this.registry.register(this.calendarCreate);
+    this.registry.register(this.calendarListEvents);
     this.registry.register(this.outlookSend);
     this.registry.register(this.outlookSearch);
     this.registry.register(this.excelAppend);
