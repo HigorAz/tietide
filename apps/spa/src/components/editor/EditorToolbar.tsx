@@ -1,14 +1,26 @@
 import { useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Download, FlaskConical, Play, Redo2, Save, Undo2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Download,
+  FileText,
+  FlaskConical,
+  Play,
+  Redo2,
+  Save,
+  Sparkles,
+  Undo2,
+} from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
+import { useDocumentationStore } from '@/stores/documentationStore';
 import { executeWorkflow, testWorkflow } from '@/api/executions';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { buildExportPayload, exportFilename, serializeExport } from '@/lib/workflowExport';
 import { downloadJson } from '@/lib/downloadFile';
+import { EditorViewTabs } from './EditorViewTabs';
 import { saveWorkflow } from './saveWorkflow';
 import { toWorkflowDefinition } from './serialization';
 
@@ -24,6 +36,8 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const future = useEditorStore((s) => s.future);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
+  const docStatus = useDocumentationStore((s) => s.status);
+  const regenerateDocs = useDocumentationStore((s) => s.regenerate);
   const toast = useToastStore((s) => s.show);
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
@@ -96,6 +110,19 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
     }
   }, [isSaving, isTesting, setSearchParams, toast, workflowId]);
 
+  const handleDocs = useCallback(async () => {
+    if (useDocumentationStore.getState().status === 'loading') return;
+    toast({ tone: 'info', message: 'Generating documentation…' });
+    await regenerateDocs(workflowId);
+    const s = useDocumentationStore.getState();
+    if (s.status === 'error') {
+      toast({ tone: 'error', message: s.error ?? 'Could not generate documentation' });
+    } else {
+      toast({ tone: 'success', message: 'Documentation generated — see the Docs tab' });
+    }
+  }, [regenerateDocs, toast, workflowId]);
+
+  const docsDisabled = docStatus === 'loading';
   const saveDisabled = !isDirty || isSaving;
   const runDisabled = isRunning || isSaving;
   const testDisabled = isTesting || isSaving || nodeCount === 0;
@@ -104,11 +131,15 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const redoDisabled = future.length === 0;
 
   return (
-    <>
+    // One wrapping row: Back on the left, controls on the right. On narrow /
+    // split-view widths the controls bar wraps to the next line (below Back)
+    // instead of overflowing the canvas or overlapping Back. pointer-events-none
+    // here keeps the canvas interactive in the gap; each pill re-enables them.
+    <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-wrap items-start justify-between gap-2">
       <div
         data-testid="editor-toolbar-back"
         className={cn(
-          'pointer-events-auto absolute left-4 top-4 z-10 flex items-center',
+          'pointer-events-auto flex items-center',
           'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
         )}
       >
@@ -121,10 +152,11 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
       <div
         data-testid="editor-toolbar"
         className={cn(
-          'pointer-events-auto absolute right-4 top-4 z-10 flex items-center gap-2',
+          'pointer-events-auto flex flex-wrap items-center justify-end gap-2',
           'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
         )}
       >
+        <EditorViewTabs />
         <ToolbarButton
           label="Undo"
           onClick={undo}
@@ -143,6 +175,26 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           onClick={handleExport}
           disabled={exportDisabled}
           icon={<Download size={16} aria-hidden />}
+        />
+        <ToolbarButton
+          label={docStatus === 'loading' ? 'Generating…' : 'AI Docs'}
+          onClick={handleDocs}
+          disabled={docsDisabled}
+          title="Generate AI documentation for this workflow"
+          icon={
+            docStatus === 'loading' ? (
+              <Spinner size="sm" label="Generating" />
+            ) : (
+              <span className="relative inline-flex">
+                <FileText size={16} aria-hidden />
+                <Sparkles
+                  size={9}
+                  aria-hidden
+                  className="absolute -right-1.5 -top-1.5 fill-accent-teal text-accent-teal"
+                />
+              </span>
+            )
+          }
         />
         <ToolbarButton
           label={isRunning ? 'Running…' : 'Run'}
@@ -202,7 +254,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           }
         />
       </div>
-    </>
+    </div>
   );
 }
 

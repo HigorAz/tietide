@@ -5,7 +5,6 @@ import { Canvas } from '@/components/editor/Canvas';
 import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
 import { EditorMobileToolbox } from '@/components/editor/EditorMobileToolbox';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
-import { EditorViewTabs } from '@/components/editor/EditorViewTabs';
 import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
 import { ShortcutCheatsheet } from '@/components/editor/ShortcutCheatsheet';
@@ -265,7 +264,6 @@ export function WorkflowEditorPage() {
         <div className="relative flex-1">
           <Canvas />
           <EditorToolbar workflowId={id} entryRoute={entryRoute} />
-          <EditorViewTabs />
           <DocumentationPanel workflowId={id} />
           {isMobile && <EditorMobileToolbox />}
         </div>
