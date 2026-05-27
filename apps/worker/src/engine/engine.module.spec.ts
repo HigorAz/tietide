@@ -108,6 +108,7 @@ import {
   SlackChannelCreatedPassthrough,
   DiscordMessageReceivedPassthrough,
   TelegramMessageReceivedPassthrough,
+  TelegramCallbackQueryReceivedPassthrough,
   TwilioSmsReceivedPassthrough,
   HubspotContactChangedPassthrough,
   MailchimpSubscriberAddedPassthrough,
@@ -238,6 +239,7 @@ describe('EngineModule', () => {
     const slackChannelCreated = new SlackChannelCreatedPassthrough();
     const discordMessageReceived = new DiscordMessageReceivedPassthrough();
     const telegramMessageReceived = new TelegramMessageReceivedPassthrough();
+    const telegramCallbackQueryReceived = new TelegramCallbackQueryReceivedPassthrough();
     const twilioSmsReceived = new TwilioSmsReceivedPassthrough();
     const notionCreatePage = new NotionCreatePageAction(undefined as never);
     const notionQueryDatabase = new NotionQueryDatabaseAction(undefined as never);
@@ -389,6 +391,7 @@ describe('EngineModule', () => {
       slackChannelCreated,
       discordMessageReceived,
       telegramMessageReceived,
+      telegramCallbackQueryReceived,
       twilioSmsReceived,
       notionCreatePage,
       notionQueryDatabase,
@@ -535,6 +538,7 @@ describe('EngineModule', () => {
       slackChannelCreated,
       discordMessageReceived,
       telegramMessageReceived,
+      telegramCallbackQueryReceived,
       twilioSmsReceived,
       notionCreatePage,
       notionQueryDatabase,
@@ -671,6 +675,11 @@ describe('EngineModule', () => {
         'telegram-message-received',
         'telegramMessageReceived',
       ],
+      [
+        'TelegramCallbackQueryReceivedPassthrough',
+        'telegram-callback-query-received',
+        'telegramCallbackQueryReceived',
+      ],
       ['TwilioSmsReceivedPassthrough', 'twilio-sms-received', 'twilioSmsReceived'],
       ['NotionCreatePageAction', 'notion-create-page', 'notionCreatePage'],
       ['NotionQueryDatabaseAction', 'notion-query-database', 'notionQueryDatabase'],
@@ -732,11 +741,11 @@ describe('EngineModule', () => {
       // 6 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
       // outlook-msg-with-attachment, onedrive-file-added, excel-row-added,
       // excel-row-updated) +
-      // 7 communication push triggers (slack ×4, discord, telegram, twilio) +
+      // 8 communication push triggers (slack ×4, discord, telegram ×2, twilio) +
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated). +messaging pack triggers (#245).
-      expect(counts.trigger).toBe(31);
+      expect(counts.trigger).toBe(32);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +

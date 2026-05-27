@@ -51,6 +51,10 @@ import {
   TELEGRAM_MESSAGE_RECEIVED_TYPE,
 } from './triggers/telegram/telegram-message-received.trigger';
 import {
+  TelegramCallbackQueryReceivedTrigger,
+  TELEGRAM_CALLBACK_QUERY_RECEIVED_TYPE,
+} from './triggers/telegram/telegram-callback-query-received.trigger';
+import {
   SlackMessageReceivedTrigger,
   SLACK_MESSAGE_RECEIVED_TYPE,
 } from './triggers/slack/slack-message-received.trigger';
@@ -125,6 +129,7 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     TwilioSmsReceivedTrigger,
     TelegramApiFactory,
     TelegramMessageReceivedTrigger,
+    TelegramCallbackQueryReceivedTrigger,
     SlackMessageReceivedTrigger,
     SlackReactionAddedTrigger,
     SlackAppMentionTrigger,
@@ -162,6 +167,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly onedriveFileAdded: OnedriveFileAddedTrigger,
     private readonly twilioSmsReceived: TwilioSmsReceivedTrigger,
     private readonly telegramMessageReceived: TelegramMessageReceivedTrigger,
+    private readonly telegramCallbackQueryReceived: TelegramCallbackQueryReceivedTrigger,
     private readonly slackMessageReceived: SlackMessageReceivedTrigger,
     private readonly slackReactionAdded: SlackReactionAddedTrigger,
     private readonly slackAppMention: SlackAppMentionTrigger,
@@ -186,6 +192,10 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(ONEDRIVE_FILE_ADDED_TYPE, this.onedriveFileAdded);
     this.registry.register(TWILIO_SMS_RECEIVED_TYPE, this.twilioSmsReceived);
     this.registry.register(TELEGRAM_MESSAGE_RECEIVED_TYPE, this.telegramMessageReceived);
+    this.registry.register(
+      TELEGRAM_CALLBACK_QUERY_RECEIVED_TYPE,
+      this.telegramCallbackQueryReceived,
+    );
     this.registry.register(SLACK_MESSAGE_RECEIVED_TYPE, this.slackMessageReceived);
     this.registry.register(SLACK_REACTION_ADDED_TYPE, this.slackReactionAdded);
     this.registry.register(SLACK_APP_MENTION_TYPE, this.slackAppMention);

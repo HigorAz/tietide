@@ -89,6 +89,7 @@ import { TelegramSendDocumentForm } from './telegram/TelegramSendDocumentForm';
 import { TelegramEditMessageForm } from './telegram/TelegramEditMessageForm';
 import { TelegramGetChatForm } from './telegram/TelegramGetChatForm';
 import { TelegramMessageReceivedForm } from './telegram/TelegramMessageReceivedForm';
+import { TelegramCallbackQueryReceivedForm } from './telegram/TelegramCallbackQueryReceivedForm';
 import { NotionCreatePageForm } from './notion/NotionCreatePageForm';
 import { NotionQueryDatabaseForm } from './notion/NotionQueryDatabaseForm';
 import { NotionGetPageForm } from './notion/NotionGetPageForm';
@@ -242,6 +243,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TELEGRAM_EDIT_MESSAGE]: TelegramEditMessageForm,
   [NodeType.TELEGRAM_GET_CHAT]: TelegramGetChatForm,
   [NodeType.TELEGRAM_MESSAGE_RECEIVED]: TelegramMessageReceivedForm,
+  [NodeType.TELEGRAM_CALLBACK_QUERY_RECEIVED]: TelegramCallbackQueryReceivedForm,
   [NodeType.NOTION_CREATE_PAGE]: NotionCreatePageForm,
   [NodeType.NOTION_QUERY_DATABASE]: NotionQueryDatabaseForm,
   [NodeType.NOTION_GET_PAGE]: NotionGetPageForm,

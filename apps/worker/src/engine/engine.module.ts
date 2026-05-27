@@ -164,6 +164,7 @@ import {
   SlackChannelCreatedPassthrough,
   DiscordMessageReceivedPassthrough,
   TelegramMessageReceivedPassthrough,
+  TelegramCallbackQueryReceivedPassthrough,
   TwilioSmsReceivedPassthrough,
   HubspotContactChangedPassthrough,
   MailchimpSubscriberAddedPassthrough,
@@ -342,6 +343,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     SlackChannelCreatedPassthrough,
     DiscordMessageReceivedPassthrough,
     TelegramMessageReceivedPassthrough,
+    TelegramCallbackQueryReceivedPassthrough,
     TwilioSmsReceivedPassthrough,
     HubspotContactChangedPassthrough,
     MailchimpSubscriberAddedPassthrough,
@@ -444,6 +446,7 @@ export class EngineModule implements OnModuleInit {
     private readonly slackChannelCreated: SlackChannelCreatedPassthrough,
     private readonly discordMessageReceived: DiscordMessageReceivedPassthrough,
     private readonly telegramMessageReceived: TelegramMessageReceivedPassthrough,
+    private readonly telegramCallbackQueryReceived: TelegramCallbackQueryReceivedPassthrough,
     private readonly twilioSmsReceived: TwilioSmsReceivedPassthrough,
     private readonly notionCreatePage: NotionCreatePageAction,
     private readonly notionQueryDatabase: NotionQueryDatabaseAction,
@@ -590,6 +593,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.slackChannelCreated);
     this.registry.register(this.discordMessageReceived);
     this.registry.register(this.telegramMessageReceived);
+    this.registry.register(this.telegramCallbackQueryReceived);
     this.registry.register(this.twilioSmsReceived);
     this.registry.register(this.notionCreatePage);
     this.registry.register(this.notionQueryDatabase);
