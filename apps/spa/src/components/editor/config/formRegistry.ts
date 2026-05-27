@@ -73,6 +73,7 @@ import { DiscordPostWebhookForm } from './discord/DiscordPostWebhookForm';
 import { DiscordReplyToCommandForm } from './discord/DiscordReplyToCommandForm';
 import { DiscordMessageReceivedForm } from './discord/DiscordMessageReceivedForm';
 import { DiscordBotSendMessageForm } from './discord/DiscordBotSendMessageForm';
+import { DiscordGetChannelMessagesForm } from './discord/DiscordGetChannelMessagesForm';
 import { TwilioSendSmsForm } from './twilio/TwilioSendSmsForm';
 import { TwilioSendWhatsAppForm } from './twilio/TwilioSendWhatsAppForm';
 import { TwilioSmsReceivedForm } from './twilio/TwilioSmsReceivedForm';
@@ -215,6 +216,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.DISCORD_REPLY_TO_COMMAND]: DiscordReplyToCommandForm,
   [NodeType.DISCORD_MESSAGE_RECEIVED]: DiscordMessageReceivedForm,
   [NodeType.DISCORD_BOT_SEND_MESSAGE]: DiscordBotSendMessageForm,
+  [NodeType.DISCORD_GET_CHANNEL_MESSAGES]: DiscordGetChannelMessagesForm,
   [NodeType.TWILIO_SEND_SMS]: TwilioSendSmsForm,
   [NodeType.TWILIO_SEND_WHATSAPP]: TwilioSendWhatsAppForm,
   [NodeType.TWILIO_SMS_RECEIVED]: TwilioSmsReceivedForm,

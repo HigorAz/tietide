@@ -775,6 +775,14 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     provider: 'discord-bot',
   },
   {
+    type: NodeType.DISCORD_GET_CHANNEL_MESSAGES,
+    name: 'Discord: Get Channel Messages',
+    description: 'Read recent messages from a Discord channel using a bot token',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMUNICATION,
+    provider: 'discord-bot',
+  },
+  {
     type: NodeType.TWILIO_SEND_SMS,
     name: 'Twilio: Send SMS',
     description: 'Send an SMS via Twilio to an E.164 number',
