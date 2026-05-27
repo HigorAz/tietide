@@ -115,6 +115,16 @@ export const onedriveCreateConfigSchema = z.object({
 });
 export type OnedriveCreateConfig = z.infer<typeof onedriveCreateConfigSchema>;
 
+export const onedriveGetFileConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  itemId: graphId(),
+  // Download the bytes (base64) in addition to metadata. Files over the ~10 MB
+  // cap return metadata only with contentBase64 null.
+  downloadContent: z.boolean().default(true),
+  mockOnDryRun,
+});
+export type OnedriveGetFileConfig = z.infer<typeof onedriveGetFileConfigSchema>;
+
 export const excelFindRowConfigSchema = z.object({
   connectionId: z.string().uuid(),
   workbookId: z.string().min(1).max(128),
@@ -232,6 +242,7 @@ export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.EXCEL_FIND_ROW]: 'Files.Read',
   [NodeType.EXCEL_UPDATE_ROW]: 'Files.ReadWrite',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',
+  [NodeType.ONEDRIVE_GET_FILE]: 'Files.Read',
 };
 
 export const MICROSOFT_NODE_TYPES: ReadonlyArray<string> = Object.keys(

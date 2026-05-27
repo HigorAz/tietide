@@ -57,6 +57,7 @@ import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { ExcelFindRowAction } from '../nodes/connectors/microsoft/excel-find-row';
 import { ExcelUpdateRowAction } from '../nodes/connectors/microsoft/excel-update-row';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { OnedriveGetFileAction } from '../nodes/connectors/microsoft/onedrive-get-file';
 import { SlackClientFactory } from '../nodes/connectors/slack/slack-client.factory';
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
@@ -182,6 +183,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     ExcelFindRowAction,
     ExcelUpdateRowAction,
     OnedriveCreateAction,
+    OnedriveGetFileAction,
     SlackClientFactory,
     SlackPostMessageAction,
     SlackPostToChannelAction,
@@ -304,6 +306,7 @@ export class EngineModule implements OnModuleInit {
     private readonly excelFindRow: ExcelFindRowAction,
     private readonly excelUpdateRow: ExcelUpdateRowAction,
     private readonly onedriveCreate: OnedriveCreateAction,
+    private readonly onedriveGetFile: OnedriveGetFileAction,
     private readonly stripeEventReceived: StripeEventReceivedPassthrough,
     private readonly driveFileAdded: DriveFileAddedPassthrough,
     private readonly gmailMessageReceived: GmailMessageReceivedExecutor,
@@ -402,6 +405,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.excelFindRow);
     this.registry.register(this.excelUpdateRow);
     this.registry.register(this.onedriveCreate);
+    this.registry.register(this.onedriveGetFile);
     this.registry.register(this.stripeEventReceived);
     this.registry.register(this.driveFileAdded);
     this.registry.register(this.gmailMessageReceived);

@@ -40,6 +40,7 @@ import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { ExcelFindRowAction } from '../nodes/connectors/microsoft/excel-find-row';
 import { ExcelUpdateRowAction } from '../nodes/connectors/microsoft/excel-update-row';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
+import { OnedriveGetFileAction } from '../nodes/connectors/microsoft/onedrive-get-file';
 import { SlackPostMessageAction } from '../nodes/connectors/slack/slack-post-message';
 import { SlackPostToChannelAction } from '../nodes/connectors/slack/slack-post-to-channel';
 import { SlackUploadFileAction } from '../nodes/connectors/slack/slack-upload-file';
@@ -145,6 +146,7 @@ describe('EngineModule', () => {
     const excelFindRow = new ExcelFindRowAction(undefined as never);
     const excelUpdateRow = new ExcelUpdateRowAction(undefined as never);
     const onedriveCreate = new OnedriveCreateAction(undefined as never);
+    const onedriveGetFile = new OnedriveGetFileAction(undefined as never);
     const stripeEventReceived = new StripeEventReceivedPassthrough();
     const driveFileAdded = new DriveFileAddedPassthrough();
     const gmailMessageReceived = new GmailMessageReceivedExecutor(
@@ -251,6 +253,7 @@ describe('EngineModule', () => {
       excelFindRow,
       excelUpdateRow,
       onedriveCreate,
+      onedriveGetFile,
       stripeEventReceived,
       driveFileAdded,
       gmailMessageReceived,
@@ -349,6 +352,7 @@ describe('EngineModule', () => {
       excelFindRow,
       excelUpdateRow,
       onedriveCreate,
+      onedriveGetFile,
       stripeEventReceived,
       driveFileAdded,
       gmailMessageReceived,
@@ -450,6 +454,7 @@ describe('EngineModule', () => {
       ['ExcelFindRowAction', 'excel-find-row', 'excelFindRow'],
       ['ExcelUpdateRowAction', 'excel-update-row', 'excelUpdateRow'],
       ['OnedriveCreateAction', 'onedrive-create', 'onedriveCreate'],
+      ['OnedriveGetFileAction', 'onedrive-get-file', 'onedriveGetFile'],
       ['StripeEventReceivedPassthrough', 'stripe-event-received', 'stripeEventReceived'],
       ['DriveFileAddedPassthrough', 'drive-file-added', 'driveFileAdded'],
       ['GmailMessageReceivedExecutor', 'gmail-message-received', 'gmailMessageReceived'],
@@ -540,14 +545,14 @@ describe('EngineModule', () => {
       expect(counts.trigger).toBe(22);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
-      // 11 Microsoft connector actions +
+      // 12 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 69.
-      expect(counts.action).toBe(69);
+      //   calendly, postgres, mysql, s3, trello ×2) = 70.
+      expect(counts.action).toBe(70);
     });
   });
 });
