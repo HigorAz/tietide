@@ -26,6 +26,7 @@ import {
 } from '../nodes/connectors/google/google-auth';
 import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
 import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
+import { GmailGetMessageAction } from '../nodes/connectors/google/gmail-get-message';
 import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
 import { DriveListAction } from '../nodes/connectors/google/drive-list';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
@@ -129,6 +130,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     { provide: GOOGLE_CLIENTS, useValue: DEFAULT_GOOGLE_CLIENTS },
     GmailSendAction,
     GmailSearchAction,
+    GmailGetMessageAction,
     DriveCreateAction,
     DriveListAction,
     SheetsAppendAction,
@@ -230,6 +232,7 @@ export class EngineModule implements OnModuleInit {
     private readonly subworkflowAction: SubworkflowAction,
     private readonly gmailSend: GmailSendAction,
     private readonly gmailSearch: GmailSearchAction,
+    private readonly gmailGetMessage: GmailGetMessageAction,
     private readonly driveCreate: DriveCreateAction,
     private readonly driveList: DriveListAction,
     private readonly sheetsAppend: SheetsAppendAction,
@@ -306,6 +309,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.subworkflowAction);
     this.registry.register(this.gmailSend);
     this.registry.register(this.gmailSearch);
+    this.registry.register(this.gmailGetMessage);
     this.registry.register(this.driveCreate);
     this.registry.register(this.driveList);
     this.registry.register(this.sheetsAppend);

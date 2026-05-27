@@ -55,6 +55,13 @@ export const gmailSearchConfigSchema = z.object({
 });
 export type GmailSearchConfig = z.infer<typeof gmailSearchConfigSchema>;
 
+export const gmailGetMessageConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  messageId: z.string().min(1).max(128),
+  mockOnDryRun,
+});
+export type GmailGetMessageConfig = z.infer<typeof gmailGetMessageConfigSchema>;
+
 export const driveCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   name: z.string().min(1).max(255),
@@ -122,6 +129,7 @@ export type CalendarCreateConfig = z.infer<typeof calendarCreateConfigSchema>;
 export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.GMAIL_SEND]: 'https://www.googleapis.com/auth/gmail.send',
   [NodeType.GMAIL_SEARCH]: 'https://www.googleapis.com/auth/gmail.readonly',
+  [NodeType.GMAIL_GET_MESSAGE]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.DRIVE_CREATE]: 'https://www.googleapis.com/auth/drive.file',
   [NodeType.DRIVE_LIST]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_APPEND]: 'https://www.googleapis.com/auth/spreadsheets',

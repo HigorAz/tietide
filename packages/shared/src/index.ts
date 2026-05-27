@@ -171,6 +171,7 @@ export {
 export {
   gmailSendConfigSchema,
   gmailSearchConfigSchema,
+  gmailGetMessageConfigSchema,
   driveCreateConfigSchema,
   driveListConfigSchema,
   sheetsAppendConfigSchema,
@@ -181,6 +182,7 @@ export {
   GOOGLE_NODE_TYPES,
   type GmailSendConfig,
   type GmailSearchConfig,
+  type GmailGetMessageConfig,
   type DriveCreateConfig,
   type DriveListConfig,
   type SheetsAppendConfig,
