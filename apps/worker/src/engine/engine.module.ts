@@ -26,12 +26,25 @@ import {
 } from '../nodes/connectors/google/google-auth';
 import { GmailSendAction } from '../nodes/connectors/google/gmail-send';
 import { GmailSearchAction } from '../nodes/connectors/google/gmail-search';
+import { GmailGetMessageAction } from '../nodes/connectors/google/gmail-get-message';
+import { GmailGetAttachmentAction } from '../nodes/connectors/google/gmail-get-attachment';
+import { GmailModifyLabelsAction } from '../nodes/connectors/google/gmail-modify-labels';
+import { GmailCreateDraftAction } from '../nodes/connectors/google/gmail-create-draft';
 import { DriveCreateAction } from '../nodes/connectors/google/drive-create';
 import { DriveListAction } from '../nodes/connectors/google/drive-list';
+import { DriveGetFileAction } from '../nodes/connectors/google/drive-get-file';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
+import { SheetsFindRowAction } from '../nodes/connectors/google/sheets-find-row';
+import { SheetsUpdateRowAction } from '../nodes/connectors/google/sheets-update-row';
+import { SheetsClearRangeAction } from '../nodes/connectors/google/sheets-clear-range';
 import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
+import { DocsGetAction } from '../nodes/connectors/google/docs-get';
+import { DocsInsertTextAction } from '../nodes/connectors/google/docs-insert-text';
+import { DocsReplaceTextAction } from '../nodes/connectors/google/docs-replace-text';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
+import { CalendarListEventsAction } from '../nodes/connectors/google/calendar-list-events';
+import { CalendarGetEventAction } from '../nodes/connectors/google/calendar-get-event';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
@@ -94,6 +107,7 @@ import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
+  DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
   OnedriveFileAddedPassthrough,
@@ -109,6 +123,8 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
+import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
+import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 
 @Module({
   imports: [ExecutionEventsModule, OAuthRefreshModule],
@@ -129,12 +145,25 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     { provide: GOOGLE_CLIENTS, useValue: DEFAULT_GOOGLE_CLIENTS },
     GmailSendAction,
     GmailSearchAction,
+    GmailGetMessageAction,
+    GmailGetAttachmentAction,
+    GmailModifyLabelsAction,
+    GmailCreateDraftAction,
     DriveCreateAction,
     DriveListAction,
+    DriveGetFileAction,
     SheetsAppendAction,
     SheetsReadAction,
+    SheetsFindRowAction,
+    SheetsUpdateRowAction,
+    SheetsClearRangeAction,
     DocsCreateAction,
+    DocsGetAction,
+    DocsInsertTextAction,
+    DocsReplaceTextAction,
     CalendarCreateAction,
+    CalendarListEventsAction,
+    CalendarGetEventAction,
     MicrosoftAuthService,
     OutlookSendAction,
     OutlookSearchAction,
@@ -196,6 +225,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     TrelloUpdateCardAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
+    DriveFileUpdatedPassthrough,
     OutlookMessageReceivedPassthrough,
     OutlookMessageFlaggedPassthrough,
     OnedriveFileAddedPassthrough,
@@ -210,6 +240,8 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     TrelloCardChangedPassthrough,
     GmailMessageReceivedExecutor,
     ExcelRowAddedTrigger,
+    CalendarEventUpdatedTrigger,
+    GmailAttachmentReceivedTrigger,
     { provide: SECRET_RESOLVER, useClass: PrismaSecretResolver },
     { provide: ENV_VAR_RESOLVER, useClass: PrismaEnvVarResolver },
     { provide: CONNECTION_RESOLVER, useClass: PrismaConnectionResolver },
@@ -230,12 +262,25 @@ export class EngineModule implements OnModuleInit {
     private readonly subworkflowAction: SubworkflowAction,
     private readonly gmailSend: GmailSendAction,
     private readonly gmailSearch: GmailSearchAction,
+    private readonly gmailGetMessage: GmailGetMessageAction,
+    private readonly gmailGetAttachment: GmailGetAttachmentAction,
+    private readonly gmailModifyLabels: GmailModifyLabelsAction,
+    private readonly gmailCreateDraft: GmailCreateDraftAction,
     private readonly driveCreate: DriveCreateAction,
     private readonly driveList: DriveListAction,
+    private readonly driveGetFile: DriveGetFileAction,
     private readonly sheetsAppend: SheetsAppendAction,
     private readonly sheetsRead: SheetsReadAction,
+    private readonly sheetsFindRow: SheetsFindRowAction,
+    private readonly sheetsUpdateRow: SheetsUpdateRowAction,
+    private readonly sheetsClearRange: SheetsClearRangeAction,
     private readonly docsCreate: DocsCreateAction,
+    private readonly docsGet: DocsGetAction,
+    private readonly docsInsertText: DocsInsertTextAction,
+    private readonly docsReplaceText: DocsReplaceTextAction,
     private readonly calendarCreate: CalendarCreateAction,
+    private readonly calendarListEvents: CalendarListEventsAction,
+    private readonly calendarGetEvent: CalendarGetEventAction,
     private readonly outlookSend: OutlookSendAction,
     private readonly outlookSearch: OutlookSearchAction,
     private readonly excelAppend: ExcelAppendAction,
@@ -292,6 +337,9 @@ export class EngineModule implements OnModuleInit {
     private readonly mailchimpSubscriberAdded: MailchimpSubscriberAddedPassthrough,
     private readonly calendlyEventScheduled: CalendlyEventScheduledPassthrough,
     private readonly trelloCardChanged: TrelloCardChangedPassthrough,
+    private readonly calendarEventUpdated: CalendarEventUpdatedTrigger,
+    private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
+    private readonly driveFileUpdated: DriveFileUpdatedPassthrough,
   ) {}
 
   onModuleInit(): void {
@@ -306,12 +354,25 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.subworkflowAction);
     this.registry.register(this.gmailSend);
     this.registry.register(this.gmailSearch);
+    this.registry.register(this.gmailGetMessage);
+    this.registry.register(this.gmailGetAttachment);
+    this.registry.register(this.gmailModifyLabels);
+    this.registry.register(this.gmailCreateDraft);
     this.registry.register(this.driveCreate);
     this.registry.register(this.driveList);
+    this.registry.register(this.driveGetFile);
     this.registry.register(this.sheetsAppend);
     this.registry.register(this.sheetsRead);
+    this.registry.register(this.sheetsFindRow);
+    this.registry.register(this.sheetsUpdateRow);
+    this.registry.register(this.sheetsClearRange);
     this.registry.register(this.docsCreate);
+    this.registry.register(this.docsGet);
+    this.registry.register(this.docsInsertText);
+    this.registry.register(this.docsReplaceText);
     this.registry.register(this.calendarCreate);
+    this.registry.register(this.calendarListEvents);
+    this.registry.register(this.calendarGetEvent);
     this.registry.register(this.outlookSend);
     this.registry.register(this.outlookSearch);
     this.registry.register(this.excelAppend);
@@ -368,5 +429,8 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.mailchimpSubscriberAdded);
     this.registry.register(this.calendlyEventScheduled);
     this.registry.register(this.trelloCardChanged);
+    this.registry.register(this.calendarEventUpdated);
+    this.registry.register(this.gmailAttachmentReceived);
+    this.registry.register(this.driveFileUpdated);
   }
 }

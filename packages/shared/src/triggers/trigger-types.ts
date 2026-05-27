@@ -2,6 +2,7 @@ export const PUSH_TRIGGER_TYPES = [
   'stripe-event-received',
   'gmail-message-received',
   'drive-file-added',
+  'drive-file-updated',
   'outlook-message-received',
   'outlook-message-flagged',
   'onedrive-file-added',
@@ -22,7 +23,9 @@ export const isPushTriggerType = (value: string): value is PushTriggerType =>
 export const POLL_TRIGGER_TYPES = [
   'sheets-row-added',
   'gmail-label-added',
+  'gmail-attachment-received',
   'calendar-event-created',
+  'calendar-event-updated',
   'excel-row-added',
 ] as const;
 export type PollTriggerType = (typeof POLL_TRIGGER_TYPES)[number];
@@ -48,6 +51,7 @@ export const TRIGGER_TYPE_TO_PROVIDER: Record<PushTriggerType, ProviderTriggerPr
   'stripe-event-received': 'stripe',
   'gmail-message-received': 'google',
   'drive-file-added': 'google',
+  'drive-file-updated': 'google',
   'outlook-message-received': 'microsoft',
   'outlook-message-flagged': 'microsoft',
   'onedrive-file-added': 'microsoft',
