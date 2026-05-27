@@ -78,6 +78,7 @@ import { DiscordAddRoleForm } from './discord/DiscordAddRoleForm';
 import { TwilioSendSmsForm } from './twilio/TwilioSendSmsForm';
 import { TwilioSendWhatsAppForm } from './twilio/TwilioSendWhatsAppForm';
 import { TwilioSmsReceivedForm } from './twilio/TwilioSmsReceivedForm';
+import { TwilioGetMessageForm } from './twilio/TwilioGetMessageForm';
 import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
 import { TelegramSendPhotoForm } from './telegram/TelegramSendPhotoForm';
 import { TelegramSendDocumentForm } from './telegram/TelegramSendDocumentForm';
@@ -226,6 +227,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TWILIO_SEND_SMS]: TwilioSendSmsForm,
   [NodeType.TWILIO_SEND_WHATSAPP]: TwilioSendWhatsAppForm,
   [NodeType.TWILIO_SMS_RECEIVED]: TwilioSmsReceivedForm,
+  [NodeType.TWILIO_GET_MESSAGE]: TwilioGetMessageForm,
   [NodeType.TELEGRAM_SEND_MESSAGE]: TelegramSendMessageForm,
   [NodeType.TELEGRAM_SEND_PHOTO]: TelegramSendPhotoForm,
   [NodeType.TELEGRAM_SEND_DOCUMENT]: TelegramSendDocumentForm,

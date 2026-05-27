@@ -327,11 +327,17 @@ export {
 export {
   twilioSendSmsConfigSchema,
   twilioSendWhatsAppConfigSchema,
+  twilioGetMessageConfigSchema,
+  twilioListMessagesConfigSchema,
+  twilioMakeCallConfigSchema,
   twilioSmsReceivedConfigSchema,
   E164_REGEX,
   WHATSAPP_NUMBER_REGEX,
   type TwilioSendSmsConfig,
   type TwilioSendWhatsAppConfig,
+  type TwilioGetMessageConfig,
+  type TwilioListMessagesConfig,
+  type TwilioMakeCallConfig,
   type TwilioSmsReceivedConfig,
 } from './schemas/twilio.schema.js';
 export {
