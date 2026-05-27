@@ -66,6 +66,7 @@ import { SlackAddReactionForm } from './slack/SlackAddReactionForm';
 import { SlackCreateChannelForm } from './slack/SlackCreateChannelForm';
 import { SlackInviteToChannelForm } from './slack/SlackInviteToChannelForm';
 import { SlackGetChannelHistoryForm } from './slack/SlackGetChannelHistoryForm';
+import { SlackUpdateMessageForm } from './slack/SlackUpdateMessageForm';
 import { SlackMessageReceivedForm } from './slack/SlackMessageReceivedForm';
 import { SlackReactionAddedForm } from './slack/SlackReactionAddedForm';
 import { DiscordPostWebhookForm } from './discord/DiscordPostWebhookForm';
@@ -206,6 +207,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.SLACK_CREATE_CHANNEL]: SlackCreateChannelForm,
   [NodeType.SLACK_INVITE_TO_CHANNEL]: SlackInviteToChannelForm,
   [NodeType.SLACK_GET_CHANNEL_HISTORY]: SlackGetChannelHistoryForm,
+  [NodeType.SLACK_UPDATE_MESSAGE]: SlackUpdateMessageForm,
   [NodeType.SLACK_MESSAGE_RECEIVED]: SlackMessageReceivedForm,
   [NodeType.SLACK_REACTION_ADDED]: SlackReactionAddedForm,
   [NodeType.DISCORD_POST_WEBHOOK]: DiscordPostWebhookForm,

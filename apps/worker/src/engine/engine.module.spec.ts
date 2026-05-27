@@ -51,6 +51,7 @@ import { SlackAddReactionAction } from '../nodes/connectors/slack/slack-add-reac
 import { SlackCreateChannelAction } from '../nodes/connectors/slack/slack-create-channel';
 import { SlackInviteToChannelAction } from '../nodes/connectors/slack/slack-invite-to-channel';
 import { SlackGetChannelHistoryAction } from '../nodes/connectors/slack/slack-get-channel-history';
+import { SlackUpdateMessageAction } from '../nodes/connectors/slack/slack-update-message';
 import { DiscordPostWebhookAction } from '../nodes/connectors/discord/discord-post-webhook';
 import { DiscordReplyToCommandAction } from '../nodes/connectors/discord/discord-reply-to-command';
 import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms';
@@ -203,6 +204,7 @@ describe('EngineModule', () => {
     const slackCreateChannel = new SlackCreateChannelAction(undefined as never);
     const slackInviteToChannel = new SlackInviteToChannelAction(undefined as never);
     const slackGetChannelHistory = new SlackGetChannelHistoryAction(undefined as never);
+    const slackUpdateMessage = new SlackUpdateMessageAction(undefined as never);
     const discordPostWebhook = new DiscordPostWebhookAction();
     const discordReplyToCommand = new DiscordReplyToCommandAction();
     const twilioSendSms = new TwilioSendSmsAction(undefined as never);
@@ -341,6 +343,7 @@ describe('EngineModule', () => {
       slackCreateChannel,
       slackInviteToChannel,
       slackGetChannelHistory,
+      slackUpdateMessage,
       discordPostWebhook,
       discordReplyToCommand,
       twilioSendSms,
@@ -474,6 +477,7 @@ describe('EngineModule', () => {
       slackCreateChannel,
       slackInviteToChannel,
       slackGetChannelHistory,
+      slackUpdateMessage,
       discordPostWebhook,
       discordReplyToCommand,
       twilioSendSms,
@@ -589,6 +593,7 @@ describe('EngineModule', () => {
       ['SlackCreateChannelAction', 'slack-create-channel', 'slackCreateChannel'],
       ['SlackInviteToChannelAction', 'slack-invite-to-channel', 'slackInviteToChannel'],
       ['SlackGetChannelHistoryAction', 'slack-get-channel-history', 'slackGetChannelHistory'],
+      ['SlackUpdateMessageAction', 'slack-update-message', 'slackUpdateMessage'],
       ['DiscordPostWebhookAction', 'discord-post-webhook', 'discordPostWebhook'],
       ['DiscordReplyToCommandAction', 'discord-reply-to-command', 'discordReplyToCommand'],
       ['TwilioSendSmsAction', 'twilio-send-sms', 'twilioSendSms'],
@@ -671,13 +676,13 @@ describe('EngineModule', () => {
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
-      // 14 communication actions (slack ×9, discord ×2, twilio ×2, telegram) +
+      // 15 communication actions (slack ×10, discord ×2, twilio ×2, telegram) +
       // productivity actions (notion, trello, airtable, linear, github) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      expect(counts.action).toBe(97);
+      expect(counts.action).toBe(98);
     });
   });
 });
