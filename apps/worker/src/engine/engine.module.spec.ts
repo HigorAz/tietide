@@ -104,6 +104,7 @@ import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page'
 import { NotionUpdatePageAction } from '../nodes/connectors/notion/notion-update-page';
 import { NotionAppendBlocksAction } from '../nodes/connectors/notion/notion-append-blocks';
 import { NotionGetBlockChildrenAction } from '../nodes/connectors/notion/notion-get-block-children';
+import { NotionFindDatabaseItemAction } from '../nodes/connectors/notion/notion-find-database-item';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -224,6 +225,7 @@ describe('EngineModule', () => {
     const notionUpdatePage = new NotionUpdatePageAction(undefined as never);
     const notionAppendBlocks = new NotionAppendBlocksAction(undefined as never);
     const notionGetBlockChildren = new NotionGetBlockChildrenAction(undefined as never);
+    const notionFindDatabaseItem = new NotionFindDatabaseItemAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -329,6 +331,7 @@ describe('EngineModule', () => {
       notionUpdatePage,
       notionAppendBlocks,
       notionGetBlockChildren,
+      notionFindDatabaseItem,
     );
     return {
       registry,
@@ -584,7 +587,7 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244).
-      expect(counts.action).toBe(75);
+      expect(counts.action).toBe(76);
     });
   });
 });
