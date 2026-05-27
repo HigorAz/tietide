@@ -89,6 +89,7 @@ import { AirtableListRecordsForm } from './airtable/AirtableListRecordsForm';
 import { AirtableGetRecordForm } from './airtable/AirtableGetRecordForm';
 import { AirtableFindRecordsForm } from './airtable/AirtableFindRecordsForm';
 import { AirtableDeleteRecordForm } from './airtable/AirtableDeleteRecordForm';
+import { AirtableRecordCreatedForm } from './airtable/AirtableRecordCreatedForm';
 import { LinearCreateIssueForm } from './linear/LinearCreateIssueForm';
 import { LinearUpdateIssueStatusForm } from './linear/LinearUpdateIssueStatusForm';
 import { LinearGetIssueForm } from './linear/LinearGetIssueForm';
@@ -219,6 +220,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.AIRTABLE_GET_RECORD]: AirtableGetRecordForm,
   [NodeType.AIRTABLE_FIND_RECORDS]: AirtableFindRecordsForm,
   [NodeType.AIRTABLE_DELETE_RECORD]: AirtableDeleteRecordForm,
+  [NodeType.AIRTABLE_RECORD_CREATED]: AirtableRecordCreatedForm,
   [NodeType.LINEAR_CREATE_ISSUE]: LinearCreateIssueForm,
   [NodeType.LINEAR_UPDATE_ISSUE_STATUS]: LinearUpdateIssueStatusForm,
   [NodeType.LINEAR_GET_ISSUE]: LinearGetIssueForm,
