@@ -122,6 +122,14 @@ export const outlookGetMessageConfigSchema = z.object({
 });
 export type OutlookGetMessageConfig = z.infer<typeof outlookGetMessageConfigSchema>;
 
+export const outlookGetAttachmentConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  messageId: graphId(),
+  attachmentId: graphId(),
+  mockOnDryRun,
+});
+export type OutlookGetAttachmentConfig = z.infer<typeof outlookGetAttachmentConfigSchema>;
+
 // Map of Microsoft node types to the OAuth scope each requires. Mirrors
 // GOOGLE_NODE_REQUIRED_SCOPES so the SPA's ScopeReauthBanner can surface
 // missing-scope hints uniformly.
@@ -129,6 +137,7 @@ export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.OUTLOOK_SEND]: 'Mail.Send',
   [NodeType.OUTLOOK_SEARCH]: 'Mail.Read',
   [NodeType.OUTLOOK_GET_MESSAGE]: 'Mail.Read',
+  [NodeType.OUTLOOK_GET_ATTACHMENT]: 'Mail.Read',
   [NodeType.EXCEL_APPEND]: 'Files.ReadWrite',
   [NodeType.EXCEL_READ]: 'Files.Read',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',

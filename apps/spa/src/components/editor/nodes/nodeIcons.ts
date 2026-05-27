@@ -89,6 +89,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.OUTLOOK_SEND]: Mail,
   [NodeType.OUTLOOK_SEARCH]: Mail,
   [NodeType.OUTLOOK_GET_MESSAGE]: Mail,
+  [NodeType.OUTLOOK_GET_ATTACHMENT]: Mail,
   [NodeType.EXCEL_APPEND]: Sheet,
   [NodeType.EXCEL_READ]: Sheet,
   [NodeType.ONEDRIVE_CREATE]: HardDrive,

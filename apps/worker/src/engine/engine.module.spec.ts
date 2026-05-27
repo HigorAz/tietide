@@ -32,6 +32,7 @@ import { CalendarGetEventAction } from '../nodes/connectors/google/calendar-get-
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
 import { OutlookSearchAction } from '../nodes/connectors/microsoft/outlook-search';
 import { OutlookGetMessageAction } from '../nodes/connectors/microsoft/outlook-get-message';
+import { OutlookGetAttachmentAction } from '../nodes/connectors/microsoft/outlook-get-attachment';
 import { ExcelAppendAction } from '../nodes/connectors/microsoft/excel-append';
 import { ExcelReadAction } from '../nodes/connectors/microsoft/excel-read';
 import { OnedriveCreateAction } from '../nodes/connectors/microsoft/onedrive-create';
@@ -132,6 +133,7 @@ describe('EngineModule', () => {
     const outlookSend = new OutlookSendAction(undefined as never);
     const outlookSearch = new OutlookSearchAction(undefined as never);
     const outlookGetMessage = new OutlookGetMessageAction(undefined as never);
+    const outlookGetAttachment = new OutlookGetAttachmentAction(undefined as never);
     const excelAppend = new ExcelAppendAction(undefined as never);
     const excelRead = new ExcelReadAction(undefined as never);
     const onedriveCreate = new OnedriveCreateAction(undefined as never);
@@ -233,6 +235,7 @@ describe('EngineModule', () => {
       outlookSend,
       outlookSearch,
       outlookGetMessage,
+      outlookGetAttachment,
       excelAppend,
       excelRead,
       onedriveCreate,
@@ -326,6 +329,7 @@ describe('EngineModule', () => {
       outlookSend,
       outlookSearch,
       outlookGetMessage,
+      outlookGetAttachment,
       excelAppend,
       excelRead,
       onedriveCreate,
@@ -422,6 +426,7 @@ describe('EngineModule', () => {
       ['OutlookSendAction', 'outlook-send', 'outlookSend'],
       ['OutlookSearchAction', 'outlook-search', 'outlookSearch'],
       ['OutlookGetMessageAction', 'outlook-get-message', 'outlookGetMessage'],
+      ['OutlookGetAttachmentAction', 'outlook-get-attachment', 'outlookGetAttachment'],
       ['ExcelAppendAction', 'excel-append', 'excelAppend'],
       ['ExcelReadAction', 'excel-read', 'excelRead'],
       ['OnedriveCreateAction', 'onedrive-create', 'onedriveCreate'],
@@ -515,14 +520,14 @@ describe('EngineModule', () => {
       expect(counts.trigger).toBe(22);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
-      // 6 Microsoft connector actions +
+      // 7 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
       // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
       //   linear ×2, github ×3) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 64.
-      expect(counts.action).toBe(64);
+      //   calendly, postgres, mysql, s3, trello ×2) = 65.
+      expect(counts.action).toBe(65);
     });
   });
 });
