@@ -111,6 +111,7 @@ import { TrelloCreateListAction } from '../nodes/connectors/trello/trello-create
 import { AirtableGetRecordAction } from '../nodes/connectors/airtable/airtable-get-record';
 import { AirtableFindRecordsAction } from '../nodes/connectors/airtable/airtable-find-records';
 import { AirtableDeleteRecordAction } from '../nodes/connectors/airtable/airtable-delete-record';
+import { LinearGetIssueAction } from '../nodes/connectors/linear/linear-get-issue';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -238,6 +239,7 @@ describe('EngineModule', () => {
     const airtableGetRecord = new AirtableGetRecordAction(undefined as never);
     const airtableFindRecords = new AirtableFindRecordsAction(undefined as never);
     const airtableDeleteRecord = new AirtableDeleteRecordAction(undefined as never);
+    const linearGetIssue = new LinearGetIssueAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -350,6 +352,7 @@ describe('EngineModule', () => {
       airtableGetRecord,
       airtableFindRecords,
       airtableDeleteRecord,
+      linearGetIssue,
     );
     return {
       registry,
@@ -605,7 +608,7 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244).
-      expect(counts.action).toBe(82);
+      expect(counts.action).toBe(83);
     });
   });
 });
