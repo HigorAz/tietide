@@ -159,6 +159,9 @@ import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-a
 import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
 import { CalendlyClientFactory } from '../nodes/connectors/calendly/calendly-client.factory';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
+import { CalendlyGetEventAction } from '../nodes/connectors/calendly/calendly-get-event';
+import { CalendlyCancelEventAction } from '../nodes/connectors/calendly/calendly-cancel-event';
+import { CalendlyListInviteesAction } from '../nodes/connectors/calendly/calendly-list-invitees';
 import { PostgresClientFactory } from '../nodes/connectors/postgres/postgres-client.factory';
 import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
 import { MysqlClientFactory } from '../nodes/connectors/mysql/mysql-client.factory';
@@ -356,6 +359,9 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     MailchimpListCampaignsAction,
     CalendlyClientFactory,
     CalendlyListEventsAction,
+    CalendlyGetEventAction,
+    CalendlyCancelEventAction,
+    CalendlyListInviteesAction,
     PostgresClientFactory,
     PostgresRunQueryAction,
     MysqlClientFactory,
@@ -558,6 +564,9 @@ export class EngineModule implements OnModuleInit {
     private readonly mailchimpUnsubscribe: MailchimpUnsubscribeAction,
     private readonly mailchimpAddTag: MailchimpAddTagAction,
     private readonly mailchimpListCampaigns: MailchimpListCampaignsAction,
+    private readonly calendlyGetEvent: CalendlyGetEventAction,
+    private readonly calendlyCancelEvent: CalendlyCancelEventAction,
+    private readonly calendlyListInvitees: CalendlyListInviteesAction,
   ) {}
 
   onModuleInit(): void {
@@ -722,5 +731,8 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.mailchimpUnsubscribe);
     this.registry.register(this.mailchimpAddTag);
     this.registry.register(this.mailchimpListCampaigns);
+    this.registry.register(this.calendlyGetEvent);
+    this.registry.register(this.calendlyCancelEvent);
+    this.registry.register(this.calendlyListInvitees);
   }
 }

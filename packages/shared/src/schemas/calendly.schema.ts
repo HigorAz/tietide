@@ -39,3 +39,36 @@ export const calendlyEventScheduledConfigSchema = z.object({
   eventType: z.enum(CALENDLY_TRIGGER_EVENT_TYPES).optional(),
 });
 export type CalendlyEventScheduledConfig = z.infer<typeof calendlyEventScheduledConfigSchema>;
+
+// --- S15 commerce/data/storage read/update pack (#246) ---
+
+// The UUID segment of a Calendly scheduled-event URI (…/scheduled_events/<uuid>).
+const calendlyEventUuid = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Za-z0-9-]+$/, { message: 'must be a Calendly event UUID' });
+
+export const calendlyGetEventConfigSchema = z.object({
+  connectionId,
+  eventUuid: calendlyEventUuid,
+  mockOnDryRun,
+});
+export type CalendlyGetEventConfig = z.infer<typeof calendlyGetEventConfigSchema>;
+
+export const calendlyCancelEventConfigSchema = z.object({
+  connectionId,
+  eventUuid: calendlyEventUuid,
+  reason: z.string().max(1000).optional(),
+  mockOnDryRun,
+});
+export type CalendlyCancelEventConfig = z.infer<typeof calendlyCancelEventConfigSchema>;
+
+export const calendlyListInviteesConfigSchema = z.object({
+  connectionId,
+  eventUuid: calendlyEventUuid,
+  count: z.number().int().min(1).max(100).default(20),
+  status: z.union([z.literal('active'), z.literal('canceled')]).optional(),
+  mockOnDryRun,
+});
+export type CalendlyListInviteesConfig = z.infer<typeof calendlyListInviteesConfigSchema>;

@@ -106,6 +106,9 @@ import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailch
 import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
 import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
+import { CalendlyGetEventAction } from '../nodes/connectors/calendly/calendly-get-event';
+import { CalendlyCancelEventAction } from '../nodes/connectors/calendly/calendly-cancel-event';
+import { CalendlyListInviteesAction } from '../nodes/connectors/calendly/calendly-list-invitees';
 import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
 import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
 import { S3UploadFileAction } from '../nodes/connectors/s3/s3-upload-file';
@@ -340,6 +343,9 @@ describe('EngineModule', () => {
     const mailchimpUnsubscribe = new MailchimpUnsubscribeAction(undefined as never);
     const mailchimpAddTag = new MailchimpAddTagAction(undefined as never);
     const mailchimpListCampaigns = new MailchimpListCampaignsAction(undefined as never);
+    const calendlyGetEvent = new CalendlyGetEventAction(undefined as never);
+    const calendlyCancelEvent = new CalendlyCancelEventAction(undefined as never);
+    const calendlyListInvitees = new CalendlyListInviteesAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -503,6 +509,9 @@ describe('EngineModule', () => {
       mailchimpUnsubscribe,
       mailchimpAddTag,
       mailchimpListCampaigns,
+      calendlyGetEvent,
+      calendlyCancelEvent,
+      calendlyListInvitees,
     );
     return {
       registry,
@@ -642,6 +651,9 @@ describe('EngineModule', () => {
       mailchimpUnsubscribe,
       mailchimpAddTag,
       mailchimpListCampaigns,
+      calendlyGetEvent,
+      calendlyCancelEvent,
+      calendlyListInvitees,
       module,
     };
   };
@@ -812,6 +824,9 @@ describe('EngineModule', () => {
       ['MailchimpUnsubscribeAction', 'mailchimp-unsubscribe', 'mailchimpUnsubscribe'],
       ['MailchimpAddTagAction', 'mailchimp-add-tag', 'mailchimpAddTag'],
       ['MailchimpListCampaignsAction', 'mailchimp-list-campaigns', 'mailchimpListCampaigns'],
+      ['CalendlyGetEventAction', 'calendly-get-event', 'calendlyGetEvent'],
+      ['CalendlyCancelEventAction', 'calendly-cancel-event', 'calendlyCancelEvent'],
+      ['CalendlyListInviteesAction', 'calendly-list-invitees', 'calendlyListInvitees'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -848,8 +863,9 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 + Mailchimp ×5.
-      expect(counts.action).toBe(125);
+      // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
+      // Mailchimp ×5 + Calendly ×3.
+      expect(counts.action).toBe(128);
     });
   });
 });

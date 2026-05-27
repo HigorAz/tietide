@@ -158,6 +158,9 @@ import { MailchimpAddTagForm } from './mailchimp/MailchimpAddTagForm';
 import { MailchimpListCampaignsForm } from './mailchimp/MailchimpListCampaignsForm';
 import { CalendlyListEventsForm } from './calendly/CalendlyListEventsForm';
 import { CalendlyEventScheduledForm } from './calendly/CalendlyEventScheduledForm';
+import { CalendlyGetEventForm } from './calendly/CalendlyGetEventForm';
+import { CalendlyCancelEventForm } from './calendly/CalendlyCancelEventForm';
+import { CalendlyListInviteesForm } from './calendly/CalendlyListInviteesForm';
 import { PostgresRunQueryForm } from './postgres/PostgresRunQueryForm';
 import { MysqlRunQueryForm } from './mysql/MysqlRunQueryForm';
 import { S3UploadFileForm } from './s3/S3UploadFileForm';
@@ -329,6 +332,9 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.MAILCHIMP_LIST_CAMPAIGNS]: MailchimpListCampaignsForm,
   [NodeType.CALENDLY_LIST_EVENTS]: CalendlyListEventsForm,
   [NodeType.CALENDLY_EVENT_SCHEDULED]: CalendlyEventScheduledForm,
+  [NodeType.CALENDLY_GET_EVENT]: CalendlyGetEventForm,
+  [NodeType.CALENDLY_CANCEL_EVENT]: CalendlyCancelEventForm,
+  [NodeType.CALENDLY_LIST_INVITEES]: CalendlyListInviteesForm,
   [NodeType.POSTGRES_RUN_QUERY]: PostgresRunQueryForm,
   [NodeType.MYSQL_RUN_QUERY]: MysqlRunQueryForm,
   [NodeType.S3_UPLOAD_FILE]: S3UploadFileForm,

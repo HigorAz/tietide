@@ -214,6 +214,9 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.MAILCHIMP_UNSUBSCRIBE]: Mail,
   [NodeType.MAILCHIMP_ADD_TAG]: Tag,
   [NodeType.MAILCHIMP_LIST_CAMPAIGNS]: Megaphone,
+  [NodeType.CALENDLY_GET_EVENT]: Calendar,
+  [NodeType.CALENDLY_CANCEL_EVENT]: CalendarClock,
+  [NodeType.CALENDLY_LIST_INVITEES]: Users,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

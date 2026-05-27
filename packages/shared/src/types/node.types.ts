@@ -175,6 +175,9 @@ export const NodeType = {
   MAILCHIMP_UNSUBSCRIBE: 'mailchimp-unsubscribe',
   MAILCHIMP_ADD_TAG: 'mailchimp-add-tag',
   MAILCHIMP_LIST_CAMPAIGNS: 'mailchimp-list-campaigns',
+  CALENDLY_GET_EVENT: 'calendly-get-event',
+  CALENDLY_CANCEL_EVENT: 'calendly-cancel-event',
+  CALENDLY_LIST_INVITEES: 'calendly-list-invitees',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -1562,5 +1565,29 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.COMMERCE,
     provider: 'mailchimp',
+  },
+  {
+    type: NodeType.CALENDLY_GET_EVENT,
+    name: 'Calendly: Get Event',
+    description: 'Fetch a Calendly scheduled event by UUID',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'calendly',
+  },
+  {
+    type: NodeType.CALENDLY_CANCEL_EVENT,
+    name: 'Calendly: Cancel Event',
+    description: 'Cancel a Calendly scheduled event by UUID',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'calendly',
+  },
+  {
+    type: NodeType.CALENDLY_LIST_INVITEES,
+    name: 'Calendly: List Invitees',
+    description: 'List invitees for a Calendly scheduled event',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'calendly',
   },
 ];

@@ -471,9 +471,15 @@ export {
 export {
   calendlyListEventsConfigSchema,
   calendlyEventScheduledConfigSchema,
+  calendlyGetEventConfigSchema,
+  calendlyCancelEventConfigSchema,
+  calendlyListInviteesConfigSchema,
   CALENDLY_TRIGGER_EVENT_TYPES,
   type CalendlyListEventsConfig,
   type CalendlyEventScheduledConfig,
+  type CalendlyGetEventConfig,
+  type CalendlyCancelEventConfig,
+  type CalendlyListInviteesConfig,
   type CalendlyTriggerEventType,
 } from './schemas/calendly.schema.js';
 export {
