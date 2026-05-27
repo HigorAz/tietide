@@ -110,6 +110,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.SLACK_UPLOAD_FILE]: Upload,
   [NodeType.SLACK_FIND_USER]: Users,
   [NodeType.SLACK_SEARCH_MESSAGES]: Search,
+  [NodeType.SLACK_ADD_REACTION]: Smile,
   [NodeType.DISCORD_POST_WEBHOOK]: MessageSquare,
   [NodeType.DISCORD_REPLY_TO_COMMAND]: MessageSquare,
   [NodeType.TWILIO_SEND_SMS]: Phone,
