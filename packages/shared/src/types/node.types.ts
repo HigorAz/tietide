@@ -44,6 +44,7 @@ export const NodeType = {
   DRIVE_FILE_ADDED: 'drive-file-added',
   SHEETS_ROW_ADDED: 'sheets-row-added',
   CALENDAR_EVENT_CREATED: 'calendar-event-created',
+  CALENDAR_EVENT_UPDATED: 'calendar-event-updated',
   OUTLOOK_SEND: 'outlook-send',
   OUTLOOK_SEARCH: 'outlook-search',
   EXCEL_APPEND: 'excel-append',
@@ -473,6 +474,15 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     type: NodeType.CALENDAR_EVENT_CREATED,
     name: 'Calendar: Event Created',
     description: 'Trigger when a new event is created in a Google Calendar (poll, updatedMin)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.GOOGLE_TRIGGERS,
+    provider: 'google',
+  },
+  {
+    type: NodeType.CALENDAR_EVENT_UPDATED,
+    name: 'Calendar: Event Updated',
+    description:
+      'Trigger when a Google Calendar event is changed or cancelled (poll, updated watermark)',
     category: NodeCategory.TRIGGER,
     group: NodeGroup.GOOGLE_TRIGGERS,
     provider: 'google',

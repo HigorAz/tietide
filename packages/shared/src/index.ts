@@ -220,12 +220,14 @@ export {
   driveFileAddedConfigSchema,
   sheetsRowAddedConfigSchema,
   calendarEventCreatedConfigSchema,
+  calendarEventUpdatedConfigSchema,
   GOOGLE_TRIGGER_REQUIRED_SCOPES,
   type GmailMessageReceivedConfig,
   type GmailLabelAddedConfig,
   type DriveFileAddedConfig,
   type SheetsRowAddedConfig,
   type CalendarEventCreatedConfig,
+  type CalendarEventUpdatedConfig,
 } from './schemas/google-triggers.schema.js';
 export {
   outlookSendConfigSchema,

@@ -23,6 +23,7 @@ export const POLL_TRIGGER_TYPES = [
   'sheets-row-added',
   'gmail-label-added',
   'calendar-event-created',
+  'calendar-event-updated',
   'excel-row-added',
 ] as const;
 export type PollTriggerType = (typeof POLL_TRIGGER_TYPES)[number];

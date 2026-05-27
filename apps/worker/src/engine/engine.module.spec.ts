@@ -87,6 +87,7 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
+import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -184,6 +185,10 @@ describe('EngineModule', () => {
     const mailchimpSubscriberAdded = new MailchimpSubscriberAddedPassthrough();
     const calendlyEventScheduled = new CalendlyEventScheduledPassthrough();
     const trelloCardChanged = new TrelloCardChangedPassthrough();
+    const calendarEventUpdated = new CalendarEventUpdatedTrigger(
+      undefined as never,
+      undefined as never,
+    );
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -272,6 +277,7 @@ describe('EngineModule', () => {
       mailchimpSubscriberAdded,
       calendlyEventScheduled,
       trelloCardChanged,
+      calendarEventUpdated,
     );
     return {
       registry,
@@ -361,6 +367,7 @@ describe('EngineModule', () => {
       mailchimpSubscriberAdded,
       calendlyEventScheduled,
       trelloCardChanged,
+      calendarEventUpdated,
       module,
     };
   };
@@ -461,6 +468,7 @@ describe('EngineModule', () => {
       ],
       ['CalendlyEventScheduledPassthrough', 'calendly-event-scheduled', 'calendlyEventScheduled'],
       ['TrelloCardChangedPassthrough', 'trello-card-changed', 'trelloCardChanged'],
+      ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -483,8 +491,9 @@ describe('EngineModule', () => {
       // 4 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
       // onedrive-file-added, excel-row-added) +
       // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
-      // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) = 19.
-      expect(counts.trigger).toBe(19);
+      // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
+      // 1 Google poll trigger (calendar-event-updated) = 20.
+      expect(counts.trigger).toBe(20);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 5 Microsoft connector actions +
