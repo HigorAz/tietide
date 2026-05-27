@@ -44,6 +44,12 @@ export const driveFileAddedConfigSchema = z.object({
 });
 export type DriveFileAddedConfig = z.infer<typeof driveFileAddedConfigSchema>;
 
+export const driveFileUpdatedConfigSchema = z.object({
+  connectionId,
+  fileId: z.string().min(1).max(128),
+});
+export type DriveFileUpdatedConfig = z.infer<typeof driveFileUpdatedConfigSchema>;
+
 export const sheetsRowAddedConfigSchema = z.object({
   connectionId,
   spreadsheetId: z.string().min(1).max(128),
@@ -71,6 +77,7 @@ export const GOOGLE_TRIGGER_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.GMAIL_LABEL_ADDED]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_ATTACHMENT_RECEIVED]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.DRIVE_FILE_ADDED]: 'https://www.googleapis.com/auth/drive.readonly',
+  [NodeType.DRIVE_FILE_UPDATED]: 'https://www.googleapis.com/auth/drive.readonly',
   [NodeType.SHEETS_ROW_ADDED]: 'https://www.googleapis.com/auth/spreadsheets.readonly',
   [NodeType.CALENDAR_EVENT_CREATED]: 'https://www.googleapis.com/auth/calendar.readonly',
   [NodeType.CALENDAR_EVENT_UPDATED]: 'https://www.googleapis.com/auth/calendar.readonly',

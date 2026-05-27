@@ -72,6 +72,7 @@ import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
+  DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
   OnedriveFileAddedPassthrough,
@@ -194,6 +195,7 @@ describe('EngineModule', () => {
       undefined as never,
       undefined as never,
     );
+    const driveFileUpdated = new DriveFileUpdatedPassthrough();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -284,6 +286,7 @@ describe('EngineModule', () => {
       trelloCardChanged,
       calendarEventUpdated,
       gmailAttachmentReceived,
+      driveFileUpdated,
     );
     return {
       registry,
@@ -375,6 +378,7 @@ describe('EngineModule', () => {
       trelloCardChanged,
       calendarEventUpdated,
       gmailAttachmentReceived,
+      driveFileUpdated,
       module,
     };
   };
@@ -477,6 +481,7 @@ describe('EngineModule', () => {
       ['TrelloCardChangedPassthrough', 'trello-card-changed', 'trelloCardChanged'],
       ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
       ['GmailAttachmentReceivedTrigger', 'gmail-attachment-received', 'gmailAttachmentReceived'],
+      ['DriveFileUpdatedPassthrough', 'drive-file-updated', 'driveFileUpdated'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -500,8 +505,9 @@ describe('EngineModule', () => {
       // onedrive-file-added, excel-row-added) +
       // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
-      // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) = 21.
-      expect(counts.trigger).toBe(21);
+      // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
+      // 1 Google push trigger (drive-file-updated) = 22.
+      expect(counts.trigger).toBe(22);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 5 Microsoft connector actions +

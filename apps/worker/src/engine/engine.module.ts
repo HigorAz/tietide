@@ -107,6 +107,7 @@ import { TrelloUpdateCardAction } from '../nodes/connectors/trello/trello-update
 import {
   StripeEventReceivedPassthrough,
   DriveFileAddedPassthrough,
+  DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
   OnedriveFileAddedPassthrough,
@@ -224,6 +225,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     TrelloUpdateCardAction,
     StripeEventReceivedPassthrough,
     DriveFileAddedPassthrough,
+    DriveFileUpdatedPassthrough,
     OutlookMessageReceivedPassthrough,
     OutlookMessageFlaggedPassthrough,
     OnedriveFileAddedPassthrough,
@@ -337,6 +339,7 @@ export class EngineModule implements OnModuleInit {
     private readonly trelloCardChanged: TrelloCardChangedPassthrough,
     private readonly calendarEventUpdated: CalendarEventUpdatedTrigger,
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
+    private readonly driveFileUpdated: DriveFileUpdatedPassthrough,
   ) {}
 
   onModuleInit(): void {
@@ -428,5 +431,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.trelloCardChanged);
     this.registry.register(this.calendarEventUpdated);
     this.registry.register(this.gmailAttachmentReceived);
+    this.registry.register(this.driveFileUpdated);
   }
 }

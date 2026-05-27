@@ -35,6 +35,7 @@ import { GmailMessageReceivedForm } from './google/GmailMessageReceivedForm';
 import { GmailLabelAddedForm } from './google/GmailLabelAddedForm';
 import { GmailAttachmentReceivedForm } from './google/GmailAttachmentReceivedForm';
 import { DriveFileAddedForm } from './google/DriveFileAddedForm';
+import { DriveFileUpdatedForm } from './google/DriveFileUpdatedForm';
 import { CalendarEventCreatedForm } from './google/CalendarEventCreatedForm';
 import { CalendarEventUpdatedForm } from './google/CalendarEventUpdatedForm';
 import { OutlookSendForm } from './microsoft/OutlookSendForm';
@@ -133,6 +134,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.GMAIL_LABEL_ADDED]: GmailLabelAddedForm,
   [NodeType.GMAIL_ATTACHMENT_RECEIVED]: GmailAttachmentReceivedForm,
   [NodeType.DRIVE_FILE_ADDED]: DriveFileAddedForm,
+  [NodeType.DRIVE_FILE_UPDATED]: DriveFileUpdatedForm,
   [NodeType.CALENDAR_EVENT_CREATED]: CalendarEventCreatedForm,
   [NodeType.CALENDAR_EVENT_UPDATED]: CalendarEventUpdatedForm,
   [NodeType.OUTLOOK_SEND]: OutlookSendForm,

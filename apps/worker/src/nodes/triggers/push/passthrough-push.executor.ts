@@ -45,6 +45,17 @@ export class DriveFileAddedPassthrough extends PassthroughPushExecutor {
 }
 
 @Injectable()
+export class DriveFileUpdatedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'drive-file-updated',
+      'Drive: File Updated',
+      'Triggers when Google Drive notifies that a watched file was modified',
+    );
+  }
+}
+
+@Injectable()
 export class OutlookMessageReceivedPassthrough extends PassthroughPushExecutor {
   constructor() {
     super(
