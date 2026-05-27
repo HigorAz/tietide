@@ -33,6 +33,21 @@ import {
   ExcelRowUpdatedTrigger,
   EXCEL_ROW_UPDATED_TYPE,
 } from '../nodes/triggers/poll/excel-row-updated';
+import {
+  NotionDatabaseItemUpdatedTrigger,
+  NOTION_DATABASE_ITEM_UPDATED_TYPE,
+} from '../nodes/triggers/poll/notion-database-item-updated';
+import { NotionClientFactory } from '../nodes/connectors/notion/notion-client.factory';
+import {
+  AirtableRecordCreatedTrigger,
+  AIRTABLE_RECORD_CREATED_TYPE,
+} from '../nodes/triggers/poll/airtable-record-created';
+import { AirtableClientFactory } from '../nodes/connectors/airtable/airtable-client.factory';
+import {
+  LinearIssueUpdatedTrigger,
+  LINEAR_ISSUE_UPDATED_TYPE,
+} from '../nodes/triggers/poll/linear-issue-updated';
+import { LinearClientFactory } from '../nodes/connectors/linear/linear-client.factory';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import { PollSchedulerService } from './poll-scheduler.service';
@@ -62,6 +77,12 @@ import { PollConnectionLoader } from './poll-connection-loader';
     MicrosoftAuthService,
     ExcelRowAddedTrigger,
     ExcelRowUpdatedTrigger,
+    NotionClientFactory,
+    NotionDatabaseItemUpdatedTrigger,
+    AirtableClientFactory,
+    AirtableRecordCreatedTrigger,
+    LinearClientFactory,
+    LinearIssueUpdatedTrigger,
   ],
   exports: [PollTriggerRegistry],
 })
@@ -75,6 +96,9 @@ export class PollModule implements OnModuleInit {
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
     private readonly excelRowAdded: ExcelRowAddedTrigger,
     private readonly excelRowUpdated: ExcelRowUpdatedTrigger,
+    private readonly notionDbItemUpdated: NotionDatabaseItemUpdatedTrigger,
+    private readonly airtableRecordCreated: AirtableRecordCreatedTrigger,
+    private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -85,5 +109,8 @@ export class PollModule implements OnModuleInit {
     this.registry.register(GMAIL_ATTACHMENT_RECEIVED_TYPE, this.gmailAttachmentReceived);
     this.registry.register(EXCEL_ROW_ADDED_TYPE, this.excelRowAdded);
     this.registry.register(EXCEL_ROW_UPDATED_TYPE, this.excelRowUpdated);
+    this.registry.register(NOTION_DATABASE_ITEM_UPDATED_TYPE, this.notionDbItemUpdated);
+    this.registry.register(AIRTABLE_RECORD_CREATED_TYPE, this.airtableRecordCreated);
+    this.registry.register(LINEAR_ISSUE_UPDATED_TYPE, this.linearIssueUpdated);
   }
 }

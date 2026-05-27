@@ -197,3 +197,25 @@ export class TrelloCardChangedPassthrough extends PassthroughPushExecutor {
     );
   }
 }
+
+@Injectable()
+export class GithubIssueOpenedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'github-issue-opened',
+      'GitHub: Issue Opened',
+      'Triggers when an issue is opened in a watched GitHub repository',
+    );
+  }
+}
+
+@Injectable()
+export class GithubPrOpenedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'github-pr-opened',
+      'GitHub: Pull Request Opened',
+      'Triggers when a pull request is opened in a watched GitHub repository',
+    );
+  }
+}

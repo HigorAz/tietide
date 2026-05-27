@@ -72,16 +72,41 @@ import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
 import { TelegramMessageReceivedForm } from './telegram/TelegramMessageReceivedForm';
 import { NotionCreatePageForm } from './notion/NotionCreatePageForm';
 import { NotionQueryDatabaseForm } from './notion/NotionQueryDatabaseForm';
+import { NotionGetPageForm } from './notion/NotionGetPageForm';
+import { NotionUpdatePageForm } from './notion/NotionUpdatePageForm';
+import { NotionAppendBlocksForm } from './notion/NotionAppendBlocksForm';
+import { NotionGetBlockChildrenForm } from './notion/NotionGetBlockChildrenForm';
+import { NotionFindDatabaseItemForm } from './notion/NotionFindDatabaseItemForm';
+import { NotionDatabaseItemUpdatedForm } from './notion/NotionDatabaseItemUpdatedForm';
+import { TrelloGetCardForm } from './trello/TrelloGetCardForm';
+import { TrelloListCardsForm } from './trello/TrelloListCardsForm';
+import { TrelloCreateListForm } from './trello/TrelloCreateListForm';
 import { TrelloCreateCardForm } from './trello/TrelloCreateCardForm';
 import { TrelloMoveCardForm } from './trello/TrelloMoveCardForm';
 import { AirtableCreateRecordForm } from './airtable/AirtableCreateRecordForm';
 import { AirtableUpdateRecordForm } from './airtable/AirtableUpdateRecordForm';
 import { AirtableListRecordsForm } from './airtable/AirtableListRecordsForm';
+import { AirtableGetRecordForm } from './airtable/AirtableGetRecordForm';
+import { AirtableFindRecordsForm } from './airtable/AirtableFindRecordsForm';
+import { AirtableDeleteRecordForm } from './airtable/AirtableDeleteRecordForm';
+import { AirtableRecordCreatedForm } from './airtable/AirtableRecordCreatedForm';
 import { LinearCreateIssueForm } from './linear/LinearCreateIssueForm';
 import { LinearUpdateIssueStatusForm } from './linear/LinearUpdateIssueStatusForm';
+import { LinearGetIssueForm } from './linear/LinearGetIssueForm';
+import { LinearSearchIssuesForm } from './linear/LinearSearchIssuesForm';
+import { LinearAddCommentForm } from './linear/LinearAddCommentForm';
+import { LinearIssueUpdatedForm } from './linear/LinearIssueUpdatedForm';
 import { GitHubCreateIssueForm } from './github/GitHubCreateIssueForm';
 import { GitHubCommentIssueForm } from './github/GitHubCommentIssueForm';
 import { GitHubCreatePrForm } from './github/GitHubCreatePrForm';
+import { GitHubGetIssueForm } from './github/GitHubGetIssueForm';
+import { GitHubListIssuesForm } from './github/GitHubListIssuesForm';
+import { GitHubCloseIssueForm } from './github/GitHubCloseIssueForm';
+import { GitHubGetRepoForm } from './github/GitHubGetRepoForm';
+import { GitHubListPrsForm } from './github/GitHubListPrsForm';
+import { GitHubMergePrForm } from './github/GitHubMergePrForm';
+import { GitHubIssueOpenedForm } from './github/GitHubIssueOpenedForm';
+import { GitHubPrOpenedForm } from './github/GitHubPrOpenedForm';
 import { ClaudeMessagesForm } from './anthropic/ClaudeMessagesForm';
 import { OpenAIChatCompletionForm } from './openai/OpenAIChatCompletionForm';
 import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
@@ -181,16 +206,41 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TELEGRAM_MESSAGE_RECEIVED]: TelegramMessageReceivedForm,
   [NodeType.NOTION_CREATE_PAGE]: NotionCreatePageForm,
   [NodeType.NOTION_QUERY_DATABASE]: NotionQueryDatabaseForm,
+  [NodeType.NOTION_GET_PAGE]: NotionGetPageForm,
+  [NodeType.NOTION_UPDATE_PAGE]: NotionUpdatePageForm,
+  [NodeType.NOTION_APPEND_BLOCKS]: NotionAppendBlocksForm,
+  [NodeType.NOTION_GET_BLOCK_CHILDREN]: NotionGetBlockChildrenForm,
+  [NodeType.NOTION_FIND_DATABASE_ITEM]: NotionFindDatabaseItemForm,
+  [NodeType.NOTION_DATABASE_ITEM_UPDATED]: NotionDatabaseItemUpdatedForm,
+  [NodeType.TRELLO_GET_CARD]: TrelloGetCardForm,
+  [NodeType.TRELLO_LIST_CARDS]: TrelloListCardsForm,
+  [NodeType.TRELLO_CREATE_LIST]: TrelloCreateListForm,
   [NodeType.TRELLO_CREATE_CARD]: TrelloCreateCardForm,
   [NodeType.TRELLO_MOVE_CARD]: TrelloMoveCardForm,
   [NodeType.AIRTABLE_CREATE_RECORD]: AirtableCreateRecordForm,
   [NodeType.AIRTABLE_UPDATE_RECORD]: AirtableUpdateRecordForm,
   [NodeType.AIRTABLE_LIST_RECORDS]: AirtableListRecordsForm,
+  [NodeType.AIRTABLE_GET_RECORD]: AirtableGetRecordForm,
+  [NodeType.AIRTABLE_FIND_RECORDS]: AirtableFindRecordsForm,
+  [NodeType.AIRTABLE_DELETE_RECORD]: AirtableDeleteRecordForm,
+  [NodeType.AIRTABLE_RECORD_CREATED]: AirtableRecordCreatedForm,
   [NodeType.LINEAR_CREATE_ISSUE]: LinearCreateIssueForm,
   [NodeType.LINEAR_UPDATE_ISSUE_STATUS]: LinearUpdateIssueStatusForm,
+  [NodeType.LINEAR_GET_ISSUE]: LinearGetIssueForm,
+  [NodeType.LINEAR_SEARCH_ISSUES]: LinearSearchIssuesForm,
+  [NodeType.LINEAR_ADD_COMMENT]: LinearAddCommentForm,
+  [NodeType.LINEAR_ISSUE_UPDATED]: LinearIssueUpdatedForm,
   [NodeType.GITHUB_CREATE_ISSUE]: GitHubCreateIssueForm,
   [NodeType.GITHUB_COMMENT_ISSUE]: GitHubCommentIssueForm,
   [NodeType.GITHUB_CREATE_PR]: GitHubCreatePrForm,
+  [NodeType.GITHUB_GET_ISSUE]: GitHubGetIssueForm,
+  [NodeType.GITHUB_LIST_ISSUES]: GitHubListIssuesForm,
+  [NodeType.GITHUB_CLOSE_ISSUE]: GitHubCloseIssueForm,
+  [NodeType.GITHUB_GET_REPO]: GitHubGetRepoForm,
+  [NodeType.GITHUB_LIST_PRS]: GitHubListPrsForm,
+  [NodeType.GITHUB_MERGE_PR]: GitHubMergePrForm,
+  [NodeType.GITHUB_ISSUE_OPENED]: GitHubIssueOpenedForm,
+  [NodeType.GITHUB_PR_OPENED]: GitHubPrOpenedForm,
   [NodeType.CLAUDE_MESSAGES]: ClaudeMessagesForm,
   [NodeType.OPENAI_CHAT_COMPLETION]: OpenAIChatCompletionForm,
   [NodeType.OLLAMA_GENERATE]: OllamaGenerateForm,

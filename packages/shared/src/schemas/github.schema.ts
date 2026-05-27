@@ -62,3 +62,78 @@ export const githubCreatePrConfigSchema = z.object({
   mockOnDryRun,
 });
 export type GitHubCreatePrConfig = z.infer<typeof githubCreatePrConfigSchema>;
+
+const githubIssueNumber = z.number().int().min(1).max(2_147_483_647);
+export const GITHUB_ISSUE_STATES = ['open', 'closed', 'all'] as const;
+export type GitHubIssueState = (typeof GITHUB_ISSUE_STATES)[number];
+export const GITHUB_MERGE_METHODS = ['merge', 'squash', 'rebase'] as const;
+export type GitHubMergeMethod = (typeof GITHUB_MERGE_METHODS)[number];
+
+export const githubGetIssueConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+  issueNumber: githubIssueNumber,
+});
+export type GitHubGetIssueConfig = z.infer<typeof githubGetIssueConfigSchema>;
+
+export const githubListIssuesConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+  state: z.enum(GITHUB_ISSUE_STATES).optional(),
+  labels: z.array(githubLabel).max(50).optional(),
+  perPage: z.number().int().min(1).max(100).optional(),
+});
+export type GitHubListIssuesConfig = z.infer<typeof githubListIssuesConfigSchema>;
+
+export const githubCloseIssueConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+  issueNumber: githubIssueNumber,
+  mockOnDryRun,
+});
+export type GitHubCloseIssueConfig = z.infer<typeof githubCloseIssueConfigSchema>;
+
+export const githubGetRepoConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+});
+export type GitHubGetRepoConfig = z.infer<typeof githubGetRepoConfigSchema>;
+
+export const githubListPrsConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+  state: z.enum(GITHUB_ISSUE_STATES).optional(),
+  perPage: z.number().int().min(1).max(100).optional(),
+});
+export type GitHubListPrsConfig = z.infer<typeof githubListPrsConfigSchema>;
+
+export const githubMergePrConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+  pullNumber: githubIssueNumber,
+  mergeMethod: z.enum(GITHUB_MERGE_METHODS).optional(),
+  commitTitle: z.string().min(1).max(256).optional(),
+  mockOnDryRun,
+});
+export type GitHubMergePrConfig = z.infer<typeof githubMergePrConfigSchema>;
+
+// Push (webhook) triggers — the repo whose hook we install in onActivate.
+export const githubIssueOpenedConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+});
+export type GitHubIssueOpenedConfig = z.infer<typeof githubIssueOpenedConfigSchema>;
+
+export const githubPrOpenedConfigSchema = z.object({
+  connectionId,
+  owner: githubOwner,
+  repo: githubRepo,
+});
+export type GitHubPrOpenedConfig = z.infer<typeof githubPrOpenedConfigSchema>;

@@ -94,12 +94,37 @@ import {
   MailchimpSubscriberAddedPassthrough,
   CalendlyEventScheduledPassthrough,
   TrelloCardChangedPassthrough,
+  GithubIssueOpenedPassthrough,
+  GithubPrOpenedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
+import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page';
+import { NotionUpdatePageAction } from '../nodes/connectors/notion/notion-update-page';
+import { NotionAppendBlocksAction } from '../nodes/connectors/notion/notion-append-blocks';
+import { NotionGetBlockChildrenAction } from '../nodes/connectors/notion/notion-get-block-children';
+import { NotionFindDatabaseItemAction } from '../nodes/connectors/notion/notion-find-database-item';
+import { TrelloGetCardAction } from '../nodes/connectors/trello/trello-get-card';
+import { TrelloListCardsAction } from '../nodes/connectors/trello/trello-list-cards';
+import { TrelloCreateListAction } from '../nodes/connectors/trello/trello-create-list';
+import { AirtableGetRecordAction } from '../nodes/connectors/airtable/airtable-get-record';
+import { AirtableFindRecordsAction } from '../nodes/connectors/airtable/airtable-find-records';
+import { AirtableDeleteRecordAction } from '../nodes/connectors/airtable/airtable-delete-record';
+import { LinearGetIssueAction } from '../nodes/connectors/linear/linear-get-issue';
+import { LinearSearchIssuesAction } from '../nodes/connectors/linear/linear-search-issues';
+import { LinearAddCommentAction } from '../nodes/connectors/linear/linear-add-comment';
+import { GitHubGetIssueAction } from '../nodes/connectors/github/github-get-issue';
+import { GitHubListIssuesAction } from '../nodes/connectors/github/github-list-issues';
+import { GitHubCloseIssueAction } from '../nodes/connectors/github/github-close-issue';
+import { GitHubGetRepoAction } from '../nodes/connectors/github/github-get-repo';
+import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs';
+import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr';
+import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
+import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-record-created';
+import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -216,6 +241,31 @@ describe('EngineModule', () => {
       undefined as never,
     );
     const driveFileUpdated = new DriveFileUpdatedPassthrough();
+    const notionGetPage = new NotionGetPageAction(undefined as never);
+    const notionUpdatePage = new NotionUpdatePageAction(undefined as never);
+    const notionAppendBlocks = new NotionAppendBlocksAction(undefined as never);
+    const notionGetBlockChildren = new NotionGetBlockChildrenAction(undefined as never);
+    const notionFindDatabaseItem = new NotionFindDatabaseItemAction(undefined as never);
+    const trelloGetCard = new TrelloGetCardAction(undefined as never);
+    const trelloListCards = new TrelloListCardsAction(undefined as never);
+    const trelloCreateList = new TrelloCreateListAction(undefined as never);
+    const airtableGetRecord = new AirtableGetRecordAction(undefined as never);
+    const airtableFindRecords = new AirtableFindRecordsAction(undefined as never);
+    const airtableDeleteRecord = new AirtableDeleteRecordAction(undefined as never);
+    const linearGetIssue = new LinearGetIssueAction(undefined as never);
+    const linearSearchIssues = new LinearSearchIssuesAction(undefined as never);
+    const linearAddComment = new LinearAddCommentAction(undefined as never);
+    const githubGetIssue = new GitHubGetIssueAction(undefined as never);
+    const githubListIssues = new GitHubListIssuesAction(undefined as never);
+    const githubCloseIssue = new GitHubCloseIssueAction(undefined as never);
+    const githubGetRepo = new GitHubGetRepoAction(undefined as never);
+    const githubListPrs = new GitHubListPrsAction(undefined as never);
+    const githubMergePr = new GitHubMergePrAction(undefined as never);
+    const notionDbItemUpdated = new NotionDatabaseItemUpdatedTrigger(undefined as never);
+    const airtableRecordCreated = new AirtableRecordCreatedTrigger(undefined as never);
+    const linearIssueUpdated = new LinearIssueUpdatedTrigger(undefined as never);
+    const githubIssueOpened = new GithubIssueOpenedPassthrough();
+    const githubPrOpened = new GithubPrOpenedPassthrough();
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -317,6 +367,31 @@ describe('EngineModule', () => {
       calendarEventUpdated,
       gmailAttachmentReceived,
       driveFileUpdated,
+      notionGetPage,
+      notionUpdatePage,
+      notionAppendBlocks,
+      notionGetBlockChildren,
+      notionFindDatabaseItem,
+      trelloGetCard,
+      trelloListCards,
+      trelloCreateList,
+      airtableGetRecord,
+      airtableFindRecords,
+      airtableDeleteRecord,
+      linearGetIssue,
+      linearSearchIssues,
+      linearAddComment,
+      githubGetIssue,
+      githubListIssues,
+      githubCloseIssue,
+      githubGetRepo,
+      githubListPrs,
+      githubMergePr,
+      notionDbItemUpdated,
+      airtableRecordCreated,
+      linearIssueUpdated,
+      githubIssueOpened,
+      githubPrOpened,
     );
     return {
       registry,
@@ -562,17 +637,17 @@ describe('EngineModule', () => {
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated) = 24.
-      expect(counts.trigger).toBe(24);
+      expect(counts.trigger).toBe(29);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
       // 8 communication actions (slack ×3, discord ×2, twilio ×2, telegram) +
-      // 12 productivity actions (notion ×2, trello ×2, airtable ×3,
-      //   linear ×2, github ×3) +
+      // productivity actions (notion, trello, airtable, linear, github) +
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
-      //   calendly, postgres, mysql, s3, trello ×2) = 71.
-      expect(counts.action).toBe(71);
+      //   calendly, postgres, mysql, s3, trello ×2).
+      // +notion read/update pack (#244).
+      expect(counts.action).toBe(91);
     });
   });
 });
