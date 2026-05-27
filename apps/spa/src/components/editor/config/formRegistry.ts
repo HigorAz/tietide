@@ -80,6 +80,7 @@ import { TwilioSendWhatsAppForm } from './twilio/TwilioSendWhatsAppForm';
 import { TwilioSmsReceivedForm } from './twilio/TwilioSmsReceivedForm';
 import { TwilioGetMessageForm } from './twilio/TwilioGetMessageForm';
 import { TwilioListMessagesForm } from './twilio/TwilioListMessagesForm';
+import { TwilioMakeCallForm } from './twilio/TwilioMakeCallForm';
 import { TelegramSendMessageForm } from './telegram/TelegramSendMessageForm';
 import { TelegramSendPhotoForm } from './telegram/TelegramSendPhotoForm';
 import { TelegramSendDocumentForm } from './telegram/TelegramSendDocumentForm';
@@ -230,6 +231,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.TWILIO_SMS_RECEIVED]: TwilioSmsReceivedForm,
   [NodeType.TWILIO_GET_MESSAGE]: TwilioGetMessageForm,
   [NodeType.TWILIO_LIST_MESSAGES]: TwilioListMessagesForm,
+  [NodeType.TWILIO_MAKE_CALL]: TwilioMakeCallForm,
   [NodeType.TELEGRAM_SEND_MESSAGE]: TelegramSendMessageForm,
   [NodeType.TELEGRAM_SEND_PHOTO]: TelegramSendPhotoForm,
   [NodeType.TELEGRAM_SEND_DOCUMENT]: TelegramSendDocumentForm,

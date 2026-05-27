@@ -830,6 +830,14 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     provider: 'twilio',
   },
   {
+    type: NodeType.TWILIO_MAKE_CALL,
+    name: 'Twilio: Make Call',
+    description: 'Place an outbound voice call via Twilio using a TwiML URL or inline TwiML',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMUNICATION,
+    provider: 'twilio',
+  },
+  {
     type: NodeType.TELEGRAM_SEND_MESSAGE,
     name: 'Telegram: Send Message',
     description: 'Send a message via a Telegram bot to a chat or channel',

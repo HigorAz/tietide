@@ -81,6 +81,7 @@ import { TwilioSendSmsAction } from '../nodes/connectors/twilio/twilio-send-sms'
 import { TwilioSendWhatsAppAction } from '../nodes/connectors/twilio/twilio-send-whatsapp';
 import { TwilioGetMessageAction } from '../nodes/connectors/twilio/twilio-get-message';
 import { TwilioListMessagesAction } from '../nodes/connectors/twilio/twilio-list-messages';
+import { TwilioMakeCallAction } from '../nodes/connectors/twilio/twilio-make-call';
 import { TelegramClientFactory } from '../nodes/connectors/telegram/telegram-client.factory';
 import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram-send-message';
 import { TelegramSendPhotoAction } from '../nodes/connectors/telegram/telegram-send-photo';
@@ -252,6 +253,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     TwilioSendWhatsAppAction,
     TwilioGetMessageAction,
     TwilioListMessagesAction,
+    TwilioMakeCallAction,
     TelegramClientFactory,
     TelegramSendMessageAction,
     TelegramSendPhotoAction,
@@ -426,6 +428,7 @@ export class EngineModule implements OnModuleInit {
     private readonly twilioSendWhatsApp: TwilioSendWhatsAppAction,
     private readonly twilioGetMessage: TwilioGetMessageAction,
     private readonly twilioListMessages: TwilioListMessagesAction,
+    private readonly twilioMakeCall: TwilioMakeCallAction,
     private readonly telegramSendMessage: TelegramSendMessageAction,
     private readonly telegramSendPhoto: TelegramSendPhotoAction,
     private readonly telegramSendDocument: TelegramSendDocumentAction,
@@ -569,6 +572,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.twilioSendWhatsApp);
     this.registry.register(this.twilioGetMessage);
     this.registry.register(this.twilioListMessages);
+    this.registry.register(this.twilioMakeCall);
     this.registry.register(this.telegramSendMessage);
     this.registry.register(this.telegramSendPhoto);
     this.registry.register(this.telegramSendDocument);
