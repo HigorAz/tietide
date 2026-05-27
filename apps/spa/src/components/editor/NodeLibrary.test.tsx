@@ -78,7 +78,8 @@ describe('NodeLibrary', () => {
       const gmailApp = await expandApp(user, 'triggers', 'gmail');
       expect(within(gmailApp).getByText('Gmail: Message Received')).toBeInTheDocument();
       expect(within(gmailApp).getByText('Gmail: Label Added')).toBeInTheDocument();
-      expect(within(gmailApp).queryAllByTestId('node-library-item')).toHaveLength(2);
+      expect(within(gmailApp).getByText('Gmail: Attachment Received')).toBeInTheDocument();
+      expect(within(gmailApp).queryAllByTestId('node-library-item')).toHaveLength(3);
     });
 
     it('should group Outlook triggers under the Outlook app inside Triggers', async () => {
