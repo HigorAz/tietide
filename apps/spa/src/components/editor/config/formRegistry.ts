@@ -85,6 +85,7 @@ import { TrelloMoveCardForm } from './trello/TrelloMoveCardForm';
 import { AirtableCreateRecordForm } from './airtable/AirtableCreateRecordForm';
 import { AirtableUpdateRecordForm } from './airtable/AirtableUpdateRecordForm';
 import { AirtableListRecordsForm } from './airtable/AirtableListRecordsForm';
+import { AirtableGetRecordForm } from './airtable/AirtableGetRecordForm';
 import { LinearCreateIssueForm } from './linear/LinearCreateIssueForm';
 import { LinearUpdateIssueStatusForm } from './linear/LinearUpdateIssueStatusForm';
 import { GitHubCreateIssueForm } from './github/GitHubCreateIssueForm';
@@ -202,6 +203,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.AIRTABLE_CREATE_RECORD]: AirtableCreateRecordForm,
   [NodeType.AIRTABLE_UPDATE_RECORD]: AirtableUpdateRecordForm,
   [NodeType.AIRTABLE_LIST_RECORDS]: AirtableListRecordsForm,
+  [NodeType.AIRTABLE_GET_RECORD]: AirtableGetRecordForm,
   [NodeType.LINEAR_CREATE_ISSUE]: LinearCreateIssueForm,
   [NodeType.LINEAR_UPDATE_ISSUE_STATUS]: LinearUpdateIssueStatusForm,
   [NodeType.GITHUB_CREATE_ISSUE]: GitHubCreateIssueForm,

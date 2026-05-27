@@ -88,6 +88,7 @@ import { AirtableClientFactory } from '../nodes/connectors/airtable/airtable-cli
 import { AirtableCreateRecordAction } from '../nodes/connectors/airtable/airtable-create-record';
 import { AirtableUpdateRecordAction } from '../nodes/connectors/airtable/airtable-update-record';
 import { AirtableListRecordsAction } from '../nodes/connectors/airtable/airtable-list-records';
+import { AirtableGetRecordAction } from '../nodes/connectors/airtable/airtable-get-record';
 import { LinearClientFactory } from '../nodes/connectors/linear/linear-client.factory';
 import { LinearCreateIssueAction } from '../nodes/connectors/linear/linear-create-issue';
 import { LinearUpdateIssueStatusAction } from '../nodes/connectors/linear/linear-update-issue-status';
@@ -225,6 +226,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     AirtableCreateRecordAction,
     AirtableUpdateRecordAction,
     AirtableListRecordsAction,
+    AirtableGetRecordAction,
     LinearClientFactory,
     LinearCreateIssueAction,
     LinearUpdateIssueStatusAction,
@@ -394,6 +396,7 @@ export class EngineModule implements OnModuleInit {
     private readonly trelloGetCard: TrelloGetCardAction,
     private readonly trelloListCards: TrelloListCardsAction,
     private readonly trelloCreateList: TrelloCreateListAction,
+    private readonly airtableGetRecord: AirtableGetRecordAction,
   ) {}
 
   onModuleInit(): void {
@@ -504,5 +507,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.trelloGetCard);
     this.registry.register(this.trelloListCards);
     this.registry.register(this.trelloCreateList);
+    this.registry.register(this.airtableGetRecord);
   }
 }
