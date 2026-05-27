@@ -180,6 +180,7 @@ export {
   sheetsAppendConfigSchema,
   sheetsReadConfigSchema,
   sheetsFindRowConfigSchema,
+  sheetsUpdateRowConfigSchema,
   docsCreateConfigSchema,
   calendarCreateConfigSchema,
   GOOGLE_NODE_REQUIRED_SCOPES,
@@ -195,6 +196,7 @@ export {
   type SheetsAppendConfig,
   type SheetsReadConfig,
   type SheetsFindRowConfig,
+  type SheetsUpdateRowConfig,
   type DocsCreateConfig,
   type CalendarCreateConfig,
 } from './schemas/google.schema.js';

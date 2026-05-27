@@ -35,6 +35,7 @@ import { DriveListAction } from '../nodes/connectors/google/drive-list';
 import { SheetsAppendAction } from '../nodes/connectors/google/sheets-append';
 import { SheetsReadAction } from '../nodes/connectors/google/sheets-read';
 import { SheetsFindRowAction } from '../nodes/connectors/google/sheets-find-row';
+import { SheetsUpdateRowAction } from '../nodes/connectors/google/sheets-update-row';
 import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
@@ -143,6 +144,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     SheetsAppendAction,
     SheetsReadAction,
     SheetsFindRowAction,
+    SheetsUpdateRowAction,
     DocsCreateAction,
     CalendarCreateAction,
     MicrosoftAuthService,
@@ -249,6 +251,7 @@ export class EngineModule implements OnModuleInit {
     private readonly sheetsAppend: SheetsAppendAction,
     private readonly sheetsRead: SheetsReadAction,
     private readonly sheetsFindRow: SheetsFindRowAction,
+    private readonly sheetsUpdateRow: SheetsUpdateRowAction,
     private readonly docsCreate: DocsCreateAction,
     private readonly calendarCreate: CalendarCreateAction,
     private readonly outlookSend: OutlookSendAction,
@@ -330,6 +333,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.sheetsAppend);
     this.registry.register(this.sheetsRead);
     this.registry.register(this.sheetsFindRow);
+    this.registry.register(this.sheetsUpdateRow);
     this.registry.register(this.docsCreate);
     this.registry.register(this.calendarCreate);
     this.registry.register(this.outlookSend);
