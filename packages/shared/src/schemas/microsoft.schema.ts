@@ -29,6 +29,16 @@ const a1RangePattern = /^[A-Z]+\d+(?::[A-Z]+\d+)?$/;
 // these would let a user write to a folder they don't intend.
 const onedriveItemNamePattern = /^[^\\/]+$/;
 
+// Graph resource IDs (message / attachment / driveItem). Long, URL-unsafe
+// base64-ish strings — the action encodeURIComponent()s them into the path, so
+// here we only reject control chars and cap the length.
+const graphId = (max = 512) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine((v) => !/[\r\n]/.test(v), { message: 'must not contain newline characters' });
+
 export const outlookSendConfigSchema = z.object({
   connectionId: z.string().uuid(),
   to: headerString(),
@@ -105,15 +115,152 @@ export const onedriveCreateConfigSchema = z.object({
 });
 export type OnedriveCreateConfig = z.infer<typeof onedriveCreateConfigSchema>;
 
+export const onedriveGetFileConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  itemId: graphId(),
+  // Download the bytes (base64) in addition to metadata. Files over the ~10 MB
+  // cap return metadata only with contentBase64 null.
+  downloadContent: z.boolean().default(true),
+  mockOnDryRun,
+});
+export type OnedriveGetFileConfig = z.infer<typeof onedriveGetFileConfigSchema>;
+
+const onedriveFolderPath = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine((v) => !v.includes('..'), { message: 'folderPath must not contain ".."' })
+  .refine((v) => !/[\r\n]/.test(v), { message: 'folderPath must not contain newlines' });
+
+export const onedriveListFilesConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  // folderId wins over folderPath; with neither set, the drive root is listed.
+  folderId: graphId().optional(),
+  folderPath: onedriveFolderPath.optional(),
+  top: z.number().int().positive().max(200).optional(),
+  mockOnDryRun,
+});
+export type OnedriveListFilesConfig = z.infer<typeof onedriveListFilesConfigSchema>;
+
+export const excelFindRowConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  workbookId: z.string().min(1).max(128),
+  worksheet: z.string().min(1).max(255),
+  tableName: z.string().min(1).max(255).default('Table1'),
+  column: z.string().min(1).max(255),
+  value: z.string().max(4096),
+  matchMode: z.enum(['exact', 'contains', 'startsWith']).default('exact'),
+  maxMatches: z.number().int().positive().max(500).optional(),
+  mockOnDryRun,
+});
+export type ExcelFindRowConfig = z.infer<typeof excelFindRowConfigSchema>;
+
+export const excelUpdateRowConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    workbookId: z.string().min(1).max(128),
+    worksheet: z.string().min(1).max(255),
+    tableName: z.string().min(1).max(255).default('Table1'),
+    values: z.array(z.unknown()).min(1).max(256),
+    rowIndex: z.number().int().min(0).optional(),
+    // Resolve the target row by a unique exact match on a column instead of an
+    // index; the action errors if the lookup matches zero or multiple rows.
+    lookup: z
+      .object({ column: z.string().min(1).max(255), value: z.string().max(4096) })
+      .optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => (v.rowIndex !== undefined) !== (v.lookup !== undefined), {
+    message: 'Specify exactly one of rowIndex or lookup',
+    path: ['rowIndex'],
+  });
+export type ExcelUpdateRowConfig = z.infer<typeof excelUpdateRowConfigSchema>;
+
+export const outlookGetMessageConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  messageId: graphId(),
+  mockOnDryRun,
+});
+export type OutlookGetMessageConfig = z.infer<typeof outlookGetMessageConfigSchema>;
+
+export const outlookGetAttachmentConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  messageId: graphId(),
+  attachmentId: graphId(),
+  mockOnDryRun,
+});
+export type OutlookGetAttachmentConfig = z.infer<typeof outlookGetAttachmentConfigSchema>;
+
+export const outlookUpdateMessageConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    messageId: graphId(),
+    flagStatus: z.enum(['flagged', 'complete', 'notFlagged']).optional(),
+    categories: z.array(z.string().min(1).max(255)).max(25).optional(),
+    markRead: z.boolean().optional(),
+    markUnread: z.boolean().optional(),
+    // Destination mailFolder id or a well-known name (e.g. 'archive', 'inbox').
+    moveToFolderId: graphId(255).optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => !(v.markRead && v.markUnread), {
+    message: 'markRead and markUnread are mutually exclusive',
+    path: ['markUnread'],
+  })
+  .refine(
+    (v) =>
+      v.flagStatus !== undefined ||
+      (v.categories?.length ?? 0) > 0 ||
+      v.markRead === true ||
+      v.markUnread === true ||
+      v.moveToFolderId !== undefined,
+    {
+      message: 'Specify at least one update (flag, categories, read state, or move)',
+      path: ['flagStatus'],
+    },
+  );
+export type OutlookUpdateMessageConfig = z.infer<typeof outlookUpdateMessageConfigSchema>;
+
+export const outlookCreateDraftConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    // When set, a reply draft is created against this message; `body` becomes
+    // the reply comment and to/subject are inherited from the original.
+    replyToMessageId: graphId().optional(),
+    to: optionalHeaderString(),
+    cc: optionalHeaderString(),
+    subject: optionalHeaderString(255),
+    body: z.string().min(1).max(1_000_000),
+    isHtml: z.boolean().optional(),
+    mockOnDryRun,
+  })
+  .refine(
+    (v) =>
+      v.replyToMessageId !== undefined || ((v.to?.length ?? 0) > 0 && (v.subject?.length ?? 0) > 0),
+    {
+      message: 'to and subject are required for a standalone draft',
+      path: ['to'],
+    },
+  );
+export type OutlookCreateDraftConfig = z.infer<typeof outlookCreateDraftConfigSchema>;
+
 // Map of Microsoft node types to the OAuth scope each requires. Mirrors
 // GOOGLE_NODE_REQUIRED_SCOPES so the SPA's ScopeReauthBanner can surface
 // missing-scope hints uniformly.
 export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.OUTLOOK_SEND]: 'Mail.Send',
   [NodeType.OUTLOOK_SEARCH]: 'Mail.Read',
+  [NodeType.OUTLOOK_GET_MESSAGE]: 'Mail.Read',
+  [NodeType.OUTLOOK_GET_ATTACHMENT]: 'Mail.Read',
+  [NodeType.OUTLOOK_UPDATE_MESSAGE]: 'Mail.ReadWrite',
+  [NodeType.OUTLOOK_CREATE_DRAFT]: 'Mail.ReadWrite',
   [NodeType.EXCEL_APPEND]: 'Files.ReadWrite',
   [NodeType.EXCEL_READ]: 'Files.Read',
+  [NodeType.EXCEL_FIND_ROW]: 'Files.Read',
+  [NodeType.EXCEL_UPDATE_ROW]: 'Files.ReadWrite',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',
+  [NodeType.ONEDRIVE_GET_FILE]: 'Files.Read',
+  [NodeType.ONEDRIVE_LIST_FILES]: 'Files.Read',
 };
 
 export const MICROSOFT_NODE_TYPES: ReadonlyArray<string> = Object.keys(

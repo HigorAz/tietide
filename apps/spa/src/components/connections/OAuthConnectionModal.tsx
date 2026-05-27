@@ -92,8 +92,10 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
     {
       id: 'outlook',
       label: 'Outlook',
-      description: 'Send and read email',
-      scopes: ['Mail.Send', 'Mail.Read'],
+      description: 'Send, read, and update email (flag, categorize, drafts)',
+      // Mail.ReadWrite backs outlook-update-message (flag/categorize/mark-read/move)
+      // and outlook-create-draft; Mail.Read/Mail.Send cover get/search/send.
+      scopes: ['Mail.Send', 'Mail.Read', 'Mail.ReadWrite'],
       defaultOn: true,
     },
     {

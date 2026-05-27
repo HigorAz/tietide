@@ -5,6 +5,7 @@ export const PUSH_TRIGGER_TYPES = [
   'drive-file-updated',
   'outlook-message-received',
   'outlook-message-flagged',
+  'outlook-message-with-attachment',
   'onedrive-file-added',
   'slack-message-received',
   'slack-reaction-added',
@@ -27,6 +28,7 @@ export const POLL_TRIGGER_TYPES = [
   'calendar-event-created',
   'calendar-event-updated',
   'excel-row-added',
+  'excel-row-updated',
 ] as const;
 export type PollTriggerType = (typeof POLL_TRIGGER_TYPES)[number];
 export const isPollTriggerType = (value: string): value is PollTriggerType =>
@@ -54,6 +56,7 @@ export const TRIGGER_TYPE_TO_PROVIDER: Record<PushTriggerType, ProviderTriggerPr
   'drive-file-updated': 'google',
   'outlook-message-received': 'microsoft',
   'outlook-message-flagged': 'microsoft',
+  'outlook-message-with-attachment': 'microsoft',
   'onedrive-file-added': 'microsoft',
   'slack-message-received': 'slack',
   'slack-reaction-added': 'slack',

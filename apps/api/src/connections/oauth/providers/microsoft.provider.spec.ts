@@ -41,6 +41,12 @@ describe('MicrosoftOAuthProvider', () => {
     });
   });
 
+  describe('allowedScopes', () => {
+    it('permits Mail.ReadWrite (required by outlook-update-message / outlook-create-draft)', () => {
+      expect(provider.allowedScopes.has('Mail.ReadWrite')).toBe(true);
+    });
+  });
+
   describe('buildAuthorizeUrl', () => {
     it('uses the common tenant by default', () => {
       const url = new URL(
