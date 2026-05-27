@@ -101,6 +101,7 @@ import { GitHubClientFactory } from '../nodes/connectors/github/github-client.fa
 import { GitHubCreateIssueAction } from '../nodes/connectors/github/github-create-issue';
 import { GitHubCommentIssueAction } from '../nodes/connectors/github/github-comment-issue';
 import { GitHubCreatePrAction } from '../nodes/connectors/github/github-create-pr';
+import { GitHubGetIssueAction } from '../nodes/connectors/github/github-get-issue';
 import { ClaudeClientFactory } from '../nodes/connectors/anthropic/claude-client.factory';
 import { ClaudeMessagesAction } from '../nodes/connectors/anthropic/claude-messages';
 import { OpenaiClientFactory } from '../nodes/connectors/openai/openai-client.factory';
@@ -244,6 +245,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     GitHubCreateIssueAction,
     GitHubCommentIssueAction,
     GitHubCreatePrAction,
+    GitHubGetIssueAction,
     ClaudeClientFactory,
     ClaudeMessagesAction,
     OpenaiClientFactory,
@@ -412,6 +414,7 @@ export class EngineModule implements OnModuleInit {
     private readonly linearGetIssue: LinearGetIssueAction,
     private readonly linearSearchIssues: LinearSearchIssuesAction,
     private readonly linearAddComment: LinearAddCommentAction,
+    private readonly githubGetIssue: GitHubGetIssueAction,
   ) {}
 
   onModuleInit(): void {
@@ -528,5 +531,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.linearGetIssue);
     this.registry.register(this.linearSearchIssues);
     this.registry.register(this.linearAddComment);
+    this.registry.register(this.githubGetIssue);
   }
 }

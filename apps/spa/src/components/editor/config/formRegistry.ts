@@ -96,6 +96,7 @@ import { LinearAddCommentForm } from './linear/LinearAddCommentForm';
 import { GitHubCreateIssueForm } from './github/GitHubCreateIssueForm';
 import { GitHubCommentIssueForm } from './github/GitHubCommentIssueForm';
 import { GitHubCreatePrForm } from './github/GitHubCreatePrForm';
+import { GitHubGetIssueForm } from './github/GitHubGetIssueForm';
 import { ClaudeMessagesForm } from './anthropic/ClaudeMessagesForm';
 import { OpenAIChatCompletionForm } from './openai/OpenAIChatCompletionForm';
 import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
@@ -219,6 +220,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.GITHUB_CREATE_ISSUE]: GitHubCreateIssueForm,
   [NodeType.GITHUB_COMMENT_ISSUE]: GitHubCommentIssueForm,
   [NodeType.GITHUB_CREATE_PR]: GitHubCreatePrForm,
+  [NodeType.GITHUB_GET_ISSUE]: GitHubGetIssueForm,
   [NodeType.CLAUDE_MESSAGES]: ClaudeMessagesForm,
   [NodeType.OPENAI_CHAT_COMPLETION]: OpenAIChatCompletionForm,
   [NodeType.OLLAMA_GENERATE]: OllamaGenerateForm,
