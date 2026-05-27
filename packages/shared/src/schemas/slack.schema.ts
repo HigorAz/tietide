@@ -77,6 +77,85 @@ export const slackFindUserConfigSchema = z.object({
 });
 export type SlackFindUserConfig = z.infer<typeof slackFindUserConfigSchema>;
 
+export const SLACK_SEARCH_SORTS = ['score', 'timestamp'] as const;
+export type SlackSearchSort = (typeof SLACK_SEARCH_SORTS)[number];
+
+export const slackSearchMessagesConfigSchema = z.object({
+  connectionId,
+  query: z.string().min(1).max(1000),
+  count: z.number().int().min(1).max(100).optional(),
+  sort: z.enum(SLACK_SEARCH_SORTS).optional(),
+  mockOnDryRun,
+});
+export type SlackSearchMessagesConfig = z.infer<typeof slackSearchMessagesConfigSchema>;
+
+export const slackAddReactionConfigSchema = z.object({
+  connectionId,
+  channel: slackChannelId,
+  timestamp: z
+    .string()
+    .max(64)
+    .regex(/^\d+\.\d+$/, { message: 'timestamp must be Slack ts form ("1234567890.123456")' }),
+  // Emoji "name" without colons, e.g. "thumbsup".
+  name: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9_+-]+$/, { message: 'name must be a Slack emoji name (e.g. thumbsup)' }),
+  mockOnDryRun,
+});
+export type SlackAddReactionConfig = z.infer<typeof slackAddReactionConfigSchema>;
+
+export const slackCreateChannelConfigSchema = z.object({
+  connectionId,
+  name: slackChannelName,
+  isPrivate: z.boolean().optional(),
+  mockOnDryRun,
+});
+export type SlackCreateChannelConfig = z.infer<typeof slackCreateChannelConfigSchema>;
+
+export const slackInviteToChannelConfigSchema = z.object({
+  connectionId,
+  channel: slackChannelId,
+  // Slack user IDs (e.g. U012AB3CD); accept 1–30 to invite in one call.
+  users: z
+    .array(
+      z
+        .string()
+        .min(2)
+        .max(32)
+        .regex(/^[UW][A-Z0-9]+$/, {
+          message: 'each user must be a Slack user ID (e.g. U012AB3CD)',
+        }),
+    )
+    .min(1)
+    .max(30),
+  mockOnDryRun,
+});
+export type SlackInviteToChannelConfig = z.infer<typeof slackInviteToChannelConfigSchema>;
+
+export const slackGetChannelHistoryConfigSchema = z.object({
+  connectionId,
+  channel: slackChannelId,
+  limit: z.number().int().min(1).max(200).optional(),
+  oldest: z.string().max(64).optional(),
+  latest: z.string().max(64).optional(),
+});
+export type SlackGetChannelHistoryConfig = z.infer<typeof slackGetChannelHistoryConfigSchema>;
+
+export const slackUpdateMessageConfigSchema = z.object({
+  connectionId,
+  channel: slackChannelId,
+  ts: z
+    .string()
+    .max(64)
+    .regex(/^\d+\.\d+$/, { message: 'ts must be Slack timestamp form ("1234567890.123456")' }),
+  text: slackText,
+  blocks: slackBlocks,
+  mockOnDryRun,
+});
+export type SlackUpdateMessageConfig = z.infer<typeof slackUpdateMessageConfigSchema>;
+
 // Trigger configs
 
 export const SLACK_MESSAGE_EVENT_TYPES = ['message.channels', 'app_mention'] as const;

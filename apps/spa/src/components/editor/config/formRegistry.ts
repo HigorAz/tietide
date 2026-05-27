@@ -61,6 +61,7 @@ import { SlackPostMessageForm } from './slack/SlackPostMessageForm';
 import { SlackPostToChannelForm } from './slack/SlackPostToChannelForm';
 import { SlackUploadFileForm } from './slack/SlackUploadFileForm';
 import { SlackFindUserForm } from './slack/SlackFindUserForm';
+import { SlackSearchMessagesForm } from './slack/SlackSearchMessagesForm';
 import { SlackMessageReceivedForm } from './slack/SlackMessageReceivedForm';
 import { SlackReactionAddedForm } from './slack/SlackReactionAddedForm';
 import { DiscordPostWebhookForm } from './discord/DiscordPostWebhookForm';
@@ -196,6 +197,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.SLACK_POST_TO_CHANNEL]: SlackPostToChannelForm,
   [NodeType.SLACK_UPLOAD_FILE]: SlackUploadFileForm,
   [NodeType.SLACK_FIND_USER]: SlackFindUserForm,
+  [NodeType.SLACK_SEARCH_MESSAGES]: SlackSearchMessagesForm,
   [NodeType.SLACK_MESSAGE_RECEIVED]: SlackMessageReceivedForm,
   [NodeType.SLACK_REACTION_ADDED]: SlackReactionAddedForm,
   [NodeType.DISCORD_POST_WEBHOOK]: DiscordPostWebhookForm,
