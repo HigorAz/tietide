@@ -130,6 +130,36 @@ export const outlookGetAttachmentConfigSchema = z.object({
 });
 export type OutlookGetAttachmentConfig = z.infer<typeof outlookGetAttachmentConfigSchema>;
 
+export const outlookUpdateMessageConfigSchema = z
+  .object({
+    connectionId: z.string().uuid(),
+    messageId: graphId(),
+    flagStatus: z.enum(['flagged', 'complete', 'notFlagged']).optional(),
+    categories: z.array(z.string().min(1).max(255)).max(25).optional(),
+    markRead: z.boolean().optional(),
+    markUnread: z.boolean().optional(),
+    // Destination mailFolder id or a well-known name (e.g. 'archive', 'inbox').
+    moveToFolderId: graphId(255).optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => !(v.markRead && v.markUnread), {
+    message: 'markRead and markUnread are mutually exclusive',
+    path: ['markUnread'],
+  })
+  .refine(
+    (v) =>
+      v.flagStatus !== undefined ||
+      (v.categories?.length ?? 0) > 0 ||
+      v.markRead === true ||
+      v.markUnread === true ||
+      v.moveToFolderId !== undefined,
+    {
+      message: 'Specify at least one update (flag, categories, read state, or move)',
+      path: ['flagStatus'],
+    },
+  );
+export type OutlookUpdateMessageConfig = z.infer<typeof outlookUpdateMessageConfigSchema>;
+
 // Map of Microsoft node types to the OAuth scope each requires. Mirrors
 // GOOGLE_NODE_REQUIRED_SCOPES so the SPA's ScopeReauthBanner can surface
 // missing-scope hints uniformly.
@@ -138,6 +168,7 @@ export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.OUTLOOK_SEARCH]: 'Mail.Read',
   [NodeType.OUTLOOK_GET_MESSAGE]: 'Mail.Read',
   [NodeType.OUTLOOK_GET_ATTACHMENT]: 'Mail.Read',
+  [NodeType.OUTLOOK_UPDATE_MESSAGE]: 'Mail.ReadWrite',
   [NodeType.EXCEL_APPEND]: 'Files.ReadWrite',
   [NodeType.EXCEL_READ]: 'Files.Read',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',
