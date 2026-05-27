@@ -96,6 +96,7 @@ import { LinearCreateIssueAction } from '../nodes/connectors/linear/linear-creat
 import { LinearUpdateIssueStatusAction } from '../nodes/connectors/linear/linear-update-issue-status';
 import { LinearGetIssueAction } from '../nodes/connectors/linear/linear-get-issue';
 import { LinearSearchIssuesAction } from '../nodes/connectors/linear/linear-search-issues';
+import { LinearAddCommentAction } from '../nodes/connectors/linear/linear-add-comment';
 import { GitHubClientFactory } from '../nodes/connectors/github/github-client.factory';
 import { GitHubCreateIssueAction } from '../nodes/connectors/github/github-create-issue';
 import { GitHubCommentIssueAction } from '../nodes/connectors/github/github-comment-issue';
@@ -238,6 +239,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     LinearUpdateIssueStatusAction,
     LinearGetIssueAction,
     LinearSearchIssuesAction,
+    LinearAddCommentAction,
     GitHubClientFactory,
     GitHubCreateIssueAction,
     GitHubCommentIssueAction,
@@ -409,6 +411,7 @@ export class EngineModule implements OnModuleInit {
     private readonly airtableDeleteRecord: AirtableDeleteRecordAction,
     private readonly linearGetIssue: LinearGetIssueAction,
     private readonly linearSearchIssues: LinearSearchIssuesAction,
+    private readonly linearAddComment: LinearAddCommentAction,
   ) {}
 
   onModuleInit(): void {
@@ -524,5 +527,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.airtableDeleteRecord);
     this.registry.register(this.linearGetIssue);
     this.registry.register(this.linearSearchIssues);
+    this.registry.register(this.linearAddComment);
   }
 }

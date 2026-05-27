@@ -113,6 +113,7 @@ import { AirtableFindRecordsAction } from '../nodes/connectors/airtable/airtable
 import { AirtableDeleteRecordAction } from '../nodes/connectors/airtable/airtable-delete-record';
 import { LinearGetIssueAction } from '../nodes/connectors/linear/linear-get-issue';
 import { LinearSearchIssuesAction } from '../nodes/connectors/linear/linear-search-issues';
+import { LinearAddCommentAction } from '../nodes/connectors/linear/linear-add-comment';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -242,6 +243,7 @@ describe('EngineModule', () => {
     const airtableDeleteRecord = new AirtableDeleteRecordAction(undefined as never);
     const linearGetIssue = new LinearGetIssueAction(undefined as never);
     const linearSearchIssues = new LinearSearchIssuesAction(undefined as never);
+    const linearAddComment = new LinearAddCommentAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -356,6 +358,7 @@ describe('EngineModule', () => {
       airtableDeleteRecord,
       linearGetIssue,
       linearSearchIssues,
+      linearAddComment,
     );
     return {
       registry,
@@ -611,7 +614,7 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244).
-      expect(counts.action).toBe(84);
+      expect(counts.action).toBe(85);
     });
   });
 });
