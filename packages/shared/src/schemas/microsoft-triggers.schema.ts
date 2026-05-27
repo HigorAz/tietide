@@ -78,6 +78,16 @@ export const excelRowUpdatedConfigSchema = z.object({
 });
 export type ExcelRowUpdatedConfig = z.infer<typeof excelRowUpdatedConfigSchema>;
 
+export const outlookMessageWithAttachmentConfigSchema = z.object({
+  connectionId,
+  // The trigger pre-applies $filter=hasAttachments eq true; an optional extra
+  // filter is AND-merged at activation time.
+  filter: graphFilterExpression.optional(),
+});
+export type OutlookMessageWithAttachmentConfig = z.infer<
+  typeof outlookMessageWithAttachmentConfigSchema
+>;
+
 // Required Microsoft Graph delegated scope for each trigger. Mirrors
 // GOOGLE_TRIGGER_REQUIRED_SCOPES so the SPA's ScopeReauthBanner surfaces
 // missing-scope hints uniformly.
@@ -87,4 +97,5 @@ export const MICROSOFT_TRIGGER_REQUIRED_SCOPES: Readonly<Record<string, string>>
   [NodeType.ONEDRIVE_FILE_ADDED]: 'Files.Read',
   [NodeType.EXCEL_ROW_ADDED]: 'Files.Read',
   [NodeType.EXCEL_ROW_UPDATED]: 'Files.Read',
+  [NodeType.OUTLOOK_MESSAGE_WITH_ATTACHMENT]: 'Mail.Read',
 };

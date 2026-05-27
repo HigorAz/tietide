@@ -65,6 +65,7 @@ export const NodeType = {
   ONEDRIVE_FILE_ADDED: 'onedrive-file-added',
   EXCEL_ROW_ADDED: 'excel-row-added',
   EXCEL_ROW_UPDATED: 'excel-row-updated',
+  OUTLOOK_MESSAGE_WITH_ATTACHMENT: 'outlook-message-with-attachment',
   SLACK_POST_MESSAGE: 'slack-post-message',
   SLACK_POST_TO_CHANNEL: 'slack-post-to-channel',
   SLACK_UPLOAD_FILE: 'slack-upload-file',
@@ -617,6 +618,15 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     name: 'Excel: Row Updated',
     description:
       'Trigger when an existing Excel Online table row changes (poll, per-row value hash)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.MICROSOFT_TRIGGERS,
+    provider: 'microsoft',
+  },
+  {
+    type: NodeType.OUTLOOK_MESSAGE_WITH_ATTACHMENT,
+    name: 'Outlook: Message With Attachment',
+    description:
+      'Trigger when a new Outlook inbox message with attachments arrives (push, MS Graph subscription)',
     category: NodeCategory.TRIGGER,
     group: NodeGroup.MICROSOFT_TRIGGERS,
     provider: 'microsoft',

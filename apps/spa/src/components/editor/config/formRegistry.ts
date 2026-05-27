@@ -53,6 +53,7 @@ import { OneDriveGetFileForm } from './microsoft/OneDriveGetFileForm';
 import { OneDriveListFilesForm } from './microsoft/OneDriveListFilesForm';
 import { OutlookMessageReceivedForm } from './microsoft/OutlookMessageReceivedForm';
 import { OutlookMessageFlaggedForm } from './microsoft/OutlookMessageFlaggedForm';
+import { OutlookMessageWithAttachmentForm } from './microsoft/OutlookMessageWithAttachmentForm';
 import { OneDriveFileAddedForm } from './microsoft/OneDriveFileAddedForm';
 import { ExcelRowAddedForm } from './microsoft/ExcelRowAddedForm';
 import { ExcelRowUpdatedForm } from './microsoft/ExcelRowUpdatedForm';
@@ -161,6 +162,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.ONEDRIVE_LIST_FILES]: OneDriveListFilesForm,
   [NodeType.OUTLOOK_MESSAGE_RECEIVED]: OutlookMessageReceivedForm,
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: OutlookMessageFlaggedForm,
+  [NodeType.OUTLOOK_MESSAGE_WITH_ATTACHMENT]: OutlookMessageWithAttachmentForm,
   [NodeType.ONEDRIVE_FILE_ADDED]: OneDriveFileAddedForm,
   [NodeType.EXCEL_ROW_ADDED]: ExcelRowAddedForm,
   [NodeType.EXCEL_ROW_UPDATED]: ExcelRowUpdatedForm,

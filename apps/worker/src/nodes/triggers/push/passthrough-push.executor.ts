@@ -78,6 +78,17 @@ export class OutlookMessageFlaggedPassthrough extends PassthroughPushExecutor {
 }
 
 @Injectable()
+export class OutlookMessageWithAttachmentPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'outlook-message-with-attachment',
+      'Outlook: Message With Attachment',
+      'Triggers when Microsoft Graph notifies that a new Outlook message with attachments arrived',
+    );
+  }
+}
+
+@Injectable()
 export class OnedriveFileAddedPassthrough extends PassthroughPushExecutor {
   constructor() {
     super(

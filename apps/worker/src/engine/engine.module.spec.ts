@@ -83,6 +83,7 @@ import {
   DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
+  OutlookMessageWithAttachmentPassthrough,
   OnedriveFileAddedPassthrough,
   SlackMessageReceivedPassthrough,
   SlackReactionAddedPassthrough,
@@ -158,6 +159,7 @@ describe('EngineModule', () => {
     );
     const outlookMessageReceived = new OutlookMessageReceivedPassthrough();
     const outlookMessageFlagged = new OutlookMessageFlaggedPassthrough();
+    const outlookMessageWithAttachment = new OutlookMessageWithAttachmentPassthrough();
     const onedriveFileAdded = new OnedriveFileAddedPassthrough();
     const excelRowAdded = new ExcelRowAddedTrigger(undefined as never);
     const excelRowUpdated = new ExcelRowUpdatedTrigger(undefined as never);
@@ -264,6 +266,7 @@ describe('EngineModule', () => {
       gmailMessageReceived,
       outlookMessageReceived,
       outlookMessageFlagged,
+      outlookMessageWithAttachment,
       onedriveFileAdded,
       excelRowAdded,
       excelRowUpdated,
@@ -365,6 +368,7 @@ describe('EngineModule', () => {
       gmailMessageReceived,
       outlookMessageReceived,
       outlookMessageFlagged,
+      outlookMessageWithAttachment,
       onedriveFileAdded,
       excelRowAdded,
       excelRowUpdated,
@@ -469,6 +473,11 @@ describe('EngineModule', () => {
       ['GmailMessageReceivedExecutor', 'gmail-message-received', 'gmailMessageReceived'],
       ['OutlookMessageReceivedPassthrough', 'outlook-message-received', 'outlookMessageReceived'],
       ['OutlookMessageFlaggedPassthrough', 'outlook-message-flagged', 'outlookMessageFlagged'],
+      [
+        'OutlookMessageWithAttachmentPassthrough',
+        'outlook-message-with-attachment',
+        'outlookMessageWithAttachment',
+      ],
       ['OnedriveFileAddedPassthrough', 'onedrive-file-added', 'onedriveFileAdded'],
       ['ExcelRowAddedTrigger', 'excel-row-added', 'excelRowAdded'],
       ['ExcelRowUpdatedTrigger', 'excel-row-updated', 'excelRowUpdated'],
@@ -546,13 +555,14 @@ describe('EngineModule', () => {
         return acc;
       }, {});
       // 6 baseline triggers (manual, cron, webhook, stripe, drive, gmail) +
-      // 5 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
-      // onedrive-file-added, excel-row-added, excel-row-updated) +
+      // 6 Microsoft triggers (outlook-msg-received, outlook-msg-flagged,
+      // outlook-msg-with-attachment, onedrive-file-added, excel-row-added,
+      // excel-row-updated) +
       // 5 communication push triggers (slack ×2, discord, telegram, twilio) +
       // 4 commerce/CRM push triggers (hubspot, mailchimp, calendly, trello) +
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
-      // 1 Google push trigger (drive-file-updated) = 23.
-      expect(counts.trigger).toBe(23);
+      // 1 Google push trigger (drive-file-updated) = 24.
+      expect(counts.trigger).toBe(24);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +

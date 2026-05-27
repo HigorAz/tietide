@@ -118,6 +118,7 @@ import {
   DriveFileUpdatedPassthrough,
   OutlookMessageReceivedPassthrough,
   OutlookMessageFlaggedPassthrough,
+  OutlookMessageWithAttachmentPassthrough,
   OnedriveFileAddedPassthrough,
   SlackMessageReceivedPassthrough,
   SlackReactionAddedPassthrough,
@@ -245,6 +246,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     DriveFileUpdatedPassthrough,
     OutlookMessageReceivedPassthrough,
     OutlookMessageFlaggedPassthrough,
+    OutlookMessageWithAttachmentPassthrough,
     OnedriveFileAddedPassthrough,
     SlackMessageReceivedPassthrough,
     SlackReactionAddedPassthrough,
@@ -317,6 +319,7 @@ export class EngineModule implements OnModuleInit {
     private readonly gmailMessageReceived: GmailMessageReceivedExecutor,
     private readonly outlookMessageReceived: OutlookMessageReceivedPassthrough,
     private readonly outlookMessageFlagged: OutlookMessageFlaggedPassthrough,
+    private readonly outlookMessageWithAttachment: OutlookMessageWithAttachmentPassthrough,
     private readonly onedriveFileAdded: OnedriveFileAddedPassthrough,
     private readonly excelRowAdded: ExcelRowAddedTrigger,
     private readonly excelRowUpdated: ExcelRowUpdatedTrigger,
@@ -418,6 +421,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.gmailMessageReceived);
     this.registry.register(this.outlookMessageReceived);
     this.registry.register(this.outlookMessageFlagged);
+    this.registry.register(this.outlookMessageWithAttachment);
     this.registry.register(this.onedriveFileAdded);
     this.registry.register(this.excelRowAdded);
     this.registry.register(this.excelRowUpdated);
