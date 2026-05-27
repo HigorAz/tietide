@@ -64,3 +64,60 @@ export const mailchimpSubscriberAddedConfigSchema = z.object({
   eventType: z.enum(MAILCHIMP_TRIGGER_EVENT_TYPES).optional(),
 });
 export type MailchimpSubscriberAddedConfig = z.infer<typeof mailchimpSubscriberAddedConfigSchema>;
+
+// --- S15 commerce/data/storage read/update pack (#246) ---
+
+export const mailchimpGetSubscriberConfigSchema = z.object({
+  connectionId,
+  listId: mailchimpListId,
+  email: z.string().email().max(254),
+  mockOnDryRun,
+});
+export type MailchimpGetSubscriberConfig = z.infer<typeof mailchimpGetSubscriberConfigSchema>;
+
+export const mailchimpUpdateSubscriberConfigSchema = z
+  .object({
+    connectionId,
+    listId: mailchimpListId,
+    email: z.string().email().max(254),
+    status: z.enum(MAILCHIMP_SUBSCRIBER_STATUSES).optional(),
+    mergeFields: mailchimpMergeFields.optional(),
+    mockOnDryRun,
+  })
+  .refine((v) => v.status !== undefined || v.mergeFields !== undefined, {
+    message: 'provide a status or merge fields to update',
+    path: ['status'],
+  });
+export type MailchimpUpdateSubscriberConfig = z.infer<typeof mailchimpUpdateSubscriberConfigSchema>;
+
+export const mailchimpUnsubscribeConfigSchema = z.object({
+  connectionId,
+  listId: mailchimpListId,
+  email: z.string().email().max(254),
+  mockOnDryRun,
+});
+export type MailchimpUnsubscribeConfig = z.infer<typeof mailchimpUnsubscribeConfigSchema>;
+
+export const mailchimpAddTagConfigSchema = z.object({
+  connectionId,
+  listId: mailchimpListId,
+  email: z.string().email().max(254),
+  tags: z.array(z.string().min(1).max(100)).min(1).max(50),
+  mockOnDryRun,
+});
+export type MailchimpAddTagConfig = z.infer<typeof mailchimpAddTagConfigSchema>;
+
+export const MAILCHIMP_CAMPAIGN_STATUSES = [
+  'save',
+  'paused',
+  'schedule',
+  'sending',
+  'sent',
+] as const;
+export const mailchimpListCampaignsConfigSchema = z.object({
+  connectionId,
+  count: z.number().int().min(1).max(100).default(10),
+  status: z.enum(MAILCHIMP_CAMPAIGN_STATUSES).optional(),
+  mockOnDryRun,
+});
+export type MailchimpListCampaignsConfig = z.infer<typeof mailchimpListCampaignsConfigSchema>;

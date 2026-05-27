@@ -170,6 +170,11 @@ export const NodeType = {
   HUBSPOT_UPDATE_DEAL: 'hubspot-update-deal',
   HUBSPOT_CREATE_COMPANY: 'hubspot-create-company',
   HUBSPOT_CREATE_NOTE: 'hubspot-create-note',
+  MAILCHIMP_GET_SUBSCRIBER: 'mailchimp-get-subscriber',
+  MAILCHIMP_UPDATE_SUBSCRIBER: 'mailchimp-update-subscriber',
+  MAILCHIMP_UNSUBSCRIBE: 'mailchimp-unsubscribe',
+  MAILCHIMP_ADD_TAG: 'mailchimp-add-tag',
+  MAILCHIMP_LIST_CAMPAIGNS: 'mailchimp-list-campaigns',
 } as const;
 
 export type NodeType = (typeof NodeType)[keyof typeof NodeType];
@@ -1517,5 +1522,45 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     category: NodeCategory.ACTION,
     group: NodeGroup.COMMERCE,
     provider: 'hubspot',
+  },
+  {
+    type: NodeType.MAILCHIMP_GET_SUBSCRIBER,
+    name: 'Mailchimp: Get Subscriber',
+    description: 'Fetch a Mailchimp audience member by email',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_UPDATE_SUBSCRIBER,
+    name: 'Mailchimp: Update Subscriber',
+    description: 'Update a Mailchimp member’s status or merge fields',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_UNSUBSCRIBE,
+    name: 'Mailchimp: Unsubscribe',
+    description: 'Unsubscribe a member from a Mailchimp audience',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_ADD_TAG,
+    name: 'Mailchimp: Add Tag',
+    description: 'Add one or more tags to a Mailchimp audience member',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_LIST_CAMPAIGNS,
+    name: 'Mailchimp: List Campaigns',
+    description: 'List Mailchimp campaigns, optionally filtered by status',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
   },
 ];

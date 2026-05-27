@@ -152,6 +152,11 @@ import { StripeCreateSubscriptionAction } from '../nodes/connectors/stripe/strip
 import { MailchimpClientFactory } from '../nodes/connectors/mailchimp/mailchimp-client.factory';
 import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
 import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
+import { MailchimpGetSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-get-subscriber';
+import { MailchimpUpdateSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-update-subscriber';
+import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailchimp-unsubscribe';
+import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
+import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
 import { CalendlyClientFactory } from '../nodes/connectors/calendly/calendly-client.factory';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
 import { PostgresClientFactory } from '../nodes/connectors/postgres/postgres-client.factory';
@@ -344,6 +349,11 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     MailchimpClientFactory,
     MailchimpAddSubscriberAction,
     MailchimpSendCampaignAction,
+    MailchimpGetSubscriberAction,
+    MailchimpUpdateSubscriberAction,
+    MailchimpUnsubscribeAction,
+    MailchimpAddTagAction,
+    MailchimpListCampaignsAction,
     CalendlyClientFactory,
     CalendlyListEventsAction,
     PostgresClientFactory,
@@ -543,6 +553,11 @@ export class EngineModule implements OnModuleInit {
     private readonly hubspotUpdateDeal: HubspotUpdateDealAction,
     private readonly hubspotCreateCompany: HubspotCreateCompanyAction,
     private readonly hubspotCreateNote: HubspotCreateNoteAction,
+    private readonly mailchimpGetSubscriber: MailchimpGetSubscriberAction,
+    private readonly mailchimpUpdateSubscriber: MailchimpUpdateSubscriberAction,
+    private readonly mailchimpUnsubscribe: MailchimpUnsubscribeAction,
+    private readonly mailchimpAddTag: MailchimpAddTagAction,
+    private readonly mailchimpListCampaigns: MailchimpListCampaignsAction,
   ) {}
 
   onModuleInit(): void {
@@ -702,5 +717,10 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.hubspotUpdateDeal);
     this.registry.register(this.hubspotCreateCompany);
     this.registry.register(this.hubspotCreateNote);
+    this.registry.register(this.mailchimpGetSubscriber);
+    this.registry.register(this.mailchimpUpdateSubscriber);
+    this.registry.register(this.mailchimpUnsubscribe);
+    this.registry.register(this.mailchimpAddTag);
+    this.registry.register(this.mailchimpListCampaigns);
   }
 }

@@ -100,6 +100,11 @@ import { StripeListInvoicesAction } from '../nodes/connectors/stripe/stripe-list
 import { StripeCreateSubscriptionAction } from '../nodes/connectors/stripe/stripe-create-subscription';
 import { MailchimpAddSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-add-subscriber';
 import { MailchimpSendCampaignAction } from '../nodes/connectors/mailchimp/mailchimp-send-campaign';
+import { MailchimpGetSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-get-subscriber';
+import { MailchimpUpdateSubscriberAction } from '../nodes/connectors/mailchimp/mailchimp-update-subscriber';
+import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailchimp-unsubscribe';
+import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
+import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
 import { PostgresRunQueryAction } from '../nodes/connectors/postgres/postgres-run-query';
 import { MysqlRunQueryAction } from '../nodes/connectors/mysql/mysql-run-query';
@@ -330,6 +335,11 @@ describe('EngineModule', () => {
     const hubspotUpdateDeal = new HubspotUpdateDealAction(undefined as never);
     const hubspotCreateCompany = new HubspotCreateCompanyAction(undefined as never);
     const hubspotCreateNote = new HubspotCreateNoteAction(undefined as never);
+    const mailchimpGetSubscriber = new MailchimpGetSubscriberAction(undefined as never);
+    const mailchimpUpdateSubscriber = new MailchimpUpdateSubscriberAction(undefined as never);
+    const mailchimpUnsubscribe = new MailchimpUnsubscribeAction(undefined as never);
+    const mailchimpAddTag = new MailchimpAddTagAction(undefined as never);
+    const mailchimpListCampaigns = new MailchimpListCampaignsAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -488,6 +498,11 @@ describe('EngineModule', () => {
       hubspotUpdateDeal,
       hubspotCreateCompany,
       hubspotCreateNote,
+      mailchimpGetSubscriber,
+      mailchimpUpdateSubscriber,
+      mailchimpUnsubscribe,
+      mailchimpAddTag,
+      mailchimpListCampaigns,
     );
     return {
       registry,
@@ -622,6 +637,11 @@ describe('EngineModule', () => {
       hubspotUpdateDeal,
       hubspotCreateCompany,
       hubspotCreateNote,
+      mailchimpGetSubscriber,
+      mailchimpUpdateSubscriber,
+      mailchimpUnsubscribe,
+      mailchimpAddTag,
+      mailchimpListCampaigns,
       module,
     };
   };
@@ -783,6 +803,15 @@ describe('EngineModule', () => {
       ['HubspotUpdateDealAction', 'hubspot-update-deal', 'hubspotUpdateDeal'],
       ['HubspotCreateCompanyAction', 'hubspot-create-company', 'hubspotCreateCompany'],
       ['HubspotCreateNoteAction', 'hubspot-create-note', 'hubspotCreateNote'],
+      ['MailchimpGetSubscriberAction', 'mailchimp-get-subscriber', 'mailchimpGetSubscriber'],
+      [
+        'MailchimpUpdateSubscriberAction',
+        'mailchimp-update-subscriber',
+        'mailchimpUpdateSubscriber',
+      ],
+      ['MailchimpUnsubscribeAction', 'mailchimp-unsubscribe', 'mailchimpUnsubscribe'],
+      ['MailchimpAddTagAction', 'mailchimp-add-tag', 'mailchimpAddTag'],
+      ['MailchimpListCampaignsAction', 'mailchimp-list-campaigns', 'mailchimpListCampaigns'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -819,8 +848,8 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 so far.
-      expect(counts.action).toBe(120);
+      // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 + Mailchimp ×5.
+      expect(counts.action).toBe(125);
     });
   });
 });

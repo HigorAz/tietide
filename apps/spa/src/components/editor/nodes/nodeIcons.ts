@@ -209,6 +209,11 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.HUBSPOT_UPDATE_DEAL]: Target,
   [NodeType.HUBSPOT_CREATE_COMPANY]: Building2,
   [NodeType.HUBSPOT_CREATE_NOTE]: StickyNote,
+  [NodeType.MAILCHIMP_GET_SUBSCRIBER]: Mail,
+  [NodeType.MAILCHIMP_UPDATE_SUBSCRIBER]: Mail,
+  [NodeType.MAILCHIMP_UNSUBSCRIBE]: Mail,
+  [NodeType.MAILCHIMP_ADD_TAG]: Tag,
+  [NodeType.MAILCHIMP_LIST_CAMPAIGNS]: Megaphone,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

@@ -151,6 +151,11 @@ import { StripeCreateSubscriptionForm } from './stripe/StripeCreateSubscriptionF
 import { MailchimpAddSubscriberForm } from './mailchimp/MailchimpAddSubscriberForm';
 import { MailchimpSendCampaignForm } from './mailchimp/MailchimpSendCampaignForm';
 import { MailchimpSubscriberAddedForm } from './mailchimp/MailchimpSubscriberAddedForm';
+import { MailchimpGetSubscriberForm } from './mailchimp/MailchimpGetSubscriberForm';
+import { MailchimpUpdateSubscriberForm } from './mailchimp/MailchimpUpdateSubscriberForm';
+import { MailchimpUnsubscribeForm } from './mailchimp/MailchimpUnsubscribeForm';
+import { MailchimpAddTagForm } from './mailchimp/MailchimpAddTagForm';
+import { MailchimpListCampaignsForm } from './mailchimp/MailchimpListCampaignsForm';
 import { CalendlyListEventsForm } from './calendly/CalendlyListEventsForm';
 import { CalendlyEventScheduledForm } from './calendly/CalendlyEventScheduledForm';
 import { PostgresRunQueryForm } from './postgres/PostgresRunQueryForm';
@@ -317,6 +322,11 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.MAILCHIMP_ADD_SUBSCRIBER]: MailchimpAddSubscriberForm,
   [NodeType.MAILCHIMP_SEND_CAMPAIGN]: MailchimpSendCampaignForm,
   [NodeType.MAILCHIMP_SUBSCRIBER_ADDED]: MailchimpSubscriberAddedForm,
+  [NodeType.MAILCHIMP_GET_SUBSCRIBER]: MailchimpGetSubscriberForm,
+  [NodeType.MAILCHIMP_UPDATE_SUBSCRIBER]: MailchimpUpdateSubscriberForm,
+  [NodeType.MAILCHIMP_UNSUBSCRIBE]: MailchimpUnsubscribeForm,
+  [NodeType.MAILCHIMP_ADD_TAG]: MailchimpAddTagForm,
+  [NodeType.MAILCHIMP_LIST_CAMPAIGNS]: MailchimpListCampaignsForm,
   [NodeType.CALENDLY_LIST_EVENTS]: CalendlyListEventsForm,
   [NodeType.CALENDLY_EVENT_SCHEDULED]: CalendlyEventScheduledForm,
   [NodeType.POSTGRES_RUN_QUERY]: PostgresRunQueryForm,
