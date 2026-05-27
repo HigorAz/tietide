@@ -73,6 +73,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.DOCS_CREATE]: FileText,
   [NodeType.DOCS_GET]: FileText,
   [NodeType.DOCS_INSERT_TEXT]: FileText,
+  [NodeType.DOCS_REPLACE_TEXT]: FileText,
   [NodeType.CALENDAR_CREATE]: Calendar,
   [NodeType.GMAIL_MESSAGE_RECEIVED]: Mail,
   [NodeType.GMAIL_LABEL_ADDED]: Mail,

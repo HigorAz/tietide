@@ -206,6 +206,19 @@ export const docsInsertTextConfigSchema = z.object({
 });
 export type DocsInsertTextConfig = z.infer<typeof docsInsertTextConfigSchema>;
 
+// Find-and-replace text tokens (template fill). A token with no occurrences in
+// the document is a no-op (occurrencesChanged 0), not an error.
+export const docsReplaceTextConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  documentId: z.string().min(1).max(128),
+  replacements: z
+    .record(z.string().min(1).max(255), z.string().max(10_000))
+    .refine((r) => Object.keys(r).length > 0, { message: 'Provide at least one replacement' }),
+  matchCase: z.boolean().optional(),
+  mockOnDryRun,
+});
+export type DocsReplaceTextConfig = z.infer<typeof docsReplaceTextConfigSchema>;
+
 export const docsCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   templateId: z.string().min(1).max(128),
@@ -251,6 +264,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.DOCS_CREATE]: 'https://www.googleapis.com/auth/documents',
   [NodeType.DOCS_GET]: 'https://www.googleapis.com/auth/documents.readonly',
   [NodeType.DOCS_INSERT_TEXT]: 'https://www.googleapis.com/auth/documents',
+  [NodeType.DOCS_REPLACE_TEXT]: 'https://www.googleapis.com/auth/documents',
   [NodeType.CALENDAR_CREATE]: 'https://www.googleapis.com/auth/calendar.events',
 };
 
