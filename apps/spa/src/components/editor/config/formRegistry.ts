@@ -91,6 +91,7 @@ import { AirtableDeleteRecordForm } from './airtable/AirtableDeleteRecordForm';
 import { LinearCreateIssueForm } from './linear/LinearCreateIssueForm';
 import { LinearUpdateIssueStatusForm } from './linear/LinearUpdateIssueStatusForm';
 import { LinearGetIssueForm } from './linear/LinearGetIssueForm';
+import { LinearSearchIssuesForm } from './linear/LinearSearchIssuesForm';
 import { GitHubCreateIssueForm } from './github/GitHubCreateIssueForm';
 import { GitHubCommentIssueForm } from './github/GitHubCommentIssueForm';
 import { GitHubCreatePrForm } from './github/GitHubCreatePrForm';
@@ -212,6 +213,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.LINEAR_CREATE_ISSUE]: LinearCreateIssueForm,
   [NodeType.LINEAR_UPDATE_ISSUE_STATUS]: LinearUpdateIssueStatusForm,
   [NodeType.LINEAR_GET_ISSUE]: LinearGetIssueForm,
+  [NodeType.LINEAR_SEARCH_ISSUES]: LinearSearchIssuesForm,
   [NodeType.GITHUB_CREATE_ISSUE]: GitHubCreateIssueForm,
   [NodeType.GITHUB_COMMENT_ISSUE]: GitHubCommentIssueForm,
   [NodeType.GITHUB_CREATE_PR]: GitHubCreatePrForm,
