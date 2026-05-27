@@ -71,6 +71,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.SHEETS_UPDATE_ROW]: Sheet,
   [NodeType.SHEETS_CLEAR_RANGE]: Sheet,
   [NodeType.DOCS_CREATE]: FileText,
+  [NodeType.DOCS_GET]: FileText,
   [NodeType.CALENDAR_CREATE]: Calendar,
   [NodeType.GMAIL_MESSAGE_RECEIVED]: Mail,
   [NodeType.GMAIL_LABEL_ADDED]: Mail,

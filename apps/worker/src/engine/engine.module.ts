@@ -38,6 +38,7 @@ import { SheetsFindRowAction } from '../nodes/connectors/google/sheets-find-row'
 import { SheetsUpdateRowAction } from '../nodes/connectors/google/sheets-update-row';
 import { SheetsClearRangeAction } from '../nodes/connectors/google/sheets-clear-range';
 import { DocsCreateAction } from '../nodes/connectors/google/docs-create';
+import { DocsGetAction } from '../nodes/connectors/google/docs-get';
 import { CalendarCreateAction } from '../nodes/connectors/google/calendar-create';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { OutlookSendAction } from '../nodes/connectors/microsoft/outlook-send';
@@ -148,6 +149,7 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
     SheetsUpdateRowAction,
     SheetsClearRangeAction,
     DocsCreateAction,
+    DocsGetAction,
     CalendarCreateAction,
     MicrosoftAuthService,
     OutlookSendAction,
@@ -256,6 +258,7 @@ export class EngineModule implements OnModuleInit {
     private readonly sheetsUpdateRow: SheetsUpdateRowAction,
     private readonly sheetsClearRange: SheetsClearRangeAction,
     private readonly docsCreate: DocsCreateAction,
+    private readonly docsGet: DocsGetAction,
     private readonly calendarCreate: CalendarCreateAction,
     private readonly outlookSend: OutlookSendAction,
     private readonly outlookSearch: OutlookSearchAction,
@@ -339,6 +342,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.sheetsUpdateRow);
     this.registry.register(this.sheetsClearRange);
     this.registry.register(this.docsCreate);
+    this.registry.register(this.docsGet);
     this.registry.register(this.calendarCreate);
     this.registry.register(this.outlookSend);
     this.registry.register(this.outlookSearch);

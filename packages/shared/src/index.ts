@@ -182,6 +182,7 @@ export {
   sheetsFindRowConfigSchema,
   sheetsUpdateRowConfigSchema,
   sheetsClearRangeConfigSchema,
+  docsGetConfigSchema,
   docsCreateConfigSchema,
   calendarCreateConfigSchema,
   GOOGLE_NODE_REQUIRED_SCOPES,
@@ -199,6 +200,7 @@ export {
   type SheetsFindRowConfig,
   type SheetsUpdateRowConfig,
   type SheetsClearRangeConfig,
+  type DocsGetConfig,
   type DocsCreateConfig,
   type CalendarCreateConfig,
 } from './schemas/google.schema.js';

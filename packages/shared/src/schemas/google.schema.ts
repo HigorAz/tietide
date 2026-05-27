@@ -188,6 +188,13 @@ export const sheetsClearRangeConfigSchema = z.object({
 });
 export type SheetsClearRangeConfig = z.infer<typeof sheetsClearRangeConfigSchema>;
 
+export const docsGetConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  documentId: z.string().min(1).max(128),
+  mockOnDryRun,
+});
+export type DocsGetConfig = z.infer<typeof docsGetConfigSchema>;
+
 export const docsCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   templateId: z.string().min(1).max(128),
@@ -231,6 +238,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.SHEETS_UPDATE_ROW]: 'https://www.googleapis.com/auth/spreadsheets',
   [NodeType.SHEETS_CLEAR_RANGE]: 'https://www.googleapis.com/auth/spreadsheets',
   [NodeType.DOCS_CREATE]: 'https://www.googleapis.com/auth/documents',
+  [NodeType.DOCS_GET]: 'https://www.googleapis.com/auth/documents.readonly',
   [NodeType.CALENDAR_CREATE]: 'https://www.googleapis.com/auth/calendar.events',
 };
 
