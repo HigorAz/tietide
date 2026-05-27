@@ -50,6 +50,7 @@ import { ExcelFindRowForm } from './microsoft/ExcelFindRowForm';
 import { ExcelUpdateRowForm } from './microsoft/ExcelUpdateRowForm';
 import { OneDriveCreateForm } from './microsoft/OneDriveCreateForm';
 import { OneDriveGetFileForm } from './microsoft/OneDriveGetFileForm';
+import { OneDriveListFilesForm } from './microsoft/OneDriveListFilesForm';
 import { OutlookMessageReceivedForm } from './microsoft/OutlookMessageReceivedForm';
 import { OutlookMessageFlaggedForm } from './microsoft/OutlookMessageFlaggedForm';
 import { OneDriveFileAddedForm } from './microsoft/OneDriveFileAddedForm';
@@ -156,6 +157,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.EXCEL_UPDATE_ROW]: ExcelUpdateRowForm,
   [NodeType.ONEDRIVE_CREATE]: OneDriveCreateForm,
   [NodeType.ONEDRIVE_GET_FILE]: OneDriveGetFileForm,
+  [NodeType.ONEDRIVE_LIST_FILES]: OneDriveListFilesForm,
   [NodeType.OUTLOOK_MESSAGE_RECEIVED]: OutlookMessageReceivedForm,
   [NodeType.OUTLOOK_MESSAGE_FLAGGED]: OutlookMessageFlaggedForm,
   [NodeType.ONEDRIVE_FILE_ADDED]: OneDriveFileAddedForm,

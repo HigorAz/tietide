@@ -125,6 +125,23 @@ export const onedriveGetFileConfigSchema = z.object({
 });
 export type OnedriveGetFileConfig = z.infer<typeof onedriveGetFileConfigSchema>;
 
+const onedriveFolderPath = z
+  .string()
+  .min(1)
+  .max(512)
+  .refine((v) => !v.includes('..'), { message: 'folderPath must not contain ".."' })
+  .refine((v) => !/[\r\n]/.test(v), { message: 'folderPath must not contain newlines' });
+
+export const onedriveListFilesConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  // folderId wins over folderPath; with neither set, the drive root is listed.
+  folderId: graphId().optional(),
+  folderPath: onedriveFolderPath.optional(),
+  top: z.number().int().positive().max(200).optional(),
+  mockOnDryRun,
+});
+export type OnedriveListFilesConfig = z.infer<typeof onedriveListFilesConfigSchema>;
+
 export const excelFindRowConfigSchema = z.object({
   connectionId: z.string().uuid(),
   workbookId: z.string().min(1).max(128),
@@ -243,6 +260,7 @@ export const MICROSOFT_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = 
   [NodeType.EXCEL_UPDATE_ROW]: 'Files.ReadWrite',
   [NodeType.ONEDRIVE_CREATE]: 'Files.ReadWrite',
   [NodeType.ONEDRIVE_GET_FILE]: 'Files.Read',
+  [NodeType.ONEDRIVE_LIST_FILES]: 'Files.Read',
 };
 
 export const MICROSOFT_NODE_TYPES: ReadonlyArray<string> = Object.keys(

@@ -246,6 +246,7 @@ export {
   excelUpdateRowConfigSchema,
   onedriveCreateConfigSchema,
   onedriveGetFileConfigSchema,
+  onedriveListFilesConfigSchema,
   MICROSOFT_NODE_REQUIRED_SCOPES,
   MICROSOFT_NODE_TYPES,
   type OutlookSendConfig,
@@ -260,6 +261,7 @@ export {
   type ExcelUpdateRowConfig,
   type OnedriveCreateConfig,
   type OnedriveGetFileConfig,
+  type OnedriveListFilesConfig,
 } from './schemas/microsoft.schema.js';
 export {
   outlookMessageReceivedConfigSchema,
