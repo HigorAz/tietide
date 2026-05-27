@@ -74,6 +74,7 @@ import { NotionClientFactory } from '../nodes/connectors/notion/notion-client.fa
 import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
 import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
 import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page';
+import { NotionUpdatePageAction } from '../nodes/connectors/notion/notion-update-page';
 import { TrelloClientFactory } from '../nodes/connectors/trello/trello-client.factory';
 import { TrelloCreateCardAction } from '../nodes/connectors/trello/trello-create-card';
 import { TrelloMoveCardAction } from '../nodes/connectors/trello/trello-move-card';
@@ -204,6 +205,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     NotionCreatePageAction,
     NotionQueryDatabaseAction,
     NotionGetPageAction,
+    NotionUpdatePageAction,
     TrelloClientFactory,
     TrelloCreateCardAction,
     TrelloMoveCardAction,
@@ -373,6 +375,7 @@ export class EngineModule implements OnModuleInit {
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
     private readonly driveFileUpdated: DriveFileUpdatedPassthrough,
     private readonly notionGetPage: NotionGetPageAction,
+    private readonly notionUpdatePage: NotionUpdatePageAction,
   ) {}
 
   onModuleInit(): void {
@@ -476,5 +479,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.gmailAttachmentReceived);
     this.registry.register(this.driveFileUpdated);
     this.registry.register(this.notionGetPage);
+    this.registry.register(this.notionUpdatePage);
   }
 }

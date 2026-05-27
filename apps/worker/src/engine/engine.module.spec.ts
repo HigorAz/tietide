@@ -101,6 +101,7 @@ import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page';
+import { NotionUpdatePageAction } from '../nodes/connectors/notion/notion-update-page';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -218,6 +219,7 @@ describe('EngineModule', () => {
     );
     const driveFileUpdated = new DriveFileUpdatedPassthrough();
     const notionGetPage = new NotionGetPageAction(undefined as never);
+    const notionUpdatePage = new NotionUpdatePageAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -320,6 +322,7 @@ describe('EngineModule', () => {
       gmailAttachmentReceived,
       driveFileUpdated,
       notionGetPage,
+      notionUpdatePage,
     );
     return {
       registry,
@@ -574,8 +577,8 @@ describe('EngineModule', () => {
       // 3 AI actions (claude-messages, openai-chat-completion, ollama-generate) +
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
-      // +1 notion-get-page (#244).
-      expect(counts.action).toBe(72);
+      // +notion read/update pack (#244).
+      expect(counts.action).toBe(73);
     });
   });
 });
