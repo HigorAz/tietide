@@ -843,6 +843,14 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
     provider: 'telegram',
   },
   {
+    type: NodeType.TELEGRAM_GET_CHAT,
+    name: 'Telegram: Get Chat',
+    description: 'Fetch metadata about a Telegram chat (getChat)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMUNICATION,
+    provider: 'telegram',
+  },
+  {
     type: NodeType.SLACK_MESSAGE_RECEIVED,
     name: 'Slack: Message Received',
     description: 'Trigger when a message is posted to a Slack channel (push, Slack Events API)',

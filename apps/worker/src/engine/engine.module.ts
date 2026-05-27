@@ -84,6 +84,7 @@ import { TelegramSendMessageAction } from '../nodes/connectors/telegram/telegram
 import { TelegramSendPhotoAction } from '../nodes/connectors/telegram/telegram-send-photo';
 import { TelegramSendDocumentAction } from '../nodes/connectors/telegram/telegram-send-document';
 import { TelegramEditMessageAction } from '../nodes/connectors/telegram/telegram-edit-message';
+import { TelegramGetChatAction } from '../nodes/connectors/telegram/telegram-get-chat';
 import { NotionClientFactory } from '../nodes/connectors/notion/notion-client.factory';
 import { NotionCreatePageAction } from '../nodes/connectors/notion/notion-create-page';
 import { NotionQueryDatabaseAction } from '../nodes/connectors/notion/notion-query-database';
@@ -252,6 +253,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     TelegramSendPhotoAction,
     TelegramSendDocumentAction,
     TelegramEditMessageAction,
+    TelegramGetChatAction,
     NotionClientFactory,
     NotionCreatePageAction,
     NotionQueryDatabaseAction,
@@ -422,6 +424,7 @@ export class EngineModule implements OnModuleInit {
     private readonly telegramSendPhoto: TelegramSendPhotoAction,
     private readonly telegramSendDocument: TelegramSendDocumentAction,
     private readonly telegramEditMessage: TelegramEditMessageAction,
+    private readonly telegramGetChat: TelegramGetChatAction,
     private readonly slackMessageReceived: SlackMessageReceivedPassthrough,
     private readonly slackReactionAdded: SlackReactionAddedPassthrough,
     private readonly discordMessageReceived: DiscordMessageReceivedPassthrough,
@@ -562,6 +565,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.telegramSendPhoto);
     this.registry.register(this.telegramSendDocument);
     this.registry.register(this.telegramEditMessage);
+    this.registry.register(this.telegramGetChat);
     this.registry.register(this.slackMessageReceived);
     this.registry.register(this.slackReactionAdded);
     this.registry.register(this.discordMessageReceived);
