@@ -106,6 +106,7 @@ import { GitHubListIssuesAction } from '../nodes/connectors/github/github-list-i
 import { GitHubCloseIssueAction } from '../nodes/connectors/github/github-close-issue';
 import { GitHubGetRepoAction } from '../nodes/connectors/github/github-get-repo';
 import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs';
+import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr';
 import { ClaudeClientFactory } from '../nodes/connectors/anthropic/claude-client.factory';
 import { ClaudeMessagesAction } from '../nodes/connectors/anthropic/claude-messages';
 import { OpenaiClientFactory } from '../nodes/connectors/openai/openai-client.factory';
@@ -254,6 +255,7 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     GitHubCloseIssueAction,
     GitHubGetRepoAction,
     GitHubListPrsAction,
+    GitHubMergePrAction,
     ClaudeClientFactory,
     ClaudeMessagesAction,
     OpenaiClientFactory,
@@ -427,6 +429,7 @@ export class EngineModule implements OnModuleInit {
     private readonly githubCloseIssue: GitHubCloseIssueAction,
     private readonly githubGetRepo: GitHubGetRepoAction,
     private readonly githubListPrs: GitHubListPrsAction,
+    private readonly githubMergePr: GitHubMergePrAction,
   ) {}
 
   onModuleInit(): void {
@@ -548,5 +551,6 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.githubCloseIssue);
     this.registry.register(this.githubGetRepo);
     this.registry.register(this.githubListPrs);
+    this.registry.register(this.githubMergePr);
   }
 }
