@@ -59,3 +59,43 @@ export const airtableListRecordsConfigSchema = z.object({
   offset: z.string().max(200).optional(),
 });
 export type AirtableListRecordsConfig = z.infer<typeof airtableListRecordsConfigSchema>;
+
+export const airtableGetRecordConfigSchema = z.object({
+  connectionId,
+  baseId: airtableBaseId,
+  tableIdOrName: airtableTableIdOrName,
+  recordId: airtableRecordId,
+});
+export type AirtableGetRecordConfig = z.infer<typeof airtableGetRecordConfigSchema>;
+
+// Find — filterByFormula is required (the whole point) and the result reports
+// whether anything matched, for lookup-then-branch flows.
+export const airtableFindRecordsConfigSchema = z.object({
+  connectionId,
+  baseId: airtableBaseId,
+  tableIdOrName: airtableTableIdOrName,
+  filterByFormula: z.string().min(1).max(16_384),
+  maxRecords: z.number().int().min(1).max(100).optional(),
+  view: z.string().max(255).optional(),
+  fields: z.array(z.string().max(255)).max(50).optional(),
+});
+export type AirtableFindRecordsConfig = z.infer<typeof airtableFindRecordsConfigSchema>;
+
+export const airtableDeleteRecordConfigSchema = z.object({
+  connectionId,
+  baseId: airtableBaseId,
+  tableIdOrName: airtableTableIdOrName,
+  recordId: airtableRecordId,
+  mockOnDryRun,
+});
+export type AirtableDeleteRecordConfig = z.infer<typeof airtableDeleteRecordConfigSchema>;
+
+// Poll trigger — fires for records whose Airtable createdTime is newer than the
+// last seen cursor.
+export const airtableRecordCreatedConfigSchema = z.object({
+  connectionId,
+  baseId: airtableBaseId,
+  tableIdOrName: airtableTableIdOrName,
+  intervalSeconds: z.number().int().positive().max(3600).optional(),
+});
+export type AirtableRecordCreatedConfig = z.infer<typeof airtableRecordCreatedConfigSchema>;

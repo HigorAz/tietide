@@ -73,3 +73,29 @@ export const trelloCardChangedConfigSchema = z.object({
   eventType: z.enum(TRELLO_CARD_EVENT_TYPES).optional(),
 });
 export type TrelloCardChangedConfig = z.infer<typeof trelloCardChangedConfigSchema>;
+
+export const trelloGetCardConfigSchema = z.object({
+  connectionId,
+  cardId: trelloId,
+});
+export type TrelloGetCardConfig = z.infer<typeof trelloGetCardConfigSchema>;
+
+export const TRELLO_LIST_CARDS_SOURCES = ['board', 'list'] as const;
+export type TrelloListCardsSource = (typeof TRELLO_LIST_CARDS_SOURCES)[number];
+
+export const trelloListCardsConfigSchema = z.object({
+  connectionId,
+  // Whether containerId refers to a board or a list.
+  source: z.enum(TRELLO_LIST_CARDS_SOURCES),
+  containerId: trelloId,
+});
+export type TrelloListCardsConfig = z.infer<typeof trelloListCardsConfigSchema>;
+
+export const trelloCreateListConfigSchema = z.object({
+  connectionId,
+  boardId: trelloId,
+  name: z.string().min(1).max(16_384),
+  pos: z.union([z.literal('top'), z.literal('bottom'), z.number()]).optional(),
+  mockOnDryRun,
+});
+export type TrelloCreateListConfig = z.infer<typeof trelloCreateListConfigSchema>;

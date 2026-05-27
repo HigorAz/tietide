@@ -16,6 +16,8 @@ export const PUSH_TRIGGER_TYPES = [
   'mailchimp-subscriber-added',
   'calendly-event-scheduled',
   'trello-card-changed',
+  'github-issue-opened',
+  'github-pr-opened',
 ] as const;
 export type PushTriggerType = (typeof PUSH_TRIGGER_TYPES)[number];
 export const isPushTriggerType = (value: string): value is PushTriggerType =>
@@ -29,6 +31,9 @@ export const POLL_TRIGGER_TYPES = [
   'calendar-event-updated',
   'excel-row-added',
   'excel-row-updated',
+  'notion-database-item-updated',
+  'airtable-record-created',
+  'linear-issue-updated',
 ] as const;
 export type PollTriggerType = (typeof POLL_TRIGGER_TYPES)[number];
 export const isPollTriggerType = (value: string): value is PollTriggerType =>
@@ -46,6 +51,7 @@ export const PROVIDER_TRIGGER_PROVIDERS = [
   'mailchimp',
   'calendly',
   'trello',
+  'github',
 ] as const;
 export type ProviderTriggerProvider = (typeof PROVIDER_TRIGGER_PROVIDERS)[number];
 
@@ -67,4 +73,6 @@ export const TRIGGER_TYPE_TO_PROVIDER: Record<PushTriggerType, ProviderTriggerPr
   'mailchimp-subscriber-added': 'mailchimp',
   'calendly-event-scheduled': 'calendly',
   'trello-card-changed': 'trello',
+  'github-issue-opened': 'github',
+  'github-pr-opened': 'github',
 };
