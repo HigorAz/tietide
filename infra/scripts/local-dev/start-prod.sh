@@ -18,14 +18,21 @@ cd "$REPO"
 echo "→ Starting Docker dependencies..."
 docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
 
-echo "→ Building every workspace package in dependency order (this takes a few minutes)..."
-# pnpm -r --filter "./packages/**" build  → builds shared/sdk/crypto/etc. in topological
-# order regardless of how many packages exist. Then build the apps separately so a
-# rebuild here keeps the api/worker/spa dist dirs in sync.
-pnpm -r --filter "./packages/**" build
-pnpm --filter @tietide/api build
-pnpm --filter @tietide/worker build
-pnpm --filter @tietide/spa build
+# SKIP_BUILD=1 launches the existing build without recompiling — used by
+# deploy-production.sh, which rebuilds artifacts while the old services stay up
+# and then restarts with SKIP_BUILD=1 so the only downtime is the restart itself.
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  echo "→ SKIP_BUILD=1 — using already-built artifacts (no recompile)"
+else
+  echo "→ Building every workspace package in dependency order (this takes a few minutes)..."
+  # pnpm -r --filter "./packages/**" build  → builds shared/sdk/crypto/etc. in topological
+  # order regardless of how many packages exist. Then build the apps separately so a
+  # rebuild here keeps the api/worker/spa dist dirs in sync.
+  pnpm -r --filter "./packages/**" build
+  pnpm --filter @tietide/api build
+  pnpm --filter @tietide/worker build
+  pnpm --filter @tietide/spa build
+fi
 
 start_service() {
   local name=$1; shift

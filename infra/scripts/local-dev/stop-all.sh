@@ -95,7 +95,14 @@ if [ -n "$still_listening" ]; then
 fi
 
 echo ""
-read -p "Also stop Docker dependencies (postgres / valkey / ollama / chromadb)? [y/N] " yn
+# Prompt only when attached to a terminal. Under automation (the deploy timer,
+# CI, or `echo n | stop-all.sh`) there's no TTY, so default to keeping Docker
+# deps up rather than blocking on a read that would hang or abort under `set -e`.
+if [ -t 0 ]; then
+  read -p "Also stop Docker dependencies (postgres / valkey / ollama / chromadb)? [y/N] " yn
+else
+  yn=n
+fi
 case "$yn" in
   [yY]*)
     cd "$REPO"
