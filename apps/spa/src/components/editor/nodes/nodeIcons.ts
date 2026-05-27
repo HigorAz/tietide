@@ -1,6 +1,7 @@
 import {
   Box,
   BookText,
+  Building2,
   Calendar,
   CalendarClock,
   CheckSquare,
@@ -202,6 +203,12 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.STRIPE_CREATE_REFUND]: CreditCard,
   [NodeType.STRIPE_LIST_INVOICES]: CreditCard,
   [NodeType.STRIPE_CREATE_SUBSCRIPTION]: CreditCard,
+  [NodeType.HUBSPOT_FIND_CONTACT]: Users,
+  [NodeType.HUBSPOT_GET_CONTACT]: Users,
+  [NodeType.HUBSPOT_UPDATE_CONTACT]: UserPlus,
+  [NodeType.HUBSPOT_UPDATE_DEAL]: Target,
+  [NodeType.HUBSPOT_CREATE_COMPANY]: Building2,
+  [NodeType.HUBSPOT_CREATE_NOTE]: StickyNote,
 };
 
 export const DEFAULT_NODE_ICON: LucideIcon = Box;

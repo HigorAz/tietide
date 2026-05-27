@@ -133,6 +133,12 @@ import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
 import { HubspotCreateContactForm } from './hubspot/HubspotCreateContactForm';
 import { HubspotCreateDealForm } from './hubspot/HubspotCreateDealForm';
 import { HubspotContactChangedForm } from './hubspot/HubspotContactChangedForm';
+import { HubspotFindContactForm } from './hubspot/HubspotFindContactForm';
+import { HubspotGetContactForm } from './hubspot/HubspotGetContactForm';
+import { HubspotUpdateContactForm } from './hubspot/HubspotUpdateContactForm';
+import { HubspotUpdateDealForm } from './hubspot/HubspotUpdateDealForm';
+import { HubspotCreateCompanyForm } from './hubspot/HubspotCreateCompanyForm';
+import { HubspotCreateNoteForm } from './hubspot/HubspotCreateNoteForm';
 import { StripeCreateCustomerForm } from './stripe/StripeCreateCustomerForm';
 import { StripeListChargesForm } from './stripe/StripeListChargesForm';
 import { StripeEventReceivedForm } from './stripe/StripeEventReceivedForm';
@@ -293,6 +299,12 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.HUBSPOT_CREATE_CONTACT]: HubspotCreateContactForm,
   [NodeType.HUBSPOT_CREATE_DEAL]: HubspotCreateDealForm,
   [NodeType.HUBSPOT_CONTACT_CHANGED]: HubspotContactChangedForm,
+  [NodeType.HUBSPOT_FIND_CONTACT]: HubspotFindContactForm,
+  [NodeType.HUBSPOT_GET_CONTACT]: HubspotGetContactForm,
+  [NodeType.HUBSPOT_UPDATE_CONTACT]: HubspotUpdateContactForm,
+  [NodeType.HUBSPOT_UPDATE_DEAL]: HubspotUpdateDealForm,
+  [NodeType.HUBSPOT_CREATE_COMPANY]: HubspotCreateCompanyForm,
+  [NodeType.HUBSPOT_CREATE_NOTE]: HubspotCreateNoteForm,
   [NodeType.STRIPE_CREATE_CUSTOMER]: StripeCreateCustomerForm,
   [NodeType.STRIPE_LIST_CHARGES]: StripeListChargesForm,
   [NodeType.STRIPE_EVENT_RECEIVED]: StripeEventReceivedForm,

@@ -84,6 +84,12 @@ import { OpenaiChatCompletionAction } from '../nodes/connectors/openai/openai-ch
 import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate';
 import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-create-contact';
 import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
+import { HubspotFindContactAction } from '../nodes/connectors/hubspot/hubspot-find-contact';
+import { HubspotGetContactAction } from '../nodes/connectors/hubspot/hubspot-get-contact';
+import { HubspotUpdateContactAction } from '../nodes/connectors/hubspot/hubspot-update-contact';
+import { HubspotUpdateDealAction } from '../nodes/connectors/hubspot/hubspot-update-deal';
+import { HubspotCreateCompanyAction } from '../nodes/connectors/hubspot/hubspot-create-company';
+import { HubspotCreateNoteAction } from '../nodes/connectors/hubspot/hubspot-create-note';
 import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
 import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
 import { StripeGetCustomerAction } from '../nodes/connectors/stripe/stripe-get-customer';
@@ -318,6 +324,12 @@ describe('EngineModule', () => {
     const stripeCreateRefund = new StripeCreateRefundAction(undefined as never);
     const stripeListInvoices = new StripeListInvoicesAction(undefined as never);
     const stripeCreateSubscription = new StripeCreateSubscriptionAction(undefined as never);
+    const hubspotFindContact = new HubspotFindContactAction(undefined as never);
+    const hubspotGetContact = new HubspotGetContactAction(undefined as never);
+    const hubspotUpdateContact = new HubspotUpdateContactAction(undefined as never);
+    const hubspotUpdateDeal = new HubspotUpdateDealAction(undefined as never);
+    const hubspotCreateCompany = new HubspotCreateCompanyAction(undefined as never);
+    const hubspotCreateNote = new HubspotCreateNoteAction(undefined as never);
     const module = new EngineModule(
       registry,
       manualTrigger,
@@ -470,6 +482,12 @@ describe('EngineModule', () => {
       stripeCreateRefund,
       stripeListInvoices,
       stripeCreateSubscription,
+      hubspotFindContact,
+      hubspotGetContact,
+      hubspotUpdateContact,
+      hubspotUpdateDeal,
+      hubspotCreateCompany,
+      hubspotCreateNote,
     );
     return {
       registry,
@@ -598,6 +616,12 @@ describe('EngineModule', () => {
       stripeCreateRefund,
       stripeListInvoices,
       stripeCreateSubscription,
+      hubspotFindContact,
+      hubspotGetContact,
+      hubspotUpdateContact,
+      hubspotUpdateDeal,
+      hubspotCreateCompany,
+      hubspotCreateNote,
       module,
     };
   };
@@ -753,6 +777,12 @@ describe('EngineModule', () => {
       ['StripeCreateRefundAction', 'stripe-create-refund', 'stripeCreateRefund'],
       ['StripeListInvoicesAction', 'stripe-list-invoices', 'stripeListInvoices'],
       ['StripeCreateSubscriptionAction', 'stripe-create-subscription', 'stripeCreateSubscription'],
+      ['HubspotFindContactAction', 'hubspot-find-contact', 'hubspotFindContact'],
+      ['HubspotGetContactAction', 'hubspot-get-contact', 'hubspotGetContact'],
+      ['HubspotUpdateContactAction', 'hubspot-update-contact', 'hubspotUpdateContact'],
+      ['HubspotUpdateDealAction', 'hubspot-update-deal', 'hubspotUpdateDeal'],
+      ['HubspotCreateCompanyAction', 'hubspot-create-company', 'hubspotCreateCompany'],
+      ['HubspotCreateNoteAction', 'hubspot-create-note', 'hubspotCreateNote'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
       built.module.onModuleInit();
@@ -789,8 +819,8 @@ describe('EngineModule', () => {
       // 12 commerce/data actions (hubspot ×2, stripe ×2, mailchimp ×2,
       //   calendly, postgres, mysql, s3, trello ×2).
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
-      // +commerce/data/storage read/update pack (#246): Stripe ×6 so far.
-      expect(counts.action).toBe(114);
+      // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 so far.
+      expect(counts.action).toBe(120);
     });
   });
 });

@@ -134,6 +134,12 @@ import { OllamaGenerateAction } from '../nodes/connectors/ollama/ollama-generate
 import { HubspotClientFactory } from '../nodes/connectors/hubspot/hubspot-client.factory';
 import { HubspotCreateContactAction } from '../nodes/connectors/hubspot/hubspot-create-contact';
 import { HubspotCreateDealAction } from '../nodes/connectors/hubspot/hubspot-create-deal';
+import { HubspotFindContactAction } from '../nodes/connectors/hubspot/hubspot-find-contact';
+import { HubspotGetContactAction } from '../nodes/connectors/hubspot/hubspot-get-contact';
+import { HubspotUpdateContactAction } from '../nodes/connectors/hubspot/hubspot-update-contact';
+import { HubspotUpdateDealAction } from '../nodes/connectors/hubspot/hubspot-update-deal';
+import { HubspotCreateCompanyAction } from '../nodes/connectors/hubspot/hubspot-create-company';
+import { HubspotCreateNoteAction } from '../nodes/connectors/hubspot/hubspot-create-note';
 import { StripeClientFactory } from '../nodes/connectors/stripe/stripe-client.factory';
 import { StripeCreateCustomerAction } from '../nodes/connectors/stripe/stripe-create-customer';
 import { StripeListChargesAction } from '../nodes/connectors/stripe/stripe-list-charges';
@@ -320,6 +326,12 @@ import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-att
     HubspotClientFactory,
     HubspotCreateContactAction,
     HubspotCreateDealAction,
+    HubspotFindContactAction,
+    HubspotGetContactAction,
+    HubspotUpdateContactAction,
+    HubspotUpdateDealAction,
+    HubspotCreateCompanyAction,
+    HubspotCreateNoteAction,
     StripeClientFactory,
     StripeCreateCustomerAction,
     StripeListChargesAction,
@@ -525,6 +537,12 @@ export class EngineModule implements OnModuleInit {
     private readonly stripeCreateRefund: StripeCreateRefundAction,
     private readonly stripeListInvoices: StripeListInvoicesAction,
     private readonly stripeCreateSubscription: StripeCreateSubscriptionAction,
+    private readonly hubspotFindContact: HubspotFindContactAction,
+    private readonly hubspotGetContact: HubspotGetContactAction,
+    private readonly hubspotUpdateContact: HubspotUpdateContactAction,
+    private readonly hubspotUpdateDeal: HubspotUpdateDealAction,
+    private readonly hubspotCreateCompany: HubspotCreateCompanyAction,
+    private readonly hubspotCreateNote: HubspotCreateNoteAction,
   ) {}
 
   onModuleInit(): void {
@@ -678,5 +696,11 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.stripeCreateRefund);
     this.registry.register(this.stripeListInvoices);
     this.registry.register(this.stripeCreateSubscription);
+    this.registry.register(this.hubspotFindContact);
+    this.registry.register(this.hubspotGetContact);
+    this.registry.register(this.hubspotUpdateContact);
+    this.registry.register(this.hubspotUpdateDeal);
+    this.registry.register(this.hubspotCreateCompany);
+    this.registry.register(this.hubspotCreateNote);
   }
 }
