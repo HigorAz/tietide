@@ -195,6 +195,17 @@ export const docsGetConfigSchema = z.object({
 });
 export type DocsGetConfig = z.infer<typeof docsGetConfigSchema>;
 
+// Docs body content starts at index 1 (index 0 is the document start and is not
+// a valid insertion point). Omit `index` to append at the end of the body.
+export const docsInsertTextConfigSchema = z.object({
+  connectionId: z.string().uuid(),
+  documentId: z.string().min(1).max(128),
+  text: z.string().min(1).max(100_000),
+  index: z.number().int().min(1).optional(),
+  mockOnDryRun,
+});
+export type DocsInsertTextConfig = z.infer<typeof docsInsertTextConfigSchema>;
+
 export const docsCreateConfigSchema = z.object({
   connectionId: z.string().uuid(),
   templateId: z.string().min(1).max(128),
@@ -239,6 +250,7 @@ export const GOOGLE_NODE_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.SHEETS_CLEAR_RANGE]: 'https://www.googleapis.com/auth/spreadsheets',
   [NodeType.DOCS_CREATE]: 'https://www.googleapis.com/auth/documents',
   [NodeType.DOCS_GET]: 'https://www.googleapis.com/auth/documents.readonly',
+  [NodeType.DOCS_INSERT_TEXT]: 'https://www.googleapis.com/auth/documents',
   [NodeType.CALENDAR_CREATE]: 'https://www.googleapis.com/auth/calendar.events',
 };
 
