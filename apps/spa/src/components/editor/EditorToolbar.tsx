@@ -130,11 +130,15 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const redoDisabled = future.length === 0;
 
   return (
-    <>
+    // One wrapping row: Back on the left, controls on the right. On narrow /
+    // split-view widths the controls bar wraps to the next line (below Back)
+    // instead of overflowing the canvas or overlapping Back. pointer-events-none
+    // here keeps the canvas interactive in the gap; each pill re-enables them.
+    <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-wrap items-start justify-between gap-2">
       <div
         data-testid="editor-toolbar-back"
         className={cn(
-          'pointer-events-auto absolute left-4 top-4 z-10 flex items-center',
+          'pointer-events-auto flex items-center',
           'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
         )}
       >
@@ -147,11 +151,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
       <div
         data-testid="editor-toolbar"
         className={cn(
-          'pointer-events-auto absolute right-4 top-4 z-10 flex items-center gap-2',
-          // Stay within the canvas and wrap (right-aligned) instead of spilling
-          // over the node-library sidebar on narrow / split-view widths. The
-          // left reserve keeps wrapped rows clear of the absolute Back button.
-          'flex-wrap justify-end max-w-[calc(100%-5.5rem)]',
+          'pointer-events-auto flex flex-wrap items-center justify-end gap-2',
           'rounded-md border border-white/5 bg-surface/95 px-2 py-1.5 shadow-lg shadow-black/20 backdrop-blur',
         )}
       >
@@ -246,7 +246,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           }
         />
       </div>
-    </>
+    </div>
   );
 }
 
