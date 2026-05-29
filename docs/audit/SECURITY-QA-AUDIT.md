@@ -19,7 +19,7 @@
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
-| 1    | Confirmed critical / high       | 8     | 2    |
+| 1    | Confirmed critical / high       | 8     | 3    |
 | 2    | Medium security                 | 10    | 0    |
 | 3    | Scaling & remaining correctness | 17    | 0    |
 | 4    | Frontend QA / low               | 5     | 0    |
@@ -42,7 +42,7 @@
 - [x] **W1.2** (HIGH / qa) 3 poll triggers not in NodeRegistry (sheets-row-added, gmail-label-added,
       calendar-event-created) — register + add `POLL_TRIGGER_TYPES ⊆ NodeRegistry` invariant test.
       Files: `apps/worker/src/engine/engine.module.ts`, `engine.module.spec.ts`.
-- [ ] **W1.3** (HIGH / qa) Poll cursor advanced before enqueue → lost events — enqueue first, advance cursor
+- [x] **W1.3** (HIGH / qa) Poll cursor advanced before enqueue → lost events — enqueue first, advance cursor
       after durable enqueue. File: `apps/worker/src/poll/poll-processor.ts`.
 - [ ] **W1.4** (HIGH / qa) Push webhooks no idempotencyKey → duplicate runs — derive per-provider event id,
       set `idempotencyKey`, catch P2002. Files: `provider-webhooks.service.ts`, `webhooks.service.ts`.
