@@ -60,10 +60,26 @@ The first message from a user gives the bot the user's **chat ID**, which is wha
 - **API rate limit**: 30 messages/sec/bot globally, 1 message/sec to a single user/group. Plenty for personal use.
 - **Bot count per Telegram account**: 20 bots max. You won't hit it.
 
-## Triggers vs actions
+## Nodes available
 
-- **Actions** (`telegram-send-message`): only need the bot token.
-- **Triggers** (`telegram-message-received`): TieTide registers a webhook with Telegram pointing at `POST /v1/provider-webhooks/telegram/<subscriptionId>` (see `CLAUDE.md` Section 8). This requires your TieTide API to be **publicly reachable** (Telegram won't POST to `localhost`). For local development, use a tunnel like `cloudflared` or `ngrok`; for production the API's public URL handles it.
+All Telegram nodes use the same bot-token connection.
+
+**Actions:**
+
+- `telegram-send-message` — send a text message to a chat / channel.
+- `telegram-send-photo` — send a photo by URL, existing Telegram `file_id`, or base64 upload.
+- `telegram-send-document` — same three modes, for documents.
+- `telegram-edit-message` — edit the text of a previously sent message (`editMessageText`).
+- `telegram-get-chat` — fetch metadata (id, type, title, username, description) for a chat.
+
+**Triggers** (push, via `setWebhook`):
+
+- `telegram-message-received` — `allowed_updates: ['message', 'channel_post']`.
+- `telegram-callback-query-received` — `allowed_updates: ['callback_query']`. Fires when a user taps an inline-keyboard button.
+
+> **One webhook per bot.** Telegram only stores **one** webhook URL per bot. Activating a second trigger on the same bot connection overwrites the first. If you need both message and callback-query coverage, build one workflow that consumes whichever your bot needs most, or create a second bot via BotFather and a second TieTide connection.
+
+Triggers register a webhook at `POST /v1/provider-webhooks/telegram/<subscriptionId>` (see `CLAUDE.md` Section 8). The API must be **publicly reachable** — Telegram won't POST to `localhost`. Use `cloudflared` / `ngrok` for local dev; the production public URL handles it. The `secret_token` TieTide generates is echoed back as `X-Telegram-Bot-Api-Secret-Token` and verified with `timingSafeEqual` before any execution is enqueued.
 
 ## Rotating the token
 

@@ -112,6 +112,37 @@ When you deploy to a real domain (e.g. `app.tietide.com`):
 2. Update production env: `SLACK_OAUTH_REDIRECT_URI=https://app.tietide.com/v1/connections/oauth/callback?provider=slack`.
 3. To distribute the app outside your own workspace, you'll need to submit it to the Slack App Directory (review takes days). Until then, customers can still install via a public install link as long as your app is **Public Distribution = on** under **Manage Distribution**.
 
+## Nodes available
+
+All Slack nodes share the same OAuth connection. Scope coverage in the SPA **Connections** modal maps to what each node needs:
+
+**Send / write actions** (bot token, `chat:write` group):
+
+- `slack-post-message` — post to a channel by ID.
+- `slack-post-to-channel` — look up a channel by name, then post.
+- `slack-upload-file` — upload a base64 file payload (`files:write`).
+- `slack-update-message` — edit a previously posted message by `ts`.
+- `slack-add-reaction` — add an emoji reaction (`reactions:write`).
+
+**Read / manage actions** (bot token):
+
+- `slack-find-user` — by email (`users:read.email`) or by name (`users:read`).
+- `slack-get-channel-history` — recent messages in a channel (`channels:history`; add `groups:history` for private).
+- `slack-create-channel` / `slack-invite-to-channel` — channel management (`channels:manage`).
+
+**Search action** (user token):
+
+- `slack-search-messages` — `search.messages`. Requires the **"Search (authorizes as you)"** scope group, which adds `search:read` under **User Token Scopes** and grants TieTide an `xoxp` user token. Bot tokens cannot call this endpoint.
+
+**Push triggers** (Slack Events API, signing-secret HMAC):
+
+- `slack-message-received` — needs the `message.channels` bot event.
+- `slack-reaction-added` — needs the `reaction_added` bot event (`reactions:read`).
+- `slack-app-mention` — needs the `app_mention` bot event (`app_mentions:read`).
+- `slack-channel-created` — needs the `channel_created` bot event.
+
+> **Reinstalling matters.** After adding new bot scopes on api.slack.com, click **Reinstall to Workspace** and reconnect the Slack connection in TieTide so the new permissions take effect.
+
 ## Free-tier limits
 
 - **Slack free workspace** is enough for development — you can post in your own workspace, react to messages, and trigger workflows. No paid Slack plan needed.
