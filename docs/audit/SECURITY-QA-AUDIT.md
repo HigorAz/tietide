@@ -19,7 +19,7 @@
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
-| 1    | Confirmed critical / high       | 8     | 5    |
+| 1    | Confirmed critical / high       | 8     | 6    |
 | 2    | Medium security                 | 10    | 0    |
 | 3    | Scaling & remaining correctness | 17    | 0    |
 | 4    | Frontend QA / low               | 5     | 0    |
@@ -48,7 +48,7 @@
       set `idempotencyKey`, catch P2002. Files: `provider-webhooks.service.ts`, `webhooks.service.ts`.
 - [x] **W1.5** (HIGH / security) SSRF in HTTP Request node — scheme + private/metadata IP block, DNS-pin,
       redirect re-validation, response-size cap (post-template URL). File: `apps/worker/src/nodes/actions/http-request.ts`.
-- [ ] **W1.6** (HIGH / security) Mailchimp signature broken & forgeable — verify server-reconstructed URL
+- [x] **W1.6** (HIGH / security) Mailchimp signature broken & forgeable — verify server-reconstructed URL
       secret, stop trusting client headers; fail-fast on missing Trello/HubSpot signing secret.
       Files: `provider-webhooks.controller.ts`, `provider-webhooks.service.ts`, `mailchimp-subscriber-added.trigger.ts`,
       `trello-card-changed.trigger.ts`, `hubspot-*-changed.trigger.ts`, `packages/sdk/.../lifecycle.interface.ts`.

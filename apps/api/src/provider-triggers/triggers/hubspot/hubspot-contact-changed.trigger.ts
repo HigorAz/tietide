@@ -74,11 +74,17 @@ export class HubspotContactChangedTrigger extends BasePushTrigger {
     const cfg = ctx.connection.config as unknown as HubspotApiKeyLike & {
       appClientSecret?: string;
     };
-    // We piggy-back on the access token here as the signing input fallback.
-    // Production deployments should set HUBSPOT_APP_CLIENT_SECRET in the
-    // workflow node config; for the MVP we pull it from a per-connection field
-    // if present, falling back to the access token (acceptable on a dev account).
-    const clientSecret = cfg.appClientSecret ?? cfg.accessToken;
+    // HubSpot signs webhooks with the App client secret — NOT the user access
+    // token. Falling back to the access token meant real deliveries could never
+    // verify (and a rotating user token was repurposed as the signing key).
+    // Require the real App client secret and fail activation if it's missing.
+    const clientSecret = cfg.appClientSecret ?? process.env.HUBSPOT_APP_CLIENT_SECRET;
+    if (!clientSecret) {
+      throw new Error(
+        'HubSpot App client secret is not configured (connection appClientSecret or ' +
+          'HUBSPOT_APP_CLIENT_SECRET) — cannot verify HubSpot webhook signatures.',
+      );
+    }
     return {
       providerSubId: `hubspot:contact-changed:${ctx.workflowId}:${ctx.nodeId}`,
       signingSecret: encodeHubspotSigningSecret(ctx.callbackUrl, clientSecret),

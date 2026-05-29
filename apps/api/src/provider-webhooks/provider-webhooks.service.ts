@@ -15,6 +15,9 @@ export interface ProviderWebhookTriggerInput {
   subscriptionId: string;
   rawBody: Buffer;
   headers: Record<string, string | string[] | undefined>;
+  // Server-parsed query string of the inbound request. Used by URL-secret
+  // providers (Mailchimp) to verify a trusted value rather than a client header.
+  query?: Record<string, string | string[] | undefined>;
   requestId?: string;
 }
 
@@ -107,6 +110,7 @@ export class ProviderWebhooksService {
         rawBody: input.rawBody,
         headers: input.headers,
         signingSecret,
+        query: input.query ?? {},
       }),
     );
     if (!verified) {

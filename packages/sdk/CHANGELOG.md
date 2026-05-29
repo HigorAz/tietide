@@ -5,6 +5,15 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] — 2026-05-28
+
+### Added
+
+- `SignatureInput.query?` — the inbound request's server-parsed query string.
+  Lets URL-secret providers (Mailchimp's `?secret=` token) verify against a
+  trusted, server-side value instead of a spoofable client header. Optional and
+  additive; triggers that don't need it are unaffected.
+
 ## [2.5.0] — 2026-05-28
 
 ### Added

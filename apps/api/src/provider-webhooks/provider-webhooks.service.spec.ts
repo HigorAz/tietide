@@ -108,6 +108,7 @@ describe('ProviderWebhooksService', () => {
         rawBody: expect.any(Buffer),
         headers: { 'stripe-signature': 't=1,v1=abc' },
         signingSecret,
+        query: {},
       });
       expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
         expect.objectContaining({
