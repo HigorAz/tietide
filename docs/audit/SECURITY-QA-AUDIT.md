@@ -19,7 +19,7 @@
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
-| 1    | Confirmed critical / high       | 8     | 4    |
+| 1    | Confirmed critical / high       | 8     | 5    |
 | 2    | Medium security                 | 10    | 0    |
 | 3    | Scaling & remaining correctness | 17    | 0    |
 | 4    | Frontend QA / low               | 5     | 0    |
@@ -46,7 +46,7 @@
       after durable enqueue. File: `apps/worker/src/poll/poll-processor.ts`.
 - [x] **W1.4** (HIGH / qa) Push webhooks no idempotencyKey → duplicate runs — derive per-provider event id,
       set `idempotencyKey`, catch P2002. Files: `provider-webhooks.service.ts`, `webhooks.service.ts`.
-- [ ] **W1.5** (HIGH / security) SSRF in HTTP Request node — scheme + private/metadata IP block, DNS-pin,
+- [x] **W1.5** (HIGH / security) SSRF in HTTP Request node — scheme + private/metadata IP block, DNS-pin,
       redirect re-validation, response-size cap (post-template URL). File: `apps/worker/src/nodes/actions/http-request.ts`.
 - [ ] **W1.6** (HIGH / security) Mailchimp signature broken & forgeable — verify server-reconstructed URL
       secret, stop trusting client headers; fail-fast on missing Trello/HubSpot signing secret.

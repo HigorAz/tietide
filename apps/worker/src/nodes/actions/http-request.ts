@@ -1,10 +1,14 @@
 import { Injectable, Optional } from '@nestjs/common';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
 import { httpRequestOutputSchema } from '@tietide/shared';
+import { assertUrlAllowed, type LookupFn } from './ssrf-guard';
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+// Cap the response we buffer + persist to ExecutionStep.outputData. Prevents a
+// large/malicious endpoint from OOMing the worker or bloating Postgres JSONB.
+const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MiB
 
 interface ParsedParams {
   method: string;
@@ -24,9 +28,11 @@ export class HttpRequestAction implements INodeExecutor {
   readonly outputSchema = httpRequestOutputSchema;
 
   private readonly fetchImpl: FetchLike;
+  private readonly lookupFn?: LookupFn;
 
-  constructor(@Optional() fetchImpl?: FetchLike) {
+  constructor(@Optional() fetchImpl?: FetchLike, @Optional() lookupFn?: LookupFn) {
     this.fetchImpl = fetchImpl ?? ((url, init) => fetch(url, init));
+    this.lookupFn = lookupFn;
   }
 
   async execute(input: NodeInput, context: ExecutionContext): Promise<NodeOutput> {
@@ -56,6 +62,10 @@ export class HttpRequestAction implements INodeExecutor {
         metadata: { mocked: true, dryRun: true, skipped: true },
       };
     }
+
+    // SSRF guard: validate scheme + reject private/loopback/link-local/metadata
+    // targets BEFORE connecting. Runs on the post-template-resolution URL.
+    await assertUrlAllowed(params.url, this.lookupFn);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), params.timeoutMs);
@@ -160,7 +170,7 @@ export class HttpRequestAction implements INodeExecutor {
 
   private async parseBody(response: Response): Promise<unknown> {
     const contentType = response.headers.get('content-type') ?? '';
-    const text = await response.text();
+    const text = await this.readTextCapped(response);
     if (text.length === 0) return '';
     if (contentType.includes('application/json')) {
       try {
@@ -170,5 +180,35 @@ export class HttpRequestAction implements INodeExecutor {
       }
     }
     return text;
+  }
+
+  // Reads the response body but aborts once MAX_RESPONSE_BYTES is exceeded, so a
+  // huge/streaming response can't exhaust worker memory or bloat the DB.
+  private async readTextCapped(response: Response): Promise<string> {
+    const declared = Number(response.headers.get('content-length'));
+    if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
+      throw new Error(`HTTP response exceeds ${MAX_RESPONSE_BYTES} byte limit`);
+    }
+    const body = response.body;
+    if (!body) return '';
+    const reader = body.getReader();
+    const chunks: Buffer[] = [];
+    let total = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          total += value.byteLength;
+          if (total > MAX_RESPONSE_BYTES) {
+            throw new Error(`HTTP response exceeds ${MAX_RESPONSE_BYTES} byte limit`);
+          }
+          chunks.push(Buffer.from(value));
+        }
+      }
+    } finally {
+      await reader.cancel().catch(() => undefined);
+    }
+    return Buffer.concat(chunks).toString('utf8');
   }
 }
