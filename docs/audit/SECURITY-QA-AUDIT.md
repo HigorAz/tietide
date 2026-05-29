@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 6    |
 | 2    | Medium security                 | 11    | 2    |
-| 3    | Scaling & remaining correctness | 17    | 0    |
+| 3    | Scaling & remaining correctness | 17    | 1    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -85,7 +85,9 @@
 
 ## Wave 3 — Scaling & remaining correctness
 
-- [ ] **W3.1** Worker concurrency actually 1 — `@Processor(name,{concurrency})` env-driven. Files: `processors/*.ts`.
+- [x] **W3.1** Worker concurrency actually 1 — `@Processor('workflow-execution', { concurrency })` now driven by
+      `WORKER_CONCURRENCY` (default 5, invalid→5, capped 100) via pure unit-tested `resolveWorkerConcurrency`.
+      Files: `processors/workflow.processor.ts`, `processors/concurrency.config.ts`.
 - [ ] **W3.2** Unbounded list endpoints — cursor pagination + drop `definition` from list projection.
       Files: workflows/secrets/connections/tags/folders/env-vars `.service.ts`.
 - [ ] **W3.3** No per-tenant quotas / userId tracker — getTracker→userId + quota layer.
