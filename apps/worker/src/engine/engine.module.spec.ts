@@ -153,6 +153,9 @@ import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
+import { SheetsRowAddedTrigger } from '../nodes/triggers/poll/sheets-row-added';
+import { GmailLabelAddedTrigger } from '../nodes/triggers/poll/gmail-label-added';
+import { CalendarEventCreatedTrigger } from '../nodes/triggers/poll/calendar-event-created';
 import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page';
 import { NotionUpdatePageAction } from '../nodes/connectors/notion/notion-update-page';
 import { NotionAppendBlocksAction } from '../nodes/connectors/notion/notion-append-blocks';
@@ -176,6 +179,7 @@ import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr'
 import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
 import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-record-created';
 import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
+import { POLL_TRIGGER_TYPES } from '@tietide/shared';
 import { EngineModule } from './engine.module';
 
 describe('EngineModule', () => {
@@ -308,6 +312,12 @@ describe('EngineModule', () => {
       undefined as never,
     );
     const gmailAttachmentReceived = new GmailAttachmentReceivedTrigger(
+      undefined as never,
+      undefined as never,
+    );
+    const sheetsRowAdded = new SheetsRowAddedTrigger(undefined as never, undefined as never);
+    const gmailLabelAdded = new GmailLabelAddedTrigger(undefined as never, undefined as never);
+    const calendarEventCreated = new CalendarEventCreatedTrigger(
       undefined as never,
       undefined as never,
     );
@@ -488,6 +498,9 @@ describe('EngineModule', () => {
       trelloCardChanged,
       calendarEventUpdated,
       gmailAttachmentReceived,
+      sheetsRowAdded,
+      gmailLabelAdded,
+      calendarEventCreated,
       driveFileUpdated,
       notionGetPage,
       notionUpdatePage,
@@ -666,6 +679,9 @@ describe('EngineModule', () => {
       trelloCardChanged,
       calendarEventUpdated,
       gmailAttachmentReceived,
+      sheetsRowAdded,
+      gmailLabelAdded,
+      calendarEventCreated,
       driveFileUpdated,
       stripeGetCustomer,
       stripeFindCustomer,
@@ -842,6 +858,9 @@ describe('EngineModule', () => {
       ['TrelloCardChangedPassthrough', 'trello-card-changed', 'trelloCardChanged'],
       ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
       ['GmailAttachmentReceivedTrigger', 'gmail-attachment-received', 'gmailAttachmentReceived'],
+      ['SheetsRowAddedTrigger', 'sheets-row-added', 'sheetsRowAdded'],
+      ['GmailLabelAddedTrigger', 'gmail-label-added', 'gmailLabelAdded'],
+      ['CalendarEventCreatedTrigger', 'calendar-event-created', 'calendarEventCreated'],
       ['DriveFileUpdatedPassthrough', 'drive-file-updated', 'driveFileUpdated'],
       ['StripeGetCustomerAction', 'stripe-get-customer', 'stripeGetCustomer'],
       ['StripeFindCustomerAction', 'stripe-find-customer', 'stripeFindCustomer'],
@@ -909,7 +928,9 @@ describe('EngineModule', () => {
       // 2 Google poll triggers (calendar-event-updated, gmail-attachment-received) +
       // 1 Google push trigger (drive-file-updated). +messaging pack triggers (#245).
       // +#246 triggers: stripe-invoice-paid + hubspot-deal-changed (push) + s3-object-created (poll).
-      expect(counts.trigger).toBe(35);
+      // +W1.2: sheets-row-added + gmail-label-added + calendar-event-created (poll) — these 3
+      // were registered in PollModule but missing from NodeRegistry until the dual-registration fix.
+      expect(counts.trigger).toBe(38);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
@@ -922,6 +943,18 @@ describe('EngineModule', () => {
       // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
       // Mailchimp ×5 + Calendly ×3 + S3 ×4 + AI enrichment ×4.
       expect(counts.action).toBe(136);
+    });
+
+    // Invariant: every poll trigger type the scheduler can schedule MUST have an
+    // executor registered in NodeRegistry, or its executions fail with "No
+    // executor registered" and the event is lost. Guards the dual-registration
+    // gap that left sheets-row-added / gmail-label-added / calendar-event-created dead.
+    it('registers an executor for every POLL_TRIGGER_TYPES entry', () => {
+      const { registry, module } = build();
+      module.onModuleInit();
+      const types = new Set(registry.getAll().map((e) => e.type));
+      const missing = POLL_TRIGGER_TYPES.filter((t) => !types.has(t));
+      expect(missing).toEqual([]);
     });
   });
 });
