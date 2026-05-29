@@ -20,7 +20,7 @@
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 6    |
-| 2    | Medium security                 | 10    | 0    |
+| 2    | Medium security                 | 11    | 1    |
 | 3    | Scaling & remaining correctness | 17    | 0    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
@@ -74,7 +74,9 @@
       Files: `workflow-definition.dto.ts`, `packages/shared/.../workflow.schema.ts`.
 - [ ] **W2.8** `triggerData` + body unbounded — `express.json({limit})`, triggerData size cap.
       Files: `trigger-execution.dto.ts`, `webhooks.service.ts`, `main.ts`.
-- [ ] **W2.9** Helmet/CSP/HSTS/CORS/Swagger hardening — env-aware helmet, CORS getOrThrow, gate Swagger. File: `main.ts`.
+- [x] **W2.9** Helmet/CSP/HSTS/CORS/Swagger hardening — env-aware helmet (strict CSP + 1y HSTS in prod),
+      CORS mandatory-in-prod (throws on missing `CORS_ORIGIN`), Swagger gated behind `SWAGGER_ENABLED`.
+      Extracted into pure `common/security/security.config.ts` (unit-tested). Files: `main.ts`, `security.config.ts`.
 - [ ] **W2.10** No env validation — ConfigModule validationSchema, reject placeholders. File: `app.module.ts`.
 - [ ] **W2.11** Weak password policy — strength + breach check. File: `register.dto.ts`.
 
