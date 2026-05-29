@@ -31,7 +31,7 @@ describe('ProviderWebhooksService — Google integration', () => {
   let registry: ProviderTriggerRegistry;
   let prisma: {
     providerSubscription: { findUnique: jest.Mock };
-    workflowExecution: { create: jest.Mock };
+    workflowExecution: { create: jest.Mock; findFirst: jest.Mock };
   };
   let queue: { add: jest.Mock };
   let crypto: { decrypt: jest.Mock };
@@ -54,6 +54,7 @@ describe('ProviderWebhooksService — Google integration', () => {
           workflowId,
           status: 'PENDING',
         })),
+        findFirst: jest.fn(async () => null),
       },
     };
     queue = { add: jest.fn(async () => undefined) };

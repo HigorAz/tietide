@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import type { ValidationResponse } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
@@ -153,14 +154,59 @@ export class ProviderWebhooksService {
 
     const executionTriggerType = `provider:${subscription.provider}`;
 
-    const created = await this.prisma.workflowExecution.create({
-      data: {
-        workflowId: subscription.workflow.id,
-        status: 'PENDING',
-        triggerType: executionTriggerType,
-        triggerData: triggerData as Prisma.InputJsonValue,
-      },
+    // Provider deliveries are at-least-once: a slow/non-2xx response makes the
+    // provider redeliver the SAME event. Derive a stable idempotency key per
+    // event so a redelivery does not spawn a duplicate workflow run (duplicate
+    // charge/message/record). Dedup is scoped per workflow via the
+    // @@unique([workflowId, idempotencyKey]) constraint.
+    const idempotencyKey = this.deriveIdempotencyKey(
+      input.provider,
+      input.headers,
+      triggerData,
+      input.rawBody,
+    );
+
+    const existing = await this.prisma.workflowExecution.findFirst({
+      where: { workflowId: subscription.workflow.id, idempotencyKey },
+      select: { id: true, status: true },
     });
+    if (existing) {
+      this.log.log(
+        {
+          provider: input.provider,
+          subscriptionId: input.subscriptionId,
+          workflowId: subscription.workflow.id,
+          idempotencyKey,
+        },
+        'Duplicate provider delivery, skipping (idempotency key already seen)',
+      );
+      return { executionId: existing.id, status: existing.status };
+    }
+
+    let created: { id: string };
+    try {
+      created = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId: subscription.workflow.id,
+          status: 'PENDING',
+          triggerType: executionTriggerType,
+          triggerData: triggerData as Prisma.InputJsonValue,
+          idempotencyKey,
+        },
+        select: { id: true },
+      });
+    } catch (err) {
+      // Concurrent redelivery raced us to the unique constraint — treat as a
+      // duplicate and return the row the other request created.
+      if (this.isUniqueViolation(err)) {
+        const dup = await this.prisma.workflowExecution.findFirst({
+          where: { workflowId: subscription.workflow.id, idempotencyKey },
+          select: { id: true, status: true },
+        });
+        if (dup) return { executionId: dup.id, status: dup.status };
+      }
+      throw err;
+    }
 
     const payload: WorkflowExecutionJobPayload = {
       executionId: created.id,
@@ -205,6 +251,70 @@ export class ProviderWebhooksService {
     }
 
     return { executionId: created.id, status: 'PENDING' };
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return (
+      typeof err === 'object' &&
+      err !== null &&
+      'code' in err &&
+      (err as { code: unknown }).code === 'P2002'
+    );
+  }
+
+  // Stable per-event idempotency key. Prefers the provider's own event id
+  // (the most reliable dedup anchor); falls back to a hash of the raw body,
+  // which is byte-identical across provider redeliveries of the same event.
+  private deriveIdempotencyKey(
+    provider: string,
+    headers: Record<string, string | string[] | undefined>,
+    triggerData: Record<string, unknown>,
+    rawBody: Buffer,
+  ): string {
+    const natural = this.extractProviderEventId(provider, headers, triggerData);
+    const basis =
+      natural ?? `body:${createHash('sha256').update(rawBody).digest('hex').slice(0, 32)}`;
+    return `provider:${provider}:${basis}`;
+  }
+
+  private extractProviderEventId(
+    provider: string,
+    headers: Record<string, string | string[] | undefined>,
+    data: Record<string, unknown>,
+  ): string | null {
+    const str = (v: unknown): string | null =>
+      typeof v === 'string' && v.length > 0 ? v : typeof v === 'number' ? String(v) : null;
+    const header = (name: string): string | null => {
+      const v = headers[name];
+      return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+    };
+    switch (provider) {
+      case 'stripe':
+        return str(data.id); // event.id (evt_...)
+      case 'github':
+        return header('x-github-delivery'); // delivery GUID
+      case 'slack':
+        return str(data.event_id);
+      case 'discord-bot':
+        return str(data.id); // interaction id
+      case 'telegram':
+        return str(data.update_id);
+      case 'twilio':
+        return str(data.MessageSid) ?? str(data.SmsSid);
+      case 'trello': {
+        const action = data.action as { id?: unknown } | undefined;
+        return action ? str(action.id) : null;
+      }
+      case 'hubspot': {
+        const events = data.events;
+        if (Array.isArray(events) && events.length > 0) {
+          return str((events[0] as { eventId?: unknown }).eventId);
+        }
+        return null;
+      }
+      default:
+        return null; // mailchimp/calendly/google/microsoft → body-hash fallback
+    }
   }
 
   private parseBody(rawBody: Buffer): Record<string, unknown> {

@@ -10,7 +10,7 @@ import { ProviderWebhooksService } from './provider-webhooks.service';
 
 interface PrismaMock {
   providerSubscription: { findUnique: jest.Mock };
-  workflowExecution: { create: jest.Mock };
+  workflowExecution: { create: jest.Mock; findFirst: jest.Mock };
 }
 interface QueueMock {
   add: jest.Mock;
@@ -62,7 +62,7 @@ describe('ProviderWebhooksService', () => {
   beforeEach(async () => {
     prisma = {
       providerSubscription: { findUnique: jest.fn() },
-      workflowExecution: { create: jest.fn() },
+      workflowExecution: { create: jest.fn(), findFirst: jest.fn(async () => null) },
     };
     queue = { add: jest.fn(async () => undefined) };
     crypto = { decrypt: jest.fn(() => signingSecret) };
@@ -129,6 +129,33 @@ describe('ProviderWebhooksService', () => {
         expect.objectContaining({ jobId: executionId }),
       );
       expect(result).toEqual({ executionId, status: 'PENDING' });
+    });
+
+    it('does NOT create or enqueue a duplicate when the same event id was already seen (idempotency)', async () => {
+      prisma.providerSubscription.findUnique.mockResolvedValue(activeSubscription());
+      // Stripe event.id was already processed → findFirst returns the prior row.
+      prisma.workflowExecution.findFirst.mockResolvedValue({
+        id: 'prior-exec',
+        status: 'SUCCESS',
+      });
+
+      const result = await service.trigger({
+        provider: 'stripe',
+        subscriptionId,
+        rawBody: Buffer.from(JSON.stringify({ id: 'evt_123', type: 'payment_intent.succeeded' })),
+        headers: { 'stripe-signature': 't=1,v1=abc' },
+      });
+
+      expect(prisma.workflowExecution.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            idempotencyKey: 'provider:stripe:evt_123',
+          }),
+        }),
+      );
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+      expect(result).toEqual({ executionId: 'prior-exec', status: 'SUCCESS' });
     });
 
     it('should propagate requestId into the BullMQ job payload for correlation', async () => {
