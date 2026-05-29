@@ -122,6 +122,16 @@ The form is generated from `discordBotConfigSchema`. Validation:
 
 On the new `Connection` row, click **Test**. TieTide calls Discord's `/users/@me` endpoint with the bot token. `Test succeeded (<latencyMs>ms)` confirms the bot token is valid.
 
+### Bot REST actions
+
+In addition to the Interactions trigger, the bot connection unlocks Discord REST API actions (they call `https://discord.com/api/v10` with `Authorization: Bot <token>`):
+
+- `discord-bot-send-message` — POST `/channels/{channelId}/messages`. Distinct from `discord-post-webhook`: posts as the bot (not a webhook), works in any channel the bot can see, and returns the created `messageId`.
+- `discord-get-channel-messages` — GET `/channels/{channelId}/messages?limit=N`. Read recent messages (up to 100).
+- `discord-add-role` — PUT `/guilds/{guildId}/members/{userId}/roles/{roleId}`. Assign a role to a member. Returns 204 No Content on success.
+
+The bot must be **invited to the server** (step 5) and have the relevant **Bot Permissions** ticked in the OAuth2 URL generator: `Send Messages` + `Read Message History` for the message actions, `Manage Roles` for `discord-add-role` (and the bot's own highest role must sit **above** the role it's assigning — Discord enforces role hierarchy server-side).
+
 ### Free tier
 
 Discord bots are **entirely free**. You only need a regular Discord account to register an application.
