@@ -179,6 +179,16 @@ describe('AuthService', () => {
       expect(jwt.sign).not.toHaveBeenCalled();
     });
 
+    it('should still run bcrypt.compare when the email is unknown (constant-time, no enumeration oracle)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+      // Comparison runs against the dummy hash even though no user exists, so
+      // the response time matches the wrong-password path.
+      expect(mockedBcrypt.compare).toHaveBeenCalledTimes(1);
+    });
+
     it('should throw UnauthorizedException when password does not match', async () => {
       prisma.user.findUnique.mockResolvedValue(storedUser);
       (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);

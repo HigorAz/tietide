@@ -12,6 +12,11 @@ const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class AuthService {
+  // A precomputed hash compared against when the email is not registered, so the
+  // login response takes the same time whether or not the account exists
+  // (defeats the timing oracle that would otherwise enumerate valid emails).
+  private readonly dummyHash = bcrypt.hashSync('tietide-timing-equalizer', BCRYPT_ROUNDS);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -64,12 +69,12 @@ export class AuthService {
       where: { email: dto.email },
       select: { id: true, email: true, password: true, role: true },
     });
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
 
-    const passwordMatches = await bcrypt.compare(dto.password, user.password);
-    if (!passwordMatches) {
+    // Always run a bcrypt comparison — against a dummy hash when the user is
+    // missing — so the endpoint's timing does not reveal whether the email is
+    // registered. Decide success only after the comparison.
+    const passwordMatches = await bcrypt.compare(dto.password, user?.password ?? this.dummyHash);
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException('Invalid credentials');
     }
 

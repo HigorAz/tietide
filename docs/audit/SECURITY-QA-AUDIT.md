@@ -60,8 +60,8 @@
 
 ## Wave 2 — MEDIUM security
 
-- [ ] **W2.1** User enumeration (register oracle + login timing) — constant-time login, neutral register.
-      File: `auth.service.ts`.
+- [~] **W2.1** User enumeration — login is now constant-time (dummy bcrypt on unknown email). Register 409 oracle remains (needs email-verification flow — deferred).
+  File: `auth.service.ts`.
 - [ ] **W2.2** Auth throttler IP-only + no trust-proxy — IP+email tracker, per-account lockout, trust proxy.
       Files: `throttler.config.ts`, `main.ts`.
 - [ ] **W2.3** No PKCE on OAuth — S256 across 6 providers. Files: `connections/oauth/providers/*.ts`, `oauth.service.ts`.
