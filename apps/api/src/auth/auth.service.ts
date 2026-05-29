@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { LoginDto } from './dto/login.dto';
 import type { LoginResponseDto } from './dto/login-response.dto';
 import type { RegisterDto } from './dto/register.dto';
+import type { RegisterResponseDto } from './dto/register-response.dto';
 import type { UserResponseDto } from './dto/user-response.dto';
 
 const BCRYPT_ROUNDS = 12;
@@ -16,7 +17,7 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<UserResponseDto> {
+  async register(dto: RegisterDto): Promise<RegisterResponseDto> {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
       select: { id: true },
@@ -42,7 +43,14 @@ export class AuthService {
           createdAt: true,
         },
       });
-      return user;
+      // Auto-login: issue an access token so the SPA can land the user straight
+      // in the app instead of bouncing them to the login screen.
+      const accessToken = this.jwt.sign({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+      });
+      return { ...user, accessToken, tokenType: 'Bearer' };
     } catch (err) {
       if (this.isUniqueViolation(err)) {
         throw new ConflictException('Email already registered');

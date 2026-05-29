@@ -63,8 +63,13 @@ describe('authStore', () => {
   });
 
   describe('register', () => {
-    it('should return the created user without storing a token', async () => {
-      mockedRegister.mockResolvedValueOnce(sampleUser);
+    it('should auto-login: store the token, hydrate the user, and return it on success', async () => {
+      mockedRegister.mockResolvedValueOnce({
+        ...sampleUser,
+        accessToken: 'jwt-reg',
+        tokenType: 'Bearer',
+      });
+      mockedGetMe.mockResolvedValueOnce(sampleUser);
 
       const result = await useAuthStore
         .getState()
@@ -72,9 +77,9 @@ describe('authStore', () => {
 
       expect(result).toEqual(sampleUser);
       const state = useAuthStore.getState();
-      expect(state.token).toBeNull();
-      expect(state.user).toBeNull();
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+      expect(state.token).toBe('jwt-reg');
+      expect(state.user).toEqual(sampleUser);
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('jwt-reg');
     });
 
     it('should propagate errors (e.g. 409 duplicate email) without touching state', async () => {

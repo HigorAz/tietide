@@ -18,7 +18,7 @@
 
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
-| 0    | Auto-login after register       | 1     | 0    |
+| 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 0    |
 | 2    | Medium security                 | 10    | 0    |
 | 3    | Scaling & remaining correctness | 17    | 0    |
@@ -29,7 +29,7 @@
 
 ## Wave 0 — Auto-login after registration
 
-- [ ] **W0.1** (medium / best-practice) Auto-login after register — backend `register()` issues a JWT;
+- [x] **W0.1** (medium / best-practice) Auto-login after register — backend `register()` issues a JWT;
       SPA persists token + `getMe()`, navigates to `/`.
       Files: `apps/api/src/auth/auth.service.ts`, `apps/api/src/auth/dto/`, `apps/spa/src/api/auth.ts`,
       `apps/spa/src/stores/authStore.ts`, `apps/spa/src/pages/RegisterPage.tsx`.

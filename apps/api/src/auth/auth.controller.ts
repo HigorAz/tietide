@@ -21,6 +21,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RegisterResponseDto } from './dto/register-response.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
 
@@ -37,11 +38,11 @@ export class AuthController {
     },
   })
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user' })
-  @ApiCreatedResponse({ type: UserResponseDto })
+  @ApiOperation({ summary: 'Register a new user (auto-logs in — returns an access token)' })
+  @ApiCreatedResponse({ type: RegisterResponseDto })
   @ApiConflictResponse({ description: 'Email already registered' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
-  async register(@Body() dto: RegisterDto): Promise<UserResponseDto> {
+  async register(@Body() dto: RegisterDto): Promise<RegisterResponseDto> {
     return this.authService.register(dto);
   }
 

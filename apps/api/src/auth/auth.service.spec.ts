@@ -74,10 +74,11 @@ describe('AuthService', () => {
       );
     });
 
-    it('should return a response without the password field', async () => {
+    it('should return the user fields plus a signed accessToken without the password field', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       (mockedBcrypt.hash as unknown as jest.Mock).mockResolvedValue('hashed_password');
       prisma.user.create.mockResolvedValue(createdUser);
+      jwt.sign.mockReturnValue('signed.jwt.token');
 
       const result = await service.register(validDto);
 
@@ -87,8 +88,25 @@ describe('AuthService', () => {
         name: createdUser.name,
         role: createdUser.role,
         createdAt: createdUser.createdAt,
+        accessToken: 'signed.jwt.token',
+        tokenType: 'Bearer',
       });
       expect(result).not.toHaveProperty('password');
+    });
+
+    it('should auto-login by signing a JWT with sub, email, and role on successful registration', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      (mockedBcrypt.hash as unknown as jest.Mock).mockResolvedValue('hashed_password');
+      prisma.user.create.mockResolvedValue(createdUser);
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      await service.register(validDto);
+
+      expect(jwt.sign).toHaveBeenCalledWith({
+        sub: createdUser.id,
+        email: createdUser.email,
+        role: createdUser.role,
+      });
     });
 
     it('should throw ConflictException when email is already taken', async () => {
