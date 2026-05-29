@@ -28,6 +28,8 @@ export class OutlookGetAttachmentAction extends BaseConnectorAction<MicrosoftOAu
   readonly name = 'Outlook: Get Attachment';
   readonly description = 'Download an Outlook attachment by message + attachment ID (base64)';
   readonly requiredConnectionType = 'microsoft';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly authService: MicrosoftAuthService) {
     super();

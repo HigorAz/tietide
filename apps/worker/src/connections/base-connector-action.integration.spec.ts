@@ -33,6 +33,12 @@ class FakeConnectorAction extends BaseConnectorAction<FakeProviderConfig> {
   }
 }
 
+// A read-only connector opts out of the dry-run skip so it still executes
+// during a test run (no external mutation occurs).
+class FakeReadOnlyConnectorAction extends FakeConnectorAction {
+  protected readonly sideEffect = false;
+}
+
 const makeContext = (
   overrides: Partial<ExecutionContext> = {},
 ): ExecutionContext & {
@@ -282,6 +288,51 @@ describe('BaseConnectorAction (integration)', () => {
         action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx),
       ).rejects.toBeInstanceOf(Error);
       expect(ctx.markConnectionForRefresh).toHaveBeenCalledWith('conn-1');
+    });
+
+    describe('dry-run safety', () => {
+      it('does NOT call run() (nor resolve the connection) for a side-effecting action during a dry-run', async () => {
+        const action = new FakeConnectorAction();
+        const ctx = makeContext({ isDryRun: true });
+        const runSpy = jest.spyOn(action, 'runImpl');
+
+        const output = await action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx);
+
+        expect(runSpy).not.toHaveBeenCalled();
+        expect(ctx.getConnection).not.toHaveBeenCalled();
+        expect(output.metadata).toMatchObject({ dryRun: true, skipped: true });
+        expect(output.data).toMatchObject({ dryRun: true, skipped: true });
+      });
+
+      it('skips a side-effecting action on dry-run even when no connectionId is configured', async () => {
+        const action = new FakeConnectorAction();
+        const ctx = makeContext({ isDryRun: true });
+
+        const output = await action.execute({ data: {}, params: {} }, ctx);
+
+        expect(output.metadata).toMatchObject({ dryRun: true, skipped: true });
+      });
+
+      it('DOES execute a read-only action during a dry-run (reads have no side effect)', async () => {
+        const action = new FakeReadOnlyConnectorAction();
+        const ctx = makeContext({ isDryRun: true });
+        action.runImpl = async () => ({ data: { rows: [1, 2, 3] } });
+
+        const output = await action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx);
+
+        expect(ctx.getConnection).toHaveBeenCalledWith('conn-1');
+        expect(output).toEqual({ data: { rows: [1, 2, 3] } });
+      });
+
+      it('runs a side-effecting action normally when NOT a dry-run', async () => {
+        const action = new FakeConnectorAction();
+        const ctx = makeContext({ isDryRun: false });
+        action.runImpl = async () => ({ data: { sent: true } });
+
+        const output = await action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx);
+
+        expect(output).toEqual({ data: { sent: true } });
+      });
     });
 
     it('preserves original error as `cause` on the wrapped ConnectionAuthError', async () => {

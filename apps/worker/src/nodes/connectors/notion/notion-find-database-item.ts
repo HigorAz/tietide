@@ -21,6 +21,8 @@ export class NotionFindDatabaseItemAction extends BaseConnectorAction<NotionOAut
   readonly name = 'Notion: Find Database Item';
   readonly description = 'Query a Notion database and return the first matching item';
   readonly requiredConnectionType = 'notion';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: NotionClientFactory) {
     super();

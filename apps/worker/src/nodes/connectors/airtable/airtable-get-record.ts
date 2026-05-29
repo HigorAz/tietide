@@ -23,6 +23,8 @@ export class AirtableGetRecordAction extends BaseConnectorAction<AirtableApiKeyC
   readonly name = 'Airtable: Get Record';
   readonly description = 'Fetch a single Airtable record by ID';
   readonly requiredConnectionType = 'airtable';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: AirtableClientFactory) {
     super();

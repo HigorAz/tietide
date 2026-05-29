@@ -37,6 +37,8 @@ export class LinearSearchIssuesAction extends BaseConnectorAction<LinearApiKeyCo
   readonly name = 'Linear: Search Issues';
   readonly description = 'Search Linear issues by title text';
   readonly requiredConnectionType = 'linear';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: LinearClientFactory) {
     super();

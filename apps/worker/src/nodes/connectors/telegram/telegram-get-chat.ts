@@ -30,6 +30,8 @@ export class TelegramGetChatAction extends BaseConnectorAction<TelegramBotTokenC
   readonly name = 'Telegram: Get Chat';
   readonly description = 'Fetch metadata about a Telegram chat (getChat)';
   readonly requiredConnectionType = 'telegram';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: TelegramClientFactory) {
     super();

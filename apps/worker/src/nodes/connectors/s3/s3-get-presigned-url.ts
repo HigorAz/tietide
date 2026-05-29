@@ -17,6 +17,8 @@ export class S3GetPresignedUrlAction extends BaseConnectorAction<S3CustomConfig>
   readonly name = 'S3: Get Presigned URL';
   readonly description = 'Generate a time-limited signed GET or PUT URL for an S3 object';
   readonly requiredConnectionType = 's3';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: S3ClientFactory) {
     super();

@@ -59,6 +59,8 @@ export class SlackFindUserAction extends BaseConnectorAction<SlackOAuth2Config> 
   readonly name = 'Slack: Find User';
   readonly description = 'Find a Slack user by email or by name';
   readonly requiredConnectionType = 'slack';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: SlackClientFactory) {
     super();

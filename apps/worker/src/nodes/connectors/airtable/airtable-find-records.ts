@@ -21,6 +21,8 @@ export class AirtableFindRecordsAction extends BaseConnectorAction<AirtableApiKe
   readonly name = 'Airtable: Find Records';
   readonly description = 'Find Airtable records matching a filterByFormula expression';
   readonly requiredConnectionType = 'airtable';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: AirtableClientFactory) {
     super();

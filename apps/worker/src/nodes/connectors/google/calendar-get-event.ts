@@ -28,6 +28,8 @@ export class CalendarGetEventAction extends BaseConnectorAction<GoogleOAuth2Conf
   readonly name = 'Calendar: Get Event';
   readonly description = 'Fetch a single Google Calendar event by ID';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

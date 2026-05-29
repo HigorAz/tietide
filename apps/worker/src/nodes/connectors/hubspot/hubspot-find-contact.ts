@@ -22,6 +22,8 @@ export class HubspotFindContactAction extends BaseConnectorAction<HubspotOAuth2C
   readonly name = 'HubSpot: Find Contact';
   readonly description = 'Find a HubSpot contact by email address (search API)';
   readonly requiredConnectionType = 'hubspot';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: HubspotClientFactory) {
     super();

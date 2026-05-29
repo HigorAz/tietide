@@ -26,6 +26,8 @@ export class GitHubGetIssueAction extends BaseConnectorAction<GitHubOAuth2Config
   readonly name = 'GitHub: Get Issue';
   readonly description = 'Fetch a GitHub issue by number';
   readonly requiredConnectionType = 'github';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: GitHubClientFactory) {
     super();

@@ -19,7 +19,7 @@
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
-| 1    | Confirmed critical / high       | 8     | 0    |
+| 1    | Confirmed critical / high       | 8     | 1    |
 | 2    | Medium security                 | 10    | 0    |
 | 3    | Scaling & remaining correctness | 17    | 0    |
 | 4    | Frontend QA / low               | 5     | 0    |
@@ -36,7 +36,7 @@
 
 ## Wave 1 — Confirmed CRITICAL / HIGH
 
-- [ ] **W1.1** (CRITICAL / qa) Dry-run executes real side effects — central dry-run guard in
+- [x] **W1.1** (CRITICAL / qa) Dry-run executes real side effects — central dry-run guard in
       `BaseConnectorAction.execute`; read-only actions opt in via flag; `mockOnDryRun` stays an override.
       Files: `packages/sdk/src/base/connector-action.ts`, connector actions, connector schemas.
 - [ ] **W1.2** (HIGH / qa) 3 poll triggers not in NodeRegistry (sheets-row-added, gmail-label-added,

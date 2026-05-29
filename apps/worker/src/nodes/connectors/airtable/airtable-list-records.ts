@@ -22,6 +22,8 @@ export class AirtableListRecordsAction extends BaseConnectorAction<AirtableApiKe
   readonly name = 'Airtable: List Records';
   readonly description = 'List records from an Airtable table with optional filterByFormula';
   readonly requiredConnectionType = 'airtable';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: AirtableClientFactory) {
     super();

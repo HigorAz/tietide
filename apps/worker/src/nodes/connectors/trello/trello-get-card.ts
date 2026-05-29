@@ -29,6 +29,8 @@ export class TrelloGetCardAction extends BaseConnectorAction<TrelloApiKeyConfig>
   readonly name = 'Trello: Get Card';
   readonly description = 'Fetch a Trello card by ID';
   readonly requiredConnectionType = 'trello';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: TrelloClientFactory) {
     super();

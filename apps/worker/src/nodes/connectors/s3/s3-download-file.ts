@@ -17,6 +17,8 @@ export class S3DownloadFileAction extends BaseConnectorAction<S3CustomConfig> {
   readonly name = 'S3: Download File';
   readonly description = 'Download an object from S3 / R2 / MinIO (returns base64 content)';
   readonly requiredConnectionType = 's3';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: S3ClientFactory) {
     super();

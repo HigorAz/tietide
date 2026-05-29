@@ -349,6 +349,19 @@ describe('HttpRequestAction', () => {
       expect(result.data).not.toHaveProperty('mocked');
     });
 
+    it('should NEVER call fetch for a mutating method on dry-run, even without mockOnDryRun (safe-by-default)', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock);
+
+      const result = await action.execute(
+        makeInput({ method: 'POST', url: 'https://api.test/charge', body: { amount: 100 } }),
+        makeContext({ isDryRun: true }),
+      );
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.data).toMatchObject({ mocked: true, dryRun: true, skipped: true });
+    });
+
     it('should call fetch normally when mockOnDryRun is set but isDryRun is false (regular run)', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
       const action = new HttpRequestAction(fetchMock);

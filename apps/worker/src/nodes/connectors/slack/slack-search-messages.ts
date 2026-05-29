@@ -32,6 +32,8 @@ export class SlackSearchMessagesAction extends BaseConnectorAction<SlackOAuth2Co
   readonly name = 'Slack: Search Messages';
   readonly description = 'Search Slack messages (requires a user token with search:read)';
   readonly requiredConnectionType = 'slack';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: SlackClientFactory) {
     super();

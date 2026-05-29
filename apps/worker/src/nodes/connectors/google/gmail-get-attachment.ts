@@ -22,6 +22,8 @@ export class GmailGetAttachmentAction extends BaseConnectorAction<GoogleOAuth2Co
   readonly name = 'Gmail: Get Attachment';
   readonly description = 'Download a Gmail attachment by message ID and attachment ID (base64)';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

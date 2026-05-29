@@ -35,10 +35,17 @@ export class HttpRequestAction implements INodeExecutor {
     const headers = this.buildHeaders(params, hasBody);
     const body = hasBody ? this.serializeBody(params.body) : undefined;
 
-    if (context.isDryRun && params.mockOnDryRun) {
+    // Safe-by-default dry-run guard: never perform a *mutating* HTTP request
+    // (POST/PUT/PATCH/DELETE/...) during a test run. Read-only methods (GET/HEAD)
+    // still execute so downstream nodes get real data — unless the user
+    // explicitly opts into a mock via mockOnDryRun.
+    const isReadOnly = params.method === 'GET' || params.method === 'HEAD';
+    if (context.isDryRun && (!isReadOnly || params.mockOnDryRun)) {
       return {
         data: {
           mocked: true,
+          dryRun: true,
+          skipped: true,
           wouldHaveSent: {
             method: params.method,
             url: params.url,
@@ -46,7 +53,7 @@ export class HttpRequestAction implements INodeExecutor {
             body: hasBody ? params.body : undefined,
           },
         },
-        metadata: { mocked: true },
+        metadata: { mocked: true, dryRun: true, skipped: true },
       };
     }
 

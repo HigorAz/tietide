@@ -187,7 +187,7 @@ describe('OutlookUpdateMessageAction', () => {
       );
       expect(graphFetch).not.toHaveBeenCalled();
       expect(result.data.mocked).toBe(true);
-      expect(result.data.wouldHaveApplied).toEqual({ flag: 'flagged' });
+      expect(result.data).toMatchObject({ dryRun: true, skipped: true });
     });
   });
 });

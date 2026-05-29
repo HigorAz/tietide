@@ -23,6 +23,8 @@ export class StripeListChargesAction extends BaseConnectorAction<StripeApiKeyCon
   readonly name = 'Stripe: List Charges';
   readonly description = 'List recent Stripe charges, optionally filtered by customer';
   readonly requiredConnectionType = 'stripe';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: StripeClientFactory) {
     super();

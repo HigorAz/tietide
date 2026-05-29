@@ -24,6 +24,8 @@ export class GitHubListIssuesAction extends BaseConnectorAction<GitHubOAuth2Conf
   readonly name = 'GitHub: List Issues';
   readonly description = 'List issues in a GitHub repository (excludes pull requests)';
   readonly requiredConnectionType = 'github';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: GitHubClientFactory) {
     super();

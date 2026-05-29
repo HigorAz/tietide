@@ -19,6 +19,8 @@ export class GitHubListPrsAction extends BaseConnectorAction<GitHubOAuth2Config>
   readonly name = 'GitHub: List Pull Requests';
   readonly description = 'List pull requests in a GitHub repository';
   readonly requiredConnectionType = 'github';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: GitHubClientFactory) {
     super();

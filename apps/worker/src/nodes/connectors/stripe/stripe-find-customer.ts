@@ -22,6 +22,8 @@ export class StripeFindCustomerAction extends BaseConnectorAction<StripeApiKeyCo
   readonly name = 'Stripe: Find Customer';
   readonly description = 'Find a Stripe customer by email address (search API)';
   readonly requiredConnectionType = 'stripe';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: StripeClientFactory) {
     super();
