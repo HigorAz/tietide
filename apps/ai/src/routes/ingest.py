@@ -7,6 +7,7 @@ from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from src.auth import require_internal_token
 from src.config import settings
 from src.services.embeddings import SentenceTransformerEmbedder
 from src.services.ingestion import IngestionService
@@ -14,7 +15,7 @@ from src.services.vector_store import ChromaVectorStore
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_internal_token)])
 
 
 @lru_cache(maxsize=1)

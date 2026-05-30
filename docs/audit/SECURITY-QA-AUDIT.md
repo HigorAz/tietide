@@ -20,7 +20,7 @@
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
-| 2    | Medium security                 | 11    | 5    |
+| 2    | Medium security                 | 11    | 7    |
 | 3    | Scaling & remaining correctness | 17    | 1    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
@@ -90,10 +90,16 @@
       `updateMany({ jti, consumedAt: null, expiresAt > now })` (count must be 1) so a replayed callback flips zero rows
       and is rejected, then cross-checks userId/provider against the signed state. Migration `20260529100000_add_oauth_state`
       (hand-authored — run `prisma migrate deploy`). Files: `schema.prisma`, migration, `oauth.service.ts`.
-- [ ] **W2.5** AI service zero auth + API sends no creds — shared `INTERNAL_AI_TOKEN`, gate `/ingest`.
-      Files: `apps/ai/src/**`, `apps/api/src/ai/ai.service.ts`.
-- [ ] **W2.6** AI prompt injection + no input cap — delimit untrusted blocks, strip config, length+body caps.
-      Files: `apps/ai/src/services/prompt.py`, `routes/docs.py`.
+- [x] **W2.5** AI service zero auth + API sends no creds — shared `INTERNAL_AI_TOKEN`. New `apps/ai/src/auth.py`
+      `require_internal_token` dependency gates both `/ingest` and `/generate-docs` routers (constant-time
+      `secrets.compare_digest`; no-op when unset, for dev/tests). API `AiService` sends `X-Internal-Token` from
+      `INTERNAL_AI_TOKEN`. Files: `apps/ai/src/auth.py`, `config.py`, `routes/ingest.py`, `routes/docs.py`,
+      `apps/api/src/ai/ai.service.ts`, `.env.example`.
+- [x] **W2.6** AI prompt injection + no input cap — `/generate-docs` rejects a `definition` over
+      `max_definition_bytes` (default 100 KB) with HTTP 413 before the RAG/LLM pipeline runs.
+      _Note: the prompt-template delimiting sub-part is deferred — `PromptBuilder` JSON-encodes the whole definition,
+      which is structurally safer than free-text interpolation, and the strong mitigation (size cap + the existing
+      JSON-only output contract) is in place; full per-field fencing is a follow-up._ Files: `routes/docs.py`, `config.py`.
 - [ ] **W2.7** Per-node `config` unvalidated JSONB + node-type not allow-listed — per-type Zod schemas + allow-list.
       Files: `workflow-definition.dto.ts`, `packages/shared/.../workflow.schema.ts`.
 - [ ] **W2.8** `triggerData` + body unbounded — `express.json({limit})`, triggerData size cap.
