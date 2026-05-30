@@ -118,6 +118,24 @@ describe('AuthController (integration)', () => {
       expect(authService.register).not.toHaveBeenCalled();
     });
 
+    it('should return 400 when password has no digit (weak)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...validBody, password: 'onlyletters' })
+        .expect(400);
+
+      expect(authService.register).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when password is all digits (weak)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ ...validBody, password: '12345678' })
+        .expect(400);
+
+      expect(authService.register).not.toHaveBeenCalled();
+    });
+
     it('should return 400 when name is empty', async () => {
       await request(app.getHttpServer())
         .post('/auth/register')

@@ -20,7 +20,7 @@
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
-| 2    | Medium security                 | 11    | 7    |
+| 2    | Medium security                 | 11    | 8    |
 | 3    | Scaling & remaining correctness | 17    | 1    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
@@ -111,7 +111,9 @@
       `validateEnv` that refuses to boot in production when JWT_SECRET/WEBHOOK_HMAC_SECRET/ENCRYPTION_MASTER_KEY
       are missing, too short (<32), or still the `.env.example` placeholders. No-op outside production.
       Files: `app.module.ts`, `common/security/env.validation.ts`.
-- [ ] **W2.11** Weak password policy — strength + breach check. File: `register.dto.ts`.
+- [x] **W2.11** Weak password policy — `RegisterDto.password` now requires at least one letter and one digit
+      (`@Matches`), rejecting all-numeric/all-alphabetic passwords (still `MinLength(8)`/`MaxLength(72)`).
+      _Note: HIBP breach-list check deferred — needs an external k-anonymity lookup._ File: `register.dto.ts`.
 
 ## Wave 3 — Scaling & remaining correctness
 
