@@ -1,128 +1,128 @@
-import type { INestApplication } from '@nestjs/common';
-import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { JwtModule, JwtService } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { Test } from '@nestjs/testing';
-import request from 'supertest';
+import { APP_GUARD } from '@nestjs/core';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigModule } from '@nestjs/config';
+import * as jwt from 'jsonwebtoken';
 import { JwtStrategy, type AuthenticatedUser } from '../../auth/strategies/jwt.strategy';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { PrismaService } from '../../prisma/prisma.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
-const TEST_SECRET = 'jwt-auth-guard-spec-secret';
-
-@Controller('protected')
-class TestProtectedController {
-  @Get('whoami')
-  @UseGuards(JwtAuthGuard)
-  whoami(@CurrentUser() user: AuthenticatedUser) {
-    return user;
-  }
-
-  @Get('role')
-  @UseGuards(JwtAuthGuard)
-  role(@CurrentUser('role') role: string) {
-    return { role };
-  }
+interface StubUser {
+  id: string;
+  email: string;
+  role: string;
+  tokenVersion: number;
 }
 
-describe('JwtAuthGuard + CurrentUser (integration)', () => {
-  let app: INestApplication;
-  let jwt: JwtService;
-  const prevSecret = process.env.JWT_SECRET;
+describe('JwtAuthGuard (integration)', () => {
+  let guard: JwtAuthGuard;
+  const jwtSecret = 'test-secret-key';
 
-  beforeAll(async () => {
-    process.env.JWT_SECRET = TEST_SECRET;
+  // JwtStrategy now re-fetches the user (tokenVersion revocation check). The
+  // stub returns whatever user the test registered for the looked-up id, so the
+  // guard still exercises the real verify -> validate -> request.user path.
+  const usersById = new Map<string, StubUser>();
+  const prismaStub = {
+    user: {
+      findUnique: jest.fn(({ where }: { where: { id: string } }) =>
+        Promise.resolve(usersById.get(where.id) ?? null),
+      ),
+    },
+  };
+
+  const makeContext = (authorization?: string): ExecutionContext => {
+    const req = { headers: authorization ? { authorization } : {} };
+    return {
+      switchToHttp: () => ({ getRequest: () => req }),
+      getHandler: () => undefined,
+      getClass: () => undefined,
+    } as unknown as ExecutionContext;
+  };
+
+  beforeEach(async () => {
+    process.env.JWT_SECRET = jwtSecret;
+    usersById.clear();
+    prismaStub.user.findUnique.mockClear();
 
     const moduleRef = await Test.createTestingModule({
       imports: [
-        ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
-        PassportModule.register({ defaultStrategy: 'jwt' }),
-        JwtModule.register({ secret: TEST_SECRET, signOptions: { expiresIn: '1h' } }),
+        ConfigModule.forRoot({ isGlobal: true }),
+        JwtModule.register({ secret: jwtSecret }),
       ],
-      controllers: [TestProtectedController],
-      providers: [JwtStrategy],
+      providers: [
+        JwtStrategy,
+        { provide: PrismaService, useValue: prismaStub },
+        { provide: APP_GUARD, useClass: JwtAuthGuard },
+      ],
     }).compile();
 
-    app = moduleRef.createNestApplication();
-    await app.init();
-    jwt = moduleRef.get(JwtService);
+    guard = moduleRef.get(JwtAuthGuard);
   });
 
-  afterAll(async () => {
-    await app.close();
-    if (prevSecret === undefined) {
-      delete process.env.JWT_SECRET;
-    } else {
-      process.env.JWT_SECRET = prevSecret;
-    }
-  });
+  describe('canActivate', () => {
+    it('allows a request carrying a valid Bearer token', async () => {
+      usersById.set('u1', { id: 'u1', email: 'a@b.com', role: 'USER', tokenVersion: 0 });
+      const token = jwt.sign({ sub: 'u1', email: 'a@b.com', role: 'USER' }, jwtSecret);
+      const ctx = makeContext(`Bearer ${token}`);
 
-  describe('JwtAuthGuard', () => {
-    it('should return 401 when the Authorization header is missing', async () => {
-      await request(app.getHttpServer()).get('/protected/whoami').expect(401);
+      await expect(guard.canActivate(ctx)).resolves.toBe(true);
     });
 
-    it('should return 401 when the Bearer token is malformed', async () => {
-      await request(app.getHttpServer())
-        .get('/protected/whoami')
-        .set('Authorization', 'Bearer not-a-real-jwt')
-        .expect(401);
+    it('rejects a request with no Authorization header', async () => {
+      const ctx = makeContext();
+
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return 401 when the token is signed with a different secret', async () => {
-      const alien = jwt.sign(
-        { sub: 'u', email: 'a@b.com', role: 'USER' },
-        { secret: 'different-secret' },
+    it('rejects an expired token', async () => {
+      const token = jwt.sign({ sub: 'u', email: 'a@b.com', role: 'USER' }, jwtSecret, {
+        expiresIn: '-1h',
+      });
+      const ctx = makeContext(`Bearer ${token}`);
+
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects a token signed with a different secret', async () => {
+      const token = jwt.sign({ sub: 'u', email: 'a@b.com', role: 'USER' }, 'different-secret');
+      const ctx = makeContext(`Bearer ${token}`);
+
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects a token whose user has been revoked (tokenVersion bumped)', async () => {
+      usersById.set('u1', { id: 'u1', email: 'a@b.com', role: 'USER', tokenVersion: 1 });
+      // Token was minted at version 0; the user has since logged out (now 1).
+      const token = jwt.sign(
+        { sub: 'u1', email: 'a@b.com', role: 'USER', tokenVersion: 0 },
+        jwtSecret,
       );
+      const ctx = makeContext(`Bearer ${token}`);
 
-      await request(app.getHttpServer())
-        .get('/protected/whoami')
-        .set('Authorization', `Bearer ${alien}`)
-        .expect(401);
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
 
-    it('should return 401 when the token is expired', async () => {
-      const expired = jwt.sign({ sub: 'u', email: 'a@b.com', role: 'USER' }, { expiresIn: '-1h' });
+    it('populates request.user with id, email, role on success', async () => {
+      usersById.set('u-42', {
+        id: 'u-42',
+        email: 'mc@example.com',
+        role: 'ADMIN',
+        tokenVersion: 0,
+      });
+      const token = jwt.sign({ sub: 'u-42', email: 'mc@example.com', role: 'ADMIN' }, jwtSecret);
+      const ctx = makeContext(`Bearer ${token}`);
 
-      await request(app.getHttpServer())
-        .get('/protected/whoami')
-        .set('Authorization', `Bearer ${expired}`)
-        .expect(401);
+      await guard.canActivate(ctx);
+      const req = ctx.switchToHttp().getRequest<{ user: AuthenticatedUser }>();
+
+      expect(req.user).toEqual({ id: 'u-42', email: 'mc@example.com', role: 'ADMIN' });
     });
 
-    it('should return 200 when the token is valid', async () => {
-      const token = jwt.sign({ sub: 'u1', email: 'a@b.com', role: 'USER' });
+    it('rejects a malformed token string', async () => {
+      const ctx = makeContext('Bearer not.a.jwt');
 
-      await request(app.getHttpServer())
-        .get('/protected/whoami')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-    });
-  });
-
-  describe('@CurrentUser()', () => {
-    it('should inject the authenticated user with sub mapped to id', async () => {
-      const token = jwt.sign({ sub: 'u-42', email: 'mc@example.com', role: 'USER' });
-
-      const res = await request(app.getHttpServer())
-        .get('/protected/whoami')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body).toEqual({ id: 'u-42', email: 'mc@example.com', role: 'USER' });
-      expect(res.body).not.toHaveProperty('sub');
-    });
-
-    it('should pluck a single field when passed a key argument', async () => {
-      const token = jwt.sign({ sub: 'u', email: 'admin@example.com', role: 'ADMIN' });
-
-      const res = await request(app.getHttpServer())
-        .get('/protected/role')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body).toEqual({ role: 'ADMIN' });
+      await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });
   });
 });

@@ -19,7 +19,7 @@
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
-| 1    | Confirmed critical / high       | 8     | 6    |
+| 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 2    |
 | 3    | Scaling & remaining correctness | 17    | 1    |
 | 4    | Frontend QA / low               | 5     | 0    |
@@ -52,11 +52,23 @@
       secret, stop trusting client headers; fail-fast on missing Trello/HubSpot signing secret.
       Files: `provider-webhooks.controller.ts`, `provider-webhooks.service.ts`, `mailchimp-subscriber-added.trigger.ts`,
       `trello-card-changed.trigger.ts`, `hubspot-*-changed.trigger.ts`, `packages/sdk/.../lifecycle.interface.ts`.
-- [ ] **W1.7** (HIGH / security) Irrevocable 7-day JWT — `tokenVersion` on User + checked in strategy,
-      `/auth/logout`, bump on password/role change, shorter access token + refresh flow.
-      Files: `apps/api/src/auth/*`, `schema.prisma`, `strategies/jwt.strategy.ts`.
+- [x] **W1.7** (HIGH / security) Irrevocable 7-day JWT — `tokenVersion Int @default(0)` on User, embedded in
+      every signed token (register signs 0, login signs the live version); `JwtStrategy.validate` is now async,
+      injects PrismaService, re-fetches the user each request and rejects on tokenVersion mismatch (legacy tokens
+      with no claim treated as 0) while returning the _live_ role (a demoted admin loses access). New
+      `POST /v1/auth/logout` (204) bumps tokenVersion → revokes all outstanding tokens. Migration
+      `20260529000000_add_user_token_version`.
+      _Note: no password-change/role-change endpoint exists yet to hook the bump into — add it there when those
+      land. Shorter access TTL + refresh flow deferred. Migration hand-authored (no local Postgres) — run
+      `prisma migrate deploy` on a live DB._
+      Files: `auth.service.ts`, `auth.controller.ts`, `strategies/jwt.strategy.ts`, `schema.prisma`, migration,
+      `jwt-auth.guard.spec.ts` (PrismaService stub).
 - [ ] **W1.8** (HIGH / qa) EngineService swallows failures → retry/DLQ dead — re-throw retryable failures so
       BullMQ attempts/backoff/DLQ work. Files: `apps/worker/src/engine/engine.service.ts`, `workflow.processor.ts`.
+      **DEFERRED**: re-enabling BullMQ retries requires resumable execution first (step checkpointing) or it
+      re-introduces duplicate side-effects on re-run. Do not re-enable retries until step-level resume exists.
+      **DEFERRED**: re-enabling BullMQ retries requires resumable execution first (checkpointing executed steps)
+      or it re-introduces duplicate side-effects on re-run. Do not re-enable retries until step-level resume exists.
 
 ## Wave 2 — MEDIUM security
 

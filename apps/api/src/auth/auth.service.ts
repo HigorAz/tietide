@@ -49,11 +49,14 @@ export class AuthService {
         },
       });
       // Auto-login: issue an access token so the SPA can land the user straight
-      // in the app instead of bouncing them to the login screen.
+      // in the app instead of bouncing them to the login screen. A freshly
+      // created user is always at tokenVersion 0 (the column default), so we
+      // embed 0 without re-selecting it (keeps it out of the response body).
       const accessToken = this.jwt.sign({
         sub: user.id,
         email: user.email,
         role: user.role,
+        tokenVersion: 0,
       });
       return { ...user, accessToken, tokenType: 'Bearer' };
     } catch (err) {
@@ -67,7 +70,7 @@ export class AuthService {
   async login(dto: LoginDto): Promise<LoginResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      select: { id: true, email: true, password: true, role: true },
+      select: { id: true, email: true, password: true, role: true, tokenVersion: true },
     });
 
     // Always run a bcrypt comparison — against a dummy hash when the user is
@@ -82,8 +85,23 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
     return { accessToken, tokenType: 'Bearer' };
+  }
+
+  /**
+   * Revoke every outstanding token for a user by bumping their tokenVersion.
+   * The JWT strategy compares the version embedded in each token against the
+   * user's current version on every request, so all previously-issued tokens
+   * stop validating immediately.
+   */
+  async logout(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+      select: { id: true },
+    });
   }
 
   async getProfile(userId: string): Promise<UserResponseDto> {

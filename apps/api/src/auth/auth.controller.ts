@@ -3,6 +3,7 @@ import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -70,5 +71,16 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
   async me(@CurrentUser() user: AuthenticatedUser): Promise<UserResponseDto> {
     return this.authService.getProfile(user.id);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Log out — revokes every outstanding token for this user' })
+  @ApiNoContentResponse({ description: 'Tokens revoked' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
+  async logout(@CurrentUser() user: AuthenticatedUser): Promise<void> {
+    await this.authService.logout(user.id);
   }
 }

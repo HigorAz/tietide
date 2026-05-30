@@ -9,11 +9,21 @@ import { AuthService } from './auth.service';
 
 describe('AuthController (integration)', () => {
   let app: INestApplication;
-  let authService: { register: jest.Mock; login: jest.Mock; getProfile: jest.Mock };
+  let authService: {
+    register: jest.Mock;
+    login: jest.Mock;
+    getProfile: jest.Mock;
+    logout: jest.Mock;
+  };
   let authedUser: { id: string; email: string; role: string } | null;
 
   beforeEach(async () => {
-    authService = { register: jest.fn(), login: jest.fn(), getProfile: jest.fn() };
+    authService = {
+      register: jest.fn(),
+      login: jest.fn(),
+      getProfile: jest.fn(),
+      logout: jest.fn(),
+    };
     authedUser = { id: 'uuid-1', email: 'test@example.com', role: 'USER' };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -267,6 +277,23 @@ describe('AuthController (integration)', () => {
       await request(app.getHttpServer()).get('/auth/me').expect(200);
 
       expect(authService.getProfile).toHaveBeenCalledWith('different-id');
+    });
+  });
+
+  describe('POST /auth/logout', () => {
+    it('should return 204 and revoke tokens for the authenticated user', async () => {
+      authService.logout.mockResolvedValue(undefined);
+
+      await request(app.getHttpServer()).post('/auth/logout').expect(204);
+
+      expect(authService.logout).toHaveBeenCalledWith('uuid-1');
+    });
+
+    it('should return 401 when unauthenticated', async () => {
+      authedUser = null;
+
+      await request(app.getHttpServer()).post('/auth/logout').expect(401);
+      expect(authService.logout).not.toHaveBeenCalled();
     });
   });
 });

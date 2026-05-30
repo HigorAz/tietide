@@ -14,6 +14,7 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.Mock;
       create: jest.Mock;
+      update: jest.Mock;
     };
   };
   let jwt: { sign: jest.Mock };
@@ -24,6 +25,7 @@ describe('AuthService', () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     };
     jwt = { sign: jest.fn() };
@@ -106,6 +108,8 @@ describe('AuthService', () => {
         sub: createdUser.id,
         email: createdUser.email,
         role: createdUser.role,
+        // A freshly-created user is always at tokenVersion 0.
+        tokenVersion: 0,
       });
     });
 
@@ -145,6 +149,7 @@ describe('AuthService', () => {
       email: validDto.email,
       password: 'hashed_password',
       role: 'USER' as const,
+      tokenVersion: 2,
     };
 
     it('should return an accessToken when credentials are valid', async () => {
@@ -168,6 +173,8 @@ describe('AuthService', () => {
         sub: storedUser.id,
         email: storedUser.email,
         role: storedUser.role,
+        // The user's current tokenVersion is embedded so the token can be revoked.
+        tokenVersion: storedUser.tokenVersion,
       });
     });
 
@@ -254,6 +261,20 @@ describe('AuthService', () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
       await expect(service.getProfile(userId)).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('logout', () => {
+    it('increments the user tokenVersion to revoke every outstanding token', async () => {
+      prisma.user.update.mockResolvedValue({ id: 'uuid-1' });
+
+      await service.logout('uuid-1');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'uuid-1' },
+        data: { tokenVersion: { increment: 1 } },
+        select: { id: true },
+      });
     });
   });
 });
