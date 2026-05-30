@@ -20,7 +20,7 @@
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
-| 2    | Medium security                 | 11    | 8    |
+| 2    | Medium security                 | 11    | 9    |
 | 3    | Scaling & remaining correctness | 17    | 1    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
@@ -102,8 +102,10 @@
       JSON-only output contract) is in place; full per-field fencing is a follow-up._ Files: `routes/docs.py`, `config.py`.
 - [ ] **W2.7** Per-node `config` unvalidated JSONB + node-type not allow-listed — per-type Zod schemas + allow-list.
       Files: `workflow-definition.dto.ts`, `packages/shared/.../workflow.schema.ts`.
-- [ ] **W2.8** `triggerData` + body unbounded — `express.json({limit})`, triggerData size cap.
-      Files: `trigger-execution.dto.ts`, `webhooks.service.ts`, `main.ts`.
+- [x] **W2.8** `triggerData` + body unbounded — `main.ts` caps the request body via
+      `app.useBodyParser('json'/'urlencoded', { limit: BODY_LIMIT ?? '1mb' })` (rawBody preserved for webhook HMAC);
+      `TriggerExecutionDto.triggerData` gets a pure, unit-tested `@MaxSerializedBytes()` validator (default 64 KiB).
+      Files: `main.ts`, `trigger-execution.dto.ts`, `common/validators/max-serialized-bytes.validator.ts`.
 - [x] **W2.9** Helmet/CSP/HSTS/CORS/Swagger hardening — env-aware helmet (strict CSP + 1y HSTS in prod),
       CORS mandatory-in-prod (throws on missing `CORS_ORIGIN`), Swagger gated behind `SWAGGER_ENABLED`.
       Extracted into pure `common/security/security.config.ts` (unit-tested). Files: `main.ts`, `security.config.ts`.

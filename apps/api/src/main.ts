@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
@@ -14,7 +15,17 @@ import {
 } from './common/security/security.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { rawBody: true, bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+    bufferLogs: true,
+  });
+
+  // Cap the request body so a single request cannot exhaust memory. Re-registers
+  // the JSON/urlencoded parsers with a limit; rawBody capture (for webhook HMAC)
+  // is preserved by the rawBody:true option above.
+  const bodyLimit = process.env.BODY_LIMIT ?? '1mb';
+  app.useBodyParser('json', { limit: bodyLimit });
+  app.useBodyParser('urlencoded', { limit: bodyLimit, extended: true });
 
   // Replace default logger with Pino — structured JSON logs
   app.useLogger(app.get(Logger));
