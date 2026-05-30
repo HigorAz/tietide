@@ -47,6 +47,10 @@ export class GithubOAuthProvider extends BaseOAuthProvider implements OAuthProvi
       scope: args.scopes.join(' '),
       state: args.state,
     });
+    if (args.codeChallenge) {
+      params.set('code_challenge', args.codeChallenge);
+      params.set('code_challenge_method', 'S256');
+    }
     return `${this.authorizeUrl()}?${params.toString()}`;
   }
 
@@ -59,6 +63,7 @@ export class GithubOAuthProvider extends BaseOAuthProvider implements OAuthProvi
       redirect_uri: args.redirectUri,
       client_id: this.env('GITHUB_OAUTH_CLIENT_ID'),
       client_secret: this.env('GITHUB_OAUTH_CLIENT_SECRET'),
+      ...(args.codeVerifier ? { code_verifier: args.codeVerifier } : {}),
     })) as GithubTokenResponse;
 
     const accessToken = raw.access_token;

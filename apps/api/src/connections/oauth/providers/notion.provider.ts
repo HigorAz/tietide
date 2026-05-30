@@ -44,6 +44,10 @@ export class NotionOAuthProvider extends BaseOAuthProvider implements OAuthProvi
       redirect_uri: args.redirectUri,
       state: args.state,
     });
+    if (args.codeChallenge) {
+      params.set('code_challenge', args.codeChallenge);
+      params.set('code_challenge_method', 'S256');
+    }
     return `${AUTHORIZE_URL}?${params.toString()}`;
   }
 
@@ -58,6 +62,7 @@ export class NotionOAuthProvider extends BaseOAuthProvider implements OAuthProvi
         grant_type: 'authorization_code',
         code: args.code,
         redirect_uri: args.redirectUri,
+        ...(args.codeVerifier ? { code_verifier: args.codeVerifier } : {}),
       },
       { Authorization: `Basic ${basic}` },
     )) as NotionTokenResponse;

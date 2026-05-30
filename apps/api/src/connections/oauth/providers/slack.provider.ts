@@ -87,6 +87,10 @@ export class SlackOAuthProvider extends BaseOAuthProvider implements OAuthProvid
     if (userScopes.length > 0) {
       params.set('user_scope', userScopes.join(','));
     }
+    if (args.codeChallenge) {
+      params.set('code_challenge', args.codeChallenge);
+      params.set('code_challenge_method', 'S256');
+    }
     return `${AUTHORIZE_URL}?${params.toString()}`;
   }
 
@@ -97,6 +101,7 @@ export class SlackOAuthProvider extends BaseOAuthProvider implements OAuthProvid
       redirect_uri: args.redirectUri,
       client_id: this.env('SLACK_OAUTH_CLIENT_ID'),
       client_secret: this.env('SLACK_OAUTH_CLIENT_SECRET'),
+      ...(args.codeVerifier ? { code_verifier: args.codeVerifier } : {}),
     })) as SlackTokenResponse;
 
     if (raw.ok === false) {

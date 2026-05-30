@@ -60,6 +60,10 @@ export class MicrosoftOAuthProvider extends BaseOAuthProvider implements OAuthPr
       scope: args.scopes.join(' '),
       state: args.state,
     });
+    if (args.codeChallenge) {
+      params.set('code_challenge', args.codeChallenge);
+      params.set('code_challenge_method', 'S256');
+    }
     return `${this.authorizeUrl()}?${params.toString()}`;
   }
 
@@ -70,6 +74,7 @@ export class MicrosoftOAuthProvider extends BaseOAuthProvider implements OAuthPr
       redirect_uri: args.redirectUri,
       client_id: this.env('MS_OAUTH_CLIENT_ID'),
       client_secret: this.env('MS_OAUTH_CLIENT_SECRET'),
+      ...(args.codeVerifier ? { code_verifier: args.codeVerifier } : {}),
     })) as MicrosoftTokenResponse;
 
     return this.toTokenResult(raw, null);

@@ -5,6 +5,7 @@ import { OAuthCallbackError, OAuthService, type OAuthCallbackInput } from './oau
 import type { OAuthProviderRegistry } from './oauth-provider.registry';
 import type { OAuthStateService, OAuthStatePayload } from './oauth-state.service';
 import type { ConnectionsService } from '../connections.service';
+import type { PrismaService } from '../../prisma/prisma.service';
 import type { OAuthProvider } from './providers/oauth-provider.interface';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
@@ -38,6 +39,8 @@ function makeService(opts: {
   stateSign?: jest.Mock;
   connectionsCreate?: jest.Mock;
   spaBaseUrl?: string;
+  stateUpdateMany?: jest.Mock;
+  stateFindUnique?: jest.Mock;
 }) {
   const provider = opts.provider ?? makeProvider();
   const registry = {
@@ -84,8 +87,23 @@ function makeService(opts: {
     getOrThrow: jest.fn(() => opts.spaBaseUrl ?? 'http://localhost:5173'),
   } as unknown as ConfigService;
 
-  const service = new OAuthService(registry, state, connections, config);
-  return { service, provider, registry, state, connections, config };
+  const prisma = {
+    oAuthState: {
+      create: jest.fn().mockResolvedValue({}),
+      updateMany: opts.stateUpdateMany ?? jest.fn().mockResolvedValue({ count: 1 }),
+      findUnique:
+        opts.stateFindUnique ??
+        jest.fn().mockResolvedValue({
+          jti: 'abc',
+          userId: USER_ID,
+          provider: provider.id,
+          codeVerifier: 'verifier-xyz',
+        }),
+    },
+  } as unknown as PrismaService;
+
+  const service = new OAuthService(registry, state, connections, config, prisma);
+  return { service, provider, registry, state, connections, config, prisma };
 }
 
 describe('OAuthService', () => {
@@ -110,11 +128,13 @@ describe('OAuthService', () => {
         label: 'My Gmail',
         nonce: expect.any(String),
       });
-      expect(buildSpy).toHaveBeenCalledWith({
-        state: 'signed.jwt.token',
-        scopes: ['openid', 'email'],
-        redirectUri: provider.redirectUri(),
-      });
+      expect(buildSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: 'signed.jwt.token',
+          scopes: ['openid', 'email'],
+          redirectUri: provider.redirectUri(),
+        }),
+      );
     });
 
     it('falls back to provider defaultScopes when scopes param is omitted', async () => {
@@ -166,6 +186,7 @@ describe('OAuthService', () => {
       expect(provider.exchangeCode).toHaveBeenCalledWith({
         code: 'auth-code',
         redirectUri: provider.redirectUri(),
+        codeVerifier: 'verifier-xyz',
       });
       expect(connections.create).toHaveBeenCalledWith(
         USER_ID,
@@ -188,6 +209,7 @@ describe('OAuthService', () => {
       expect(provider.exchangeCode).toHaveBeenCalledWith({
         code: 'auth-code',
         redirectUri: provider.redirectUri(),
+        codeVerifier: 'verifier-xyz',
       });
       expect(connections.create).toHaveBeenCalledWith(
         USER_ID,
