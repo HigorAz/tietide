@@ -20,7 +20,7 @@
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
-| 2    | Medium security                 | 11    | 2    |
+| 2    | Medium security                 | 11    | 3    |
 | 3    | Scaling & remaining correctness | 17    | 1    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
@@ -67,15 +67,19 @@
       BullMQ attempts/backoff/DLQ work. Files: `apps/worker/src/engine/engine.service.ts`, `workflow.processor.ts`.
       **DEFERRED**: re-enabling BullMQ retries requires resumable execution first (step checkpointing) or it
       re-introduces duplicate side-effects on re-run. Do not re-enable retries until step-level resume exists.
-      **DEFERRED**: re-enabling BullMQ retries requires resumable execution first (checkpointing executed steps)
-      or it re-introduces duplicate side-effects on re-run. Do not re-enable retries until step-level resume exists.
 
 ## Wave 2 — MEDIUM security
 
 - [~] **W2.1** User enumeration — login is now constant-time (dummy bcrypt on unknown email). Register 409 oracle remains (needs email-verification flow — deferred).
   File: `auth.service.ts`.
-- [ ] **W2.2** Auth throttler IP-only + no trust-proxy — IP+email tracker, per-account lockout, trust proxy.
-      Files: `throttler.config.ts`, `main.ts`.
+- [x] **W2.2** Auth throttler IP-only + no trust-proxy — env-driven `TRUST_PROXY` wired in `main.ts` (real client
+      IP behind the prod tunnel; never trust-all by default); custom `TieTideThrottlerGuard` (replaces the stock
+      global guard) buckets by proxy-aware client IP and, on credential routes, by `ip|email` so one IP can't
+      cycle accounts on a shared bucket. Pure unit-tested `resolveThrottleTracker` + `resolveTrustProxy`.
+      _Note: true cross-IP per-account lockout (counting failures per email across all IPs) needs a Redis-backed
+      stateful counter — deferred to a dedicated account-lockout feature._
+      Files: `common/throttler/throttle-tracker.ts`, `tietide-throttler.guard.ts`, `throttler.module.ts`,
+      `common/security/security.config.ts`, `main.ts`.
 - [ ] **W2.3** No PKCE on OAuth — S256 across 6 providers. Files: `connections/oauth/providers/*.ts`, `oauth.service.ts`.
 - [ ] **W2.4** Replayable OAuth state nonce — persist jti, single-use. Files: `oauth-state.service.ts`, `oauth.service.ts`.
 - [ ] **W2.5** AI service zero auth + API sends no creds — shared `INTERNAL_AI_TOKEN`, gate `/ingest`.

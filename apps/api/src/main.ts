@@ -9,6 +9,7 @@ import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import {
   buildHelmetOptions,
   resolveCorsOrigin,
+  resolveTrustProxy,
   shouldEnableSwagger,
 } from './common/security/security.config';
 
@@ -20,6 +21,14 @@ async function bootstrap() {
 
   // Socket.IO adapter — required for the executions WebSocket gateway.
   app.useWebSocketAdapter(new IoAdapter(app));
+
+  // Trust proxy — behind the prod reverse proxy/tunnel, so the rate limiter
+  // and logs see the real client IP (X-Forwarded-For) instead of the proxy's.
+  // Off by default; never trust-all by default (would let clients spoof IPs).
+  const trustProxy = resolveTrustProxy();
+  if (trustProxy !== false) {
+    app.getHttpAdapter().getInstance().set('trust proxy', trustProxy);
+  }
 
   // Security headers — first middleware. Env-aware: strict CSP + strong HSTS
   // in production, relaxed in dev so the Swagger UI loads.

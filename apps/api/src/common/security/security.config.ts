@@ -68,6 +68,25 @@ export function buildHelmetOptions(env: Env = process.env): HelmetOptions {
 }
 
 /**
+ * Resolve Express's `trust proxy` setting.
+ *
+ * The API runs behind a reverse proxy / tunnel in production, so without this
+ * Express reports the proxy's IP for every request — collapsing the rate
+ * limiter onto a single bucket and making `X-Forwarded-For` invisible. Driven
+ * by `TRUST_PROXY`: a number = how many proxy hops to trust (recommended `1`),
+ * `"true"` = trust all (only safe when every upstream is trusted), anything
+ * else / unset = disabled. We never default to trust-all, since that lets
+ * clients spoof their IP via `X-Forwarded-For`.
+ */
+export function resolveTrustProxy(env: Env = process.env): number | boolean {
+  const raw = env.TRUST_PROXY?.trim();
+  if (!raw || raw === 'false' || raw === '0') return false;
+  if (raw === 'true') return true;
+  const hops = Number(raw);
+  return Number.isInteger(hops) && hops > 0 ? hops : false;
+}
+
+/**
  * Whether to mount the Swagger UI / OpenAPI document.
  *
  * Off by default in production (the spec leaks the full attack surface); opt in

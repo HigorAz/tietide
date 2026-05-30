@@ -3,6 +3,7 @@ import {
   buildHelmetOptions,
   isProduction,
   resolveCorsOrigin,
+  resolveTrustProxy,
   shouldEnableSwagger,
 } from './security.config';
 
@@ -91,6 +92,31 @@ describe('security.config', () => {
 
     it('can be explicitly opted into in production', () => {
       expect(shouldEnableSwagger({ NODE_ENV: 'production', SWAGGER_ENABLED: 'true' })).toBe(true);
+    });
+  });
+
+  describe('resolveTrustProxy', () => {
+    it('is disabled when TRUST_PROXY is unset', () => {
+      expect(resolveTrustProxy({})).toBe(false);
+    });
+
+    it('parses a hop count', () => {
+      expect(resolveTrustProxy({ TRUST_PROXY: '1' })).toBe(1);
+      expect(resolveTrustProxy({ TRUST_PROXY: '2' })).toBe(2);
+    });
+
+    it('treats "true" as trust-all (number of hops unknown)', () => {
+      expect(resolveTrustProxy({ TRUST_PROXY: 'true' })).toBe(true);
+    });
+
+    it('treats "false"/"0"/blank as disabled', () => {
+      expect(resolveTrustProxy({ TRUST_PROXY: 'false' })).toBe(false);
+      expect(resolveTrustProxy({ TRUST_PROXY: '0' })).toBe(false);
+      expect(resolveTrustProxy({ TRUST_PROXY: '   ' })).toBe(false);
+    });
+
+    it('falls back to disabled for nonsense values (no accidental trust-all)', () => {
+      expect(resolveTrustProxy({ TRUST_PROXY: 'yes-please' })).toBe(false);
     });
   });
 });
