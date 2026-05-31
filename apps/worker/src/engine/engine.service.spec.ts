@@ -249,6 +249,119 @@ describe('EngineService', () => {
       });
     });
 
+    // W1.8: a retryable failure on a top-level BullMQ job must be surfaced (thrown)
+    // so BullMQ retries it; the row is left RUNNING until retries are exhausted
+    // (the processor marks it FAILED then). Non-retryable, dry-run, and child
+    // (no attemptsAllowed) failures keep the original mark-FAILED-and-return path.
+    describe('retry surfacing (W1.8)', () => {
+      const retryableFailure = {
+        status: 'FAILED' as const,
+        error: 'node B exploded',
+        retryable: true,
+      };
+
+      it('throws and leaves the execution RUNNING for a retryable top-level failure', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue(retryableFailure);
+
+        await expect(
+          engine.execute({
+            executionId: 'exec-1',
+            workflowId: 'wf-1',
+            triggerType: 'manual',
+            attemptsAllowed: 3,
+          }),
+        ).rejects.toThrow('node B exploded');
+
+        // No update marked the row FAILED, and no terminal event was published —
+        // the row stays RUNNING so the retry can resume it.
+        const failedUpdate = prisma.workflowExecution.update.mock.calls.find(
+          (c) => c[0]?.data?.status === 'FAILED',
+        );
+        expect(failedUpdate).toBeUndefined();
+        expect(events.publishExecutionCompleted).not.toHaveBeenCalled();
+      });
+
+      it('marks FAILED without throwing for a non-retryable (structural) failure', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue({
+          status: 'FAILED',
+          error: 'cycle detected',
+          retryable: false,
+        });
+
+        await engine.execute({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          triggerType: 'manual',
+          attemptsAllowed: 3,
+        });
+
+        const lastCall = prisma.workflowExecution.update.mock.calls.pop();
+        expect(lastCall![0].data.status).toBe('FAILED');
+        expect(events.publishExecutionCompleted).toHaveBeenCalledTimes(1);
+      });
+
+      it('marks FAILED without throwing for a child execution (no attemptsAllowed)', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue(retryableFailure);
+
+        await engine.execute({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          triggerType: 'iterator',
+        });
+
+        const lastCall = prisma.workflowExecution.update.mock.calls.pop();
+        expect(lastCall![0].data.status).toBe('FAILED');
+      });
+
+      it('does not retry a dry-run failure even when retryable', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockResolvedValue(retryableFailure);
+
+        await engine.execute({
+          executionId: 'exec-1',
+          workflowId: 'wf-1',
+          triggerType: 'test',
+          isDryRun: true,
+          attemptsAllowed: 3,
+        });
+
+        const lastCall = prisma.workflowExecution.update.mock.calls.pop();
+        expect(lastCall![0].data.status).toBe('FAILED');
+      });
+
+      it('throws for an unexpected runner crash on a top-level job', async () => {
+        prisma.workflow.findUnique.mockResolvedValue({ id: 'wf-1', definition: stubDefinition });
+        runner.run.mockRejectedValue(new Error('db blip'));
+
+        await expect(
+          engine.execute({
+            executionId: 'exec-1',
+            workflowId: 'wf-1',
+            triggerType: 'manual',
+            attemptsAllowed: 3,
+          }),
+        ).rejects.toThrow('db blip');
+      });
+
+      it('failExecution marks the row FAILED and publishes the terminal event', async () => {
+        await engine.failExecution('exec-1', 'exhausted');
+
+        const lastCall = prisma.workflowExecution.update.mock.calls.pop();
+        expect(lastCall![0]).toEqual(
+          expect.objectContaining({
+            where: { id: 'exec-1' },
+            data: expect.objectContaining({ status: 'FAILED', error: 'exhausted' }),
+          }),
+        );
+        expect(events.publishExecutionCompleted).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'FAILED', error: { message: 'exhausted' } }),
+        );
+      });
+    });
+
     describe('dry-run mode', () => {
       const overrideDefinition: WorkflowDefinition = {
         nodes: [{ id: 'X', type: 'stub', name: 'X', position: { x: 0, y: 0 }, config: {} }],

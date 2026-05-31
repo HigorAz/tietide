@@ -68,6 +68,12 @@ export interface RunResult {
   status: 'SUCCESS' | 'FAILED';
   error?: string;
   failedNodeId?: string;
+  // Whether re-running this execution could plausibly succeed. A node-level
+  // runtime failure (a flaky HTTP call, a transient DB error) is retryable;
+  // a structural defect (unknown node type, a cycle, the recursion limit) will
+  // always fail, so retrying is pointless. EngineService uses this to decide
+  // whether to surface the failure to BullMQ for a retry (W1.8).
+  retryable?: boolean;
 }
 
 @Injectable()
@@ -110,7 +116,11 @@ export class WorkflowRunner {
     const runLog = this.buildRunLogger({ requestId: args.requestId });
 
     if (depth > MAX_RECURSION_DEPTH) {
-      return { status: 'FAILED', error: new RecursionDepthExceededError(depth).message };
+      return {
+        status: 'FAILED',
+        error: new RecursionDepthExceededError(depth).message,
+        retryable: false,
+      };
     }
 
     // Sticky notes are non-executing canvas annotations: no executor, no
@@ -136,9 +146,9 @@ export class WorkflowRunner {
       order = topologicalSort(executableDefinition);
     } catch (err) {
       if (err instanceof CircularDependencyError) {
-        return { status: 'FAILED', error: err.message };
+        return { status: 'FAILED', error: err.message, retryable: false };
       }
-      return { status: 'FAILED', error: (err as Error).message };
+      return { status: 'FAILED', error: (err as Error).message, retryable: false };
     }
 
     // Load merged env-var scope once per execution. The resolver caches by
@@ -149,7 +159,11 @@ export class WorkflowRunner {
     for (const nodeId of order) {
       const n = executableDefinition.nodes.find((x) => x.id === nodeId)!;
       if (!this.registry.has(n.type)) {
-        return { status: 'FAILED', error: `No executor registered for node type "${n.type}"` };
+        return {
+          status: 'FAILED',
+          error: `No executor registered for node type "${n.type}"`,
+          retryable: false,
+        };
       }
     }
 
@@ -164,6 +178,12 @@ export class WorkflowRunner {
       incomingEdges.get(e.target)!.push(e);
       outgoingEdges.get(e.source)!.push(e);
     }
+
+    // Step-level resume (W1.8): a BullMQ retry re-processes the SAME executionId.
+    // Reuse the recorded output of any side-effecting ACTION node that already
+    // SUCCEEDED so the retry does not re-fire its external side effect; every
+    // other node (pure logic / triggers, and the node that failed) is re-run.
+    const reusable = await this.loadResumableOutputs(executionId, nodeById);
 
     const outputs = new Map<string, NodeOutput>();
     const reachable = new Set<string>([order[0]]);
@@ -193,6 +213,25 @@ export class WorkflowRunner {
           await this.recordUnreachedSkipped(executionId, n);
           statusByNode.set(n.id, 'SKIPPED');
         }
+        continue;
+      }
+
+      // Resume: this side-effecting action already SUCCEEDED on a prior attempt.
+      // Restore its recorded output and routing instead of re-executing it, so the
+      // retry does not re-fire the side effect. Actions route via plain 'success'
+      // (they never set metadata.branch), so reachability stays faithful (W1.8).
+      const reusedData = reusable.get(n.id);
+      if (reusedData !== undefined) {
+        const reusedOutput: NodeOutput = { data: reusedData };
+        outputs.set(n.id, reusedOutput);
+        executionOrder.push(n.id);
+        statusByNode.set(n.id, 'SUCCESS');
+        this.propagateReachability(
+          reusedOutput,
+          outgoingEdges.get(n.id) ?? [],
+          reachable,
+          'success',
+        );
         continue;
       }
 
@@ -373,9 +412,65 @@ export class WorkflowRunner {
     }
 
     if (failure) {
-      return { status: 'FAILED', error: failure.error, failedNodeId: failure.nodeId };
+      // A node threw at runtime — retryable (a flaky dependency may recover). The
+      // step-level resume above means a BullMQ retry won't re-fire nodes that
+      // already succeeded, so re-running this execution is safe.
+      return {
+        status: 'FAILED',
+        error: failure.error,
+        failedNodeId: failure.nodeId,
+        retryable: true,
+      };
     }
     return { status: 'SUCCESS' };
+  }
+
+  // Load the outputs that a re-run may reuse. On the first attempt there are no
+  // prior steps and this is a no-op. On a retry (same executionId), the recorded
+  // output of every side-effecting ACTION node that already SUCCEEDED is returned
+  // for reuse, and all other prior step rows are dropped so the re-run records
+  // fresh attempts (pure logic/trigger nodes and the failed node re-execute). Only
+  // ACTION nodes are reused because they are the side-effecting ones and they route
+  // via plain 'success' — logic nodes carry branch metadata that is not persisted,
+  // so they must re-run to reproduce their routing (W1.8).
+  private async loadResumableOutputs(
+    executionId: string,
+    nodeById: Map<string, WorkflowNode>,
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const priorSteps = await this.prisma.executionStep.findMany({
+      where: { executionId },
+      select: { id: true, nodeId: true, status: true, outputData: true },
+    });
+    if (priorSteps.length === 0) return new Map();
+
+    const reusable = new Map<string, Record<string, unknown>>();
+    const keepStepIds: string[] = [];
+    for (const step of priorSteps) {
+      const node = nodeById.get(step.nodeId);
+      if (
+        step.status === 'SUCCESS' &&
+        node !== undefined &&
+        step.outputData != null &&
+        this.isActionNode(node)
+      ) {
+        reusable.set(step.nodeId, step.outputData as Record<string, unknown>);
+        keepStepIds.push(step.id);
+      }
+    }
+
+    if (keepStepIds.length === 0) {
+      await this.prisma.executionStep.deleteMany({ where: { executionId } });
+    } else {
+      await this.prisma.executionStep.deleteMany({
+        where: { executionId, id: { notIn: keepStepIds } },
+      });
+    }
+
+    return reusable;
+  }
+
+  private isActionNode(n: WorkflowNode): boolean {
+    return this.registry.resolve(n.type)?.category === NodeCategory.ACTION;
   }
 
   private resolveInputTemplates(

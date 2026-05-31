@@ -9,13 +9,16 @@ import { WorkflowProcessor, type ExecutionPayload } from './workflow.processor';
 
 describe('WorkflowProcessor', () => {
   let processor: WorkflowProcessor;
-  let engine: { execute: jest.Mock };
+  let engine: { execute: jest.Mock; failExecution: jest.Mock };
   let logger: { log: jest.Mock; error: jest.Mock };
   let dlq: { publishFailed: jest.Mock };
   let metrics: { observeExecution: jest.Mock };
 
   beforeEach(async () => {
-    engine = { execute: jest.fn(async () => undefined) };
+    engine = {
+      execute: jest.fn(async () => undefined),
+      failExecution: jest.fn(async () => undefined),
+    };
     logger = { log: jest.fn(), error: jest.fn() };
     dlq = { publishFailed: jest.fn(async () => undefined) };
     metrics = { observeExecution: jest.fn() };
@@ -39,11 +42,24 @@ describe('WorkflowProcessor', () => {
         triggerType: 'manual',
         triggerData: { foo: 'bar' },
       };
-      const job = { id: 'job-1', data: payload } as unknown as Job<ExecutionPayload>;
+      const job = {
+        id: 'job-1',
+        data: payload,
+        attemptsMade: 0,
+        opts: { attempts: MAX_EXECUTION_ATTEMPTS },
+      } as unknown as Job<ExecutionPayload>;
 
       await processor.process(job);
 
-      expect(engine.execute).toHaveBeenCalledWith(payload);
+      // Attempt metadata is threaded in so the engine knows this is a top-level,
+      // BullMQ-managed job that may be retried (W1.8).
+      expect(engine.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ...payload,
+          attemptsMade: 0,
+          attemptsAllowed: MAX_EXECUTION_ATTEMPTS,
+        }),
+      );
     });
 
     it('observes a completed execution into the duration histogram', async () => {
@@ -176,6 +192,36 @@ describe('WorkflowProcessor', () => {
     it('should be safe when job or error is undefined (event noise)', async () => {
       await expect(processor.onFailed(undefined, new Error('orphan'))).resolves.toBeUndefined();
       expect(dlq.publishFailed).not.toHaveBeenCalled();
+    });
+
+    it('marks the execution FAILED via the engine when retries are exhausted', async () => {
+      // The engine left the row RUNNING for the retry; on exhaustion the processor
+      // records the terminal failure (W1.8).
+      const job = makeJob();
+
+      await processor.onFailed(job, new Error('database down'));
+
+      expect(engine.failExecution).toHaveBeenCalledWith('exec-99', 'database down');
+    });
+
+    it('does NOT mark the execution FAILED while retries remain', async () => {
+      const job = makeJob({
+        attemptsMade: 1,
+        opts: { attempts: MAX_EXECUTION_ATTEMPTS },
+      } as unknown as Partial<Job<ExecutionPayload>>);
+
+      await processor.onFailed(job, new Error('transient'));
+
+      expect(engine.failExecution).not.toHaveBeenCalled();
+    });
+
+    it('still reaches the DLQ even if marking the row FAILED throws', async () => {
+      engine.failExecution.mockRejectedValueOnce(new Error('db unavailable'));
+      const job = makeJob();
+
+      await processor.onFailed(job, new Error('database down'));
+
+      expect(dlq.publishFailed).toHaveBeenCalled();
     });
   });
 });

@@ -34,7 +34,13 @@ export class WorkflowProcessor extends WorkerHost {
     this.logger.log({ ...ctx, status: 'started' }, 'Workflow execution started');
     const start = Date.now();
     try {
-      await this.engine.execute(job.data);
+      // Thread attempt metadata so the engine knows this is a top-level,
+      // BullMQ-managed job that may be retried on a retryable failure (W1.8).
+      await this.engine.execute({
+        ...job.data,
+        attemptsMade: job.attemptsMade,
+        attemptsAllowed: job.opts?.attempts ?? MAX_EXECUTION_ATTEMPTS,
+      });
       const durationMs = Date.now() - start;
       this.metrics.observeExecution('completed', durationMs / 1000);
       this.logger.log({ ...ctx, status: 'completed', durationMs }, 'Workflow execution completed');
@@ -55,6 +61,19 @@ export class WorkflowProcessor extends WorkerHost {
       return;
     }
     const attemptsAllowed = job.opts?.attempts ?? MAX_EXECUTION_ATTEMPTS;
+    // The engine left the execution RUNNING for the retry; once retries are
+    // exhausted, this is the terminal failure — record it on the row and publish
+    // the completed event. Best-effort so a DB hiccup can't block the DLQ (W1.8).
+    if (job.attemptsMade >= attemptsAllowed) {
+      try {
+        await this.engine.failExecution(job.data.executionId, error?.message ?? 'Unknown error');
+      } catch (markErr) {
+        this.logger.error(
+          { jobId: String(job.id ?? 'unknown'), err: (markErr as Error).message },
+          'Failed to mark execution FAILED after exhausted retries',
+        );
+      }
+    }
     await this.dlq.publishFailed({
       jobId: String(job.id ?? 'unknown'),
       attemptsMade: job.attemptsMade,

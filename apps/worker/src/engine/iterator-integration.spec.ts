@@ -205,7 +205,24 @@ describe('WorkflowRunner — iterator integration', () => {
 
     const prisma = {
       workflowExecution: { create: weCreate, update: weUpdate, findFirst: weFindFirst },
-      executionStep: { create: stepCreate, update: stepUpdate },
+      executionStep: {
+        create: stepCreate,
+        update: stepUpdate,
+        // Step-level resume (W1.8): returns prior steps for an executionId. Each
+        // run here uses a fresh executionId and creates its steps during the run,
+        // so at run-start this returns [] and resume is a no-op.
+        findMany: jest.fn(async ({ where }: { where: { executionId: string } }) =>
+          steps
+            .filter((r) => r.executionId === where.executionId)
+            .map((r) => ({
+              id: r.id,
+              nodeId: r.nodeId,
+              status: r.status,
+              outputData: r.outputData ?? null,
+            })),
+        ),
+        deleteMany: jest.fn(async () => ({ count: 0 })),
+      },
     };
 
     const secretResolver: SecretResolver = {

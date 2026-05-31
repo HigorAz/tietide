@@ -19,7 +19,7 @@
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
-| 1    | Confirmed critical / high       | 8     | 7    |
+| 1    | Confirmed critical / high       | 8     | 8    |
 | 2    | Medium security                 | 11    | 10   |
 | 3    | Scaling & remaining correctness | 17    | 17   |
 | 4    | Frontend QA / low               | 5     | 5    |
@@ -63,10 +63,26 @@
       `prisma migrate deploy` on a live DB._
       Files: `auth.service.ts`, `auth.controller.ts`, `strategies/jwt.strategy.ts`, `schema.prisma`, migration,
       `jwt-auth.guard.spec.ts` (PrismaService stub).
-- [ ] **W1.8** (HIGH / qa) EngineService swallows failures → retry/DLQ dead — re-throw retryable failures so
-      BullMQ attempts/backoff/DLQ work. Files: `apps/worker/src/engine/engine.service.ts`, `workflow.processor.ts`.
-      **DEFERRED**: re-enabling BullMQ retries requires resumable execution first (step checkpointing) or it
-      re-introduces duplicate side-effects on re-run. Do not re-enable retries until step-level resume exists.
+- [x] **W1.8** (HIGH / qa) EngineService swallows failures → retry/DLQ dead — jobs already enqueue with
+      `attempts:3`+exponential backoff and the processor already re-throws, but `EngineService.execute` caught
+      every failure and marked the row FAILED, so BullMQ never saw an error → never retried, never reached the
+      DLQ. Fixed with **step-level resume** (the prerequisite the deferral named) + selective re-throw:
+      (1) **Resume** (`WorkflowRunner`): a BullMQ retry re-processes the SAME `executionId`; the runner now loads
+      the prior `ExecutionStep`s and **reuses the recorded output of every side-effecting ACTION node that already
+      SUCCEEDED** (so the retry does not re-fire it), while dropping and re-running everything else — pure
+      logic/trigger nodes (re-run so a conditional's `metadata.branch`, which is not persisted, is faithfully
+      reproduced) and the node that actually failed. Action nodes are the safe-to-reuse set because they are the
+      side-effecting ones AND route via plain `success` (only `conditional`/`iterator` emit branch metadata, both
+      LOGIC). First attempt has no prior steps → no-op. (2) **Retryable signal**: `RunResult.retryable` —
+      `true` for a node runtime failure, `false` for a structural defect (cycle, unknown node type, recursion
+      limit) that will always re-fail. (3) **Re-throw** (`EngineService`): a retryable failure on a top-level
+      BullMQ job (identified by the processor threading `attemptsAllowed`) is surfaced via `RetryableExecutionError`
+      and the row is **left RUNNING**; the processor's `onFailed` marks it FAILED + publishes the terminal event
+      only once retries are exhausted (reusing the proven `attemptsMade >= attemptsAllowed` gate that already
+      drives the DLQ). Dry-runs, structural failures, and in-process child executions (iterator/subworkflow — no
+      `attemptsAllowed`) keep the original mark-FAILED-and-return path, so subworkflow/iterator semantics are
+      unchanged. Files: `apps/worker/src/engine/workflow-runner.ts`, `engine.service.ts`,
+      `apps/worker/src/processors/workflow.processor.ts` (+ specs).
 
 ## Wave 2 — MEDIUM security
 
