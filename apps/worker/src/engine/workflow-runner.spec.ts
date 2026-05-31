@@ -347,9 +347,12 @@ describe('WorkflowRunner', () => {
       expect(result.status).toBe('FAILED');
       expect(result.failedNodeId).toBe('B');
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+      const writes = [
+        ...prisma.executionStep.create.mock.calls,
+        ...prisma.executionStep.update.mock.calls,
+      ].map((c) => c[0].data);
       const statusByNode = new Map<string, string>();
-      for (const u of updates) statusByNode.set(u.nodeId as string, u.status as string);
+      for (const w of writes) statusByNode.set(w.nodeId as string, w.status as string);
       expect(statusByNode.get('A')).toBe('SUCCESS');
       expect(statusByNode.get('B')).toBe('FAILED');
       expect(statusByNode.get('C')).toBe('CANCELLED');
@@ -456,7 +459,7 @@ describe('WorkflowRunner', () => {
       expect(falsePath.execute).not.toHaveBeenCalled();
     });
 
-    it('should create CANCELLED step records for unreachable branch nodes', async () => {
+    it('should record an un-taken conditional branch node as SKIPPED (not CANCELLED)', async () => {
       registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
       registry.register(
         makeExecutor('if', async () => ({ data: {}, metadata: { branch: 'true' } }), 'logic'),
@@ -480,10 +483,42 @@ describe('WorkflowRunner', () => {
 
       await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
-      const falseUpdate = updates.find((u) => u.nodeId === 'FALSE');
-      expect(falseUpdate).toBeDefined();
-      expect(falseUpdate!.status).toBe('CANCELLED');
+      // The branch was not selected — it was skipped, not cancelled by a failure.
+      const creates = prisma.executionStep.create.mock.calls.map((c) => c[0].data);
+      const falseStep = creates.find((s) => s.nodeId === 'FALSE');
+      expect(falseStep).toBeDefined();
+      expect(falseStep!.status).toBe('SKIPPED');
+      // Single terminal write — no redundant follow-up update for the skipped node.
+      const falseUpdate = prisma.executionStep.update.mock.calls
+        .map((c) => c[0].data)
+        .find((u) => u.nodeId === 'FALSE');
+      expect(falseUpdate).toBeUndefined();
+    });
+
+    it('should record a CANCELLED node in a single write (no redundant update)', async () => {
+      registry.register(makeExecutor('a'));
+      registry.register(
+        makeExecutor('b', async () => {
+          throw new Error('boom');
+        }),
+      );
+      registry.register(makeExecutor('c'));
+
+      const def: WorkflowDefinition = {
+        nodes: [node('A', 'a'), node('B', 'b'), node('C', 'c')],
+        edges: [edge('e1', 'A', 'B'), edge('e2', 'B', 'C')],
+      };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      const cCreate = prisma.executionStep.create.mock.calls
+        .map((c) => c[0].data)
+        .find((s) => s.nodeId === 'C');
+      expect(cCreate!.status).toBe('CANCELLED');
+      const cUpdate = prisma.executionStep.update.mock.calls
+        .map((c) => c[0].data)
+        .find((u) => u.nodeId === 'C');
+      expect(cUpdate).toBeUndefined();
     });
 
     it('should merge ALL executed predecessor outputs keyed by nodeId on fan-in', async () => {
@@ -1237,9 +1272,12 @@ describe('WorkflowRunner', () => {
       expect(successPath.execute).not.toHaveBeenCalled();
       expect(handler.execute).toHaveBeenCalledTimes(1);
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+      const writes = [
+        ...prisma.executionStep.create.mock.calls,
+        ...prisma.executionStep.update.mock.calls,
+      ].map((c) => c[0].data);
       const statusByNode = new Map<string, string>();
-      for (const u of updates) statusByNode.set(u.nodeId as string, u.status as string);
+      for (const w of writes) statusByNode.set(w.nodeId as string, w.status as string);
       expect(statusByNode.get('S')).toBe('CANCELLED');
       expect(statusByNode.get('H')).toBe('SUCCESS');
     });
@@ -1267,9 +1305,12 @@ describe('WorkflowRunner', () => {
       expect(successPath.execute).toHaveBeenCalledTimes(1);
       expect(handler.execute).not.toHaveBeenCalled();
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+      const writes = [
+        ...prisma.executionStep.create.mock.calls,
+        ...prisma.executionStep.update.mock.calls,
+      ].map((c) => c[0].data);
       const statusByNode = new Map<string, string>();
-      for (const u of updates) statusByNode.set(u.nodeId as string, u.status as string);
+      for (const w of writes) statusByNode.set(w.nodeId as string, w.status as string);
       expect(statusByNode.get('S')).toBe('SUCCESS');
       expect(statusByNode.get('H')).toBe('CANCELLED');
     });

@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 11   |
+| 3    | Scaling & remaining correctness | 17    | 12   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -236,7 +236,7 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       fresh child execution every time they ran, so re-processing a parent execution (a future BullMQ retry —
       see deferred W1.8) would re-run children and duplicate side effects. Each child is now tied to its parent
       node via a deterministic idempotencyKey (`subworkflow:<parentExec>:<nodeId>` / `iterator:<parentExec>:
-    <nodeId>:<index>`), scoped per target workflow by the existing `@@unique([workflowId, idempotencyKey])`:
+  <nodeId>:<index>`), scoped per target workflow by the existing `@@unique([workflowId, idempotencyKey])`:
       before spawning, the node looks for an existing child — an already-SUCCESS child is reused without
       re-running (no duplicate side effects), a prior incomplete child is re-run in place, and the create is
       P2002-guarded (reuses the winner of a concurrent race). **requestId** is now propagated end-to-end:
@@ -246,7 +246,17 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       shares one correlation id in the logs. Files: `packages/sdk/src/interfaces/context.interface.ts`,
       `packages/sdk/CHANGELOG.md` + version bump, `apps/worker/src/nodes/logic/subworkflow.ts`,
       `apps/worker/src/engine/workflow-runner.ts` (+ subworkflow, runner, and iterator-integration specs).
-- [ ] **W3.12** Conditional CANCELLED vs SKIPPED — distinct status; collapse double write. File: `workflow-runner.ts`.
+- [x] **W3.12** Conditional CANCELLED vs SKIPPED + double write — the runner recorded every non-running node
+      as CANCELLED, conflating "a conditional branched around this node" (normal control flow) with "an upstream
+      failure aborted this path" (an error). A node skipped by a conditional now records **SKIPPED**; CANCELLED
+      is reserved for failure-abandoned paths. The runner tracks each node's final status (`statusByNode`) and,
+      for an unreachable node with no global failure, `classifyUnreached` inspects its incoming edges: an
+      un-fired error-handler edge or a predecessor that FAILED/was CANCELLED ⇒ CANCELLED; a conditional that
+      chose another branch (predecessor SUCCESS) ⇒ SKIPPED. A hard failure with no handler still cancels all
+      remaining nodes. Verified against the existing error-edge tests (un-taken error-handler and
+      success-path-after-failure correctly stay CANCELLED). Also **collapsed the double write**: `recordCancelled`
+      did a redundant create-then-update-to-the-same-status; both it and the new `recordUnreachedSkipped` now do
+      a single terminal create. File: `apps/worker/src/engine/workflow-runner.ts` (+ spec).
 - [ ] **W3.13** Count-based poll cursor fragile — stable row identity or regression detection.
       Files: `sheets-row-added.ts`, `excel-row-added.ts`.
 - [ ] **W3.14** Cron trigger only at nodes[0]; idempotency key drifts — scan all nodes; key on scheduled ts.

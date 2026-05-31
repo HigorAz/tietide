@@ -168,13 +168,31 @@ export class WorkflowRunner {
     const outputs = new Map<string, NodeOutput>();
     const reachable = new Set<string>([order[0]]);
     const executionOrder: string[] = [];
+    // Final recorded status per node, so an unreachable node can tell WHY it was
+    // not run (a conditional branched around it = SKIPPED, vs an upstream failure
+    // abandoned the path = CANCELLED) by inspecting its predecessors (W3.12).
+    const statusByNode = new Map<string, string>();
     let failure: { nodeId: string; error: string } | null = null;
 
     for (const nodeId of order) {
       const n = nodeById.get(nodeId)!;
 
-      if (failure || !reachable.has(nodeId)) {
+      // A hard failure with no error-handler aborts the rest of the run: every
+      // remaining node is CANCELLED regardless of why it would not have run.
+      if (failure) {
         await this.recordCancelled(executionId, n);
+        statusByNode.set(n.id, 'CANCELLED');
+        continue;
+      }
+      if (!reachable.has(nodeId)) {
+        const reason = this.classifyUnreached(incomingEdges.get(n.id) ?? [], statusByNode);
+        if (reason === 'CANCELLED') {
+          await this.recordCancelled(executionId, n);
+          statusByNode.set(n.id, 'CANCELLED');
+        } else {
+          await this.recordUnreachedSkipped(executionId, n);
+          statusByNode.set(n.id, 'SKIPPED');
+        }
         continue;
       }
 
@@ -188,6 +206,7 @@ export class WorkflowRunner {
 
       if (n.skipped === true && !this.isTriggerNode(n)) {
         await this.recordSkipped(executionId, n, input.data);
+        statusByNode.set(n.id, 'SKIPPED');
         const passthroughOutput: NodeOutput = { data: input.data };
         outputs.set(n.id, passthroughOutput);
         executionOrder.push(n.id);
@@ -217,6 +236,7 @@ export class WorkflowRunner {
           envScope,
           requestId: args.requestId,
         });
+        statusByNode.set(n.id, iterResult.status);
         if (iterResult.status === 'FAILED') {
           failure = { nodeId: n.id, error: iterResult.error ?? 'Iterator failed' };
         }
@@ -259,6 +279,7 @@ export class WorkflowRunner {
 
         outputs.set(n.id, output);
         executionOrder.push(n.id);
+        statusByNode.set(n.id, 'SUCCESS');
 
         await this.prisma.executionStep.update({
           where: { id: step.id },
@@ -293,6 +314,7 @@ export class WorkflowRunner {
         const message = e.message ?? 'Unknown error';
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
+        statusByNode.set(n.id, 'FAILED');
         runLog.warn(
           {
             executionId,
@@ -434,8 +456,11 @@ export class WorkflowRunner {
     }
   }
 
+  // A node that will not run because an upstream failure abandoned its path. Recorded
+  // in a single write — the status is terminal at creation, so the prior redundant
+  // create-then-update-to-the-same-status pair is collapsed (W3.12).
   private async recordCancelled(executionId: string, n: WorkflowNode): Promise<void> {
-    const step = await this.prisma.executionStep.create({
+    await this.prisma.executionStep.create({
       data: {
         executionId,
         nodeId: n.id,
@@ -444,10 +469,42 @@ export class WorkflowRunner {
         status: 'CANCELLED',
       },
     });
-    await this.prisma.executionStep.update({
-      where: { id: step.id },
-      data: { nodeId: n.id, status: 'CANCELLED' },
+  }
+
+  // A node that will not run because normal conditional control flow routed around
+  // it (the branch it sits on was not selected). Distinct from CANCELLED, which
+  // implies a failure aborted the path. Single terminal write.
+  private async recordUnreachedSkipped(executionId: string, n: WorkflowNode): Promise<void> {
+    await this.prisma.executionStep.create({
+      data: {
+        executionId,
+        nodeId: n.id,
+        nodeType: n.type,
+        nodeName: n.name,
+        status: 'SKIPPED',
+      },
     });
+  }
+
+  // Classify why an unreachable node (with no global failure in effect) did not run:
+  // SKIPPED when a conditional branched around it, CANCELLED when an upstream failure
+  // or an un-fired error-handler edge abandoned its path. Predecessors are processed
+  // earlier in topological order, so their final status is already known.
+  private classifyUnreached(
+    incoming: WorkflowEdge[],
+    statusByNode: Map<string, string>,
+  ): 'CANCELLED' | 'SKIPPED' {
+    for (const e of incoming) {
+      // An error-handler edge that did not fire (we are unreachable) means its source
+      // did not route here — the handler is a contingency that was cancelled.
+      if ((e.kind ?? 'success') === 'error') return 'CANCELLED';
+      // A success edge that was not taken because its source failed/was cancelled
+      // propagates the cancellation; a conditional that simply chose another branch
+      // (source SUCCESS) or a skipped source leaves us SKIPPED.
+      const sourceStatus = statusByNode.get(e.source);
+      if (sourceStatus === 'FAILED' || sourceStatus === 'CANCELLED') return 'CANCELLED';
+    }
+    return 'SKIPPED';
   }
 
   private isTriggerNode(n: WorkflowNode): boolean {
