@@ -51,8 +51,14 @@ COPY --from=builder --chown=tietide:tietide /out/package.json ./package.json
 
 USER tietide
 
-# Worker has no inbound port; declare it for tooling/uniformity.
-EXPOSE 9100
+# Worker exposes a tiny HTTP server for /metrics and liveness/readiness probes
+# (W3.6/W3.7) on METRICS_PORT (default 9091).
+EXPOSE 9091
+
+# Liveness probe: the process answers on /live. Uses node (always present) so no
+# curl/wget dependency is required in the runtime image.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.METRICS_PORT||9091)+'/live',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "dist/main.js"]

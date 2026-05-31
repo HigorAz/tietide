@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ConfigService } from '@nestjs/config';
 import { WorkerMetricsServer } from './metrics.server';
 import { WorkerMetricsService } from './worker-metrics.service';
+import type { WorkerHealthService } from './worker-health.service';
 
 function makeRes(): ServerResponse & { body?: string } {
   const res = {
@@ -18,15 +19,22 @@ function makeRes(): ServerResponse & { body?: string } {
   return res as unknown as ServerResponse & { body?: string };
 }
 
-function makeServer(token: string | undefined, render: jest.Mock): WorkerMetricsServer {
+function makeServer(
+  token: string | undefined,
+  render: jest.Mock,
+  readiness: jest.Mock = jest
+    .fn()
+    .mockResolvedValue({ ok: true, checks: { db: true, redis: true } }),
+): WorkerMetricsServer {
   const metrics = {
     render,
     registry: { contentType: 'text/plain' },
   } as unknown as WorkerMetricsService;
+  const health = { readiness } as unknown as WorkerHealthService;
   const config = {
     get: (k: string) => (k === 'METRICS_TOKEN' ? token : undefined),
   } as ConfigService;
-  return new WorkerMetricsServer(metrics, config);
+  return new WorkerMetricsServer(metrics, health, config);
 }
 
 describe('WorkerMetricsServer.handleRequest', () => {
@@ -99,5 +107,60 @@ describe('WorkerMetricsServer.handleRequest', () => {
     );
 
     expect(res.statusCode).toBe(500);
+  });
+
+  describe('liveness & readiness (W3.7)', () => {
+    it('serves /live with 200 and no auth, without touching dependencies', async () => {
+      const readiness = jest.fn();
+      const server = makeServer('sekret', jest.fn(), readiness);
+      const res = makeRes();
+
+      await server.handleRequest(
+        { method: 'GET', url: '/live', headers: {} } as IncomingMessage,
+        res,
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body as string)).toEqual({ status: 'ok' });
+      expect(readiness).not.toHaveBeenCalled();
+    });
+
+    it('serves /health with 200 when dependencies are ready', async () => {
+      const readiness = jest
+        .fn()
+        .mockResolvedValue({ ok: true, checks: { db: true, redis: true } });
+      const server = makeServer(undefined, jest.fn(), readiness);
+      const res = makeRes();
+
+      await server.handleRequest(
+        { method: 'GET', url: '/health', headers: {} } as IncomingMessage,
+        res,
+      );
+
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body as string)).toEqual({
+        status: 'ok',
+        checks: { db: true, redis: true },
+      });
+    });
+
+    it('serves /health with 503 when a dependency is down', async () => {
+      const readiness = jest
+        .fn()
+        .mockResolvedValue({ ok: false, checks: { db: false, redis: true } });
+      const server = makeServer(undefined, jest.fn(), readiness);
+      const res = makeRes();
+
+      await server.handleRequest(
+        { method: 'GET', url: '/health', headers: {} } as IncomingMessage,
+        res,
+      );
+
+      expect(res.statusCode).toBe(503);
+      expect(JSON.parse(res.body as string)).toEqual({
+        status: 'error',
+        checks: { db: false, redis: true },
+      });
+    });
   });
 });

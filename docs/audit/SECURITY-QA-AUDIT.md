@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 6    |
+| 3    | Scaling & remaining correctness | 17    | 7    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -174,7 +174,7 @@
       clamped [1, 3650]); ExecutionSteps cascade-delete via FK. Deletes in 500-row batches (cap 2000 batches/run,
       logs if hit) so no single giant lock. Pure `resolveRetentionDays` + processor unit-tested.
       Files: `apps/worker/src/retention/{retention.config.ts,retention.constants.ts,retention.processor.ts,
-  retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.env.example`.
+retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.env.example`.
 - [x] **W3.6** No metrics — `prom-client` `/metrics` on both apps. **API**: `MetricsModule` exposes `GET /metrics`
       (root, excluded from the `/v1` prefix, `@SkipThrottle`) with default process metrics, an
       `http_request_duration_seconds` histogram (global `HttpMetricsInterceptor`, labelled by matched route so
@@ -186,7 +186,14 @@
       server handler unit-tested.
       Files: `apps/api/src/metrics/*`, `apps/api/src/{app.module,main}.ts`, `apps/worker/src/metrics/*`,
       `apps/worker/src/{worker.module,processors/workflow.processor}.ts`, both `package.json`, `.env.example`.
-- [ ] **W3.7** Worker no liveness — HTTP liveness/readiness + Docker HEALTHCHECK. Files: `apps/worker/src/main.ts`, Dockerfile.
+- [x] **W3.7** Worker no liveness — added `/live` (liveness — always 200, no dependency checks so a transient
+      blip can't get a healthy worker killed) and `/health` (readiness — `WorkerHealthService` pings Postgres via
+      `SELECT 1` and the BullMQ Redis client via `ping`; 200 when both ready, 503 otherwise) to the worker's
+      existing metrics `node:http` server (W3.6); both probes are unauthenticated. Worker `Dockerfile` now `EXPOSE`s
+      the real metrics port (9091, was a stale 9100 placeholder) and gets a `HEALTHCHECK` that probes `/live` via
+      `node` (no curl/wget needed in the alpine runtime). Health service + server routes unit-tested.
+      Files: `apps/worker/src/metrics/{worker-health.service.ts,metrics.server.ts,metrics.module.ts}` (+ specs),
+      `apps/worker/Dockerfile`.
 - [ ] **W3.8** No prod compose / TLS / secret mgmt — `docker-compose.prod.yml` + nginx TLS. Files: `infra/docker/`.
 - [ ] **W3.9** Idempotency read-then-create races — catch P2002 (manual/poll/cron).
       Files: `executions.service.ts`, `poll-processor.ts`, `cron-processor.ts`.
