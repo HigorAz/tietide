@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 2    |
+| 3    | Scaling & remaining correctness | 17    | 3    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -149,7 +149,18 @@
       Files: `apps/api/src/common/pagination/*`, the 6 `*.service.ts` + their controllers + `*-list-response.dto.ts`,
       `apps/spa/src/api/{pagination,workflows,connections,folders,tags,envVars}.ts`, `stores/workflowsStore.ts`,
       home/dashboard workflow-list components.
-- [ ] **W3.3** No per-tenant quotas / userId tracker — getTracker→userId + quota layer.
+- [x] **W3.3** No per-tenant quotas / userId tracker — the global throttler now buckets authenticated requests
+      **per-tenant by verified userId** (`user:<id>`), so a user's rate limit follows the account across source
+      IPs and tenants behind one shared egress IP (NAT/proxy) no longer share a bucket; anonymous requests keep
+      the proxy-aware IP (and `ip|email` on credential routes). Because the global `APP_GUARD` throttler runs
+      _before_ the per-controller `JwtAuthGuard`, `req.user` isn't populated yet — `TieTideThrottlerGuard` now
+      injects `JwtService` and **verifies** the bearer token itself to obtain a trustworthy `sub` (bare decoding
+      would let a forged token mint unlimited fresh buckets and bypass the IP limit); absent/invalid/oauth-state
+      tokens fall back to IP. `resolveThrottleTracker` gained a `user` branch (taking precedence over ip/email);
+      `AppThrottlerModule` registers a verify-only `JwtModule` with the same `JWT_SECRET`.
+      _Note: a true resource-**quota** layer (per-plan caps on workflows/executions/storage with persistent
+      counters) is deferred — it's a product-tier feature beyond the rate-limit tracker this finding names._
+      Files: `common/throttler/{throttle-tracker.ts,tietide-throttler.guard.ts,throttler.module.ts}` (+ specs).
 - [ ] **W3.4** Missing indexes — Connection `[status,expiresAt]`, Workflow `[isActive]`, ExecutionStep review. File: `schema.prisma`.
 - [ ] **W3.5** Execution/step unbounded growth — retention/archival job.
 - [ ] **W3.6** No metrics — prom-client `/metrics` (queue gauges, duration histograms). API + worker.
