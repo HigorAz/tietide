@@ -182,7 +182,6 @@ describe('AppTour', () => {
             userId: 'u-1',
             name: 'Existing',
             description: null,
-            definition: { nodes: [], edges: [] },
             isActive: false,
             version: 1,
             executionCount: 0,

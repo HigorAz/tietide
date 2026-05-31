@@ -8,6 +8,7 @@ import {
   updateWorkflow as apiUpdate,
   type CreateWorkflowBody,
   type ListWorkflowsParams,
+  type WorkflowListItem,
 } from '@/api/workflows';
 
 export type WorkflowsStatus = 'idle' | 'loading' | 'ready' | 'error';
@@ -16,7 +17,10 @@ export type WorkflowsStatus = 'idle' | 'loading' | 'ready' | 'error';
 export type FolderFilter = string | null | undefined;
 
 export interface WorkflowsState {
-  workflows: Workflow[];
+  // List-view rows omit the heavy `definition` JSONB (W3.2); the editor loads it
+  // on demand via getWorkflow(id). Create/update responses (full Workflow) are
+  // structurally assignable here.
+  workflows: WorkflowListItem[];
   status: WorkflowsStatus;
   error: string | null;
   selectedFolderId: FolderFilter;

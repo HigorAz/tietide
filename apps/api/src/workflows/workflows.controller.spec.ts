@@ -217,13 +217,22 @@ describe('WorkflowsController (integration)', () => {
   });
 
   describe('GET /workflows', () => {
-    it('should return 200 with the authenticated user rows', async () => {
-      workflowsService.list.mockResolvedValue([persisted]);
+    it('should return 200 with a paginated envelope of the user rows', async () => {
+      workflowsService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
 
       const res = await request(app.getHttpServer()).get('/workflows').expect(200);
 
-      expect(res.body).toEqual([persisted]);
+      expect(res.body).toEqual({ items: [persisted], nextCursor: null });
       expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', {});
+    });
+
+    it('passes limit and cursor through to the service filter', async () => {
+      workflowsService.list.mockResolvedValue({ items: [], nextCursor: null });
+      await request(app.getHttpServer()).get('/workflows?limit=10&cursor=abc').expect(200);
+      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', {
+        limit: 10,
+        cursor: 'abc',
+      });
     });
 
     it('passes folderId="null" sentinel as filter.folderId=null', async () => {
@@ -262,21 +271,25 @@ describe('WorkflowsController (integration)', () => {
 
     it('should pass through documentation metadata when present (issue #111)', async () => {
       const generatedAt = new Date('2026-05-02T08:30:00Z').toISOString();
-      workflowsService.list.mockResolvedValue([
-        { ...persisted, documentation: { generatedAt, version: 2 } },
-      ]);
+      workflowsService.list.mockResolvedValue({
+        items: [{ ...persisted, documentation: { generatedAt, version: 2 } }],
+        nextCursor: null,
+      });
 
       const res = await request(app.getHttpServer()).get('/workflows').expect(200);
 
-      expect(res.body[0].documentation).toEqual({ generatedAt, version: 2 });
+      expect(res.body.items[0].documentation).toEqual({ generatedAt, version: 2 });
     });
 
     it('should expose documentation as null when no docs exist (issue #111)', async () => {
-      workflowsService.list.mockResolvedValue([{ ...persisted, documentation: null }]);
+      workflowsService.list.mockResolvedValue({
+        items: [{ ...persisted, documentation: null }],
+        nextCursor: null,
+      });
 
       const res = await request(app.getHttpServer()).get('/workflows').expect(200);
 
-      expect(res.body[0].documentation).toBeNull();
+      expect(res.body.items[0].documentation).toBeNull();
     });
   });
 

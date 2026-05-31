@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
-import type { Workflow, WorkflowExecution } from '@tietide/shared';
+import type { WorkflowExecution } from '@tietide/shared';
+import type { WorkflowListItem } from '@/api/workflows';
 import type { ExecutionsStatus } from '@/stores/executionsStore';
 import { RecentActivityRow } from './RecentActivityRow';
 
 export interface RecentActivitySectionProps {
   executions: WorkflowExecution[];
-  workflows: Workflow[];
+  workflows: WorkflowListItem[];
   status: ExecutionsStatus;
   error: string | null;
 }

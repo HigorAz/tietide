@@ -1,9 +1,14 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { CreateTagDto } from './dto/create-tag.dto';
 import type { UpdateTagDto } from './dto/update-tag.dto';
 import type { TagResponseDto } from './dto/tag-response.dto';
+import { decodeKeysetCursor } from '../common/pagination/cursor';
+import { buildPage, keysetWhere, type Page } from '../common/pagination/paginate';
+import { resolveLimit } from '../common/pagination/page-query.dto';
+import type { PageRequest } from '../common/pagination/page-request';
 
 const SAFE_SELECT = {
   id: true,
@@ -45,12 +50,29 @@ export class TagsService {
     return row;
   }
 
-  async list(userId: string): Promise<TagResponseDto[]> {
-    return this.prisma.tag.findMany({
-      where: { userId },
+  async list(userId: string, page: PageRequest = {}): Promise<Page<TagResponseDto>> {
+    const limit = resolveLimit(page.limit);
+    let where: Prisma.TagWhereInput = { userId };
+    if (page.cursor) {
+      const cursor = decodeKeysetCursor(page.cursor);
+      where = {
+        AND: [{ userId }, keysetWhere('name', 'asc', String(cursor.v), cursor.id)],
+      } as Prisma.TagWhereInput;
+    }
+
+    const peeked = await this.prisma.tag.findMany({
+      where,
       select: SAFE_SELECT,
-      orderBy: { name: 'asc' },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
     });
+
+    return buildPage(
+      peeked,
+      limit,
+      (row) => row,
+      (row) => ({ v: row.name, id: row.id }),
+    );
   }
 
   async update(userId: string, id: string, dto: UpdateTagDto): Promise<TagResponseDto> {

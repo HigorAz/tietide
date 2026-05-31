@@ -18,6 +18,10 @@ import { ActivationService } from '../provider-triggers/activation.service';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import type { WorkflowResponseDto } from './dto/workflow-response.dto';
+import type { WorkflowListItemDto } from './dto/workflow-list-response.dto';
+import { decodeKeysetCursor } from '../common/pagination/cursor';
+import { buildPage, type Page } from '../common/pagination/paginate';
+import { resolveLimit } from '../common/pagination/page-query.dto';
 
 const SAFE_SELECT = {
   id: true,
@@ -38,9 +42,15 @@ const SAFE_SELECT = {
   },
 } as const;
 
+// List projection: every SAFE_SELECT field except the heavy `definition` JSONB,
+// which list views never render (W3.2).
+const { definition: _omitDefinition, ...LIST_SELECT } = SAFE_SELECT;
+
 export interface WorkflowListFilter {
   folderId?: string | null;
   tagIds?: string[];
+  limit?: number;
+  cursor?: string;
 }
 
 function assertExecutableDefinition(definition: unknown): void {
@@ -127,22 +137,49 @@ export class WorkflowsService {
     return this.toResponse(row);
   }
 
-  async list(userId: string, filter: WorkflowListFilter = {}): Promise<WorkflowResponseDto[]> {
-    const where: Prisma.WorkflowWhereInput = { userId };
+  async list(userId: string, filter: WorkflowListFilter = {}): Promise<Page<WorkflowListItemDto>> {
+    const baseWhere: Prisma.WorkflowWhereInput = { userId };
     if (filter.folderId !== undefined) {
-      where.folderId = filter.folderId;
+      baseWhere.folderId = filter.folderId;
     }
     if (filter.tagIds && filter.tagIds.length > 0) {
-      where.tags = { some: { tagId: { in: filter.tagIds } } };
+      baseWhere.tags = { some: { tagId: { in: filter.tagIds } } };
     }
 
-    const rows = await this.prisma.workflow.findMany({
+    const limit = resolveLimit(filter.limit);
+
+    // Keyset pagination on (createdAt desc, id desc): a strict total order so a
+    // cursor unambiguously resumes after the last row of the previous page.
+    let where: Prisma.WorkflowWhereInput = baseWhere;
+    if (filter.cursor) {
+      const cursor = decodeKeysetCursor(filter.cursor);
+      const createdAt = new Date(cursor.v as string);
+      where = {
+        AND: [
+          baseWhere,
+          {
+            OR: [
+              { createdAt: { lt: createdAt } },
+              { AND: [{ createdAt }, { id: { lt: cursor.id } }] },
+            ],
+          },
+        ],
+      };
+    }
+
+    const peeked = await this.prisma.workflow.findMany({
       where,
-      select: SAFE_SELECT,
-      orderBy: { createdAt: 'desc' },
+      select: LIST_SELECT,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
     });
 
-    return rows.map((row) => this.toResponse(row));
+    return buildPage(
+      peeked,
+      limit,
+      (row) => this.toListItem(row),
+      (row) => ({ v: row.createdAt.toISOString(), id: row.id }),
+    );
   }
 
   async findOne(userId: string, id: string): Promise<WorkflowResponseDto> {
@@ -375,6 +412,36 @@ export class WorkflowsService {
       name: row.name,
       description: row.description,
       definition: row.definition as Record<string, unknown>,
+      isActive: row.isActive,
+      version: row.version,
+      folderId: row.folderId ?? null,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      executionCount: row._count?.executions ?? 0,
+      documentation: row.documentation
+        ? { generatedAt: row.documentation.updatedAt, version: row.documentation.version }
+        : null,
+      tags: (row.tags ?? []).map((t) => t.tag),
+    };
+  }
+
+  private toListItem(row: {
+    id: string;
+    name: string;
+    description: string | null;
+    isActive: boolean;
+    version: number;
+    folderId?: string | null;
+    createdAt: Date;
+    updatedAt: Date;
+    _count?: { executions: number };
+    documentation?: { updatedAt: Date; version: number } | null;
+    tags?: { tag: { id: string; name: string; color: string | null } }[];
+  }): WorkflowListItemDto {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
       isActive: row.isActive,
       version: row.version,
       folderId: row.folderId ?? null,

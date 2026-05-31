@@ -85,19 +85,19 @@ describe('ConnectionsController (integration)', () => {
       expect(connectionsService.list).not.toHaveBeenCalled();
     });
 
-    it('should return 200 with metadata-only rows (no encrypted/nonce/refresh fields)', async () => {
-      connectionsService.list.mockResolvedValue([persisted]);
+    it('should return 200 with a paginated envelope of metadata-only rows', async () => {
+      connectionsService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
 
       const res = await request(app.getHttpServer()).get('/connections').expect(200);
 
-      expect(res.body).toEqual([persisted]);
-      for (const row of res.body as Record<string, unknown>[]) {
+      expect(res.body).toEqual({ items: [persisted], nextCursor: null });
+      for (const row of res.body.items as Record<string, unknown>[]) {
         expect(row).not.toHaveProperty('configEncrypted');
         expect(row).not.toHaveProperty('configNonce');
         expect(row).not.toHaveProperty('refreshTokenEncrypted');
         expect(row).not.toHaveProperty('refreshTokenNonce');
       }
-      expect(connectionsService.list).toHaveBeenCalledWith('owner-uuid');
+      expect(connectionsService.list).toHaveBeenCalledWith('owner-uuid', {});
     });
   });
 

@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 1    |
+| 3    | Scaling & remaining correctness | 17    | 2    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -100,7 +100,7 @@
       _Note: the prompt-template delimiting sub-part is deferred — `PromptBuilder` JSON-encodes the whole definition,
       which is structurally safer than free-text interpolation, and the strong mitigation (size cap + the existing
       JSON-only output contract) is in place; full per-field fencing is a follow-up._ Files: `routes/docs.py`, `config.py`.
-- [x] **W2.7** Per-node `config` unvalidated JSONB + node-type not allow-listed — positive allow-list +
+- [x] **W2.7** (`c338606`) Per-node `config` unvalidated JSONB + node-type not allow-listed — positive allow-list +
       config structural safety. `KNOWN_NODE_TYPES` (derived from the canonical `NodeType` catalog) and a pure
       `findUnsafeConfigIssue` walker (rejects `__proto__`/`constructor`/`prototype` keys anywhere in the tree and
       bounds nesting at `MAX_CONFIG_DEPTH=20`) are wired into `executableWorkflowDefinitionSchema.superRefine`,
@@ -134,8 +134,21 @@
 - [x] **W3.1** Worker concurrency actually 1 — `@Processor('workflow-execution', { concurrency })` now driven by
       `WORKER_CONCURRENCY` (default 5, invalid→5, capped 100) via pure unit-tested `resolveWorkerConcurrency`.
       Files: `processors/workflow.processor.ts`, `processors/concurrency.config.ts`.
-- [ ] **W3.2** Unbounded list endpoints — cursor pagination + drop `definition` from list projection.
-      Files: workflows/secrets/connections/tags/folders/env-vars `.service.ts`.
+- [x] **W3.2** Unbounded list endpoints — keyset cursor pagination across all 6 list endpoints + dropped the
+      heavy `definition` JSONB from the workflows list projection. New `common/pagination/` module (generic
+      base64url `{v,id}` keyset cursor, `PageQueryDto` with clamped `limit` default 50 / max 100, `buildPage`
+      peek-and-slice, `keysetWhere` asc/desc fragment, `PaginatedResponseDto` Swagger factory). Each list now
+      `findMany({ orderBy: [<sort>, id], take: limit+1 })` and returns `{ items, nextCursor }`: workflows/secrets/
+      connections sort `createdAt desc`, tags/folders sort `name asc` (folders' tree is rebuilt client-side from
+      `parentFolderId`, so a global name order still presents siblings in order), env-vars sort `key asc`.
+      Workflows list uses a `WorkflowListItemDto` (= `WorkflowResponseDto` minus `definition`); the SPA editor
+      still loads the full definition via `getWorkflow(id)`. SPA: a `fetchAllPages` client helper transparently
+      walks `nextCursor` so the 5 list clients keep returning full arrays (stores/dashboard unchanged in behaviour,
+      server query now bounded per request); `workflowsStore`/list components widened to the definition-less
+      `WorkflowListItem`. _Pagination UI ("load more") deferred — clients accumulate all pages._
+      Files: `apps/api/src/common/pagination/*`, the 6 `*.service.ts` + their controllers + `*-list-response.dto.ts`,
+      `apps/spa/src/api/{pagination,workflows,connections,folders,tags,envVars}.ts`, `stores/workflowsStore.ts`,
+      home/dashboard workflow-list components.
 - [ ] **W3.3** No per-tenant quotas / userId tracker — getTracker→userId + quota layer.
 - [ ] **W3.4** Missing indexes — Connection `[status,expiresAt]`, Workflow `[isActive]`, ExecutionStep review. File: `schema.prisma`.
 - [ ] **W3.5** Execution/step unbounded growth — retention/archival job.

@@ -1,10 +1,15 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { CreateSecretDto } from './dto/create-secret.dto';
 import type { UpdateSecretDto } from './dto/update-secret.dto';
 import type { SecretResponseDto } from './dto/secret-response.dto';
+import { decodeKeysetCursor } from '../common/pagination/cursor';
+import { buildPage, keysetWhere, type Page } from '../common/pagination/paginate';
+import { resolveLimit } from '../common/pagination/page-query.dto';
+import type { PageRequest } from '../common/pagination/page-request';
 
 const SAFE_SELECT = {
   id: true,
@@ -52,12 +57,32 @@ export class SecretsService {
     return row;
   }
 
-  async list(userId: string): Promise<SecretResponseDto[]> {
-    return this.prisma.secret.findMany({
-      where: { userId },
+  async list(userId: string, page: PageRequest = {}): Promise<Page<SecretResponseDto>> {
+    const limit = resolveLimit(page.limit);
+    let where: Prisma.SecretWhereInput = { userId };
+    if (page.cursor) {
+      const cursor = decodeKeysetCursor(page.cursor);
+      where = {
+        AND: [
+          { userId },
+          keysetWhere('createdAt', 'desc', new Date(cursor.v as string), cursor.id),
+        ],
+      } as Prisma.SecretWhereInput;
+    }
+
+    const peeked = await this.prisma.secret.findMany({
+      where,
       select: SAFE_SELECT,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
     });
+
+    return buildPage(
+      peeked,
+      limit,
+      (row) => row,
+      (row) => ({ v: row.createdAt.toISOString(), id: row.id }),
+    );
   }
 
   async update(userId: string, id: string, dto: UpdateSecretDto): Promise<SecretResponseDto> {

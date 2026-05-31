@@ -111,7 +111,7 @@ describe('TagsService', () => {
   });
 
   describe('list', () => {
-    it('queries scoped to userId, ordered by name asc', async () => {
+    it('queries scoped to userId, keyset-ordered by name asc with a peek', async () => {
       prisma.tag.findMany.mockResolvedValue([]);
 
       await service.list(userId);
@@ -119,8 +119,29 @@ describe('TagsService', () => {
       expect(prisma.tag.findMany).toHaveBeenCalledWith({
         where: { userId },
         select: { id: true, name: true, color: true, createdAt: true },
-        orderBy: { name: 'asc' },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+        take: 51,
       });
+    });
+
+    it('wraps rows in a paginated envelope', async () => {
+      prisma.tag.findMany.mockResolvedValue([persisted]);
+
+      const result = await service.list(userId);
+
+      expect(result).toEqual({ items: [persisted], nextCursor: null });
+    });
+
+    it('applies a keyset where-clause (gt on name) when a cursor is supplied', async () => {
+      prisma.tag.findMany.mockResolvedValue([]);
+      const cursor = Buffer.from(JSON.stringify({ v: 'client-a', id: 'tag-x' }), 'utf8').toString(
+        'base64url',
+      );
+
+      await service.list(userId, { cursor });
+
+      const call = prisma.tag.findMany.mock.calls[0][0] as { where: { AND?: unknown[] } };
+      expect(call.where.AND).toBeDefined();
     });
   });
 

@@ -77,11 +77,11 @@ describe('FoldersController (integration)', () => {
       expect(foldersService.list).not.toHaveBeenCalled();
     });
 
-    it('returns 200 with the user folders', async () => {
-      foldersService.list.mockResolvedValue([persisted]);
+    it('returns 200 with a paginated envelope of the user folders', async () => {
+      foldersService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
       const res = await request(app.getHttpServer()).get('/folders').expect(200);
-      expect(res.body).toEqual([persisted]);
-      expect(foldersService.list).toHaveBeenCalledWith('owner-uuid');
+      expect(res.body).toEqual({ items: [persisted], nextCursor: null });
+      expect(foldersService.list).toHaveBeenCalledWith('owner-uuid', {});
     });
   });
 

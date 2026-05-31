@@ -174,7 +174,7 @@ describe('EnvVarsService', () => {
   });
 
   describe('list', () => {
-    it('should query USER scope filtered by ownerUserId, selecting safe fields only', async () => {
+    it('should query USER scope filtered by ownerUserId, keyset-ordered with a peek', async () => {
       prisma.environmentVariable.findMany.mockResolvedValue([]);
 
       await service.list({ scope: 'USER', ownerUserId: userId });
@@ -182,7 +182,8 @@ describe('EnvVarsService', () => {
       expect(prisma.environmentVariable.findMany).toHaveBeenCalledWith({
         where: { scope: 'USER', userId },
         select: { id: true, key: true, scope: true, createdAt: true, updatedAt: true },
-        orderBy: { key: 'asc' },
+        orderBy: [{ key: 'asc' }, { id: 'asc' }],
+        take: 51,
       });
     });
 
@@ -194,11 +195,12 @@ describe('EnvVarsService', () => {
       expect(prisma.environmentVariable.findMany).toHaveBeenCalledWith({
         where: { scope: 'GLOBAL', userId: null },
         select: { id: true, key: true, scope: true, createdAt: true, updatedAt: true },
-        orderBy: { key: 'asc' },
+        orderBy: [{ key: 'asc' }, { id: 'asc' }],
+        take: 51,
       });
     });
 
-    it('should never return valueEnc or valueNonce', async () => {
+    it('should wrap rows in a paginated envelope and never return valueEnc/valueNonce', async () => {
       const row = {
         id: envVarId,
         key: 'K',
@@ -210,10 +212,25 @@ describe('EnvVarsService', () => {
 
       const result = await service.list({ scope: 'USER', ownerUserId: userId });
 
-      result.forEach((r) => {
+      expect(result).toEqual({ items: [row], nextCursor: null });
+      result.items.forEach((r) => {
         expect(r).not.toHaveProperty('valueEnc');
         expect(r).not.toHaveProperty('valueNonce');
       });
+    });
+
+    it('should apply a keyset where-clause (gt on key) when a cursor is supplied', async () => {
+      prisma.environmentVariable.findMany.mockResolvedValue([]);
+      const cursor = Buffer.from(JSON.stringify({ v: 'API_KEY', id: 'ev-x' }), 'utf8').toString(
+        'base64url',
+      );
+
+      await service.list({ scope: 'USER', ownerUserId: userId, cursor });
+
+      const call = prisma.environmentVariable.findMany.mock.calls[0][0] as {
+        where: { AND?: unknown[] };
+      };
+      expect(call.where.AND).toBeDefined();
     });
   });
 
