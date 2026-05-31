@@ -22,7 +22,7 @@
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
 | 3    | Scaling & remaining correctness | 17    | 17   |
-| 4    | Frontend QA / low               | 5     | 2    |
+| 4    | Frontend QA / low               | 5     | 3    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
 ---
@@ -326,7 +326,13 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       API calls. New `AdminRoute` (in `ProtectedRoute.tsx`) waits for hydration then redirects anyone whose
       `user.role !== 'ADMIN'` to `/`; `/admin/env-vars` and `/admin/audit` are now wrapped in it (nested inside
       the existing ProtectedRoute). The backend RolesGuard remains the real authority — this is defense-in-depth + correct UX. Files: `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/App.tsx` (+ tests).
-- [ ] **W4.3** 401 interceptor hard-reloads — router navigation + session-expired toast. File: `api/client.ts`.
+- [x] **W4.3** 401 interceptor hard-reloads — the axios response interceptor did `window.location.href =
+    '/login'` on every 401, a full-page reload that threw away all in-app state. It now (extracted into a
+      testable `onResponseRejected`) does a **soft logout**: on a 401 _for an authenticated session_ it calls
+      `useAuthStore.logout()` — clearing the token makes `ProtectedRoute` redirect reactively, no reload — and
+      surfaces a session-expired error toast via `useToastStore`. A 401 with no active session (a failed login)
+      is left for the page to handle, and non-401s pass through untouched; the original error is always
+      re-rejected. File: `apps/spa/src/api/client.ts` (+ new `client.test.ts`).
 - [ ] **W4.4** Vague auth error messages — differentiate 429 + network. Files: `LoginPage.tsx`, `RegisterPage.tsx`.
 - [ ] **W4.5** JWT in localStorage (accepted risk) — add CSP to SPA + short TTL (ties W1.7). Files: `authStore.ts`, SPA.
 
