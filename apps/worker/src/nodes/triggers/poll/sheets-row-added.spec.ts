@@ -94,7 +94,9 @@ describe('SheetsRowAddedTrigger', () => {
     expect(result.newCursor).toBe('4');
   });
 
-  it('handles the case where the sheet shrunk (rows deleted) by holding the cursor steady', async () => {
+  it('re-baselines the cursor (not stuck high) when the sheet shrinks from deleted rows', async () => {
+    // cursor was 5 but the sheet now has only 2 rows — a regression. Holding the
+    // cursor at 5 would silently drop every row added until the sheet re-exceeds 5.
     sheetsClient.spreadsheets.values.get.mockResolvedValue({
       data: { values: [['h'], ['1']] },
     });
@@ -102,6 +104,20 @@ describe('SheetsRowAddedTrigger', () => {
     const result = await trigger.poll(makeCtx('5'));
 
     expect(result.items).toEqual([]);
-    expect(result.newCursor).toBe('5');
+    expect(result.newCursor).toBe('2');
+  });
+
+  it('emits new rows correctly on the tick after a shrink re-baseline', async () => {
+    // After re-baselining to 2, a sheet that grows to 4 must emit the 2 new rows
+    // (it would have stayed silent if the cursor were still stuck at the old 5).
+    sheetsClient.spreadsheets.values.get.mockResolvedValue({
+      data: { values: [['h'], ['1'], ['x'], ['y']] },
+    });
+
+    const result = await trigger.poll(makeCtx('2'));
+
+    expect(result.items).toHaveLength(2);
+    expect(result.items[0]).toMatchObject({ rowNumber: 3, values: ['x'] });
+    expect(result.newCursor).toBe('4');
   });
 });

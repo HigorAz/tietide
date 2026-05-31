@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 12   |
+| 3    | Scaling & remaining correctness | 17    | 13   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -236,7 +236,7 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       fresh child execution every time they ran, so re-processing a parent execution (a future BullMQ retry —
       see deferred W1.8) would re-run children and duplicate side effects. Each child is now tied to its parent
       node via a deterministic idempotencyKey (`subworkflow:<parentExec>:<nodeId>` / `iterator:<parentExec>:
-  <nodeId>:<index>`), scoped per target workflow by the existing `@@unique([workflowId, idempotencyKey])`:
+<nodeId>:<index>`), scoped per target workflow by the existing `@@unique([workflowId, idempotencyKey])`:
       before spawning, the node looks for an existing child — an already-SUCCESS child is reused without
       re-running (no duplicate side effects), a prior incomplete child is re-run in place, and the create is
       P2002-guarded (reuses the winner of a concurrent race). **requestId** is now propagated end-to-end:
@@ -257,8 +257,17 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       success-path-after-failure correctly stay CANCELLED). Also **collapsed the double write**: `recordCancelled`
       did a redundant create-then-update-to-the-same-status; both it and the new `recordUnreachedSkipped` now do
       a single terminal create. File: `apps/worker/src/engine/workflow-runner.ts` (+ spec).
-- [ ] **W3.13** Count-based poll cursor fragile — stable row identity or regression detection.
-      Files: `sheets-row-added.ts`, `excel-row-added.ts`.
+- [x] **W3.13** Count-based poll cursor fragile — both row-count cursors got stuck **high** when a sheet/table
+      shrank (deleted rows): they held the old peak, so every row added until the table re-exceeded that peak was
+      silently dropped. Added **regression detection** that re-baselines the cursor to the current size on a
+      shrink. **Sheets** reads the whole range, so it compares `totalRows < previousCount` directly. **Excel**
+      pages via `$skip`, where an empty page is ambiguous (no-new-rows vs shrink); it now disambiguates only on
+      that empty case with one extra `tables('…')/dataBodyRange?$select=rowCount` probe (a 404 = no data body =
+      0 rows → re-baseline to 0), so the common append/no-change paths stay single-call. _Note: the deeper
+      mid-table-deletion positional drift (a count cursor can't tell a shifted row from a new one) is inherent to
+      count cursors without stable per-row identity, which Sheets/Graph tables don't expose; the high-value
+      stuck-cursor data-loss bug is closed._ Files: `apps/worker/src/nodes/triggers/poll/sheets-row-added.ts`,
+      `apps/worker/src/nodes/triggers/poll/excel-row-added.ts` (+ specs).
 - [ ] **W3.14** Cron trigger only at nodes[0]; idempotency key drifts — scan all nodes; key on scheduled ts.
       Files: `cron-trigger.service.ts`, `cron-processor.ts`.
 - [ ] **W3.15** Calendar empty-poll watermark race — pre-request watermark + overlap. File: `calendar-event-created.ts`.
