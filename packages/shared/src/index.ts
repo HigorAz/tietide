@@ -99,12 +99,15 @@ export {
   cronTriggerOutputSchema,
   manualTriggerOutputSchema,
   httpRequestOutputSchema,
+  codeOutputSchema,
   conditionalOutputSchema,
   iteratorOutputSchema,
   subworkflowOutputSchema,
   returnOutputSchema,
   aiNodeOutputSchema,
   nodeOutputSchemas,
+  GENERIC_OUTPUT_SCHEMA,
+  getNodeOutputSchema,
 } from './schemas/node-output.schema.js';
 export {
   loginFormSchema,

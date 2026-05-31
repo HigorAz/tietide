@@ -1,6 +1,6 @@
 import type { Edge, Node } from 'reactflow';
 import type { z } from 'zod';
-import { nodeOutputSchemas } from '@tietide/shared';
+import { getNodeOutputSchema } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 
 export interface PathSuggestion {
@@ -31,7 +31,10 @@ export function getUpstreamSchemas(
   for (const ancestorId of ancestorsByDistance) {
     const node = nodeById.get(ancestorId);
     if (!node) continue;
-    const schema = nodeOutputSchemas[node.data.nodeType];
+    // Falls back to a generic whole-output schema for catalog node types without
+    // a concrete schema, so every upstream node offers at least one data pill.
+    // Unknown/removed types return undefined and contribute nothing.
+    const schema = getNodeOutputSchema(node.data.nodeType);
     if (!schema) continue;
     byNode[ancestorId] = schema;
     const label = node.data.label || ancestorId;
