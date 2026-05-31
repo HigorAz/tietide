@@ -20,7 +20,7 @@
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
-| 2    | Medium security                 | 11    | 9    |
+| 2    | Medium security                 | 11    | 10   |
 | 3    | Scaling & remaining correctness | 17    | 1    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
@@ -100,8 +100,20 @@
       _Note: the prompt-template delimiting sub-part is deferred — `PromptBuilder` JSON-encodes the whole definition,
       which is structurally safer than free-text interpolation, and the strong mitigation (size cap + the existing
       JSON-only output contract) is in place; full per-field fencing is a follow-up._ Files: `routes/docs.py`, `config.py`.
-- [ ] **W2.7** Per-node `config` unvalidated JSONB + node-type not allow-listed — per-type Zod schemas + allow-list.
-      Files: `workflow-definition.dto.ts`, `packages/shared/.../workflow.schema.ts`.
+- [x] **W2.7** Per-node `config` unvalidated JSONB + node-type not allow-listed — positive allow-list +
+      config structural safety. `KNOWN_NODE_TYPES` (derived from the canonical `NodeType` catalog) and a pure
+      `findUnsafeConfigIssue` walker (rejects `__proto__`/`constructor`/`prototype` keys anywhere in the tree and
+      bounds nesting at `MAX_CONFIG_DEPTH=20`) are wired into `executableWorkflowDefinitionSchema.superRefine`,
+      so the save boundary (`create`/`update` → `assertExecutableDefinition`) rejects unknown node types and unsafe
+      configs before persistence. The same walker backs an `@IsSafeNodeConfig()` class-validator on
+      `WorkflowNodeDto.config`, which runs one layer earlier at the HTTP DTO and catches a raw `__proto__` own-key
+      (zod's `z.record` silently neutralizes `__proto__` to a null prototype, so it never reaches `superRefine`) —
+      this also covers the dry-run `test` endpoint, whose `definitionOverride` bypasses the executable schema.
+      _Note: full per-type config Zod schemas for all ~190 node types are intentionally deferred — the worker
+      validates each node's config at execution, and the high-value gaps (arbitrary node `type`, prototype
+      pollution, unbounded depth) are closed here._
+      Files: `packages/shared/.../workflow.schema.ts`, `packages/shared/src/index.ts`,
+      `apps/api/.../dto/workflow-definition.dto.ts`, `apps/api/.../common/validators/safe-node-config.validator.ts`.
 - [x] **W2.8** `triggerData` + body unbounded — `main.ts` caps the request body via
       `app.useBodyParser('json'/'urlencoded', { limit: BODY_LIMIT ?? '1mb' })` (rawBody preserved for webhook HMAC);
       `TriggerExecutionDto.triggerData` gets a pure, unit-tested `@MaxSerializedBytes()` validator (default 64 KiB).

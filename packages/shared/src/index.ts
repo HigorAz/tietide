@@ -41,6 +41,10 @@ export {
   createWorkflowSchema,
   updateWorkflowSchema,
   FORBIDDEN_NODE_TYPES,
+  KNOWN_NODE_TYPES,
+  MAX_CONFIG_DEPTH,
+  findUnsafeConfigIssue,
+  type ConfigSafetyIssue,
 } from './schemas/workflow.schema.js';
 export {
   folderNameSchema,

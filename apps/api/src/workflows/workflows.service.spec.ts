@@ -211,6 +211,120 @@ describe('WorkflowsService', () => {
       expect(prisma.workflow.create).toHaveBeenCalled();
     });
 
+    describe('node-type allow-list & config safety (W2.7)', () => {
+      async function expectDefinitionRejection(
+        definition: { nodes: unknown[]; edges: unknown[] },
+        messageNeedle: string,
+      ) {
+        const promise = service.create(userId, {
+          name: 'Demo',
+          definition: definition as unknown as typeof validDefinition,
+        });
+        await expect(promise).rejects.toThrow(UnprocessableEntityException);
+        try {
+          await promise;
+        } catch (err) {
+          const body = (err as UnprocessableEntityException).getResponse() as {
+            message: string;
+            issues: { path: unknown[]; message: string }[];
+          };
+          expect(body.message).toBe('Workflow definition is not executable');
+          expect(body.issues.some((i) => i.message.includes(messageNeedle))).toBe(true);
+        }
+        expect(prisma.workflow.create).not.toHaveBeenCalled();
+        expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+      }
+
+      it('rejects a node whose type is not in the known-node allow-list', async () => {
+        await expectDefinitionRejection(
+          {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'totally-made-up-node',
+                name: 'Evil',
+                position: { x: 0, y: 0 },
+                config: {},
+              },
+            ],
+            edges: [],
+          },
+          'Unknown node type',
+        );
+      });
+
+      it('rejects a node whose config carries a prototype-pollution key', async () => {
+        // `constructor`/`prototype` survive JSON parsing as plain own keys (only
+        // `__proto__` is special-cased away by the runtime), so this exercises
+        // the save-boundary executable-schema gate. The `__proto__` variant is
+        // caught one layer earlier at the HTTP DTO (see safe-node-config spec).
+        await expectDefinitionRejection(
+          {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'manual-trigger',
+                name: 'Start',
+                position: { x: 0, y: 0 },
+                config: { constructor: { polluted: true } },
+              },
+            ],
+            edges: [],
+          },
+          'constructor',
+        );
+      });
+
+      it('rejects a config nested beyond the maximum depth', async () => {
+        let deep: Record<string, unknown> = { leaf: true };
+        for (let i = 0; i < 30; i++) {
+          deep = { nested: deep };
+        }
+        await expectDefinitionRejection(
+          {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'manual-trigger',
+                name: 'Start',
+                position: { x: 0, y: 0 },
+                config: deep,
+              },
+            ],
+            edges: [],
+          },
+          'nesting',
+        );
+      });
+
+      it('accepts a known node type with a normal nested config', async () => {
+        prisma.workflow.create.mockResolvedValue(persisted);
+        await service.create(userId, {
+          name: 'Demo',
+          definition: {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'manual-trigger',
+                name: 'Start',
+                position: { x: 0, y: 0 },
+                config: {},
+              },
+              {
+                id: 'n2',
+                type: 'http-request',
+                name: 'Call',
+                position: { x: 100, y: 0 },
+                config: { method: 'GET', headers: { 'x-a': '1' }, body: { nested: { ok: true } } },
+              },
+            ],
+            edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+          } as unknown as typeof validDefinition,
+        });
+        expect(prisma.workflow.create).toHaveBeenCalled();
+      });
+    });
+
     describe('topology validation', () => {
       const trigger = (id: string, type = 'manual-trigger', name = id) => ({
         id,
