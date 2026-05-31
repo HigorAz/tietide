@@ -13,6 +13,7 @@ import type {
 import type { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
 import { sanitizePayload, type WorkflowDefinition } from '@tietide/shared';
 import { decodeCursor, encodeCursor } from './cursor';
+import { buildSingleNodeDefinition } from './single-node-subgraph';
 
 export interface TriggerOptions {
   triggerData?: Record<string, unknown>;
@@ -192,6 +193,80 @@ export class ExecutionsService {
       resource: 'workflow',
       resourceId: workflowId,
       metadata: { executionId: created.id, triggerType: 'test' },
+    });
+
+    return this.toResponse(created);
+  }
+
+  /**
+   * Run a SINGLE node against real connector credentials (not a dry run) and
+   * capture its output, for the "Test this node" data-pill capture flow (#259).
+   * Builds a minimal subgraph (the node + its ancestors) and enqueues it via the
+   * same definition-override path as `triggerTest`, with `isDryRun: false`.
+   */
+  async triggerNodeTest(
+    userId: string,
+    workflowId: string,
+    nodeId: string,
+    options: TestTriggerOptions,
+  ): Promise<ExecutionResponseDto> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: { id: true, userId: true },
+    });
+    if (!workflow) {
+      throw new NotFoundException('Workflow not found');
+    }
+    if (workflow.userId !== userId) {
+      throw new ForbiddenException('You do not have access to this workflow');
+    }
+    if (!options.definition.nodes.some((n) => n.id === nodeId)) {
+      throw new NotFoundException('Node not found');
+    }
+
+    const subgraph = buildSingleNodeDefinition(options.definition, nodeId);
+
+    const triggerDataJson =
+      options.triggerData !== undefined
+        ? (options.triggerData as Prisma.InputJsonValue)
+        : undefined;
+
+    const created = await this.prisma.workflowExecution.create({
+      data: {
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'node-test',
+        triggerData: triggerDataJson,
+        idempotencyKey: null,
+        isDryRun: false,
+      },
+    });
+
+    const payload: WorkflowExecutionJobPayload = {
+      executionId: created.id,
+      workflowId,
+      triggerType: 'node-test',
+      triggerData: options.triggerData,
+      userId,
+      requestId: options.requestId,
+      isDryRun: false,
+      definitionOverride: subgraph,
+    };
+
+    await this.queue.add(EXECUTION_JOB_NAME, payload, {
+      jobId: created.id,
+      attempts: MAX_ATTEMPTS,
+      backoff: { type: 'exponential', delay: BACKOFF_DELAY_MS },
+      removeOnComplete: { age: 3600, count: 1000 },
+      removeOnFail: { age: 24 * 3600 },
+    });
+
+    await this.audit.log({
+      userId,
+      action: 'execution.node-test',
+      resource: 'workflow',
+      resourceId: workflowId,
+      metadata: { executionId: created.id, triggerType: 'node-test', nodeId },
     });
 
     return this.toResponse(created);
