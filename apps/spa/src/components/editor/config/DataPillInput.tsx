@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -11,9 +12,12 @@ import {
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import { getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
-
-const TOKEN_RE = /\{\{\s*([^{}]+?)\s*\}\}/g;
-const RESERVED_RE = /^[A-Z][A-Z0-9_]*$/;
+import {
+  buildPillToken,
+  findOpenTokenStart,
+  insertToken,
+  splitSegments,
+} from '@/lib/dataPillToken';
 
 export interface DataPillInputProps {
   value: string;
@@ -25,37 +29,6 @@ export interface DataPillInputProps {
   type?: 'text' | 'url';
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
-}
-
-interface Segment {
-  kind: 'literal' | 'token' | 'reserved';
-  text: string;
-}
-
-function splitSegments(value: string): Segment[] {
-  const segs: Segment[] = [];
-  let lastIdx = 0;
-  TOKEN_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = TOKEN_RE.exec(value)) !== null) {
-    if (m.index > lastIdx) {
-      segs.push({ kind: 'literal', text: value.slice(lastIdx, m.index) });
-    }
-    const inner = (m[1] ?? '').trim();
-    segs.push({ kind: RESERVED_RE.test(inner) ? 'reserved' : 'token', text: m[0] });
-    lastIdx = m.index + m[0].length;
-  }
-  if (lastIdx < value.length) segs.push({ kind: 'literal', text: value.slice(lastIdx) });
-  return segs;
-}
-
-function findOpenTokenStart(text: string, caret: number): number | null {
-  const before = text.slice(0, caret);
-  const lastOpen = before.lastIndexOf('{{');
-  if (lastOpen < 0) return null;
-  const lastClose = before.lastIndexOf('}}');
-  if (lastClose > lastOpen) return null;
-  return lastOpen;
 }
 
 export function DataPillInput({
@@ -70,6 +43,7 @@ export function DataPillInput({
 }: DataPillInputProps) {
   const nodes = useEditorStore((s) => s.nodes);
   const edges = useEditorStore((s) => s.edges);
+  const setActivePillField = useEditorStore((s) => s.setActivePillField);
 
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -78,6 +52,13 @@ export function DataPillInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
+
+  // Live refs so the stable insert callback registered with the store always
+  // reads the current value/onChange without re-registering on every keystroke.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const upstream = useMemo(() => getUpstreamSchemas(nodeId, nodes, edges), [nodeId, nodes, edges]);
 
@@ -159,17 +140,8 @@ export function DataPillInput({
   const insertSuggestion = (suggestion: PathSuggestion) => {
     const input = inputRef.current;
     const caret = input?.selectionStart ?? value.length;
-    const tokenStart = input ? findOpenTokenStart(input.value, caret) : null;
-    const tokenText = `{{${suggestion.nodeId}.${suggestion.path}}}`.replace(/\.\s*\}\}$/, '}}');
-    let newValue: string;
-    let newCaret: number;
-    if (tokenStart !== null) {
-      newValue = value.slice(0, tokenStart) + tokenText + value.slice(caret);
-      newCaret = tokenStart + tokenText.length;
-    } else {
-      newValue = value.slice(0, caret) + tokenText + value.slice(caret);
-      newCaret = caret + tokenText.length;
-    }
+    const token = buildPillToken(suggestion.nodeId, suggestion.path);
+    const { value: newValue, caret: newCaret } = insertToken(value, token, caret);
     onChange(newValue);
     setOpen(false);
     setTimeout(() => {
@@ -179,6 +151,22 @@ export function DataPillInput({
       el.setSelectionRange(newCaret, newCaret);
     }, 0);
   };
+
+  // Stable insert callback registered with the store on focus. The standalone
+  // DataPillPicker invokes it to insert a token at the live caret position.
+  // Reads value/onChange through refs so its identity never changes.
+  const insertAtCaret = useCallback((token: string) => {
+    const el = inputRef.current;
+    const caret = el?.selectionStart ?? valueRef.current.length;
+    const { value: newValue, caret: newCaret } = insertToken(valueRef.current, token, caret);
+    onChangeRef.current(newValue);
+    setTimeout(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(newCaret, newCaret);
+    }, 0);
+  }, []);
 
   const handleOptionMouseDown = (e: ReactMouseEvent<HTMLLIElement>, suggestion: PathSuggestion) => {
     e.preventDefault();
@@ -242,6 +230,8 @@ export function DataPillInput({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onFocus={() => setActivePillField({ nodeId, insert: insertAtCaret })}
+        onBlur={() => setActivePillField(null)}
         onKeyUp={(e) => refreshAutocomplete(e.currentTarget)}
         onClick={(e) => refreshAutocomplete(e.currentTarget)}
         role="combobox"
