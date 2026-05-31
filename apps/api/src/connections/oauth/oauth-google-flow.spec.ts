@@ -60,6 +60,11 @@ describe('OAuth Google flow (fixture token server)', () => {
     connection: {
       create: jest.Mock;
     };
+    oAuthState: {
+      create: jest.Mock;
+      updateMany: jest.Mock;
+      findUnique: jest.Mock;
+    };
   };
   let audit: { log: jest.Mock };
   let fixture: Awaited<ReturnType<typeof startFixtureTokenServer>>;
@@ -74,7 +79,28 @@ describe('OAuth Google flow (fixture token server)', () => {
       token_type: 'Bearer',
     });
 
+    // Stateful OAuthState store (keyed by jti) so the real OAuthService PKCE +
+    // single-use-state flow round-trips: start() inserts, handleCallback()
+    // consumes (updateMany) then reads (findUnique).
+    const oauthStates = new Map<string, Record<string, unknown> & { consumedAt: Date | null }>();
     prisma = {
+      oAuthState: {
+        create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => {
+          oauthStates.set(data.jti as string, { ...data, consumedAt: null });
+          return data;
+        }),
+        updateMany: jest.fn(async ({ where }: { where: { jti: string } }) => {
+          const row = oauthStates.get(where.jti);
+          if (row && row.consumedAt === null) {
+            row.consumedAt = new Date();
+            return { count: 1 };
+          }
+          return { count: 0 };
+        }),
+        findUnique: jest.fn(async ({ where }: { where: { jti: string } }) => {
+          return oauthStates.get(where.jti) ?? null;
+        }),
+      },
       connection: {
         create: jest.fn(async ({ data, select }) => {
           const row = {

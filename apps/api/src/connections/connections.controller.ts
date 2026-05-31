@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -32,6 +33,8 @@ import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { ConnectionResponseDto } from './dto/connection-response.dto';
 import { TestConnectionResponseDto } from './dto/test-connection-response.dto';
+import { PaginatedConnectionsDto } from './dto/connection-list-response.dto';
+import { PageQueryDto } from '../common/pagination/page-query.dto';
 
 @ApiTags('connections')
 @ApiBearerAuth()
@@ -42,10 +45,15 @@ export class ConnectionsController {
   constructor(private readonly connections: ConnectionsService) {}
 
   @Get()
-  @ApiOperation({ summary: "List the authenticated user's connections (config masked)" })
-  @ApiOkResponse({ type: ConnectionResponseDto, isArray: true })
-  async list(@CurrentUser() user: AuthenticatedUser): Promise<ConnectionResponseDto[]> {
-    return this.connections.list(user.id);
+  @ApiOperation({
+    summary: "List the authenticated user's connections (config masked, cursor-paginated)",
+  })
+  @ApiOkResponse({ type: PaginatedConnectionsDto })
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() page: PageQueryDto,
+  ): Promise<PaginatedConnectionsDto> {
+    return this.connections.list(user.id, page);
   }
 
   @Post()

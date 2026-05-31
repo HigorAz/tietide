@@ -9,7 +9,7 @@ import { WebhooksService } from './webhooks.service';
 
 interface PrismaMock {
   webhook: { findUnique: jest.Mock };
-  workflowExecution: { create: jest.Mock };
+  workflowExecution: { create: jest.Mock; findFirst: jest.Mock };
 }
 
 interface QueueMock {
@@ -46,7 +46,7 @@ describe('WebhooksService', () => {
   beforeEach(async () => {
     prisma = {
       webhook: { findUnique: jest.fn() },
-      workflowExecution: { create: jest.fn() },
+      workflowExecution: { create: jest.fn(), findFirst: jest.fn(async () => null) },
     };
     queue = { add: jest.fn(async () => undefined) };
 
@@ -113,6 +113,22 @@ describe('WebhooksService', () => {
         expect.objectContaining({ jobId: executionId, attempts: expect.any(Number) }),
       );
       expect(result).toEqual({ executionId, status: 'PENDING' });
+    });
+
+    it('dedups an in-window replay (same timestamp+signature) instead of creating a second execution', async () => {
+      const ts = Math.floor(fixedNowMs / 1000).toString();
+      const rawBody = Buffer.from(JSON.stringify({ hello: 'world' }));
+      const signature = sign(rawBody, ts);
+
+      prisma.webhook.findUnique.mockResolvedValue(activeWebhook());
+      // The same (timestamp, signature) was already processed within the window.
+      prisma.workflowExecution.findFirst.mockResolvedValue({ id: 'prior-exec', status: 'PENDING' });
+
+      const result = await service.trigger({ path, rawBody, signature, timestamp: ts });
+
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+      expect(result).toEqual({ executionId: 'prior-exec', status: 'PENDING' });
     });
 
     it('should throw UnauthorizedException when the signature does not match', async () => {

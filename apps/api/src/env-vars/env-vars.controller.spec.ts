@@ -73,13 +73,13 @@ describe('EnvVarsController (USER scope) integration', () => {
       expect(envVarsService.list).not.toHaveBeenCalled();
     });
 
-    it('should return USER-scope vars filtered by the authenticated user', async () => {
-      envVarsService.list.mockResolvedValue([persisted]);
+    it('should return a paginated envelope of USER-scope vars for the authenticated user', async () => {
+      envVarsService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
 
       const res = await request(app.getHttpServer()).get('/env-vars').expect(200);
 
-      expect(res.body).toEqual([persisted]);
-      res.body.forEach((row: Record<string, unknown>) => {
+      expect(res.body).toEqual({ items: [persisted], nextCursor: null });
+      res.body.items.forEach((row: Record<string, unknown>) => {
         expect(row).not.toHaveProperty('valueEnc');
         expect(row).not.toHaveProperty('valueNonce');
         expect(row).not.toHaveProperty('value');
@@ -87,6 +87,8 @@ describe('EnvVarsController (USER scope) integration', () => {
       expect(envVarsService.list).toHaveBeenCalledWith({
         scope: 'USER',
         ownerUserId: 'owner-uuid',
+        limit: undefined,
+        cursor: undefined,
       });
     });
   });

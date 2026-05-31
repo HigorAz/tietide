@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
@@ -47,15 +48,55 @@ export class WebhooksService {
 
     const triggerData = this.parseBody(input.rawBody);
 
-    const triggerDataJson = triggerData as Prisma.InputJsonValue;
-    const created = await this.prisma.workflowExecution.create({
-      data: {
-        workflowId: webhook.workflow.id,
-        status: 'PENDING',
-        triggerType: 'webhook',
-        triggerData: triggerDataJson,
-      },
+    // A replay within the freshness window reuses the exact same
+    // (timestamp, signature) tuple, so key idempotency on it. Combined with the
+    // @@unique([workflowId, idempotencyKey]) constraint this rejects in-window
+    // replays instead of spawning a duplicate execution per replay.
+    const idempotencyKey = `webhook:${createHash('sha256')
+      .update(`${input.timestamp ?? ''}:${input.signature ?? ''}`)
+      .digest('hex')
+      .slice(0, 32)}`;
+
+    const existing = await this.prisma.workflowExecution.findFirst({
+      where: { workflowId: webhook.workflow.id, idempotencyKey },
+      select: { id: true, status: true },
     });
+    if (existing) {
+      this.log.log(
+        { webhookPath: input.path, workflowId: webhook.workflow.id, idempotencyKey },
+        'Duplicate webhook delivery (replay), skipping',
+      );
+      return { executionId: existing.id, status: existing.status };
+    }
+
+    const triggerDataJson = triggerData as Prisma.InputJsonValue;
+    let created: { id: string };
+    try {
+      created = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId: webhook.workflow.id,
+          status: 'PENDING',
+          triggerType: 'webhook',
+          triggerData: triggerDataJson,
+          idempotencyKey,
+        },
+        select: { id: true },
+      });
+    } catch (err) {
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        'code' in err &&
+        (err as { code: unknown }).code === 'P2002'
+      ) {
+        const dup = await this.prisma.workflowExecution.findFirst({
+          where: { workflowId: webhook.workflow.id, idempotencyKey },
+          select: { id: true, status: true },
+        });
+        if (dup) return { executionId: dup.id, status: dup.status };
+      }
+      throw err;
+    }
 
     const payload: WorkflowExecutionJobPayload = {
       executionId: created.id,

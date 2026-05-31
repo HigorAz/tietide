@@ -17,13 +17,20 @@ export interface LoginResponse {
   tokenType: string;
 }
 
+// Registration auto-logs the user in: the API returns an access token alongside
+// the created user, so the SPA can persist the session without a second request.
+export interface RegisterResponse extends PublicUser {
+  accessToken: string;
+  tokenType: string;
+}
+
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/auth/login', credentials);
   return data;
 }
 
-export async function register(payload: RegisterPayload): Promise<PublicUser> {
-  const { data } = await api.post<PublicUser>('/auth/register', payload);
+export async function register(payload: RegisterPayload): Promise<RegisterResponse> {
+  const { data } = await api.post<RegisterResponse>('/auth/register', payload);
   return data;
 }
 

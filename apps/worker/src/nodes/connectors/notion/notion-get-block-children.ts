@@ -23,6 +23,8 @@ export class NotionGetBlockChildrenAction extends BaseConnectorAction<NotionOAut
   readonly name = 'Notion: Get Block Children';
   readonly description = 'Read the content blocks of a Notion page or block (paginated)';
   readonly requiredConnectionType = 'notion';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: NotionClientFactory) {
     super();

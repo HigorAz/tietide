@@ -41,7 +41,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
   let registry: ProviderTriggerRegistry;
   let prisma: {
     providerSubscription: { findUnique: jest.Mock };
-    workflowExecution: { create: jest.Mock };
+    workflowExecution: { create: jest.Mock; findFirst: jest.Mock };
   };
   let queue: { add: jest.Mock };
   let crypto: { decrypt: jest.Mock };
@@ -56,6 +56,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
       providerSubscription: { findUnique: jest.fn() },
       workflowExecution: {
         create: jest.fn(async () => ({ id: executionId, workflowId, status: 'PENDING' })),
+        findFirst: jest.fn(async () => null),
       },
     };
     queue = { add: jest.fn(async () => undefined) };

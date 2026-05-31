@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -34,6 +35,8 @@ import { EnvVarsService } from './env-vars.service';
 import { CreateEnvVarDto } from './dto/create-env-var.dto';
 import { UpdateEnvVarDto } from './dto/update-env-var.dto';
 import { EnvVarResponseDto } from './dto/env-var-response.dto';
+import { PaginatedEnvVarsDto } from './dto/env-var-list-response.dto';
+import { PageQueryDto } from '../common/pagination/page-query.dto';
 
 @ApiTags('admin-env-vars')
 @ApiBearerAuth()
@@ -46,10 +49,17 @@ export class AdminEnvVarsController {
   constructor(private readonly envVars: EnvVarsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all GLOBAL-scope env vars (values masked, admin only)' })
-  @ApiOkResponse({ type: EnvVarResponseDto, isArray: true })
-  async list(): Promise<EnvVarResponseDto[]> {
-    return this.envVars.list({ scope: 'GLOBAL', ownerUserId: null });
+  @ApiOperation({
+    summary: 'List all GLOBAL-scope env vars (values masked, admin only, cursor-paginated)',
+  })
+  @ApiOkResponse({ type: PaginatedEnvVarsDto })
+  async list(@Query() page: PageQueryDto): Promise<PaginatedEnvVarsDto> {
+    return this.envVars.list({
+      scope: 'GLOBAL',
+      ownerUserId: null,
+      limit: page.limit,
+      cursor: page.cursor,
+    });
   }
 
   @Post()

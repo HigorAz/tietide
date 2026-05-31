@@ -4,6 +4,7 @@ import type { Job } from 'bullmq';
 import { DlqService } from '../dlq/dlq.service';
 import { MAX_EXECUTION_ATTEMPTS } from '../dlq/dlq.constants';
 import { EngineService } from '../engine/engine.service';
+import { resolveWorkerConcurrency } from './concurrency.config';
 
 export interface ExecutionPayload {
   executionId: string;
@@ -14,7 +15,7 @@ export interface ExecutionPayload {
   userId?: string;
 }
 
-@Processor('workflow-execution')
+@Processor('workflow-execution', { concurrency: resolveWorkerConcurrency() })
 export class WorkflowProcessor extends WorkerHost {
   constructor(
     private readonly engine: EngineService,

@@ -9,6 +9,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -28,6 +29,8 @@ import { FoldersService } from './folders.service';
 import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
 import { DeleteFolderResultDto, FolderResponseDto } from './dto/folder-response.dto';
+import { PaginatedFoldersDto } from './dto/folder-list-response.dto';
+import { PageQueryDto } from '../common/pagination/page-query.dto';
 
 @ApiTags('folders')
 @ApiBearerAuth()
@@ -38,10 +41,13 @@ export class FoldersController {
   constructor(private readonly folders: FoldersService) {}
 
   @Get()
-  @ApiOperation({ summary: "List the authenticated user's folders (flat)" })
-  @ApiOkResponse({ type: FolderResponseDto, isArray: true })
-  async list(@CurrentUser() user: AuthenticatedUser): Promise<FolderResponseDto[]> {
-    return this.folders.list(user.id);
+  @ApiOperation({ summary: "List the authenticated user's folders (flat, cursor-paginated)" })
+  @ApiOkResponse({ type: PaginatedFoldersDto })
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() page: PageQueryDto,
+  ): Promise<PaginatedFoldersDto> {
+    return this.folders.list(user.id, page);
   }
 
   @Post()

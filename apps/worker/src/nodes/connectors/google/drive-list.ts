@@ -19,6 +19,8 @@ export class DriveListAction extends BaseConnectorAction<GoogleOAuth2Config> {
   readonly name = 'Drive: List Files';
   readonly description = 'List files in a Google Drive folder';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

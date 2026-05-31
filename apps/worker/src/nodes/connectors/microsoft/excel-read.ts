@@ -24,6 +24,8 @@ export class ExcelReadAction extends BaseConnectorAction<MicrosoftOAuth2Config> 
   readonly name = 'Excel: Read Range';
   readonly description = 'Read a range from an Excel Online worksheet (A1 notation)';
   readonly requiredConnectionType = 'microsoft';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly authService: MicrosoftAuthService) {
     super();

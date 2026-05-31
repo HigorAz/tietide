@@ -22,6 +22,8 @@ export class StripeListInvoicesAction extends BaseConnectorAction<StripeApiKeyCo
   readonly name = 'Stripe: List Invoices';
   readonly description = 'List Stripe invoices, optionally filtered by customer or status';
   readonly requiredConnectionType = 'stripe';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: StripeClientFactory) {
     super();

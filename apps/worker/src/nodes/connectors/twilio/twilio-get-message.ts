@@ -28,6 +28,8 @@ export class TwilioGetMessageAction extends BaseConnectorAction<TwilioApiKeyConf
   readonly name = 'Twilio: Get Message';
   readonly description = 'Fetch a Twilio message and its delivery status by SID';
   readonly requiredConnectionType = 'twilio';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: TwilioClientFactory) {
     super();

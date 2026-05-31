@@ -18,14 +18,14 @@ import {
   Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import type { Workflow } from '@tietide/shared';
+import type { WorkflowListItem } from '@/api/workflows';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { formatRelativeTime } from './relativeTime';
 import { MarkdownContent } from './MarkdownContent';
 
 export interface WorkflowRowProps {
-  workflow: Workflow;
+  workflow: WorkflowListItem;
   isExpanded: boolean;
   isGeneratingDocs: boolean;
   docsContent: string | null;

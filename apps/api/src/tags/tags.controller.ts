@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -31,6 +32,8 @@ import { TagsService } from './tags.service';
 import { CreateTagDto } from './dto/create-tag.dto';
 import { UpdateTagDto } from './dto/update-tag.dto';
 import { TagResponseDto } from './dto/tag-response.dto';
+import { PaginatedTagsDto } from './dto/tag-list-response.dto';
+import { PageQueryDto } from '../common/pagination/page-query.dto';
 
 @ApiTags('tags')
 @ApiBearerAuth()
@@ -41,10 +44,13 @@ export class TagsController {
   constructor(private readonly tags: TagsService) {}
 
   @Get()
-  @ApiOperation({ summary: "List the authenticated user's tags" })
-  @ApiOkResponse({ type: TagResponseDto, isArray: true })
-  async list(@CurrentUser() user: AuthenticatedUser): Promise<TagResponseDto[]> {
-    return this.tags.list(user.id);
+  @ApiOperation({ summary: "List the authenticated user's tags (cursor-paginated)" })
+  @ApiOkResponse({ type: PaginatedTagsDto })
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() page: PageQueryDto,
+  ): Promise<PaginatedTagsDto> {
+    return this.tags.list(user.id, page);
   }
 
   @Post()

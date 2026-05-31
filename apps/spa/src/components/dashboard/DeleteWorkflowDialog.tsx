@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { Workflow } from '@tietide/shared';
+import type { WorkflowListItem } from '@/api/workflows';
 import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from './Modal';
 import { cn } from '@/utils/cn';
 
 export interface DeleteWorkflowDialogProps {
-  workflow: Workflow;
+  workflow: WorkflowListItem;
   onClose: () => void;
   onConfirm: (id: string) => Promise<void> | void;
 }

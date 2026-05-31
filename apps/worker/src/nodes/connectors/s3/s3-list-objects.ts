@@ -18,6 +18,8 @@ export class S3ListObjectsAction extends BaseConnectorAction<S3CustomConfig> {
   readonly description =
     'List objects in an S3 bucket by prefix (paginated via continuation token)';
   readonly requiredConnectionType = 's3';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: S3ClientFactory) {
     super();

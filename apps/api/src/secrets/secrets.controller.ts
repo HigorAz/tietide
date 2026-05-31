@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -31,6 +32,8 @@ import { SecretsService } from './secrets.service';
 import { CreateSecretDto } from './dto/create-secret.dto';
 import { UpdateSecretDto } from './dto/update-secret.dto';
 import { SecretResponseDto } from './dto/secret-response.dto';
+import { PaginatedSecretsDto } from './dto/secret-list-response.dto';
+import { PageQueryDto } from '../common/pagination/page-query.dto';
 
 @ApiTags('secrets')
 @ApiBearerAuth()
@@ -41,10 +44,15 @@ export class SecretsController {
   constructor(private readonly secrets: SecretsService) {}
 
   @Get()
-  @ApiOperation({ summary: "List the authenticated user's secrets (values masked)" })
-  @ApiOkResponse({ type: SecretResponseDto, isArray: true })
-  async list(@CurrentUser() user: AuthenticatedUser): Promise<SecretResponseDto[]> {
-    return this.secrets.list(user.id);
+  @ApiOperation({
+    summary: "List the authenticated user's secrets (values masked, cursor-paginated)",
+  })
+  @ApiOkResponse({ type: PaginatedSecretsDto })
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() page: PageQueryDto,
+  ): Promise<PaginatedSecretsDto> {
+    return this.secrets.list(user.id, page);
   }
 
   @Post()

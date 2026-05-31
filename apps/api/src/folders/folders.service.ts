@@ -1,9 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { CreateFolderDto } from './dto/create-folder.dto';
 import type { UpdateFolderDto } from './dto/update-folder.dto';
 import type { DeleteFolderResultDto, FolderResponseDto } from './dto/folder-response.dto';
+import { decodeKeysetCursor } from '../common/pagination/cursor';
+import { buildPage, keysetWhere, type Page } from '../common/pagination/paginate';
+import { resolveLimit } from '../common/pagination/page-query.dto';
+import type { PageRequest } from '../common/pagination/page-request';
 
 const SAFE_SELECT = {
   id: true,
@@ -42,12 +47,32 @@ export class FoldersService {
     return row;
   }
 
-  async list(userId: string): Promise<FolderResponseDto[]> {
-    return this.prisma.folder.findMany({
-      where: { userId },
+  async list(userId: string, page: PageRequest = {}): Promise<Page<FolderResponseDto>> {
+    const limit = resolveLimit(page.limit);
+    // Keyset on (name asc, id asc). The tree is reconstructed client-side from
+    // parentFolderId, so a global name order still presents each parent's
+    // children in name order while giving a strict, cursorable total order.
+    let where: Prisma.FolderWhereInput = { userId };
+    if (page.cursor) {
+      const cursor = decodeKeysetCursor(page.cursor);
+      where = {
+        AND: [{ userId }, keysetWhere('name', 'asc', String(cursor.v), cursor.id)],
+      } as Prisma.FolderWhereInput;
+    }
+
+    const peeked = await this.prisma.folder.findMany({
+      where,
       select: SAFE_SELECT,
-      orderBy: [{ parentFolderId: 'asc' }, { name: 'asc' }],
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
     });
+
+    return buildPage(
+      peeked,
+      limit,
+      (row) => row,
+      (row) => ({ v: row.name, id: row.id }),
+    );
   }
 
   async update(userId: string, id: string, dto: UpdateFolderDto): Promise<FolderResponseDto> {

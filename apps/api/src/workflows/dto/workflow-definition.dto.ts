@@ -10,6 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { IsSafeNodeConfig } from '../../common/validators/safe-node-config.validator';
 
 export class WorkflowNodePositionDto {
   @ApiProperty()
@@ -45,6 +46,7 @@ export class WorkflowNodeDto {
 
   @ApiProperty({ type: 'object', additionalProperties: true })
   @IsObject()
+  @IsSafeNodeConfig()
   config!: Record<string, unknown>;
 }
 

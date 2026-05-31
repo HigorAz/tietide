@@ -36,6 +36,8 @@ export class DocsGetAction extends BaseConnectorAction<GoogleOAuth2Config> {
   readonly name = 'Docs: Get Document';
   readonly description = 'Read a Google Doc — title, plain text, and structural content';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

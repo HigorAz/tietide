@@ -74,23 +74,25 @@ describe('AdminEnvVarsController (GLOBAL scope) integration', () => {
     });
 
     it('should allow an ADMIN through to the handler', async () => {
-      envVarsService.list.mockResolvedValue([]);
+      envVarsService.list.mockResolvedValue({ items: [], nextCursor: null });
       await request(app.getHttpServer()).get('/admin/env-vars').expect(200);
       expect(envVarsService.list).toHaveBeenCalledWith({
         scope: 'GLOBAL',
         ownerUserId: null,
+        limit: undefined,
+        cursor: undefined,
       });
     });
   });
 
   describe('GET /admin/env-vars', () => {
-    it('should return GLOBAL-scope rows masked', async () => {
-      envVarsService.list.mockResolvedValue([persisted]);
+    it('should return a paginated envelope of GLOBAL-scope rows masked', async () => {
+      envVarsService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
 
       const res = await request(app.getHttpServer()).get('/admin/env-vars').expect(200);
 
-      expect(res.body).toEqual([persisted]);
-      res.body.forEach((row: Record<string, unknown>) => {
+      expect(res.body).toEqual({ items: [persisted], nextCursor: null });
+      res.body.items.forEach((row: Record<string, unknown>) => {
         expect(row).not.toHaveProperty('valueEnc');
         expect(row).not.toHaveProperty('valueNonce');
       });

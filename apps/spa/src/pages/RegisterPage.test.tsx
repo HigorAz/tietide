@@ -28,6 +28,7 @@ const renderRegister = () =>
       <Routes>
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/login" element={<div>Login Screen</div>} />
+        <Route path="/" element={<div>Dashboard Screen</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -49,7 +50,7 @@ describe('RegisterPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should call authStore.register and navigate to /login on success', async () => {
+  it('should call authStore.register and navigate to the app (/) on success (auto-login)', async () => {
     const registerMock = vi.fn().mockResolvedValueOnce(sampleUser);
     useAuthStore.setState({ register: registerMock });
     const user = userEvent.setup();
@@ -69,8 +70,9 @@ describe('RegisterPage', () => {
       });
     });
     await waitFor(() => {
-      expect(screen.getByText('Login Screen')).toBeInTheDocument();
+      expect(screen.getByText('Dashboard Screen')).toBeInTheDocument();
     });
+    expect(screen.queryByText('Login Screen')).not.toBeInTheDocument();
   });
 
   it('should toast an email-already-registered error on 409 responses', async () => {

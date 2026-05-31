@@ -47,12 +47,16 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly internalToken: string;
 
   constructor(private readonly config: ConfigService) {
     this.baseUrl = (
       this.config.get<string>('AI_SERVICE_URL', 'http://localhost:8000') ?? 'http://localhost:8000'
     ).replace(/\/+$/, '');
     this.timeoutMs = Number(this.config.get<string>('AI_SERVICE_TIMEOUT_MS', '120000'));
+    // Shared secret the AI service requires once configured. Empty in local dev
+    // (the AI service then skips the check).
+    this.internalToken = this.config.get<string>('INTERNAL_AI_TOKEN', '') ?? '';
   }
 
   async generateDocs(params: GenerateDocsParams): Promise<GenerateDocsResult> {
@@ -64,7 +68,10 @@ export class AiService {
     try {
       response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.internalToken ? { 'X-Internal-Token': this.internalToken } : {}),
+        },
         body: JSON.stringify({
           workflow_id: params.workflowId,
           workflow_name: params.workflowName,

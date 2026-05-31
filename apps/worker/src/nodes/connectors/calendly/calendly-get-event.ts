@@ -21,6 +21,8 @@ export class CalendlyGetEventAction extends BaseConnectorAction<CalendlyApiKeyCo
   readonly name = 'Calendly: Get Event';
   readonly description = 'Fetch a Calendly scheduled event by UUID';
   readonly requiredConnectionType = 'calendly';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: CalendlyClientFactory) {
     super();

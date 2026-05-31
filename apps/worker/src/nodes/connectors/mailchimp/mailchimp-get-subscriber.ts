@@ -31,6 +31,8 @@ export class MailchimpGetSubscriberAction extends BaseConnectorAction<MailchimpA
   readonly name = 'Mailchimp: Get Subscriber';
   readonly description = 'Fetch a Mailchimp audience member by email';
   readonly requiredConnectionType = 'mailchimp';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: MailchimpClientFactory) {
     super();

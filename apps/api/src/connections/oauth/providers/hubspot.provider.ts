@@ -62,6 +62,10 @@ export class HubspotOAuthProvider extends BaseOAuthProvider implements OAuthProv
       scope: args.scopes.join(' '),
       state: args.state,
     });
+    if (args.codeChallenge) {
+      params.set('code_challenge', args.codeChallenge);
+      params.set('code_challenge_method', 'S256');
+    }
     return `${AUTHORIZE_URL}?${params.toString()}`;
   }
 
@@ -72,6 +76,7 @@ export class HubspotOAuthProvider extends BaseOAuthProvider implements OAuthProv
       redirect_uri: args.redirectUri,
       client_id: this.env('HUBSPOT_OAUTH_CLIENT_ID'),
       client_secret: this.env('HUBSPOT_OAUTH_CLIENT_SECRET'),
+      ...(args.codeVerifier ? { code_verifier: args.codeVerifier } : {}),
     })) as HubspotTokenResponse;
     return this.toTokenResult(raw, null);
   }

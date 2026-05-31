@@ -17,6 +17,8 @@ export class SheetsReadAction extends BaseConnectorAction<GoogleOAuth2Config> {
   readonly name = 'Sheets: Read Range';
   readonly description = 'Read a range from a Google Sheet (A1 notation)';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

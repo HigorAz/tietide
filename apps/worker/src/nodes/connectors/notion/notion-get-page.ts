@@ -27,6 +27,8 @@ export class NotionGetPageAction extends BaseConnectorAction<NotionOAuth2Config>
   readonly name = 'Notion: Get Page';
   readonly description = 'Retrieve a Notion page and its properties by ID';
   readonly requiredConnectionType = 'notion';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: NotionClientFactory) {
     super();

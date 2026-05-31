@@ -26,7 +26,24 @@ export abstract class BaseConnectorAction<
   readonly category = 'action' as const;
   readonly outputSchema?: OutputSchema;
 
+  /**
+   * Whether executing this action mutates external state (sends a message,
+   * charges a card, writes/deletes a record, etc.). Defaults to `true` so the
+   * platform is **safe-by-default**: during a dry-run ("Test"), side-effecting
+   * actions are skipped before `run()` is ever called. Read-only actions
+   * (get/list/find/search/read) MUST override this to `false` so they still
+   * execute during a dry-run and feed realistic data to downstream nodes.
+   */
+  protected readonly sideEffect: boolean = true;
+
   async execute(input: NodeInput, context: ExecutionContext): Promise<NodeOutput> {
+    // Safe-by-default dry-run guard: never perform a real side effect during a
+    // test run. This is enforced centrally so it can't be forgotten per-action.
+    // (Read-only actions opt out via `sideEffect = false` and run normally.)
+    if (context.isDryRun && this.sideEffect) {
+      return this.buildDryRunOutput(input);
+    }
+
     const connectionId = input.connectionId;
     if (typeof connectionId !== 'string' || connectionId.length === 0) {
       throw new ConnectorMisconfiguredError(
@@ -124,6 +141,26 @@ export abstract class BaseConnectorAction<
     connection: DecryptedConnection<TConfig>,
     context: ExecutionContext,
   ): Promise<NodeOutput>;
+
+  /**
+   * Output returned in place of a real side effect during a dry-run. Subclasses
+   * MAY override to return a richer provider-shaped mock for downstream nodes;
+   * the default is a generic, clearly-marked no-op.
+   */
+  protected buildDryRunOutput(_input: NodeInput): NodeOutput {
+    return {
+      // `mocked` is kept for backward compatibility with nodes/tests that keyed
+      // off it; `dryRun`/`skipped` are the canonical flags going forward.
+      data: { mocked: true, dryRun: true, skipped: true },
+      metadata: {
+        mocked: true,
+        dryRun: true,
+        skipped: true,
+        reason: 'side-effecting action skipped during dry-run',
+        nodeType: this.type,
+      },
+    };
+  }
 
   protected isAuthError(error: unknown): boolean {
     if (error === null || typeof error !== 'object') return false;

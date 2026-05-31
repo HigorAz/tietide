@@ -182,4 +182,36 @@ describe('PollProcessor', () => {
 
     expect(trigger.poll).not.toHaveBeenCalled();
   });
+
+  it('does NOT advance the cursor when an item enqueue fails (at-least-once: re-poll next tick)', async () => {
+    trigger.poll.mockResolvedValueOnce({
+      items: [{ row: 11 }, { row: 12 }],
+      newCursor: '12',
+    });
+    // First enqueue succeeds, second throws (e.g. Redis hiccup).
+    executionQueue.add
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('redis down'));
+
+    await expect(processor.process(makeJob())).rejects.toThrow('redis down');
+
+    // Cursor stays unadvanced so the next tick re-polls the same window and
+    // dedups via idempotencyKey — no silent event loss.
+    expect(prisma.triggerCursor.upsert).not.toHaveBeenCalled();
+  });
+
+  it('advances the cursor only after all items are enqueued', async () => {
+    trigger.poll.mockResolvedValueOnce({
+      items: [{ row: 11 }, { row: 12 }],
+      newCursor: '12',
+    });
+
+    await processor.process(makeJob());
+
+    // Both items enqueued before the cursor advances.
+    expect(executionQueue.add).toHaveBeenCalledTimes(2);
+    expect(prisma.triggerCursor.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ update: expect.objectContaining({ cursor: '12' }) }),
+    );
+  });
 });

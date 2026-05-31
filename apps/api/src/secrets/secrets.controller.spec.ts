@@ -79,17 +79,17 @@ describe('SecretsController (integration)', () => {
       expect(secretsService.list).not.toHaveBeenCalled();
     });
 
-    it('should return 200 with a list of masked secrets (no value or nonce)', async () => {
-      secretsService.list.mockResolvedValue([persisted]);
+    it('should return 200 with a paginated envelope of masked secrets (no value or nonce)', async () => {
+      secretsService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
 
       const res = await request(app.getHttpServer()).get('/secrets').expect(200);
 
-      expect(res.body).toEqual([persisted]);
-      res.body.forEach((row: Record<string, unknown>) => {
+      expect(res.body).toEqual({ items: [persisted], nextCursor: null });
+      res.body.items.forEach((row: Record<string, unknown>) => {
         expect(row).not.toHaveProperty('value');
         expect(row).not.toHaveProperty('nonce');
       });
-      expect(secretsService.list).toHaveBeenCalledWith('owner-uuid');
+      expect(secretsService.list).toHaveBeenCalledWith('owner-uuid', {});
     });
   });
 

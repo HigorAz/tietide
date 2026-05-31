@@ -53,6 +53,8 @@ export class OutlookGetMessageAction extends BaseConnectorAction<MicrosoftOAuth2
   readonly name = 'Outlook: Get Message';
   readonly description = 'Fetch a full Outlook message by ID (headers, body, attachment list)';
   readonly requiredConnectionType = 'microsoft';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly authService: MicrosoftAuthService) {
     super();

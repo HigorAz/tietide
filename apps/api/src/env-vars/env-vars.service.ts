@@ -1,10 +1,14 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import type { CreateEnvVarDto } from './dto/create-env-var.dto';
 import type { UpdateEnvVarDto } from './dto/update-env-var.dto';
 import type { EnvVarResponseDto } from './dto/env-var-response.dto';
+import { decodeKeysetCursor } from '../common/pagination/cursor';
+import { buildPage, keysetWhere, type Page } from '../common/pagination/paginate';
+import { resolveLimit } from '../common/pagination/page-query.dto';
 
 export type EnvVarScope = 'GLOBAL' | 'USER';
 
@@ -38,6 +42,8 @@ interface RemoveInput extends ScopeContext {
 interface ListInput {
   scope: EnvVarScope;
   ownerUserId: string | null;
+  limit?: number;
+  cursor?: string;
 }
 
 @Injectable()
@@ -82,12 +88,30 @@ export class EnvVarsService {
     return row;
   }
 
-  async list(input: ListInput): Promise<EnvVarResponseDto[]> {
-    return (await this.prisma.environmentVariable.findMany({
-      where: { scope: input.scope, userId: input.ownerUserId },
+  async list(input: ListInput): Promise<Page<EnvVarResponseDto>> {
+    const limit = resolveLimit(input.limit);
+    const baseWhere = { scope: input.scope, userId: input.ownerUserId };
+    let where: Prisma.EnvironmentVariableWhereInput = baseWhere;
+    if (input.cursor) {
+      const cursor = decodeKeysetCursor(input.cursor);
+      where = {
+        AND: [baseWhere, keysetWhere('key', 'asc', String(cursor.v), cursor.id)],
+      } as Prisma.EnvironmentVariableWhereInput;
+    }
+
+    const peeked = (await this.prisma.environmentVariable.findMany({
+      where,
       select: SAFE_SELECT,
-      orderBy: { key: 'asc' },
-    })) as EnvVarResponseDto[];
+      orderBy: [{ key: 'asc' }, { id: 'asc' }],
+      take: limit + 1,
+    })) as (EnvVarResponseDto & { key: string })[];
+
+    return buildPage(
+      peeked,
+      limit,
+      (row) => row,
+      (row) => ({ v: row.key, id: row.id }),
+    );
   }
 
   async update(input: UpdateInput): Promise<EnvVarResponseDto> {

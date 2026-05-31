@@ -80,6 +80,8 @@ export class GmailGetMessageAction extends BaseConnectorAction<GoogleOAuth2Confi
   readonly name = 'Gmail: Get Message';
   readonly description = 'Fetch a Gmail message by ID (headers, decoded body, attachment list)';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

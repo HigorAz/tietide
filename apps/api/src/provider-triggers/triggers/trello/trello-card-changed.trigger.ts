@@ -104,7 +104,17 @@ export class TrelloCardChangedTrigger extends BasePushTrigger {
     // user OAuth-like token). We need a SEPARATE secret to verify HMAC. By
     // Trello's contract the API secret is public-shareable per developer
     // account, so we pass it through env.
-    const apiSecret = process.env.TRELLO_API_SECRET ?? cfg.token; // fallback to token for dev; production must set env.
+    // Trello signs deliveries with the developer API secret — NOT the user
+    // token. Falling back to cfg.token stored the wrong signing material (real
+    // deliveries would 401, and the user token would be repurposed as a webhook
+    // key). Require the real secret and fail activation loudly if it's absent.
+    const apiSecret = process.env.TRELLO_API_SECRET;
+    if (!apiSecret) {
+      throw new Error(
+        'TRELLO_API_SECRET is not configured — cannot verify Trello webhook signatures. ' +
+          'Set it to your Trello developer API secret before activating Trello triggers.',
+      );
+    }
 
     return {
       providerSubId: json.id,

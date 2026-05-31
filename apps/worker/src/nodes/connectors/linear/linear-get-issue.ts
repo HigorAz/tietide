@@ -41,6 +41,8 @@ export class LinearGetIssueAction extends BaseConnectorAction<LinearApiKeyConfig
   readonly name = 'Linear: Get Issue';
   readonly description = 'Fetch a Linear issue by ID';
   readonly requiredConnectionType = 'linear';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: LinearClientFactory) {
     super();

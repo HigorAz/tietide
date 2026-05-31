@@ -181,14 +181,15 @@ describe('GmailSendAction', () => {
       expect(result.metadata?.mocked).toBe(true);
     });
 
-    it('still calls the SDK when isDryRun is true but mockOnDryRun is false', async () => {
+    it('never calls the SDK on a dry-run, even when mockOnDryRun is not set (safe-by-default)', async () => {
       send.mockResolvedValue({ status: 200, data: { id: 'm' } });
       const ctx = makeContext({
         isDryRun: true,
         getConnection: jest.fn().mockResolvedValue(makeConnection()),
       });
-      await action.execute(makeInput(), ctx);
-      expect(send).toHaveBeenCalledTimes(1);
+      const result = await action.execute(makeInput(), ctx);
+      expect(send).not.toHaveBeenCalled();
+      expect(result.data).toMatchObject({ dryRun: true, skipped: true });
     });
   });
 

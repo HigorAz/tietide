@@ -5,6 +5,38 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] — 2026-05-28
+
+### Added
+
+- `SignatureInput.query?` — the inbound request's server-parsed query string.
+  Lets URL-secret providers (Mailchimp's `?secret=` token) verify against a
+  trusted, server-side value instead of a spoofable client header. Optional and
+  additive; triggers that don't need it are unaffected.
+
+## [2.5.0] — 2026-05-28
+
+### Added
+
+- `BaseConnectorAction` is now **safe-by-default during dry-runs**. A new
+  optional protected `sideEffect` flag (default `true`) gates a central
+  guard in `execute()`: when `context.isDryRun` is true and the action is
+  side-effecting, `execute()` short-circuits to `buildDryRunOutput(input)`
+  **before** resolving the connection or calling `run()`, so no real side
+  effect (message send, charge, write, delete) ever occurs during a test
+  run. Read-only actions (get/list/find/search/read) set
+  `sideEffect = false` to keep executing during a dry-run and feed
+  realistic data to downstream nodes.
+- `BaseConnectorAction.buildDryRunOutput(input)` — overridable hook
+  returning the dry-run placeholder output (default
+  `{ data: { mocked, dryRun, skipped }, metadata: {...} }`).
+
+Purely additive — both members are protected with defaults, so existing
+subclasses keep compiling and behave identically except that
+side-effecting actions are now correctly skipped on dry-runs (previously
+they only skipped when the caller opted into the per-node `mockOnDryRun`
+flag, which defaulted off — a safety bug).
+
 ## [2.4.0] — 2026-05-24
 
 ### Added

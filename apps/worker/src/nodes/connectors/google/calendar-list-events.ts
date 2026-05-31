@@ -17,6 +17,8 @@ export class CalendarListEventsAction extends BaseConnectorAction<GoogleOAuth2Co
   readonly name = 'Calendar: List Events';
   readonly description = 'List Google Calendar events in a time window';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

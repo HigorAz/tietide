@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import type { Workflow } from '@tietide/shared';
+import type { WorkflowListItem } from '@/api/workflows';
 import { formatRelativeTime } from '@/components/dashboard/relativeTime';
 import { cn } from '@/utils/cn';
 
 export interface RecentWorkflowItemProps {
-  workflow: Workflow;
+  workflow: WorkflowListItem;
 }
 
 export function RecentWorkflowItem({ workflow }: RecentWorkflowItemProps): JSX.Element {

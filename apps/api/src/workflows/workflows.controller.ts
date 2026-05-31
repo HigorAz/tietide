@@ -33,6 +33,7 @@ import { WorkflowsService } from './workflows.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import { WorkflowResponseDto } from './dto/workflow-response.dto';
+import { PaginatedWorkflowsDto } from './dto/workflow-list-response.dto';
 
 @ApiTags('workflows')
 @ApiBearerAuth()
@@ -43,8 +44,8 @@ export class WorkflowsController {
   constructor(private readonly workflows: WorkflowsService) {}
 
   @Get()
-  @ApiOperation({ summary: "List the authenticated user's workflows" })
-  @ApiOkResponse({ type: WorkflowResponseDto, isArray: true })
+  @ApiOperation({ summary: "List the authenticated user's workflows (cursor-paginated)" })
+  @ApiOkResponse({ type: PaginatedWorkflowsDto })
   @ApiQuery({
     name: 'folderId',
     required: false,
@@ -55,12 +56,32 @@ export class WorkflowsController {
     required: false,
     description: 'Comma-separated UUIDs. Returns workflows tagged with ANY of the given tags.',
   })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Max items per page (default 50, max 100).',
+  })
+  @ApiQuery({
+    name: 'cursor',
+    required: false,
+    description: "Opaque cursor from a previous page's nextCursor.",
+  })
   async list(
     @CurrentUser() user: AuthenticatedUser,
     @Query('folderId') folderId?: string,
     @Query('tagIds') tagIds?: string,
-  ): Promise<WorkflowResponseDto[]> {
-    const filter: { folderId?: string | null; tagIds?: string[] } = {};
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ): Promise<PaginatedWorkflowsDto> {
+    const filter: { folderId?: string | null; tagIds?: string[]; limit?: number; cursor?: string } =
+      {};
+    if (limit !== undefined) {
+      const parsed = Number(limit);
+      filter.limit = Number.isFinite(parsed) ? parsed : undefined;
+    }
+    if (cursor !== undefined && cursor.length > 0) {
+      filter.cursor = cursor;
+    }
     if (folderId !== undefined) {
       if (folderId === 'null') {
         filter.folderId = null;
