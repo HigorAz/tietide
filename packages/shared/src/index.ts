@@ -629,5 +629,7 @@ export {
   TemplatePathNotFoundError,
   EnvVarNotFoundError,
   TEMPLATE_TOKEN_REGEX,
+  TEMPLATE_OPERATORS,
+  type TemplateOperator,
   type EnvScope,
 } from './template-engine/template-engine.js';
