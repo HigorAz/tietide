@@ -22,7 +22,7 @@
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
 | 3    | Scaling & remaining correctness | 17    | 17   |
-| 4    | Frontend QA / low               | 5     | 4    |
+| 4    | Frontend QA / low               | 5     | 5    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
 ---
@@ -327,7 +327,7 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       `user.role !== 'ADMIN'` to `/`; `/admin/env-vars` and `/admin/audit` are now wrapped in it (nested inside
       the existing ProtectedRoute). The backend RolesGuard remains the real authority — this is defense-in-depth + correct UX. Files: `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/App.tsx` (+ tests).
 - [x] **W4.3** 401 interceptor hard-reloads — the axios response interceptor did `window.location.href =
-  '/login'` on every 401, a full-page reload that threw away all in-app state. It now (extracted into a
+'/login'` on every 401, a full-page reload that threw away all in-app state. It now (extracted into a
       testable `onResponseRejected`) does a **soft logout**: on a 401 _for an authenticated session_ it calls
       `useAuthStore.logout()` — clearing the token makes `ProtectedRoute` redirect reactively, no reload — and
       surfaces a session-expired error toast via `useToastStore`. A 401 with no active session (a failed login)
@@ -341,7 +341,16 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       status first (login 401 "Invalid credentials", register 409 "Email already registered"). Files:
       `apps/spa/src/utils/authError.ts`, `apps/spa/src/pages/LoginPage.tsx`, `apps/spa/src/pages/RegisterPage.tsx`
       (+ helper spec + LoginPage 429/network tests).
-- [ ] **W4.5** JWT in localStorage (accepted risk) — add CSP to SPA + short TTL (ties W1.7). Files: `authStore.ts`, SPA.
+- [x] **W4.5** JWT in localStorage (accepted risk) — the token stays in localStorage (SPA architecture), so the
+      mitigation is to shrink the XSS surface that could read it + limit a stolen token's lifetime. Added a
+      **Content-Security-Policy** (plus `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`,
+      COOP) to the SPA's production `nginx.conf`: `default-src 'self'`, `object-src 'none'`,
+      `frame-ancestors 'none'`, scripts/styles restricted to self (+ the Google Fonts origins the app uses),
+      `connect-src 'self' ws: wss:` for the same-origin API + Socket.IO stream. _Deliberately set at the prod
+      nginx layer, NOT as an index.html `<meta>`, because a strict CSP meta would break Vite's dev server (inline
+      scripts/HMR eval)._ Documented a **short access-TTL** recommendation on `JWT_EXPIRES_IN` in `.env.example`,
+      tied to the W1.7 `tokenVersion` revocation (a refresh-token flow to keep short TTLs seamless is a noted
+      follow-up). Files: `apps/spa/nginx.conf`, `.env.example`.
 
 ---
 
