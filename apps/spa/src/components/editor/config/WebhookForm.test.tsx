@@ -47,4 +47,9 @@ describe('WebhookForm', () => {
     render(<WebhookForm nodeId={NODE_ID} config={{ path: longPath }} />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('should render the output-sample (data-pill) field', () => {
+    render(<WebhookForm nodeId={NODE_ID} config={{}} />);
+    expect(screen.getByTestId('pill-sample-field')).toBeInTheDocument();
+  });
 });

@@ -3,6 +3,7 @@ import { webhookConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from './formRegistry';
+import { PillSampleField } from './PillSampleField';
 
 export function WebhookForm({ nodeId, config }: NodeConfigFormProps) {
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
@@ -46,6 +47,8 @@ export function WebhookForm({ nodeId, config }: NodeConfigFormProps) {
           </p>
         )}
       </div>
+
+      <PillSampleField nodeId={nodeId} config={config} />
     </div>
   );
 }

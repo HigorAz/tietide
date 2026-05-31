@@ -461,6 +461,122 @@ describe('ExecutionsService', () => {
     });
   });
 
+  describe('triggerNodeTest', () => {
+    const definition = {
+      nodes: [
+        { id: 'n1', type: 'manual-trigger', name: 'Start', position: { x: 0, y: 0 }, config: {} },
+        {
+          id: 'n2',
+          type: 'http-request',
+          name: 'Fetch',
+          position: { x: 1, y: 0 },
+          config: { url: 'https://api.example.com' },
+        },
+        {
+          id: 'n3',
+          type: 'http-request',
+          name: 'After',
+          position: { x: 2, y: 0 },
+          config: {},
+        },
+      ],
+      edges: [
+        { id: 'e1', source: 'n1', target: 'n2' },
+        { id: 'e2', source: 'n2', target: 'n3' },
+      ],
+    };
+
+    const mockPending = () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'node-test',
+        triggerData: null,
+        idempotencyKey: null,
+        isDryRun: false,
+        createdAt: new Date('2026-05-31T00:00:00Z'),
+      });
+    };
+
+    it('enqueues a non-dry-run execution with the single-node subgraph as the override', async () => {
+      mockPending();
+
+      const result = await service.triggerNodeTest(userId, workflowId, 'n2', { definition });
+
+      expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            workflowId,
+            status: 'PENDING',
+            triggerType: 'node-test',
+            isDryRun: false,
+          }),
+        }),
+      );
+      const payload = queue.add.mock.calls[0][1] as {
+        isDryRun: boolean;
+        triggerType: string;
+        definitionOverride: { nodes: { id: string }[]; edges: { id: string }[] };
+      };
+      expect(payload.isDryRun).toBe(false);
+      expect(payload.triggerType).toBe('node-test');
+      // Subgraph is target n2 + ancestor n1; downstream n3 excluded.
+      expect(payload.definitionOverride.nodes.map((n) => n.id).sort()).toEqual(['n1', 'n2']);
+      expect(payload.definitionOverride.edges.map((e) => e.id)).toEqual(['e1']);
+      expect(result).toEqual(
+        expect.objectContaining({ id: executionId, status: 'PENDING', triggerType: 'node-test' }),
+      );
+    });
+
+    it('throws NotFoundException when the workflow does not exist', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.triggerNodeTest(userId, workflowId, 'n2', { definition }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the workflow belongs to another user', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId: otherUserId });
+
+      await expect(
+        service.triggerNodeTest(userId, workflowId, 'n2', { definition }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when the node is not in the definition', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+
+      await expect(
+        service.triggerNodeTest(userId, workflowId, 'does-not-exist', { definition }),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('records an audit log entry with action "execution.node-test"', async () => {
+      mockPending();
+
+      await service.triggerNodeTest(userId, workflowId, 'n2', { definition });
+
+      expect(audit.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId,
+          action: 'execution.node-test',
+          resource: 'workflow',
+          resourceId: workflowId,
+          metadata: expect.objectContaining({ executionId, nodeId: 'n2' }),
+        }),
+      );
+    });
+  });
+
   describe('list', () => {
     const exec = (
       id: string,
