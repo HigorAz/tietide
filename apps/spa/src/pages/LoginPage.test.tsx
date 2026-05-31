@@ -87,6 +87,48 @@ describe('LoginPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('should toast a rate-limit message (not "invalid credentials") when login fails with 429', async () => {
+    const axiosError = Object.assign(new Error('Too Many Requests'), {
+      isAxiosError: true,
+      response: { status: 429 },
+    });
+    useAuthStore.setState({ login: vi.fn().mockRejectedValueOnce(axiosError) });
+    const user = userEvent.setup();
+
+    renderLogin();
+
+    await user.type(screen.getByLabelText(/email/i), 'alice@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'whatever1');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0].message).toMatch(/too many attempts/i);
+    });
+  });
+
+  it('should toast a connection message when the login request gets no response (network error)', async () => {
+    const networkError = Object.assign(new Error('Network Error'), {
+      isAxiosError: true,
+      code: 'ERR_NETWORK',
+    });
+    useAuthStore.setState({ login: vi.fn().mockRejectedValueOnce(networkError) });
+    const user = userEvent.setup();
+
+    renderLogin();
+
+    await user.type(screen.getByLabelText(/email/i), 'alice@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'whatever1');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0].message).toMatch(/cannot reach the server/i);
+    });
+  });
+
   it('should render the shared Spinner inside the submit button while signing in', async () => {
     const loginMock = vi.fn().mockReturnValue(new Promise(() => {}));
     useAuthStore.setState({ login: loginMock });

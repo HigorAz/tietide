@@ -22,7 +22,7 @@
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
 | 3    | Scaling & remaining correctness | 17    | 17   |
-| 4    | Frontend QA / low               | 5     | 3    |
+| 4    | Frontend QA / low               | 5     | 4    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
 ---
@@ -327,13 +327,20 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       `user.role !== 'ADMIN'` to `/`; `/admin/env-vars` and `/admin/audit` are now wrapped in it (nested inside
       the existing ProtectedRoute). The backend RolesGuard remains the real authority — this is defense-in-depth + correct UX. Files: `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/App.tsx` (+ tests).
 - [x] **W4.3** 401 interceptor hard-reloads — the axios response interceptor did `window.location.href =
-    '/login'` on every 401, a full-page reload that threw away all in-app state. It now (extracted into a
+  '/login'` on every 401, a full-page reload that threw away all in-app state. It now (extracted into a
       testable `onResponseRejected`) does a **soft logout**: on a 401 _for an authenticated session_ it calls
       `useAuthStore.logout()` — clearing the token makes `ProtectedRoute` redirect reactively, no reload — and
       surfaces a session-expired error toast via `useToastStore`. A 401 with no active session (a failed login)
       is left for the page to handle, and non-401s pass through untouched; the original error is always
       re-rejected. File: `apps/spa/src/api/client.ts` (+ new `client.test.ts`).
-- [ ] **W4.4** Vague auth error messages — differentiate 429 + network. Files: `LoginPage.tsx`, `RegisterPage.tsx`.
+- [x] **W4.4** Vague auth error messages — both login and register collapsed every non-credential failure into
+      "Something went wrong", so a rate-limited or offline user got no actionable signal. New shared
+      `resolveAuthErrorMessage` (`apps/spa/src/utils/authError.ts`) differentiates **429** ("Too many attempts.
+      Please wait a moment…") and a **no-response / `ERR_NETWORK`** connection failure ("Cannot reach the
+      server. Check your connection…") from a generic server error; each page still handles its own specific
+      status first (login 401 "Invalid credentials", register 409 "Email already registered"). Files:
+      `apps/spa/src/utils/authError.ts`, `apps/spa/src/pages/LoginPage.tsx`, `apps/spa/src/pages/RegisterPage.tsx`
+      (+ helper spec + LoginPage 429/network tests).
 - [ ] **W4.5** JWT in localStorage (accepted risk) — add CSP to SPA + short TTL (ties W1.7). Files: `authStore.ts`, SPA.
 
 ---

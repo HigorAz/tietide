@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
+import { resolveAuthErrorMessage } from '@/utils/authError';
 
 const inputClasses = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
@@ -43,8 +44,7 @@ export function RegisterPage(): JSX.Element {
       navigate('/', { replace: true });
     } catch (err) {
       const status = getStatus(err);
-      const message =
-        status === 409 ? 'Email already registered' : 'Something went wrong. Please try again.';
+      const message = status === 409 ? 'Email already registered' : resolveAuthErrorMessage(err);
       toast({ tone: 'error', message });
     }
   });
