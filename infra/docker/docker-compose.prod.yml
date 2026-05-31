@@ -1,0 +1,261 @@
+# TieTide — Production stack (W3.8)
+#
+# A self-contained production deployment: the four application images are built
+# from their Dockerfiles and wired onto the stateful dependencies, fronted by an
+# nginx edge proxy that terminates TLS. Unlike the dev compose, the database and
+# queue are NOT published to the host — they are only reachable over the internal
+# compose network (.claude/rules/infrastructure.md: "PostgreSQL and Valkey ports
+# NEVER exposed publicly in production").
+#
+# Usage (from the repo root):
+#   docker compose -f infra/docker/docker-compose.prod.yml --env-file .env build
+#   docker compose -f infra/docker/docker-compose.prod.yml --env-file .env up -d
+#
+# Prerequisites: a hardened `.env` (see docs/deployment.md §3 and §9 checklist),
+# DOMAIN + ACME_EMAIL set, and TLS certificates seeded (infra/docker/nginx/README.md).
+# Database migrations are applied separately, not on boot — run the `migrate`
+# profile once per schema change (see docs/deployment.md §5.5).
+
+services:
+  # ---- Stateful dependencies (internal only — no host port publishing) -------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tietide}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-tietide}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-tietide}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    # An empty REDIS_PASSWORD leaves auth off (acceptable because the port is not
+    # published); set REDIS_PASSWORD in .env to require AUTH on the internal network.
+    command: ['sh', '-c', 'exec valkey-server ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}']
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'valkey-cli ${REDIS_PASSWORD:+-a "$REDIS_PASSWORD"} ping | grep -q PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    # RAM-heavy (~8 GB for llama3.1:8b). If the VPS is constrained, remove this
+    # service and point OLLAMA_BASE_URL at a remote GPU host in .env instead.
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ['CMD-SHELL', 'ollama list >/dev/null 2>&1 || exit 1']
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    networks:
+      - backend
+
+  chromadb:
+    image: chromadb/chroma:latest
+    restart: unless-stopped
+    environment:
+      ANONYMIZED_TELEMETRY: 'false'
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - backend
+
+  # ---- Application services (internal only — reached via the edge proxy) ------
+  ai:
+    build:
+      context: ../..
+      dockerfile: apps/ai/Dockerfile
+    image: tietide-ai:latest
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    # Service-name overrides win over .env so the apps reach the compose network,
+    # not localhost. CHROMA listens on 8000 INSIDE its container (dev publishes it
+    # as 8001 on the host — internal traffic must use 8000).
+    environment:
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: '8000'
+      OLLAMA_BASE_URL: http://ollama:11434
+    depends_on:
+      chromadb:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+    networks:
+      - backend
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: tietide-api:latest
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tietide}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tietide}?schema=public
+      REDIS_HOST: valkey
+      REDIS_PORT: '6379'
+      AI_SERVICE_URL: http://ai:8000
+      # The edge proxy is the single trusted hop in front of the API.
+      TRUST_PROXY: ${TRUST_PROXY:-1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      ai:
+        condition: service_started
+    healthcheck:
+      # The runtime image is node:alpine (no curl/wget) — probe via node.
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://127.0.0.1:'+(process.env.API_PORT||3030)+'/v1/health/live',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 25s
+      retries: 3
+    networks:
+      - backend
+
+  # ---- One-shot DB migration (opt-in via the `migrate` profile) --------------
+  # The slim api runtime image strips the prisma CLI (a devDependency), so it
+  # cannot run `migrate deploy` itself. This service reuses the api Dockerfile's
+  # BUILDER stage, which still has the CLI, the schema, and the migrations.
+  #   docker compose -f infra/docker/docker-compose.prod.yml --profile migrate \
+  #     run --rm migrate
+  # Run it once per deploy that ships a schema change, BEFORE the apps start.
+  migrate:
+    profiles: ['migrate']
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      target: builder
+    image: tietide-api-builder:latest
+    restart: 'no'
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tietide}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tietide}?schema=public
+    working_dir: /repo
+    command: ['pnpm', '--filter', '@tietide/api', 'exec', 'prisma', 'migrate', 'deploy']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    image: tietide-worker:latest
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tietide}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tietide}?schema=public
+      REDIS_HOST: valkey
+      REDIS_PORT: '6379'
+      AI_SERVICE_URL: http://ai:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    # The worker's /metrics + /live server (W3.6/W3.7) is bound to loopback ONLY so
+    # a host-level Prometheus can scrape it without exposing it to the internet.
+    # Protect it further by setting METRICS_TOKEN in .env.
+    ports:
+      - '127.0.0.1:${METRICS_PORT:-9091}:${METRICS_PORT:-9091}'
+    # The Dockerfile already declares a HEALTHCHECK probing /live.
+    networks:
+      - backend
+
+  spa:
+    build:
+      context: ../..
+      dockerfile: apps/spa/Dockerfile
+      args:
+        # Same-origin relative base URL: the SPA and API are served from the same
+        # host behind the edge proxy, so "/v1" resolves against the page origin for
+        # REST and (origin undefined -> page origin) for the Socket.IO stream. This
+        # deliberately does NOT read the dev VITE_API_URL from .env (that points at
+        # localhost:3030 and would be baked into the bundle); set SPA_API_BASE_URL
+        # only if the SPA must call a different origin than it is served from.
+        VITE_API_URL: ${SPA_API_BASE_URL:-/v1}
+    image: tietide-spa:latest
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # ---- Edge reverse proxy + TLS termination ----------------------------------
+  edge:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - spa
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      # Substituted into the conf template at container start (envsubst); only env
+      # vars named here are replaced, so nginx's own $uri/$host stay intact.
+      DOMAIN: ${DOMAIN:?DOMAIN must be set in .env for the TLS server_name and cert path}
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_webroot:/var/www/certbot:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --quiet --spider http://127.0.0.1/healthz || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - backend
+
+  # ---- Let's Encrypt renewal (http-01 webroot challenge) ---------------------
+  # Initial issuance is a manual one-shot — see infra/docker/nginx/README.md. This
+  # companion only renews existing certs; reload nginx after a renewal.
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_webroot:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done'
+    networks:
+      - backend
+
+volumes:
+  postgres_data:
+  valkey_data:
+  ollama_data:
+  chroma_data:
+  certbot_certs:
+  certbot_webroot:
+
+networks:
+  backend:
+    driver: bridge

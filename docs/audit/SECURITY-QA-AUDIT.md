@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 7    |
+| 3    | Scaling & remaining correctness | 17    | 8    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -194,7 +194,23 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       `node` (no curl/wget needed in the alpine runtime). Health service + server routes unit-tested.
       Files: `apps/worker/src/metrics/{worker-health.service.ts,metrics.server.ts,metrics.module.ts}` (+ specs),
       `apps/worker/Dockerfile`.
-- [ ] **W3.8** No prod compose / TLS / secret mgmt — `docker-compose.prod.yml` + nginx TLS. Files: `infra/docker/`.
+- [x] **W3.8** No prod compose / TLS / secret mgmt — new standalone `infra/docker/docker-compose.prod.yml`
+      that **builds and wires all four app images** (api/worker/ai/spa) onto the dependency stack behind an
+      **nginx `edge` service that terminates TLS** (Let's Encrypt via a `certbot` companion;
+      `infra/docker/nginx/templates/default.conf.template` routes `/v1/*` + `/webhooks/*` → api, `/*` → spa,
+      with HSTS/X-Frame-Options/COOP headers and Socket.IO upgrade support). PostgreSQL + Valkey get **no
+      `ports:` block** (internal `backend` network only, per `.claude/rules/infrastructure.md`); the AI service
+      and `/metrics` are not proxied (worker metrics bound to `127.0.0.1:${METRICS_PORT}` loopback only);
+      `NODE_ENV=production` is forced on api+worker (activates the W2.9/W2.10 prod hardening); service-name
+      hostnames (`@postgres`, `valkey`, `http://ai:8000`) injected via compose `environment:` overriding the
+      localhost `.env` defaults; `POSTGRES_PASSWORD`/`DOMAIN` fail-fast if unset; SPA API base baked same-origin
+      `/v1` (not the dev `VITE_API_URL`). A `migrate` profile reuses the api **builder** stage (which retains the
+      prisma CLI the slim runtime strips) to run `prisma migrate deploy` — the documented way to apply the three
+      hand-authored migrations on a live DB. Secret mgmt stays `.env`/secret-manager — nothing hardcoded.
+      _Validated with `docker compose config` (the local Docker daemon is down, so container-level `nginx -t`
+      could not run; the template uses only `${DOMAIN}` envsubst and standard proxy directives)._ Files:
+      `infra/docker/docker-compose.prod.yml`, `infra/docker/nginx/templates/default.conf.template`,
+      `infra/docker/nginx/README.md`, `docs/deployment.md`.
 - [ ] **W3.9** Idempotency read-then-create races — catch P2002 (manual/poll/cron).
       Files: `executions.service.ts`, `poll-processor.ts`, `cron-processor.ts`.
 - [ ] **W3.10** Fan-in drops predecessors — merge executed-predecessor outputs keyed by nodeId. File: `workflow-runner.ts`.
