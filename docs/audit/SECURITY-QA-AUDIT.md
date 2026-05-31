@@ -22,7 +22,7 @@
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
 | 3    | Scaling & remaining correctness | 17    | 17   |
-| 4    | Frontend QA / low               | 5     | 1    |
+| 4    | Frontend QA / low               | 5     | 2    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
 ---
@@ -321,7 +321,11 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       gates on it: no token → `/login`; token present but not yet hydrated → a `role="status"` loading state
       (no content flash, no premature redirect); hydrated → children. Files: `apps/spa/src/stores/authStore.ts`,
       `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/components/layout/RootLayout.tsx` (+ tests).
-- [ ] **W4.2** No client role guard on admin routes — `AdminRoute`. Files: `ProtectedRoute.tsx`, `App.tsx`.
+- [x] **W4.2** No client role guard on admin routes — the `/admin/*` routes sat behind `ProtectedRoute` only
+      (any authenticated user), so a non-admin who navigated there rendered the admin UI and merely saw failed
+      API calls. New `AdminRoute` (in `ProtectedRoute.tsx`) waits for hydration then redirects anyone whose
+      `user.role !== 'ADMIN'` to `/`; `/admin/env-vars` and `/admin/audit` are now wrapped in it (nested inside
+      the existing ProtectedRoute). The backend RolesGuard remains the real authority — this is defense-in-depth + correct UX. Files: `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/App.tsx` (+ tests).
 - [ ] **W4.3** 401 interceptor hard-reloads — router navigation + session-expired toast. File: `api/client.ts`.
 - [ ] **W4.4** Vague auth error messages — differentiate 429 + network. Files: `LoginPage.tsx`, `RegisterPage.tsx`.
 - [ ] **W4.5** JWT in localStorage (accepted risk) — add CSP to SPA + short TTL (ties W1.7). Files: `authStore.ts`, SPA.

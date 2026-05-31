@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import type { PublicUser } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
-import { ProtectedRoute } from './ProtectedRoute';
+import { AdminRoute, ProtectedRoute } from './ProtectedRoute';
 
 const resetStore = (): void => {
   useAuthStore.setState({ user: null, token: null, hydrated: false });
@@ -56,6 +57,59 @@ describe('ProtectedRoute', () => {
 
     expect(screen.queryByText('Dashboard Screen')).not.toBeInTheDocument();
     expect(screen.queryByText('Login Screen')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+  });
+});
+
+const adminUser: PublicUser = { id: 'u1', email: 'a@x.io', name: 'Admin', role: 'ADMIN' };
+const normalUser: PublicUser = { id: 'u2', email: 'b@x.io', name: 'User', role: 'USER' };
+
+const renderAdminAt = (initial: string) =>
+  render(
+    <MemoryRouter initialEntries={[initial]}>
+      <Routes>
+        <Route path="/" element={<div>Home Screen</div>} />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <div>Admin Screen</div>
+            </AdminRoute>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+describe('AdminRoute', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  it('should render children for an ADMIN user', () => {
+    useAuthStore.setState({ token: 'jwt', user: adminUser, hydrated: true });
+
+    renderAdminAt('/admin');
+
+    expect(screen.getByText('Admin Screen')).toBeInTheDocument();
+  });
+
+  it('should redirect a non-admin (USER) away from admin routes', () => {
+    useAuthStore.setState({ token: 'jwt', user: normalUser, hydrated: true });
+
+    renderAdminAt('/admin');
+
+    expect(screen.queryByText('Admin Screen')).not.toBeInTheDocument();
+    expect(screen.getByText('Home Screen')).toBeInTheDocument();
+  });
+
+  it('should wait (loading) until auth is hydrated before judging the role', () => {
+    useAuthStore.setState({ token: 'jwt', user: null, hydrated: false });
+
+    renderAdminAt('/admin');
+
+    expect(screen.queryByText('Admin Screen')).not.toBeInTheDocument();
+    expect(screen.queryByText('Home Screen')).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
   });
 });
