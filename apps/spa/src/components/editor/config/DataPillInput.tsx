@@ -23,6 +23,7 @@ import {
   type ClosedTokenSpan,
 } from '@/lib/dataPillToken';
 import { AppendOperatorMenu } from './AppendOperatorMenu';
+import { PillOverlay } from './PillOverlay';
 
 export interface DataPillInputProps {
   value: string;
@@ -199,52 +200,12 @@ export function DataPillInput({
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
-      <div
-        aria-hidden="true"
-        data-testid="data-pill-overlay"
-        className={cn(
-          // z-10 lifts the syntax-highlighted overlay above the underlying
-          // <input>, which paints its own bg-elevated background. Without it,
-          // the input's bg covered the overlay and the text was invisible
-          // unless selected (selection highlight paints on top regardless).
-          'pointer-events-none absolute inset-0 z-10 whitespace-pre-wrap break-words',
-          'px-3 py-2 text-sm leading-6',
-        )}
-      >
-        {showPlaceholder && placeholder ? (
-          <span className="text-text-muted">{placeholder}</span>
-        ) : (
-          segments.map((seg, i) => {
-            if (seg.kind === 'literal') {
-              return (
-                <span key={i} className="text-text-primary">
-                  {seg.text}
-                </span>
-              );
-            }
-            if (seg.kind === 'reserved') {
-              return (
-                <span
-                  key={i}
-                  data-testid="data-pill-reserved"
-                  className="rounded bg-amber-400/15 px-1 text-amber-300"
-                >
-                  {seg.text}
-                </span>
-              );
-            }
-            return (
-              <span
-                key={i}
-                data-testid="data-pill-chip"
-                className="rounded bg-accent-teal/15 px-1 text-accent-teal"
-              >
-                {seg.text}
-              </span>
-            );
-          })
-        )}
-      </div>
+      <PillOverlay
+        segments={segments}
+        placeholder={placeholder}
+        showPlaceholder={showPlaceholder}
+      />
+
       <input
         ref={inputRef}
         id={id}
