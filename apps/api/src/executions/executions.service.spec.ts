@@ -205,6 +205,50 @@ describe('ExecutionsService', () => {
       expect(queue.add).toHaveBeenCalled();
     });
 
+    it('should return the existing execution when a concurrent create races the unique constraint (P2002)', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      // Pre-create dedup check sees nothing (the racing request has not committed
+      // yet), so we proceed to create — which then loses the race and the unique
+      // constraint rejects with P2002. The post-catch re-fetch finds the winner.
+      const winner = {
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'manual',
+        triggerData: null,
+        idempotencyKey: 'key-race',
+        createdAt: new Date(),
+      };
+      prisma.workflowExecution.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(winner);
+      prisma.workflowExecution.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      const result = await service.triggerManual(userId, workflowId, {
+        idempotencyKey: 'key-race',
+      });
+
+      expect(result.id).toBe(executionId);
+      // The loser must NOT enqueue a duplicate job — the winner already did.
+      expect(queue.add).not.toHaveBeenCalled();
+      expect(prisma.workflowExecution.findFirst).toHaveBeenLastCalledWith({
+        where: { workflowId, idempotencyKey: 'key-race' },
+      });
+    });
+
+    it('should rethrow a non-unique create error unchanged', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflowExecution.findFirst.mockResolvedValue(null);
+      prisma.workflowExecution.create.mockRejectedValue(
+        Object.assign(new Error('connection reset'), { code: 'P1001' }),
+      );
+
+      await expect(
+        service.triggerManual(userId, workflowId, { idempotencyKey: 'key-x' }),
+      ).rejects.toThrow('connection reset');
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
     it('should use the executionId as the BullMQ jobId for at-most-once delivery', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
       prisma.workflowExecution.create.mockResolvedValue({

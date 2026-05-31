@@ -4,6 +4,7 @@ import type { Job, Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CRON_QUEUE_NAME, EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from './cron.constants';
+import { isUniqueViolation } from '../common/prisma-error';
 
 export interface CronFirePayload {
   workflowId: string;
@@ -67,15 +68,32 @@ export class CronProcessor extends WorkerHost {
 
     const triggerData = { scheduledFor, expression };
 
-    const created = await this.prisma.workflowExecution.create({
-      data: {
-        workflowId,
-        status: 'PENDING',
-        triggerType: 'cron',
-        triggerData: triggerData as unknown as Prisma.InputJsonValue,
-        idempotencyKey,
-      },
-    });
+    let created: { id: string };
+    try {
+      created = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId,
+          status: 'PENDING',
+          triggerType: 'cron',
+          triggerData: triggerData as unknown as Prisma.InputJsonValue,
+          idempotencyKey,
+        },
+      });
+    } catch (err) {
+      // The findFirst dedup above is not atomic with this create: if two ticks
+      // for the same scheduled timestamp run concurrently, both can pass the
+      // findFirst and reach here, and the loser hits the
+      // @@unique([workflowId, idempotencyKey]) constraint (P2002). The winner has
+      // already created + enqueued the run, so swallow the duplicate and skip.
+      if (isUniqueViolation(err)) {
+        this.log.log(
+          { workflowId, idempotencyKey },
+          'Concurrent cron tick lost the idempotency race, skipping duplicate',
+        );
+        return;
+      }
+      throw err;
+    }
 
     const payload: ExecutionJobPayload = {
       executionId: created.id,

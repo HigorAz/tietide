@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 8    |
+| 3    | Scaling & remaining correctness | 17    | 9    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -211,8 +211,18 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       could not run; the template uses only `${DOMAIN}` envsubst and standard proxy directives)._ Files:
       `infra/docker/docker-compose.prod.yml`, `infra/docker/nginx/templates/default.conf.template`,
       `infra/docker/nginx/README.md`, `docs/deployment.md`.
-- [ ] **W3.9** Idempotency read-then-create races — catch P2002 (manual/poll/cron).
-      Files: `executions.service.ts`, `poll-processor.ts`, `cron-processor.ts`.
+- [x] **W3.9** Idempotency read-then-create races — the three trigger paths all did a non-atomic
+      `findFirst`-then-`create` against `@@unique([workflowId, idempotencyKey])`, so two concurrent
+      triggers carrying the same key both pass the dedup read and the loser crashes on P2002 (or, for the
+      workers, fails the whole tick). Each `create` is now wrapped to catch the unique violation:
+      **manual** (`executions.service.ts`) re-fetches and returns the winner's execution without enqueuing a
+      second job; **cron** (`cron-processor.ts`) logs and returns (the winner already enqueued); **poll**
+      (`poll-processor.ts`) `continue`s to the next item and still advances the cursor (the item is durably
+      handled), distinct from an enqueue failure which rethrows to hold the cursor. Non-P2002 errors rethrow
+      unchanged. Shared pure `isUniqueViolation` helper (`apps/worker/src/common/prisma-error.ts`) backs both
+      workers; the API service keeps a local copy (mirrors the existing provider-webhooks W1.4 pattern).
+      Files: `apps/api/src/executions/executions.service.ts`, `apps/worker/src/poll/poll-processor.ts`,
+      `apps/worker/src/cron/cron-processor.ts`, `apps/worker/src/common/prisma-error.ts` (+ specs).
 - [ ] **W3.10** Fan-in drops predecessors — merge executed-predecessor outputs keyed by nodeId. File: `workflow-runner.ts`.
 - [ ] **W3.11** Subworkflow/iterator in-process retry dup — tie child re-exec to parent idempotency; propagate requestId.
       Files: `nodes/logic/subworkflow.ts`, `workflow-runner.ts`.

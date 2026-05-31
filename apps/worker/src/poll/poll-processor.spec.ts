@@ -153,6 +153,41 @@ describe('PollProcessor', () => {
     expect(executionQueue.add).not.toHaveBeenCalled();
   });
 
+  it('treats a create that loses the unique-constraint race (P2002) as a duplicate and still advances the cursor', async () => {
+    trigger.poll.mockResolvedValueOnce({
+      items: [{ row: 11 }, { row: 12 }],
+      newCursor: '12',
+    });
+    // First item: a concurrent tick committed the same idempotency key first, so
+    // our create loses on the unique constraint. Second item: created normally.
+    prisma.workflowExecution.create.mockRejectedValueOnce(
+      Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+    );
+
+    await expect(processor.process(makeJob())).resolves.toBeUndefined();
+
+    // Only the second item is enqueued by us; the first was enqueued by the winner.
+    expect(executionQueue.add).toHaveBeenCalledTimes(1);
+    // The first item is durably handled (the winner created it), so the cursor
+    // advances — it is NOT treated like an enqueue failure.
+    expect(prisma.triggerCursor.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ update: expect.objectContaining({ cursor: '12' }) }),
+    );
+  });
+
+  it('does NOT advance the cursor when a create fails with a non-unique error', async () => {
+    trigger.poll.mockResolvedValueOnce({
+      items: [{ row: 11 }],
+      newCursor: '11',
+    });
+    prisma.workflowExecution.create.mockRejectedValueOnce(
+      Object.assign(new Error('db down'), { code: 'P1001' }),
+    );
+
+    await expect(processor.process(makeJob())).rejects.toThrow('db down');
+    expect(prisma.triggerCursor.upsert).not.toHaveBeenCalled();
+  });
+
   it('skips when workflow is inactive', async () => {
     prisma.workflow.findUnique.mockResolvedValueOnce({
       id: workflowId,

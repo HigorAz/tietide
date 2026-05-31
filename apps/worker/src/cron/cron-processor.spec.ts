@@ -153,5 +153,39 @@ describe('CronProcessor', () => {
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(executionQueue.add).not.toHaveBeenCalled();
     });
+
+    it('should treat a concurrent insert that loses the unique-constraint race (P2002) as a duplicate', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: 'wf-1',
+        userId: 'user-1',
+        isActive: true,
+      });
+      // The pre-create findFirst sees nothing, but a concurrent tick commits the
+      // same cron:<wf>:<ts> key first, so create loses on the unique constraint.
+      prisma.workflowExecution.findFirst.mockResolvedValue(null);
+      prisma.workflowExecution.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      await expect(processor.process(buildJob())).resolves.toBeUndefined();
+
+      // The winner already enqueued the run — we must not enqueue a duplicate.
+      expect(executionQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('should rethrow a non-unique create error so the tick fails and retries', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: 'wf-1',
+        userId: 'user-1',
+        isActive: true,
+      });
+      prisma.workflowExecution.findFirst.mockResolvedValue(null);
+      prisma.workflowExecution.create.mockRejectedValue(
+        Object.assign(new Error('db down'), { code: 'P1001' }),
+      );
+
+      await expect(processor.process(buildJob())).rejects.toThrow('db down');
+      expect(executionQueue.add).not.toHaveBeenCalled();
+    });
   });
 });
