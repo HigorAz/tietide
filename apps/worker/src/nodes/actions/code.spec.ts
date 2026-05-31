@@ -27,9 +27,11 @@ const makeContext = (overrides: Partial<ExecutionContext> = {}): ExecutionContex
 const makeInput = (
   params: Record<string, unknown>,
   data: Record<string, unknown> = {},
+  scope?: Record<string, unknown>,
 ): NodeInput => ({
   data,
   params,
+  ...(scope ? { scope } : {}),
 });
 
 // Worker thread spin-up is the dominant cost on this suite. Give jest enough
@@ -96,6 +98,64 @@ describe('CodeAction', () => {
 
       // JSON.stringify drops function-valued properties.
       expect(result.data.result).toEqual({ name: 'x' });
+    });
+  });
+
+  describe('execute — $nodes upstream scope (Issue #260)', () => {
+    it('should expose the upstream scope as the $nodes sandbox global', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(
+        makeInput(
+          { code: 'return { n: $nodes["http-1"].body.id, who: $nodes.trigger.user };' },
+          { body: { id: 99 } },
+          { trigger: { user: 'alice' }, 'http-1': { body: { id: 99 } } },
+        ),
+        makeContext(),
+      );
+
+      expect(result.data.result).toEqual({ n: 99, who: 'alice' });
+    });
+
+    it('should default $nodes to an empty object when no scope is provided', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(
+        makeInput({ code: 'return { type: typeof $nodes, keys: Object.keys($nodes).length };' }),
+        makeContext(),
+      );
+
+      expect(result.data.result).toEqual({ type: 'object', keys: 0 });
+    });
+
+    it('should carry the scope intact across the worker_thread boundary (nested objects + arrays)', async () => {
+      const action = new CodeAction();
+      const scope = {
+        a: { nested: { deep: [1, 2, 3] }, label: 'x' },
+        b: { items: [{ id: 1 }, { id: 2 }], flag: true },
+      };
+
+      const result = await action.execute(
+        makeInput({ code: 'return $nodes;' }, {}, scope),
+        makeContext(),
+      );
+
+      expect(result.data.result).toEqual(scope);
+    });
+
+    it('should keep $nodes (full upstream map) distinct from input (flattened last predecessor)', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(
+        makeInput(
+          { code: 'return { fromInput: input.src, branches: Object.keys($nodes).sort() };' },
+          { src: 'right' },
+          { left: { src: 'left' }, right: { src: 'right' } },
+        ),
+        makeContext(),
+      );
+
+      expect(result.data.result).toEqual({ fromInput: 'right', branches: ['left', 'right'] });
     });
   });
 

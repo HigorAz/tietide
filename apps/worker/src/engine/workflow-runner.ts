@@ -378,7 +378,9 @@ export class WorkflowRunner {
       string,
       unknown
     >;
-    return { ...input, params: resolvedParams };
+    // Surface the same upstream scope that drove template resolution so executors
+    // (e.g. the Code node's `$nodes`) can read sibling/ancestor outputs directly.
+    return { ...input, params: resolvedParams, scope };
   }
 
   private buildInput(
