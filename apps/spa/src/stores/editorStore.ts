@@ -32,12 +32,24 @@ export interface EditorSnapshot {
 
 export type EditorViewMode = 'configure' | 'result';
 
+/**
+ * The config field currently focused by the user. `insert` is the focused
+ * DataPillInput's own caret-aware inserter, registered on focus so the
+ * standalone DataPillPicker can drop a token into the live field. Transient UI
+ * state — like `selectedNodeId`, it is never captured by undo history.
+ */
+export interface ActivePillField {
+  nodeId: string;
+  insert: (token: string) => void;
+}
+
 export interface EditorState {
   workflowId: string | null;
   nodes: Node<CustomNodeData>[];
   edges: Edge[];
   isDirty: boolean;
   selectedNodeId: string | null;
+  activePillField: ActivePillField | null;
   past: EditorSnapshot[];
   future: EditorSnapshot[];
   entryRoute: string | null;
@@ -56,6 +68,7 @@ export interface EditorActions {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   selectNode: (id: string | null) => void;
+  setActivePillField: (field: ActivePillField | null) => void;
   updateNodeConfig: (id: string, patch: Record<string, unknown>) => void;
   toggleNodeSkip: (id: string) => void;
   toggleSkipOnSelected: () => void;
@@ -82,6 +95,7 @@ export const initialEditorState: EditorState = {
   edges: [],
   isDirty: false,
   selectedNodeId: null,
+  activePillField: null,
   past: [],
   future: [],
   entryRoute: null,
@@ -230,6 +244,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     },
 
     selectNode: (id) => set({ selectedNodeId: id }),
+
+    setActivePillField: (field) => set({ activePillField: field }),
 
     updateNodeConfig: (id, patch) => {
       const { nodes } = get();
@@ -388,6 +404,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         edges,
         isDirty: false,
         selectedNodeId: null,
+        activePillField: null,
         past: [],
         future: [],
         entryRoute: entryRoute ?? null,
