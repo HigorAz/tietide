@@ -23,6 +23,7 @@ import { DemoModule } from './demo/demo.module';
 import { LibraryModule } from './library/library.module';
 import { FoldersModule } from './folders/folders.module';
 import { TagsModule } from './tags/tags.module';
+import { MetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { TagsModule } from './tags/tags.module';
     LibraryModule,
     FoldersModule,
     TagsModule,
+    MetricsModule,
   ],
 })
 export class AppModule {}

@@ -11,6 +11,7 @@ import { DlqModule } from './dlq/dlq.module';
 import { OAuthRefreshModule } from './connections/refresh/oauth-refresh.module';
 import { PollModule } from './poll/poll.module';
 import { RetentionModule } from './retention/retention.module';
+import { WorkerMetricsModule } from './metrics/metrics.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { RetentionModule } from './retention/retention.module';
     OAuthRefreshModule,
     PollModule,
     RetentionModule,
+    WorkerMetricsModule,
   ],
   providers: [WorkflowProcessor],
 })

@@ -4,6 +4,7 @@ import type { Job } from 'bullmq';
 import { DlqService } from '../dlq/dlq.service';
 import { MAX_EXECUTION_ATTEMPTS } from '../dlq/dlq.constants';
 import { EngineService } from '../engine/engine.service';
+import { WorkerMetricsService } from '../metrics/worker-metrics.service';
 import { WorkflowProcessor, type ExecutionPayload } from './workflow.processor';
 
 describe('WorkflowProcessor', () => {
@@ -11,17 +12,20 @@ describe('WorkflowProcessor', () => {
   let engine: { execute: jest.Mock };
   let logger: { log: jest.Mock; error: jest.Mock };
   let dlq: { publishFailed: jest.Mock };
+  let metrics: { observeExecution: jest.Mock };
 
   beforeEach(async () => {
     engine = { execute: jest.fn(async () => undefined) };
     logger = { log: jest.fn(), error: jest.fn() };
     dlq = { publishFailed: jest.fn(async () => undefined) };
+    metrics = { observeExecution: jest.fn() };
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowProcessor,
         { provide: EngineService, useValue: engine },
         { provide: Logger, useValue: logger },
         { provide: DlqService, useValue: dlq },
+        { provide: WorkerMetricsService, useValue: metrics },
       ],
     }).compile();
     processor = mod.get(WorkflowProcessor);
@@ -42,6 +46,17 @@ describe('WorkflowProcessor', () => {
       expect(engine.execute).toHaveBeenCalledWith(payload);
     });
 
+    it('observes a completed execution into the duration histogram', async () => {
+      const job = {
+        id: 'job-1',
+        data: { executionId: 'e', workflowId: 'w', triggerType: 'manual' },
+      } as unknown as Job<ExecutionPayload>;
+
+      await processor.process(job);
+
+      expect(metrics.observeExecution).toHaveBeenCalledWith('completed', expect.any(Number));
+    });
+
     it('should let exceptions from EngineService bubble up for BullMQ retry', async () => {
       engine.execute.mockRejectedValue(new Error('database down'));
       const job = {
@@ -50,6 +65,7 @@ describe('WorkflowProcessor', () => {
       } as unknown as Job<ExecutionPayload>;
 
       await expect(processor.process(job)).rejects.toThrow('database down');
+      expect(metrics.observeExecution).toHaveBeenCalledWith('failed', expect.any(Number));
     });
 
     it('should emit a structured log with executionId, workflowId, status and requestId', async () => {

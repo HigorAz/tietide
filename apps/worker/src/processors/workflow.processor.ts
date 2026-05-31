@@ -4,6 +4,7 @@ import type { Job } from 'bullmq';
 import { DlqService } from '../dlq/dlq.service';
 import { MAX_EXECUTION_ATTEMPTS } from '../dlq/dlq.constants';
 import { EngineService } from '../engine/engine.service';
+import { WorkerMetricsService } from '../metrics/worker-metrics.service';
 import { resolveWorkerConcurrency } from './concurrency.config';
 
 export interface ExecutionPayload {
@@ -21,6 +22,7 @@ export class WorkflowProcessor extends WorkerHost {
     private readonly engine: EngineService,
     private readonly logger: Logger,
     private readonly dlq: DlqService,
+    private readonly metrics: WorkerMetricsService,
   ) {
     super();
   }
@@ -33,13 +35,14 @@ export class WorkflowProcessor extends WorkerHost {
     const start = Date.now();
     try {
       await this.engine.execute(job.data);
-      this.logger.log(
-        { ...ctx, status: 'completed', durationMs: Date.now() - start },
-        'Workflow execution completed',
-      );
+      const durationMs = Date.now() - start;
+      this.metrics.observeExecution('completed', durationMs / 1000);
+      this.logger.log({ ...ctx, status: 'completed', durationMs }, 'Workflow execution completed');
     } catch (err) {
+      const durationMs = Date.now() - start;
+      this.metrics.observeExecution('failed', durationMs / 1000);
       this.logger.error(
-        { ...ctx, status: 'failed', durationMs: Date.now() - start, err: (err as Error).message },
+        { ...ctx, status: 'failed', durationMs, err: (err as Error).message },
         'Workflow execution failed',
       );
       throw err;
