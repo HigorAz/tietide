@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Edge, Node } from 'reactflow';
-import { NodeType } from '@tietide/shared';
+import { NodeType, resolveTemplate } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import type { NodeRunState } from '@/stores/executionLiveStore';
 import { buildPreviewScope } from './buildPreviewScope';
@@ -130,5 +130,33 @@ describe('buildPreviewScope', () => {
     const scope = buildPreviewScope('http', nodes, edges, live);
 
     expect(scope.trigger).toEqual({ method: 'PUT', body: { live: true } });
+  });
+
+  // #258: the editor preview resolves chained-method tokens through the SAME shared engine
+  // the worker uses. This fixture (expression + upstream data + expected) is mirrored in
+  // the worker integration test (apps/worker/.../engine/workflow-runner.spec.ts) so the two
+  // surfaces are guaranteed to resolve identically.
+  it('should resolve chained-method tokens over the preview scope (matches worker execution)', () => {
+    const nodes = [
+      makeNode('trigger', NodeType.MANUAL_TRIGGER),
+      makeNode('http', NodeType.HTTP_REQUEST),
+    ];
+    const edges = [makeEdge('trigger', 'http')];
+    const live = new Map<string, NodeRunState>();
+    live.set(
+      'trigger',
+      makeRunState({
+        items: [{ name: 'Alice' }, { name: 'Bob' }],
+        tags: ['x', 'y', 'z'],
+        email: 'user@example.com',
+      }),
+    );
+
+    const scope = buildPreviewScope('http', nodes, edges, live);
+
+    expect(resolveTemplate('{{trigger.items.first.name}}', scope)).toBe('Alice');
+    expect(resolveTemplate('{{trigger.tags.join(", ")}}', scope)).toBe('x, y, z');
+    expect(resolveTemplate('{{trigger.email.upcase}}', scope)).toBe('USER@EXAMPLE.COM');
+    expect(resolveTemplate('{{trigger.items.size}}', scope)).toBe(2);
   });
 });

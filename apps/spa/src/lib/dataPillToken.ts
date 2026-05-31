@@ -75,3 +75,52 @@ export function insertToken(value: string, token: string, caret: number): Insert
     caret: c + token.length,
   };
 }
+
+export interface ClosedTokenSpan {
+  /** Index of the opening `{{`. */
+  start: number;
+  /** Index just past the closing `}}` (equals the caret). */
+  end: number;
+  /** Trimmed inner expression, e.g. `http_1.body.name`. */
+  inner: string;
+}
+
+/**
+ * When the caret sits immediately after a complete `{{ … }}` token, return that token's
+ * span; otherwise null. Drives the #258 "append operator" menu availability.
+ */
+export function findClosedTokenBeforeCaret(value: string, caret: number): ClosedTokenSpan | null {
+  const before = value.slice(0, Math.min(Math.max(caret, 0), value.length));
+  if (!before.endsWith('}}')) return null;
+  const start = before.lastIndexOf('{{');
+  if (start === -1) return null;
+  const inner = before.slice(start + 2, before.length - 2);
+  if (inner.includes('{{') || inner.includes('}}')) return null;
+  if (inner.trim().length === 0) return null;
+  return { start, end: before.length, inner: inner.trim() };
+}
+
+/**
+ * Append a template operator to the closed token immediately before the caret. The token is
+ * rebuilt from its trimmed inner expression. For arg-taking operators (`join`, `default`) it
+ * inserts empty quotes and parks the caret between them. No-op when the caret is not right
+ * after a closed token.
+ */
+export function appendOperatorAtCaret(
+  value: string,
+  caret: number,
+  op: { name: string; hasArg: boolean },
+): InsertResult {
+  const span = findClosedTokenBeforeCaret(value, caret);
+  if (!span) return { value, caret };
+
+  const opText = op.hasArg ? `.${op.name}("")` : `.${op.name}`;
+  const newInner = `${span.inner}${opText}`;
+  const before = value.slice(0, span.start);
+  const after = value.slice(span.end);
+  const nextValue = `${before}{{${newInner}}}${after}`;
+
+  // Caret: between the inserted quotes for arg operators, else right after the operator name.
+  const innerCaret = op.hasArg ? newInner.length - 2 : newInner.length;
+  return { value: nextValue, caret: before.length + 2 + innerCaret };
+}
