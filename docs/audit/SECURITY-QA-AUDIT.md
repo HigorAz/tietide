@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 10   |
+| 3    | Scaling & remaining correctness | 17    | 11   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -232,8 +232,20 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       Template refs `{{nodeId.field}}` were already resolved against the full by-id scope, so they are
       unaffected. File: `apps/worker/src/engine/workflow-runner.ts` (+ spec: replaced the old "last wins (MVP)"
       assertion with a keyed-merge assertion, added a single-predecessor flat-passthrough regression test).
-- [ ] **W3.11** Subworkflow/iterator in-process retry dup — tie child re-exec to parent idempotency; propagate requestId.
-      Files: `nodes/logic/subworkflow.ts`, `workflow-runner.ts`.
+- [x] **W3.11** Subworkflow/iterator in-process retry dup + requestId propagation — both logic nodes spawned a
+      fresh child execution every time they ran, so re-processing a parent execution (a future BullMQ retry —
+      see deferred W1.8) would re-run children and duplicate side effects. Each child is now tied to its parent
+      node via a deterministic idempotencyKey (`subworkflow:<parentExec>:<nodeId>` / `iterator:<parentExec>:
+    <nodeId>:<index>`), scoped per target workflow by the existing `@@unique([workflowId, idempotencyKey])`:
+      before spawning, the node looks for an existing child — an already-SUCCESS child is reused without
+      re-running (no duplicate side effects), a prior incomplete child is re-run in place, and the create is
+      P2002-guarded (reuses the winner of a concurrent race). **requestId** is now propagated end-to-end:
+      `ExecutionContext` gained an optional `requestId` (`@tietide/sdk@2.7.0`, additive + CHANGELOG), the runner
+      threads the run's requestId into every node context, and the subworkflow forwards it on the child
+      `engine.execute` (iterator children already received it via `this.run`), so a parent→child execution tree
+      shares one correlation id in the logs. Files: `packages/sdk/src/interfaces/context.interface.ts`,
+      `packages/sdk/CHANGELOG.md` + version bump, `apps/worker/src/nodes/logic/subworkflow.ts`,
+      `apps/worker/src/engine/workflow-runner.ts` (+ subworkflow, runner, and iterator-integration specs).
 - [ ] **W3.12** Conditional CANCELLED vs SKIPPED — distinct status; collapse double write. File: `workflow-runner.ts`.
 - [ ] **W3.13** Count-based poll cursor fragile — stable row identity or regression detection.
       Files: `sheets-row-added.ts`, `excel-row-added.ts`.

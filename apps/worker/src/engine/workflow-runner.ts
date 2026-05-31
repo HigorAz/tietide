@@ -24,6 +24,7 @@ import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/con
 import { CircularDependencyError, topologicalSort } from './topological-sort';
 import { buildBodyDefinition, extractBodySubgraph, validateBodySubgraph } from './iterator-runner';
 import { ITERATOR_NODE_TYPE } from '../nodes/logic/iterator';
+import { isUniqueViolation } from '../common/prisma-error';
 
 export const MAX_RECURSION_DEPTH = 5;
 
@@ -243,7 +244,14 @@ export class WorkflowRunner {
       const started = Date.now();
       try {
         const executor = this.registry.resolve(n.type)!;
-        const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun, depth);
+        const ctx = this.buildContext(
+          executionId,
+          workflowId,
+          n.id,
+          isDryRun,
+          depth,
+          args.requestId,
+        );
         const resolvedInput = this.resolveInputTemplates(input, executionOrder, outputs, envScope);
         const output = await executor.execute(resolvedInput, ctx);
         const durationMs = Date.now() - started;
@@ -612,19 +620,34 @@ export class WorkflowRunner {
     for (let index = 0; index < total; index++) {
       const item = items[index];
       const iterStartedAt = new Date();
-      const child = await this.prisma.workflowExecution.create({
-        data: {
-          workflowId,
-          parentExecutionId,
-          status: 'RUNNING',
-          triggerType: 'iterator',
-          triggerData: { item, index, total } as object,
-          isDryRun,
-          startedAt: iterStartedAt,
-        },
-        select: { id: true },
+
+      // Tie each iteration child to (parent execution, iterator node, index) so a
+      // re-processed parent (e.g. a future BullMQ retry — see W1.8) reuses the
+      // child it already ran instead of duplicating the iteration's side effects.
+      // Scoped per workflow via the child's @@unique([workflowId, idempotencyKey]).
+      const iterKey = `iterator:${parentExecutionId}:${n.id}:${index}`;
+      const priorChild = await this.prisma.workflowExecution.findFirst({
+        where: { workflowId, idempotencyKey: iterKey },
+        select: { id: true, status: true },
       });
-      const childExecutionId = child.id;
+      if (priorChild?.status === 'SUCCESS') {
+        // Already completed on a previous attempt — count it and skip re-running.
+        succeeded += 1;
+        continue;
+      }
+
+      const childExecutionId = priorChild
+        ? priorChild.id // prior attempt created it but did not finish — re-run in place
+        : await this.createIterationChild({
+            workflowId,
+            parentExecutionId,
+            item,
+            index,
+            total,
+            isDryRun,
+            iterStartedAt,
+            idempotencyKey: iterKey,
+          });
 
       await this.events.publishIterationStarted({
         executionId: parentExecutionId,
@@ -763,12 +786,52 @@ export class WorkflowRunner {
     return { status: 'SUCCESS' };
   }
 
+  // Create one iteration's child execution, tolerating a concurrent attempt that
+  // wins the unique-key race by reusing the row it created.
+  private async createIterationChild(args: {
+    workflowId: string;
+    parentExecutionId: string;
+    item: unknown;
+    index: number;
+    total: number;
+    isDryRun: boolean;
+    iterStartedAt: Date;
+    idempotencyKey: string;
+  }): Promise<string> {
+    try {
+      const child = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId: args.workflowId,
+          parentExecutionId: args.parentExecutionId,
+          status: 'RUNNING',
+          triggerType: 'iterator',
+          triggerData: { item: args.item, index: args.index, total: args.total } as object,
+          isDryRun: args.isDryRun,
+          startedAt: args.iterStartedAt,
+          idempotencyKey: args.idempotencyKey,
+        },
+        select: { id: true },
+      });
+      return child.id;
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const winner = await this.prisma.workflowExecution.findFirst({
+          where: { workflowId: args.workflowId, idempotencyKey: args.idempotencyKey },
+          select: { id: true },
+        });
+        if (winner) return winner.id;
+      }
+      throw err;
+    }
+  }
+
   private buildContext(
     executionId: string,
     workflowId: string,
     nodeId: string,
     isDryRun: boolean,
     depth: number,
+    requestId: string | undefined,
   ): ExecutionContext {
     const secrets = this.secretResolver;
     const connections = this.connectionResolver;
@@ -785,6 +848,7 @@ export class WorkflowRunner {
       logger,
       isDryRun,
       depth,
+      requestId,
       getSecret: (name: string) => secrets.getSecret(executionId, name),
       getConnection: <TConfig = Record<string, unknown>>(connectionId: string) =>
         connections.getConnection<TConfig>(executionId, connectionId),

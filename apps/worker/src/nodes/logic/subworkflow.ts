@@ -4,6 +4,7 @@ import { subworkflowConfigSchema, subworkflowOutputSchema } from '@tietide/share
 import { PrismaService } from '../../prisma/prisma.service';
 import { EngineService, type ExecutePayload as _ExecutePayload } from '../../engine/engine.service';
 import { MAX_RECURSION_DEPTH, RecursionDepthExceededError } from '../../engine/workflow-runner';
+import { isUniqueViolation } from '../../common/prisma-error';
 
 export const SUBWORKFLOW_NODE_TYPE = 'subworkflow';
 
@@ -62,36 +63,44 @@ export class SubworkflowAction implements INodeExecutor {
       throw new SubworkflowTargetNotFoundError(config.workflowId);
     }
 
-    // Spawn the child execution row up front so the WS overlay sees it
-    // appear before the engine flips it to RUNNING.
-    const child = await this.prisma.workflowExecution.create({
-      data: {
+    // Tie the child to this exact parent node so a re-processed parent execution
+    // (e.g. a future BullMQ retry — see W1.8) reuses the child it already spawned
+    // instead of running the subworkflow again (duplicate side effects). Scoped
+    // per target workflow via the child's @@unique([workflowId, idempotencyKey]).
+    const idempotencyKey = `subworkflow:${context.executionId}:${context.nodeId}`;
+    const existing = await this.prisma.workflowExecution.findFirst({
+      where: { workflowId: config.workflowId, idempotencyKey },
+      select: { id: true, status: true },
+    });
+
+    let childId: string;
+    if (existing?.status === 'SUCCESS') {
+      // A previous attempt already completed this child — reuse its result and do
+      // NOT re-run it (the whole point of the idempotency guard).
+      childId = existing.id;
+    } else {
+      childId = existing
+        ? existing.id // prior attempt created it but did not finish — re-run in place
+        : await this.createChild(config, context, idempotencyKey);
+
+      await this.engine.execute({
+        executionId: childId,
         workflowId: config.workflowId,
-        parentExecutionId: context.executionId,
-        status: 'PENDING',
         triggerType: 'subworkflow',
-        triggerData: config.inputMapping as object,
+        triggerData: config.inputMapping,
+        parentExecutionId: context.executionId,
+        depth: depth + 1,
         isDryRun: context.isDryRun,
-      },
-      select: { id: true },
-    });
+        requestId: context.requestId,
+      });
 
-    await this.engine.execute({
-      executionId: child.id,
-      workflowId: config.workflowId,
-      triggerType: 'subworkflow',
-      triggerData: config.inputMapping,
-      parentExecutionId: context.executionId,
-      depth: depth + 1,
-      isDryRun: context.isDryRun,
-    });
-
-    const finalRow = await this.prisma.workflowExecution.findUnique({
-      where: { id: child.id },
-      select: { status: true, error: true },
-    });
-    if (!finalRow || finalRow.status !== 'SUCCESS') {
-      throw new SubworkflowFailedError(child.id, finalRow?.error ?? 'Unknown failure');
+      const finalRow = await this.prisma.workflowExecution.findUnique({
+        where: { id: childId },
+        select: { status: true, error: true },
+      });
+      if (!finalRow || finalRow.status !== 'SUCCESS') {
+        throw new SubworkflowFailedError(childId, finalRow?.error ?? 'Unknown failure');
+      }
     }
 
     // Prefer the child's most-recently-completed return-node output as the
@@ -99,7 +108,7 @@ export class SubworkflowAction implements INodeExecutor {
     // existing single-sink workflows can be invoked as subworkflows
     // without an explicit return node.
     const returnStep = await this.prisma.executionStep.findFirst({
-      where: { executionId: child.id, nodeType: 'return', status: 'SUCCESS' },
+      where: { executionId: childId, nodeType: 'return', status: 'SUCCESS' },
       orderBy: { finishedAt: 'desc' },
       select: { outputData: true },
     });
@@ -109,7 +118,7 @@ export class SubworkflowAction implements INodeExecutor {
     }
 
     const latest = await this.prisma.executionStep.findFirst({
-      where: { executionId: child.id, status: 'SUCCESS' },
+      where: { executionId: childId, status: 'SUCCESS' },
       orderBy: { finishedAt: 'desc' },
       select: { outputData: true },
     });
@@ -117,6 +126,40 @@ export class SubworkflowAction implements INodeExecutor {
       return { data: latest.outputData as Record<string, unknown> };
     }
     return { data: {} };
+  }
+
+  // Spawn the child execution row up front (so the WS overlay sees it appear
+  // before the engine flips it to RUNNING), tolerating a concurrent attempt that
+  // wins the unique-key race by reusing the row it created.
+  private async createChild(
+    config: ReturnType<typeof subworkflowConfigSchema.parse>,
+    context: ExecutionContext,
+    idempotencyKey: string,
+  ): Promise<string> {
+    try {
+      const child = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId: config.workflowId,
+          parentExecutionId: context.executionId,
+          status: 'PENDING',
+          triggerType: 'subworkflow',
+          triggerData: config.inputMapping as object,
+          isDryRun: context.isDryRun,
+          idempotencyKey,
+        },
+        select: { id: true },
+      });
+      return child.id;
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const winner = await this.prisma.workflowExecution.findFirst({
+          where: { workflowId: config.workflowId, idempotencyKey },
+          select: { id: true },
+        });
+        if (winner) return winner.id;
+      }
+      throw err;
+    }
   }
 
   private coerceToRecord(value: unknown): Record<string, unknown> {

@@ -54,6 +54,7 @@ interface FakeWorkflowExecution {
   startedAt: Date | null;
   finishedAt: Date | null;
   error: string | null;
+  idempotencyKey: string | null;
 }
 
 interface FakeExecutionStep {
@@ -93,6 +94,7 @@ describe('WorkflowRunner — iterator integration', () => {
   let steps: FakeExecutionStep[];
   let weCreate: jest.Mock;
   let weUpdate: jest.Mock;
+  let weFindFirst: jest.Mock;
   let stepCreate: jest.Mock;
   let stepUpdate: jest.Mock;
   let publishStepStarted: jest.Mock;
@@ -133,9 +135,28 @@ describe('WorkflowRunner — iterator integration', () => {
           startedAt: (data.startedAt as Date) ?? null,
           finishedAt: null,
           error: null,
+          idempotencyKey: (data.idempotencyKey as string) ?? null,
         };
         workflowExecutions.push(row);
         return select ? { id } : row;
+      },
+    );
+
+    weFindFirst = jest.fn(
+      async ({
+        where,
+        select,
+      }: {
+        where: { workflowId?: string; idempotencyKey?: string };
+        select?: Record<string, boolean>;
+      }) => {
+        const row = workflowExecutions.find(
+          (r) =>
+            (where.workflowId === undefined || r.workflowId === where.workflowId) &&
+            (where.idempotencyKey === undefined || r.idempotencyKey === where.idempotencyKey),
+        );
+        if (!row) return null;
+        return select ? { id: row.id, status: row.status } : row;
       },
     );
 
@@ -183,7 +204,7 @@ describe('WorkflowRunner — iterator integration', () => {
     publishIterationCompleted = jest.fn(async () => undefined);
 
     const prisma = {
-      workflowExecution: { create: weCreate, update: weUpdate },
+      workflowExecution: { create: weCreate, update: weUpdate, findFirst: weFindFirst },
       executionStep: { create: stepCreate, update: stepUpdate },
     };
 
@@ -278,6 +299,62 @@ describe('WorkflowRunner — iterator integration', () => {
       expect(c.workflowId).toBe('wf-1');
       expect(c.status).toBe('SUCCESS');
     });
+  });
+
+  it('should key each iteration child by parentExecutionId+nodeId+index for idempotent re-runs', async () => {
+    const def: WorkflowDefinition = {
+      nodes: [
+        node('t1', 'manual-trigger'),
+        node('iter1', 'iterator', 'iter1', { arrayPath: '{{t1.items}}' }),
+        node('bodyA', 'body-action'),
+      ],
+      edges: [edge('e1', 't1', 'iter1'), edge('e2', 'iter1', 'bodyA', 'body')],
+    };
+
+    await runner.run({
+      executionId: 'parent-exec',
+      workflowId: 'wf-1',
+      definition: def,
+      triggerData: { items: ['a', 'b'] },
+    });
+
+    const children = workflowExecutions.filter((r) => r.parentExecutionId === 'parent-exec');
+    expect(children.map((c) => c.idempotencyKey)).toEqual([
+      'iterator:parent-exec:iter1:0',
+      'iterator:parent-exec:iter1:1',
+    ]);
+  });
+
+  it('should reuse already-SUCCESS iteration children and NOT re-run their body when the parent re-runs', async () => {
+    const def: WorkflowDefinition = {
+      nodes: [
+        node('t1', 'manual-trigger'),
+        node('iter1', 'iterator', 'iter1', { arrayPath: '{{t1.items}}' }),
+        node('bodyA', 'body-action'),
+      ],
+      edges: [edge('e1', 't1', 'iter1'), edge('e2', 'iter1', 'bodyA', 'body')],
+    };
+    const runArgs = {
+      executionId: 'parent-exec',
+      workflowId: 'wf-1',
+      definition: def,
+      triggerData: { items: ['a', 'b'] },
+    };
+
+    // First processing of this parent execution: both iterations run.
+    await runner.run(runArgs);
+    expect(bodyExecutor.execute).toHaveBeenCalledTimes(2);
+    expect(workflowExecutions.filter((r) => r.parentExecutionId === 'parent-exec')).toHaveLength(2);
+
+    bodyExecutor.execute.mockClear();
+
+    // Re-processing the SAME parent execution (e.g. a future BullMQ retry) must
+    // reuse the completed iteration children instead of duplicating side effects.
+    const second = await runner.run(runArgs);
+
+    expect(second.status).toBe('SUCCESS');
+    expect(bodyExecutor.execute).not.toHaveBeenCalled();
+    expect(workflowExecutions.filter((r) => r.parentExecutionId === 'parent-exec')).toHaveLength(2);
   });
 
   it('should pass correct {item, index, total} as triggerData for each iteration', async () => {

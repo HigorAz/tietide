@@ -5,6 +5,16 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] — 2026-05-31
+
+### Added
+
+- `ExecutionContext.requestId?` — the end-to-end correlation id for the request
+  that started the execution, propagated from the BullMQ job payload. Logic nodes
+  that spawn child executions (subworkflow/iterator) forward it so the whole
+  parent→child tree shares one requestId in the logs. Optional and additive;
+  nodes that don't read it are unaffected.
+
 ## [2.6.0] — 2026-05-28
 
 ### Added

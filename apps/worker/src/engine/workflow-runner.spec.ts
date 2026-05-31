@@ -548,6 +548,22 @@ describe('WorkflowRunner', () => {
       expect(ctx.nodeId).toBe('A');
     });
 
+    it('should expose the run requestId on the node ExecutionContext', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        definition: def,
+        requestId: 'req-corr-1',
+      });
+
+      expect(exec.execute.mock.calls[0][1].requestId).toBe('req-corr-1');
+    });
+
     it('should delegate context.getSecret to SecretResolver with executionId', async () => {
       const exec = makeExecutor('a', async (_input, ctx) => {
         const value = await ctx.getSecret('api-key');
