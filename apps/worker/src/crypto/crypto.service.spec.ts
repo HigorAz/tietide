@@ -26,6 +26,7 @@ describe('CryptoService (worker)', () => {
               }
               return config[key] as unknown as T;
             },
+            get: <T>(key: string): T | undefined => config[key] as unknown as T | undefined,
           },
         },
       ],
@@ -90,6 +91,24 @@ describe('CryptoService (worker)', () => {
       const tampered = sodium.to_base64(cipherBytes, sodium.base64_variants.ORIGINAL);
 
       expect(() => service.decrypt(tampered, nonce)).toThrow(/decrypt/i);
+    });
+
+    it('decrypts data written under a former key listed in ENCRYPTION_MASTER_KEYS_OLD', async () => {
+      const oldService = await buildService({ ENCRYPTION_MASTER_KEY: masterKeyBase64 });
+      const legacy = oldService.encrypt('pre-rotation-secret');
+
+      const newKeyBytes = sodium.randombytes_buf(
+        sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES,
+      );
+      const newKeyBase64 = sodium.to_base64(newKeyBytes, sodium.base64_variants.ORIGINAL);
+      const rotated = await buildService({
+        ENCRYPTION_MASTER_KEY: newKeyBase64,
+        ENCRYPTION_MASTER_KEYS_OLD: masterKeyBase64,
+      });
+
+      expect(rotated.decrypt(legacy.ciphertext, legacy.nonce)).toBe('pre-rotation-secret');
+      const fresh = rotated.encrypt('post-rotation-secret');
+      expect(() => oldService.decrypt(fresh.ciphertext, fresh.nonce)).toThrow();
     });
   });
 });

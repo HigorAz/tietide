@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 16   |
+| 3    | Scaling & remaining correctness | 17    | 17   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -298,8 +298,18 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       is kicked off synchronously but not awaited, so auditing never adds DB latency to (nor can fail) the request
       path (it was already best-effort/non-throwing). Files: `apps/{api,worker}/src/common/logger/logger.config.ts`,
       `apps/worker/src/connections/prisma-connection-resolver.ts`, `apps/api/src/audit/audit-log.service.ts` (+ specs).
-- [ ] **W3.17** Single static master key, no rotation — key-id/version + keyring + re-encrypt migration.
-      File: `packages/crypto/src/crypto-core.ts`. _(May stay documented if too large for MVP.)_
+- [x] **W3.17** Single static master key, no rotation — `CryptoCore` is now a **keyring**: the first key is the
+      primary (used for every `encrypt`); additional keys are decrypt-only. Because XChaCha20-Poly1305 is
+      authenticated, `decrypt` tries each key and accepts the one whose tag verifies — so rotation needs **no
+      ciphertext-format change and no migration**. `CryptoService` (api + worker) reads an optional
+      `ENCRYPTION_MASTER_KEYS_OLD` (comma-separated former base64 keys); with it set, it builds the ring via the
+      new `CryptoCore.fromBase64Keyring(primary, [...old])`, otherwise behaviour is identical to before. This
+      enables zero-downtime rotation: deploy a new primary, demote the current key to the old-keys ring, and new
+      writes use the new key while old rows still decrypt. _The optional background **re-encryption migration**
+      (to eventually drop a retired key) is documented as a runbook procedure rather than automated — that piece
+      stays an ops task; removing an old key before its rows are re-encrypted makes them unrecoverable._ Files:
+      `packages/crypto/src/crypto-core.ts`, `apps/{api,worker}/src/crypto/crypto.service.ts`, `.env.example`,
+      `docs/runbook.md` (+ specs).
 
 ## Wave 4 — Frontend QA / low
 
