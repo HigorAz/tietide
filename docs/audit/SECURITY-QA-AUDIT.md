@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 9    |
+| 3    | Scaling & remaining correctness | 17    | 10   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -223,7 +223,15 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       workers; the API service keeps a local copy (mirrors the existing provider-webhooks W1.4 pattern).
       Files: `apps/api/src/executions/executions.service.ts`, `apps/worker/src/poll/poll-processor.ts`,
       `apps/worker/src/cron/cron-processor.ts`, `apps/worker/src/common/prisma-error.ts` (+ specs).
-- [ ] **W3.10** Fan-in drops predecessors — merge executed-predecessor outputs keyed by nodeId. File: `workflow-runner.ts`.
+- [x] **W3.10** Fan-in drops predecessors — `buildInput` resolved a node's input data from only the _last_
+      executed predecessor (`outputs.get(last)`), so a join/merge node with 2+ in-edges silently lost every
+      branch but one. Now: 0 predecessors → triggerData (unchanged); exactly 1 → that predecessor's output
+      flat (linear-chain passthrough preserved, back-compat); 2+ → outputs merged into one object keyed by
+      source nodeId (`{ <predId>: <output.data>, ... }`) so no branch is dropped. Only predecessors that
+      actually produced output (`outputs.has(id)`) are merged — cancelled/unreached ones are excluded.
+      Template refs `{{nodeId.field}}` were already resolved against the full by-id scope, so they are
+      unaffected. File: `apps/worker/src/engine/workflow-runner.ts` (+ spec: replaced the old "last wins (MVP)"
+      assertion with a keyed-merge assertion, added a single-predecessor flat-passthrough regression test).
 - [ ] **W3.11** Subworkflow/iterator in-process retry dup — tie child re-exec to parent idempotency; propagate requestId.
       Files: `nodes/logic/subworkflow.ts`, `workflow-runner.ts`.
 - [ ] **W3.12** Conditional CANCELLED vs SKIPPED — distinct status; collapse double write. File: `workflow-runner.ts`.

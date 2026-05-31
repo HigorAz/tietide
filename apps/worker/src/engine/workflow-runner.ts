@@ -377,12 +377,26 @@ export class WorkflowRunner {
     if (incoming.length === 0) {
       data = triggerData ?? {};
     } else {
-      const executedPredecessors = executionOrder.filter((id) =>
-        incoming.some((e) => e.source === id),
+      // Only predecessors that actually produced an output (executed or
+      // skipped-passthrough) feed this node; cancelled/unreached ones do not.
+      const predecessorIds = executionOrder.filter(
+        (id) => incoming.some((e) => e.source === id) && outputs.has(id),
       );
-      const last = executedPredecessors[executedPredecessors.length - 1];
-      if (last) {
-        data = outputs.get(last)?.data ?? {};
+      if (predecessorIds.length === 1) {
+        // Linear chain: the single predecessor's output IS the input data (flat),
+        // preserving the established passthrough contract.
+        data = outputs.get(predecessorIds[0])?.data ?? {};
+      } else if (predecessorIds.length > 1) {
+        // Fan-in: more than one branch feeds this node. Key each predecessor's
+        // output by its source nodeId so no branch is dropped — the previous
+        // "last executed predecessor wins" behavior silently discarded every
+        // predecessor but one. (Template refs `{{nodeId.field}}` already resolve
+        // against the full by-id output scope, so they are unaffected.)
+        const merged: Record<string, unknown> = {};
+        for (const id of predecessorIds) {
+          merged[id] = outputs.get(id)?.data ?? {};
+        }
+        data = merged;
       }
     }
     const rawConnectionId = (n.config as { connectionId?: unknown }).connectionId;

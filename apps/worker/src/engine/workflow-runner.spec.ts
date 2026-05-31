@@ -486,7 +486,7 @@ describe('WorkflowRunner', () => {
       expect(falseUpdate!.status).toBe('CANCELLED');
     });
 
-    it('should use the last executed predecessor output when node has multiple in-edges (MVP)', async () => {
+    it('should merge ALL executed predecessor outputs keyed by nodeId on fan-in', async () => {
       registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
       registry.register(makeExecutor('leftBranch', async () => ({ data: { src: 'left' } })));
       registry.register(makeExecutor('rightBranch', async () => ({ data: { src: 'right' } })));
@@ -512,7 +512,26 @@ describe('WorkflowRunner', () => {
 
       expect(merge.execute).toHaveBeenCalledTimes(1);
       const mergeInput = merge.execute.mock.calls[0][0];
-      expect(['left', 'right']).toContain(mergeInput.data.src);
+      // Neither branch is dropped: both predecessor outputs are present, keyed by
+      // their source nodeId, so a fan-in/join node can read from every branch.
+      expect(mergeInput.data).toEqual({ L: { src: 'left' }, R: { src: 'right' } });
+    });
+
+    it('should keep a single predecessor output flat (linear chain passthrough)', async () => {
+      registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
+      registry.register(makeExecutor('producer', async () => ({ data: { value: 42 } })));
+      const consumer = makeExecutor('consumer');
+      registry.register(consumer);
+
+      const def: WorkflowDefinition = {
+        nodes: [node('T', 'trigger'), node('P', 'producer'), node('C', 'consumer')],
+        edges: [edge('e1', 'T', 'P'), edge('e2', 'P', 'C')],
+      };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      // One predecessor → flat output, NOT keyed by nodeId (back-compat).
+      expect(consumer.execute.mock.calls[0][0].data).toEqual({ value: 42 });
     });
 
     it('should provide ExecutionContext with correct executionId/workflowId/nodeId', async () => {
