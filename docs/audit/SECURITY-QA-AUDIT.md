@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 3    |
+| 3    | Scaling & remaining correctness | 17    | 4    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -161,7 +161,13 @@
       _Note: a true resource-**quota** layer (per-plan caps on workflows/executions/storage with persistent
       counters) is deferred — it's a product-tier feature beyond the rate-limit tracker this finding names._
       Files: `common/throttler/{throttle-tracker.ts,tietide-throttler.guard.ts,throttler.module.ts}` (+ specs).
-- [ ] **W3.4** Missing indexes — Connection `[status,expiresAt]`, Workflow `[isActive]`, ExecutionStep review. File: `schema.prisma`.
+- [x] **W3.4** Missing indexes — added `@@index([status, expiresAt])` on Connection (backs the OAuth refresh-scan
+      sweep `status='ACTIVE' AND expires_at < cutoff`) and `@@index([isActive])` on Workflow (backs the worker
+      cron/poll schedulers' global `WHERE is_active = true` enumeration). ExecutionStep review: its only query
+      (fetch steps for an execution) is already served by `@@index([executionId])` — no change. Hand-authored
+      migration `20260531000000_add_missing_indexes` (no local Postgres → **run `prisma migrate deploy` on a live
+      DB**; index-only, so the generated client is unchanged). Schema-regression spec guards the indexes.
+      Files: `schema.prisma`, migration, `src/prisma/schema-indexes.spec.ts`.
 - [ ] **W3.5** Execution/step unbounded growth — retention/archival job.
 - [ ] **W3.6** No metrics — prom-client `/metrics` (queue gauges, duration histograms). API + worker.
 - [ ] **W3.7** Worker no liveness — HTTP liveness/readiness + Docker HEALTHCHECK. Files: `apps/worker/src/main.ts`, Dockerfile.
