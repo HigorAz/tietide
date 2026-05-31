@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Edge, Node } from 'reactflow';
 import { z } from 'zod';
-import { NodeType } from '@tietide/shared';
+import { NodeType, NodeCategory, NODE_CATALOG, getNodeOutputSchema } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { getUpstreamSchemas, walkSchema } from './upstream-schema';
 
@@ -101,6 +101,71 @@ describe('getUpstreamSchemas', () => {
     const edges = [mkEdge('A', 'B')];
     const result = getUpstreamSchemas('B', nodes, edges);
     expect(result.suggestions.some((s) => s.nodeId === 'B')).toBe(false);
+  });
+
+  // The data-pill picker was empty for ~168 node types because only 11 had a
+  // registered output schema. With the generic fallback, every *catalog* node
+  // type now contributes at least a whole-output pill.
+  it('yields at least one suggestion for an upstream catalog node lacking a concrete schema', () => {
+    const nodes = [mkNode('s', NodeType.SLACK_POST_MESSAGE), mkNode('http', NodeType.HTTP_REQUEST)];
+    const edges = [mkEdge('s', 'http')];
+    const result = getUpstreamSchemas('http', nodes, edges);
+    expect(result.suggestions.some((x) => x.nodeId === 's')).toBe(true);
+  });
+
+  it('exposes concrete fields for a trigger upstream (gmail-message-received)', () => {
+    const nodes = [
+      mkNode('g', NodeType.GMAIL_MESSAGE_RECEIVED),
+      mkNode('http', NodeType.HTTP_REQUEST),
+    ];
+    const edges = [mkEdge('g', 'http')];
+    const result = getUpstreamSchemas('http', nodes, edges);
+    const paths = result.suggestions.filter((s) => s.nodeId === 'g').map((s) => s.path);
+    expect(paths).toContain('subject');
+    expect(paths).toContain('from');
+  });
+
+  it('exposes concrete fields for a Discord trigger upstream (the reported bug)', () => {
+    const nodes = [
+      mkNode('d', NodeType.DISCORD_MESSAGE_RECEIVED),
+      mkNode('gmail', NodeType.GMAIL_SEARCH),
+    ];
+    const edges = [mkEdge('d', 'gmail')];
+    const result = getUpstreamSchemas('gmail', nodes, edges);
+    expect(result.suggestions.some((s) => s.nodeId === 'd')).toBe(true);
+  });
+});
+
+describe('getNodeOutputSchema — coverage', () => {
+  it('returns an output schema for every non-annotation catalog node type', () => {
+    const missing = NODE_CATALOG.filter((d) => d.category !== NodeCategory.ANNOTATION)
+      .filter((d) => !getNodeOutputSchema(d.type))
+      .map((d) => d.type);
+    expect(missing).toEqual([]);
+  });
+
+  it('returns undefined for a type that is not in the catalog', () => {
+    expect(getNodeOutputSchema('totally-unknown-type' as NodeType)).toBeUndefined();
+  });
+
+  it('returns concrete (field-bearing) schemas for high-value triggers', () => {
+    const highValue = [
+      NodeType.GMAIL_MESSAGE_RECEIVED,
+      NodeType.SLACK_MESSAGE_RECEIVED,
+      NodeType.DISCORD_MESSAGE_RECEIVED,
+      NodeType.TELEGRAM_MESSAGE_RECEIVED,
+      NodeType.TWILIO_SMS_RECEIVED,
+      NodeType.STRIPE_EVENT_RECEIVED,
+    ];
+    for (const type of highValue) {
+      const schema = getNodeOutputSchema(type);
+      expect(schema, type).toBeDefined();
+      const paths = walkSchema(schema as z.ZodTypeAny).map((p) => p.path);
+      expect(
+        paths.some((p) => p.length > 0),
+        type,
+      ).toBe(true);
+    }
   });
 });
 
