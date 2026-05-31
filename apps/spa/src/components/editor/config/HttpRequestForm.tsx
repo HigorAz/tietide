@@ -5,6 +5,7 @@ import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from './formRegistry';
 import { HeadersEditor } from './HeadersEditor';
 import { DataPillInput } from './DataPillInput';
+import { PillSampleField } from './PillSampleField';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
@@ -163,6 +164,8 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
         />
         <p className="text-xs text-text-muted">Request timeout in milliseconds (max 30,000).</p>
       </div>
+
+      <PillSampleField nodeId={nodeId} config={config} />
     </div>
   );
 }
