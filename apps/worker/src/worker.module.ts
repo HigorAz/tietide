@@ -10,6 +10,7 @@ import { CronModule } from './cron/cron.module';
 import { DlqModule } from './dlq/dlq.module';
 import { OAuthRefreshModule } from './connections/refresh/oauth-refresh.module';
 import { PollModule } from './poll/poll.module';
+import { RetentionModule } from './retention/retention.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { PollModule } from './poll/poll.module';
     DlqModule,
     OAuthRefreshModule,
     PollModule,
+    RetentionModule,
   ],
   providers: [WorkflowProcessor],
 })

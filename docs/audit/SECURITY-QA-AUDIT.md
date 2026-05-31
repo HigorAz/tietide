@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 4    |
+| 3    | Scaling & remaining correctness | 17    | 5    |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -168,7 +168,13 @@
       migration `20260531000000_add_missing_indexes` (no local Postgres → **run `prisma migrate deploy` on a live
       DB**; index-only, so the generated client is unchanged). Schema-regression spec guards the indexes.
       Files: `schema.prisma`, migration, `src/prisma/schema-indexes.spec.ts`.
-- [ ] **W3.5** Execution/step unbounded growth — retention/archival job.
+- [x] **W3.5** Execution/step unbounded growth — new worker `RetentionModule`: a daily BullMQ scheduler
+      (`upsertJobScheduler`, 03:17 cron) enqueues a sweep that batch-deletes **terminal** WorkflowExecutions
+      (SUCCESS/FAILED/CANCELLED/SKIPPED — never PENDING/RUNNING) older than `EXECUTION_RETENTION_DAYS` (default 90,
+      clamped [1, 3650]); ExecutionSteps cascade-delete via FK. Deletes in 500-row batches (cap 2000 batches/run,
+      logs if hit) so no single giant lock. Pure `resolveRetentionDays` + processor unit-tested.
+      Files: `apps/worker/src/retention/{retention.config.ts,retention.constants.ts,retention.processor.ts,
+    retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.env.example`.
 - [ ] **W3.6** No metrics — prom-client `/metrics` (queue gauges, duration histograms). API + worker.
 - [ ] **W3.7** Worker no liveness — HTTP liveness/readiness + Docker HEALTHCHECK. Files: `apps/worker/src/main.ts`, Dockerfile.
 - [ ] **W3.8** No prod compose / TLS / secret mgmt — `docker-compose.prod.yml` + nginx TLS. Files: `infra/docker/`.
