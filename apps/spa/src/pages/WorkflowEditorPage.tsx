@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
+import { DataPillPicker } from '@/components/editor/config/DataPillPicker';
 import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
 import { EditorMobileToolbox } from '@/components/editor/EditorMobileToolbox';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
+import { InspectorDock } from '@/components/editor/InspectorDock';
 import { NodeConfigPanel } from '@/components/editor/NodeConfigPanel';
 import { NodeLibrary } from '@/components/editor/NodeLibrary';
 import { ShortcutCheatsheet } from '@/components/editor/ShortcutCheatsheet';
@@ -264,6 +266,12 @@ export function WorkflowEditorPage() {
         <div className="relative flex-1">
           <Canvas />
           <EditorToolbar workflowId={id} entryRoute={entryRoute} />
+          {/* The inspector dock sits below the toolbar (top-right); the data-pill
+              picker takes the vacated bottom-right slot while a field is focused.
+              Both are desktop overlays — the picker self-renders as a bottom
+              sheet on mobile and returns null when no field is focused. */}
+          {!isMobile && <InspectorDock />}
+          <DataPillPicker />
           <DocumentationPanel workflowId={id} />
           {isMobile && <EditorMobileToolbox />}
         </div>

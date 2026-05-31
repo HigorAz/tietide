@@ -161,14 +161,15 @@ describe('InspectorDock', () => {
       expect(dock.style.height).toBe('288px');
     });
 
-    it('should grow the dock when the user drags the NW handle up-and-left', () => {
+    it('should grow the dock when the user drags the SW handle down-and-left', () => {
       render(<InspectorDock />);
       const dock = screen.getByTestId('inspector-dock');
       const handle = screen.getByTestId('inspector-dock-resize-handle');
 
-      // Default 320x288. Drag handle from (1000, 800) to (900, 700) → +100, +100.
+      // Default 320x288. Anchored top-right: drag LEFT widens, DOWN heightens.
+      // From (1000, 800) to (900, 900) → +100 width, +100 height.
       fireEvent.mouseDown(handle, { clientX: 1000, clientY: 800 });
-      fireEvent.mouseMove(window, { clientX: 900, clientY: 700 });
+      fireEvent.mouseMove(window, { clientX: 900, clientY: 900 });
 
       expect(dock.style.width).toBe('420px');
       expect(dock.style.height).toBe('388px');
@@ -178,8 +179,9 @@ describe('InspectorDock', () => {
       render(<InspectorDock />);
       const handle = screen.getByTestId('inspector-dock-resize-handle');
 
+      // Drag LEFT 200 (widen) and DOWN 200 (heighten) → 520 x 488.
       fireEvent.mouseDown(handle, { clientX: 1000, clientY: 800 });
-      fireEvent.mouseMove(window, { clientX: 800, clientY: 600 });
+      fireEvent.mouseMove(window, { clientX: 800, clientY: 1000 });
       fireEvent.mouseUp(window);
 
       const stored = localStorage.getItem(INSPECTOR_DOCK_SIZE_STORAGE_KEY);
@@ -193,9 +195,9 @@ describe('InspectorDock', () => {
       const dock = screen.getByTestId('inspector-dock');
       const handle = screen.getByTestId('inspector-dock-resize-handle');
 
-      // Drag DOWN-RIGHT (positive dx, dy) so the dock would shrink below mins.
-      fireEvent.mouseDown(handle, { clientX: 100, clientY: 100 });
-      fireEvent.mouseMove(window, { clientX: 1000, clientY: 1000 });
+      // Drag RIGHT (narrows) and UP (shortens) so the dock would shrink below mins.
+      fireEvent.mouseDown(handle, { clientX: 100, clientY: 1000 });
+      fireEvent.mouseMove(window, { clientX: 1000, clientY: 100 });
 
       // Clamped at the floor, never below 320 x 200.
       expect(dock.style.width).toBe('320px');

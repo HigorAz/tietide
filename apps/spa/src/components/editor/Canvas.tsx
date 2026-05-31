@@ -10,7 +10,6 @@ import { ClipboardJsonDialog, type ClipboardJsonDialogMode } from './ClipboardJs
 import { edgeTypes } from './edges';
 import { editorTouchProps } from './editorTouchProps';
 import { EditorContextMenu } from './EditorContextMenu';
-import { InspectorDock } from './InspectorDock';
 import { InkPlumeBackdrop } from './canvas/InkPlumeBackdrop';
 import { nodeTypes } from './nodes';
 import { NODE_LIBRARY_DRAG_MIME } from './NodeLibrary';
@@ -43,6 +42,7 @@ export function Canvas() {
   const onConnect = useEditorStore((s) => s.onConnect);
   const addNode = useEditorStore((s) => s.addNode);
   const selectNode = useEditorStore((s) => s.selectNode);
+  const setActivePillField = useEditorStore((s) => s.setActivePillField);
   const deleteSelected = useEditorStore((s) => s.deleteSelected);
   const showToast = useToastStore((s) => s.show);
   const { screenToFlowPosition } = useReactFlow();
@@ -63,7 +63,9 @@ export function Canvas() {
 
   const handlePaneClick = useCallback(() => {
     selectNode(null);
-  }, [selectNode]);
+    // Clicking empty canvas deselects the node and dismisses the data-pill picker.
+    setActivePillField(null);
+  }, [selectNode, setActivePillField]);
 
   const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -162,11 +164,6 @@ export function Canvas() {
         <Background gap={16} color="#1A3050" />
         <Controls />
       </ReactFlow>
-      {/* The inspector dock (minimap / run / logs / versions) competes with the
-          bottom sheets and add-node button for the limited bottom area on a
-          phone, so it is desktop-only. Per-node run I/O remains available in
-          the node config panel. */}
-      {!isMobile && <InspectorDock />}
       {isDragActive && (
         <div
           aria-hidden

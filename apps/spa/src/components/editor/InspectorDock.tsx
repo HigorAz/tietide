@@ -112,7 +112,7 @@ export function InspectorDock(): JSX.Element {
 
   const handleResizeStart = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      // Anchored bottom-right: dragging the NW handle UP-LEFT grows the dock.
+      // Anchored top-right: dragging the SW handle DOWN-LEFT grows the dock.
       event.preventDefault();
       event.stopPropagation();
       const startX = event.clientX;
@@ -125,8 +125,9 @@ export function InspectorDock(): JSX.Element {
 
       const onMove = (e: MouseEvent): void => {
         latestSize = clampSize({
+          // Drag LEFT widens (anchored right); drag DOWN heightens (anchored top).
           width: startW + (startX - e.clientX),
-          height: startH + (startY - e.clientY),
+          height: startH + (e.clientY - startY),
         });
         setSize(latestSize);
       };
@@ -159,7 +160,9 @@ export function InspectorDock(): JSX.Element {
             }
       }
       className={cn(
-        'absolute bottom-4 right-4 z-10 flex flex-col overflow-hidden rounded-md border border-white/5 bg-elevated shadow-lg',
+        // Re-anchored below the editor toolbar (top-right) so the bottom-right
+        // slot is free for the DataPillPicker.
+        'absolute right-4 top-16 z-10 flex flex-col overflow-hidden rounded-md border border-white/5 bg-elevated shadow-lg',
         collapsed ? 'h-9 w-80' : '',
       )}
     >
@@ -170,7 +173,7 @@ export function InspectorDock(): JSX.Element {
           aria-orientation="horizontal"
           data-testid="inspector-dock-resize-handle"
           onMouseDown={handleResizeStart}
-          className="absolute left-0 top-0 z-20 h-3 w-3 cursor-nwse-resize bg-transparent before:absolute before:left-0.5 before:top-0.5 before:h-2 before:w-2 before:rounded-sm before:border-l-2 before:border-t-2 before:border-text-secondary/40 hover:before:border-accent-teal"
+          className="absolute bottom-0 left-0 z-20 h-3 w-3 cursor-nesw-resize bg-transparent before:absolute before:bottom-0.5 before:left-0.5 before:h-2 before:w-2 before:rounded-sm before:border-b-2 before:border-l-2 before:border-text-secondary/40 hover:before:border-accent-teal"
         />
       )}
       <Tabs

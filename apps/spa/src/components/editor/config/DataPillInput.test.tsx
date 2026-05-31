@@ -191,4 +191,36 @@ describe('DataPillInput', () => {
     // Placeholder must be visible inside the overlay (input is text-transparent so its own placeholder would be hidden)
     expect(screen.getByText('Enter a URL')).toBeInTheDocument();
   });
+
+  it('registers the active pill field on focus and clears it on blur', () => {
+    render(<DataPillInput nodeId={TARGET_ID} value="" onChange={vi.fn()} />);
+    const input = screen.getByRole('combobox');
+
+    expect(useEditorStore.getState().activePillField).toBeNull();
+
+    fireEvent.focus(input);
+    expect(useEditorStore.getState().activePillField?.nodeId).toBe(TARGET_ID);
+    expect(typeof useEditorStore.getState().activePillField?.insert).toBe('function');
+
+    fireEvent.blur(input);
+    expect(useEditorStore.getState().activePillField).toBeNull();
+  });
+
+  it('inserts a token at the caret via the registered insert callback (picker path)', () => {
+    let value = 'hi ';
+    const onChange = vi.fn((next: string) => {
+      value = next;
+    });
+    render(<DataPillInput nodeId={TARGET_ID} value={value} onChange={onChange} />);
+    const input = screen.getByRole('combobox') as HTMLInputElement;
+    fireEvent.focus(input);
+    input.setSelectionRange(3, 3);
+
+    // Simulate the picker invoking the registered inserter.
+    act(() => {
+      useEditorStore.getState().activePillField?.insert('{{http-1.statusCode}}');
+    });
+
+    expect(onChange).toHaveBeenCalledWith('hi {{http-1.statusCode}}');
+  });
 });
