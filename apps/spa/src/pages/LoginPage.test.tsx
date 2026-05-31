@@ -87,6 +87,27 @@ describe('LoginPage', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('should toast a verify-your-email message when login fails with 403 (unverified)', async () => {
+    const axiosError = Object.assign(new Error('Forbidden'), {
+      isAxiosError: true,
+      response: { status: 403 },
+    });
+    useAuthStore.setState({ login: vi.fn().mockRejectedValueOnce(axiosError) });
+    const user = userEvent.setup();
+
+    renderLogin();
+
+    await user.type(screen.getByLabelText(/email/i), 'alice@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      const toasts = useToastStore.getState().toasts;
+      expect(toasts).toHaveLength(1);
+      expect(toasts[0].message).toMatch(/verify your email/i);
+    });
+  });
+
   it('should toast a rate-limit message (not "invalid credentials") when login fails with 429', async () => {
     const axiosError = Object.assign(new Error('Too Many Requests'), {
       isAxiosError: true,

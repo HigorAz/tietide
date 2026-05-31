@@ -3,6 +3,7 @@ import type { PublicUser } from '@tietide/shared';
 import {
   login as apiLogin,
   register as apiRegister,
+  verifyEmail as apiVerifyEmail,
   getMe as apiGetMe,
   type LoginCredentials,
   type RegisterPayload,
@@ -21,7 +22,11 @@ export interface AuthState {
 
 export interface AuthActions {
   login: (credentials: LoginCredentials) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<PublicUser>;
+  // Registration no longer logs the user in — it triggers a verification email
+  // and returns the neutral server message for the UI to display.
+  register: (payload: RegisterPayload) => Promise<string>;
+  // Verifies the emailed token and establishes the session (auto-login).
+  verifyEmail: (token: string) => Promise<void>;
   logout: () => void;
   hydrate: () => Promise<void>;
 }
@@ -47,14 +52,20 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   register: async (payload) => {
-    // Auto-login after registration: the API returns an access token, so persist
-    // it and hydrate the user exactly like login() instead of bouncing to /login.
-    const { accessToken } = await apiRegister(payload);
+    // No session yet — registration emails a verification link and returns a
+    // neutral message. The session is established when the user verifies.
+    const { message } = await apiRegister(payload);
+    return message;
+  },
+
+  verifyEmail: async (token) => {
+    // Verifying the emailed token activates the account and returns a session,
+    // so persist it and hydrate the user exactly like login() (auto-login).
+    const { accessToken } = await apiVerifyEmail(token);
     localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
     set({ token: accessToken });
     const user = await apiGetMe();
     set({ user });
-    return user;
   },
 
   logout: () => {

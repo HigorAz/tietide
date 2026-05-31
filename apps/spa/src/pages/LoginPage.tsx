@@ -43,7 +43,15 @@ export function LoginPage(): JSX.Element {
       navigate('/', { replace: true });
     } catch (err) {
       const status = getStatus(err);
-      const message = status === 401 ? 'Invalid credentials' : resolveAuthErrorMessage(err);
+      let message: string;
+      if (status === 401) {
+        message = 'Invalid credentials';
+      } else if (status === 403) {
+        // The account exists but the email isn't verified yet.
+        message = 'Please verify your email before signing in. Check your inbox for the link.';
+      } else {
+        message = resolveAuthErrorMessage(err);
+      }
       toast({ tone: 'error', message });
     }
   });

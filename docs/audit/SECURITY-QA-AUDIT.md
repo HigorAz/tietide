@@ -20,7 +20,7 @@
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 8    |
-| 2    | Medium security                 | 11    | 10   |
+| 2    | Medium security                 | 11    | 11   |
 | 3    | Scaling & remaining correctness | 17    | 17   |
 | 4    | Frontend QA / low               | 5     | 5    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
@@ -86,8 +86,31 @@
 
 ## Wave 2 — MEDIUM security
 
-- [~] **W2.1** User enumeration — login is now constant-time (dummy bcrypt on unknown email). Register 409 oracle remains (needs email-verification flow — deferred).
-  File: `auth.service.ts`.
+- [x] **W2.1** User enumeration — login was already constant-time (dummy bcrypt on unknown email); the
+      remaining register **409 oracle is now closed** via a full **email-verification flow**. `register` always
+      responds **202 with a neutral message** ("if that email can be used, check your inbox") for every outcome —
+      new email, taken-but-verified, taken-but-unverified, or a P2002 create-race — so the response no longer
+      reveals whether an account exists; the password is hashed on every path so timing doesn't betray it either.
+      A new email creates an unverified `User` (default `email_verified=false`; existing rows grandfathered to
+      `true` by the migration so they aren't locked out) and emails a single-use, SHA-256-**hashed**, 24h-expiry
+      token (`EmailVerificationToken` table, mirrors the OAuthState anti-replay pattern); a taken-but-unverified
+      email re-sends the link (doubles as resend); a verified one gets a "you already have an account" nudge.
+      `POST /v1/auth/verify-email` atomically consumes the token (`updateMany` single-use + not-expired → count
+      must be 1), marks the user verified, and **issues the session — this is where auto-login now happens** (W0's
+      instant-on-register auto-login is preserved, just moved to the verify-link click, since a token in the
+      register response is itself an enumeration signal). `login` now returns **403** for valid credentials on an
+      unverified account (only after the bcrypt check, so a wrong password still 401s and never reveals verification
+      state). New **MailerService** with a pluggable transport: a **log transport** (writes the email + link to the
+      logs) is the default so dev/CI/registration work with no mail server; **SMTP** (nodemailer, an _optional_ dep,
+      lazily/guarded-imported) activates when `SMTP_HOST` is set. Migration `20260531120000_add_email_verification`
+      (hand-authored — run `prisma migrate deploy`). SPA: register shows a "check your inbox" confirmation (no
+      enumeration via UI); new `/verify-email` page consumes the token and lands the user in the app; login surfaces
+      a "verify your email" message on 403. _Note: a small residual timing difference remains between the create and
+      already-exists paths (extra row writes) — the high-value **status** oracle is closed; full timing-equalisation
+      would need constant-time dummy writes._ Files: `apps/api/prisma/{schema.prisma,migrations/...}`,
+      `apps/api/src/mailer/*`, `apps/api/src/auth/{auth.service,auth.controller,auth.module}.ts` + DTOs,
+      `apps/spa/src/{api/auth.ts,stores/authStore.ts,pages/{RegisterPage,LoginPage,VerifyEmailPage}.tsx,App.tsx}`,
+      `.env.example` (+ specs).
 - [x] **W2.2** Auth throttler IP-only + no trust-proxy — env-driven `TRUST_PROXY` wired in `main.ts` (real client
       IP behind the prod tunnel; never trust-all by default); custom `TieTideThrottlerGuard` (replaces the stock
       global guard) buckets by proxy-aware client IP and, on credential routes, by `ip|email` so one IP can't

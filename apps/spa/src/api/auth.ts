@@ -17,11 +17,11 @@ export interface LoginResponse {
   tokenType: string;
 }
 
-// Registration auto-logs the user in: the API returns an access token alongside
-// the created user, so the SPA can persist the session without a second request.
-export interface RegisterResponse extends PublicUser {
-  accessToken: string;
-  tokenType: string;
+// Registration no longer returns a session: the API emails a verification link
+// and responds with a neutral message (so it can't be used to enumerate
+// accounts). The session is issued when the user verifies via the emailed link.
+export interface RegisterResponse {
+  message: string;
 }
 
 export async function login(credentials: LoginCredentials): Promise<LoginResponse> {
@@ -31,6 +31,13 @@ export async function login(credentials: LoginCredentials): Promise<LoginRespons
 
 export async function register(payload: RegisterPayload): Promise<RegisterResponse> {
   const { data } = await api.post<RegisterResponse>('/auth/register', payload);
+  return data;
+}
+
+// Verifies an email via the single-use token from the emailed link, activating
+// the account and returning a session (this is where auto-login now happens).
+export async function verifyEmail(token: string): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/auth/verify-email', { token });
   return data;
 }
 
