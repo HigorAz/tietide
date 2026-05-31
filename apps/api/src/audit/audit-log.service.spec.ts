@@ -102,6 +102,31 @@ describe('AuditLogService', () => {
       expect(call.data.metadata).not.toHaveProperty('value');
       expect(call.data.metadata).not.toHaveProperty('password');
     });
+
+    it('should strip sensitive keys nested anywhere in the metadata tree', async () => {
+      prisma.auditLog.create.mockResolvedValue({});
+
+      await service.log({
+        userId,
+        action: 'connection.update',
+        resource: 'connection',
+        resourceId: 'conn-1',
+        metadata: {
+          provider: 'google',
+          connection: { config: { accessToken: 'leak-me' }, name: 'My Google' },
+          tags: [{ label: 'prod', secret: 'also-leak' }],
+        },
+      });
+
+      const call = prisma.auditLog.create.mock.calls[0][0] as {
+        data: { metadata: Record<string, unknown> };
+      };
+      expect(call.data.metadata).toEqual({
+        provider: 'google',
+        connection: { name: 'My Google' }, // the whole `config` subtree is dropped
+        tags: [{ label: 'prod' }], // `secret` dropped inside the array element
+      });
+    });
   });
 
   describe('findMany', () => {

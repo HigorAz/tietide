@@ -41,6 +41,7 @@ const FILTER_VALUES_CAP = 200;
 
 const SENSITIVE_KEYS = new Set([
   'value',
+  'config',
   'password',
   'token',
   'secret',
@@ -49,18 +50,40 @@ const SENSITIVE_KEYS = new Set([
   'apiKey',
   'encryptionKey',
   'hmacSecret',
+  'accessToken',
+  'refreshToken',
+  'access_token',
+  'refresh_token',
+  'client_secret',
+  'configEncrypted',
+  'configNonce',
+  'valueEnc',
+  'valueNonce',
 ]);
+
+// Drop any sensitive key found ANYWHERE in the metadata tree — the previous
+// top-level-only pass let a secret nested under e.g. `connection.config.accessToken`
+// slip into the audit row. Walks plain objects and arrays; primitives pass through.
+function sanitizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeValue);
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (SENSITIVE_KEYS.has(k)) continue;
+      out[k] = sanitizeValue(v);
+    }
+    return out;
+  }
+  return value;
+}
 
 function sanitizeMetadata(
   metadata: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
   if (!metadata) return undefined;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(metadata)) {
-    if (SENSITIVE_KEYS.has(k)) continue;
-    out[k] = v;
-  }
-  return out;
+  return sanitizeValue(metadata) as Record<string, unknown>;
 }
 
 interface AuditRowWithUser {
@@ -80,10 +103,13 @@ export class AuditLogService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async log(entry: AuditLogEntry): Promise<void> {
-    try {
-      const safeMetadata = sanitizeMetadata(entry.metadata);
-      await this.prisma.auditLog.create({
+  // Fire-and-forget: the write is kicked off synchronously but not awaited, so the
+  // audit log never adds DB latency to (nor can it fail) the caller's request path.
+  // Failures are logged best-effort — auditing has always been non-fatal here.
+  log(entry: AuditLogEntry): Promise<void> {
+    const safeMetadata = sanitizeMetadata(entry.metadata);
+    this.prisma.auditLog
+      .create({
         data: {
           userId: entry.userId,
           action: entry.action,
@@ -91,12 +117,13 @@ export class AuditLogService {
           resourceId: entry.resourceId,
           metadata: safeMetadata as Prisma.InputJsonValue | undefined,
         },
+      })
+      .catch((err: unknown) => {
+        this.logger.warn(
+          `Failed to write audit log entry action=${entry.action} resource=${entry.resource}: ${(err as Error).message}`,
+        );
       });
-    } catch (err) {
-      this.logger.warn(
-        `Failed to write audit log entry action=${entry.action} resource=${entry.resource}: ${(err as Error).message}`,
-      );
-    }
+    return Promise.resolve();
   }
 
   async findMany(options: FindManyOptions): Promise<AuditLogListResponseDto> {

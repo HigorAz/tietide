@@ -17,10 +17,20 @@ const REDACT_PATHS = [
   '*.access_token',
   '*.refresh_token',
   '*.client_secret',
+  // Secret/EnvVar plaintext value, connection decrypted config blob, and their
+  // encrypted-at-rest columns — never belong in logs (W3.16).
+  '*.value',
+  '*.config',
+  '*.configEncrypted',
+  '*.configNonce',
+  '*.valueEnc',
+  '*.valueNonce',
   'password',
   'token',
   'secret',
   'authorization',
+  'value',
+  'config',
 ];
 
 export interface BuildLoggerOptionsEnv {

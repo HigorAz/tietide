@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 15   |
+| 3    | Scaling & remaining correctness | 17    | 16   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -286,8 +286,18 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       overlapping window re-emits is deduped by the poll-processor's idempotencyKey. File:
       `apps/worker/src/nodes/triggers/poll/calendar-event-created.ts` (+ spec: a fake-timer test where the
       mocked request advances the clock 2 min proves the cursor stays at the pre-request watermark).
-- [ ] **W3.16** Log redaction gaps — add `value`/`config` paths, stop logging raw `e.response`, recursive audit sanitize,
-      async audit log. Files: `logger.config.ts`, `prisma-connection-resolver.ts`, `audit-log.service.ts`.
+- [x] **W3.16** Log redaction gaps — four fixes. (1) Both pino loggers' `REDACT_PATHS` now censor `value`/`config`
+      (Secret/EnvVar plaintext value, connection decrypted-config blob) and their at-rest columns
+      (`configEncrypted`/`configNonce`/`valueEnc`/`valueNonce`), top-level and one-level-nested. (2) The OAuth
+      refresh failure path in `prisma-connection-resolver` logged the raw `e.response` (which carries the request's
+      bearer/refresh token + client secret in headers and possibly token material in the body) — it now logs only
+      `errStatus` (the upstream HTTP status). (3) Audit `sanitizeMetadata` was top-level only, so a secret nested
+      under e.g. `connection.config.accessToken` reached the audit row — it is now a recursive walk over objects
+      AND arrays, with an expanded sensitive-key set (`config`, `accessToken`, `refreshToken`, `*_token`,
+      `client_secret`, the `*Enc`/`*Nonce` columns). (4) `AuditLogService.log` is now fire-and-forget — the write
+      is kicked off synchronously but not awaited, so auditing never adds DB latency to (nor can fail) the request
+      path (it was already best-effort/non-throwing). Files: `apps/{api,worker}/src/common/logger/logger.config.ts`,
+      `apps/worker/src/connections/prisma-connection-resolver.ts`, `apps/api/src/audit/audit-log.service.ts` (+ specs).
 - [ ] **W3.17** Single static master key, no rotation — key-id/version + keyring + re-encrypt migration.
       File: `packages/crypto/src/crypto-core.ts`. _(May stay documented if too large for MVP.)_
 

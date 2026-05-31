@@ -122,7 +122,10 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     try {
       result = await this.oauthRefresh.refresh(row.provider, refreshTokenPlain, currentConfig);
     } catch (refreshErr) {
-      const e = refreshErr as Error & { response?: unknown };
+      const e = refreshErr as Error & { response?: { status?: number } };
+      // Log only the upstream HTTP status, NEVER the raw `e.response`: an OAuth
+      // provider's error response carries request/response headers (the bearer/
+      // refresh token, client secret) and possibly token material in the body.
       this.log.warn(
         {
           executionId,
@@ -130,7 +133,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
           provider: row.provider,
           errName: e.name,
           errMessage: e.message,
-          errResponse: e.response ?? null,
+          errStatus: e.response?.status ?? null,
         },
         'connection.refresh.provider_error',
       );
