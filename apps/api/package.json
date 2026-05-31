@@ -75,5 +75,8 @@
     "ts-jest": "^29.4.0",
     "ts-loader": "^9.5.2",
     "typescript": "^6.0.2"
+  },
+  "optionalDependencies": {
+    "nodemailer": "^8.0.10"
   }
 }
