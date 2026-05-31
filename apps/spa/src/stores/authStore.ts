@@ -13,6 +13,10 @@ export const TOKEN_STORAGE_KEY = 'tietide-token';
 export interface AuthState {
   user: PublicUser | null;
   token: string | null;
+  // True once the initial hydrate() has settled (restored the user from a stored
+  // token, or determined there is none / it was invalid). ProtectedRoute waits on
+  // this so a refresh doesn't bounce a logged-in user to /login before getMe resolves.
+  hydrated: boolean;
 }
 
 export interface AuthActions {
@@ -32,6 +36,7 @@ const readStoredToken = (): string | null => {
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   token: readStoredToken(),
+  hydrated: false,
 
   login: async (credentials) => {
     const { accessToken } = await apiLogin(credentials);
@@ -59,11 +64,21 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   hydrate: async () => {
     const stored = readStoredToken();
-    if (!stored) return;
+    if (!stored) {
+      set({ hydrated: true });
+      return;
+    }
     if (get().token !== stored) {
       set({ token: stored });
     }
-    const user = await apiGetMe();
-    set({ user });
+    try {
+      const user = await apiGetMe();
+      set({ user, hydrated: true });
+    } catch {
+      // The stored token is invalid/expired — drop it so the guard sends the user
+      // to /login instead of leaving them in a half-authenticated state.
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      set({ user: null, token: null, hydrated: true });
+    }
   },
 }));

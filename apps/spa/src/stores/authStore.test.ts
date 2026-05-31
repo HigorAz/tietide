@@ -22,7 +22,7 @@ const sampleUser: PublicUser = {
 };
 
 const resetStore = (): void => {
-  useAuthStore.setState({ user: null, token: null });
+  useAuthStore.setState({ user: null, token: null, hydrated: false });
   localStorage.clear();
 };
 
@@ -120,13 +120,28 @@ describe('authStore', () => {
       const state = useAuthStore.getState();
       expect(state.token).toBe('jwt-123');
       expect(state.user).toEqual(sampleUser);
+      expect(state.hydrated).toBe(true);
     });
 
-    it('should be a no-op when no token is stored', async () => {
+    it('should be a no-op when no token is stored, but still mark hydrated', async () => {
       await useAuthStore.getState().hydrate();
 
       expect(mockedGetMe).not.toHaveBeenCalled();
       expect(useAuthStore.getState().token).toBeNull();
+      expect(useAuthStore.getState().hydrated).toBe(true);
+    });
+
+    it('should drop an invalid stored token (and mark hydrated) when getMe fails', async () => {
+      localStorage.setItem(TOKEN_STORAGE_KEY, 'expired-jwt');
+      mockedGetMe.mockRejectedValueOnce(new Error('401 Unauthorized'));
+
+      await useAuthStore.getState().hydrate();
+
+      const state = useAuthStore.getState();
+      expect(state.token).toBeNull();
+      expect(state.user).toBeNull();
+      expect(state.hydrated).toBe(true);
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     });
   });
 });

@@ -22,7 +22,7 @@
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
 | 3    | Scaling & remaining correctness | 17    | 17   |
-| 4    | Frontend QA / low               | 5     | 0    |
+| 4    | Frontend QA / low               | 5     | 1    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
 ---
@@ -313,8 +313,14 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
 
 ## Wave 4 — Frontend QA / low
 
-- [ ] **W4.1** `hydrate()` never called → user lost on refresh — call on mount, gate ProtectedRoute on hydrated flag.
-      Files: `App.tsx`/`RootLayout.tsx`, `ProtectedRoute.tsx`.
+- [x] **W4.1** `hydrate()` never called → user lost on refresh — the auth store had a `hydrate()` (restore token
+      from localStorage + `getMe()`) that nothing invoked, so after a refresh the token persisted but the `user`
+      object was null forever. `RootLayout` now calls `hydrate()` once on mount; the store gained a `hydrated`
+      flag (set true once hydrate settles, including the no-token and getMe-failure paths), and `hydrate()` now
+      drops an invalid/expired stored token on `getMe` failure so the guard cleanly redirects. `ProtectedRoute`
+      gates on it: no token → `/login`; token present but not yet hydrated → a `role="status"` loading state
+      (no content flash, no premature redirect); hydrated → children. Files: `apps/spa/src/stores/authStore.ts`,
+      `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/components/layout/RootLayout.tsx` (+ tests).
 - [ ] **W4.2** No client role guard on admin routes — `AdminRoute`. Files: `ProtectedRoute.tsx`, `App.tsx`.
 - [ ] **W4.3** 401 interceptor hard-reloads — router navigation + session-expired toast. File: `api/client.ts`.
 - [ ] **W4.4** Vague auth error messages — differentiate 429 + network. Files: `LoginPage.tsx`, `RegisterPage.tsx`.
