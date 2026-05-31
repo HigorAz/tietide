@@ -14,7 +14,11 @@ import { ExecutionsService } from './executions.service';
 
 describe('ExecutionsController (integration)', () => {
   let app: INestApplication;
-  let executionsService: { triggerManual: jest.Mock; triggerTest: jest.Mock };
+  let executionsService: {
+    triggerManual: jest.Mock;
+    triggerTest: jest.Mock;
+    triggerNodeTest: jest.Mock;
+  };
   let authedUser: { id: string; email: string; role: string } | null;
 
   const workflowId = '550e8400-e29b-41d4-a716-446655440000';
@@ -52,8 +56,23 @@ describe('ExecutionsController (integration)', () => {
     edges: [],
   };
 
+  const nodeTestAccepted = {
+    id: executionId,
+    workflowId,
+    status: 'PENDING',
+    triggerType: 'node-test',
+    triggerData: null,
+    idempotencyKey: null,
+    isDryRun: false,
+    createdAt: new Date('2026-05-31T00:00:00Z').toISOString(),
+  };
+
   beforeEach(async () => {
-    executionsService = { triggerManual: jest.fn(), triggerTest: jest.fn() };
+    executionsService = {
+      triggerManual: jest.fn(),
+      triggerTest: jest.fn(),
+      triggerNodeTest: jest.fn(),
+    };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
 
     const mod: TestingModule = await Test.createTestingModule({
@@ -292,6 +311,91 @@ describe('ExecutionsController (integration)', () => {
     it('should reject unknown body fields with 400', async () => {
       await request(app.getHttpServer())
         .post(`/workflows/${workflowId}/test`)
+        .send({ definition: validDefinition, userId: 'forged' })
+        .expect(400);
+    });
+  });
+
+  describe('POST /workflows/:id/nodes/:nodeId/test', () => {
+    const url = `/workflows/${workflowId}/nodes/n1/test`;
+
+    it('should return 202 with the queued node-test execution on success', async () => {
+      executionsService.triggerNodeTest.mockResolvedValue(nodeTestAccepted);
+
+      const res = await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(202);
+
+      expect(res.body).toEqual(nodeTestAccepted);
+      expect(executionsService.triggerNodeTest).toHaveBeenCalledWith(
+        'owner-uuid',
+        workflowId,
+        'n1',
+        expect.objectContaining({ definition: validDefinition }),
+      );
+    });
+
+    it('should return 401 when no authenticated user', async () => {
+      authedUser = null;
+
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(401);
+      expect(executionsService.triggerNodeTest).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when the workflow id is not a UUID', async () => {
+      await request(app.getHttpServer())
+        .post('/workflows/not-a-uuid/nodes/n1/test')
+        .send({ definition: validDefinition })
+        .expect(400);
+      expect(executionsService.triggerNodeTest).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when the body is missing definition', async () => {
+      await request(app.getHttpServer()).post(url).send({}).expect(400);
+      expect(executionsService.triggerNodeTest).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 when the service throws NotFoundException (unknown node)', async () => {
+      executionsService.triggerNodeTest.mockRejectedValue(new NotFoundException('Node not found'));
+
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(404);
+    });
+
+    it('should return 403 when the service throws ForbiddenException', async () => {
+      executionsService.triggerNodeTest.mockRejectedValue(new ForbiddenException('No access'));
+
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(403);
+    });
+
+    it('should forward triggerData and the node id to the service', async () => {
+      executionsService.triggerNodeTest.mockResolvedValue(nodeTestAccepted);
+
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition, triggerData: { hello: 'world' } })
+        .expect(202);
+
+      expect(executionsService.triggerNodeTest).toHaveBeenCalledWith(
+        'owner-uuid',
+        workflowId,
+        'n1',
+        expect.objectContaining({ triggerData: { hello: 'world' } }),
+      );
+    });
+
+    it('should reject unknown body fields with 400', async () => {
+      await request(app.getHttpServer())
+        .post(url)
         .send({ definition: validDefinition, userId: 'forged' })
         .expect(400);
     });
