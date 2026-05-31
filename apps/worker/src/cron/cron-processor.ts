@@ -113,7 +113,20 @@ export class CronProcessor extends WorkerHost {
   }
 
   private computeScheduledFor(job: Job<CronFirePayload>): string {
-    const ts = job.processedOn ?? job.timestamp ?? Date.now();
-    return new Date(ts).toISOString();
+    // Key the cron idempotency on the SCHEDULED fire time, not the processing time.
+    // `processedOn` is when a worker picked the job up — it differs on every
+    // attempt/retry, so using it made the idempotency key drift and let the same
+    // tick run twice. BullMQ job-scheduler job ids end in the scheduled epoch
+    // millis (`repeat:<key>:<millis>`); fall back to the job's enqueue timestamp.
+    const ms = this.scheduledMillisFromId(job.id) ?? job.timestamp ?? Date.now();
+    return new Date(ms).toISOString();
+  }
+
+  private scheduledMillisFromId(id: string | undefined): number | null {
+    if (!id) return null;
+    const match = /:(\d+)$/.exec(id);
+    if (!match) return null;
+    const ms = Number.parseInt(match[1], 10);
+    return Number.isFinite(ms) ? ms : null;
   }
 }

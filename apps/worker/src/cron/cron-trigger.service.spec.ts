@@ -156,6 +156,24 @@ describe('CronTriggerService', () => {
       expect(ids).toEqual(['cron:wf-cron']);
     });
 
+    it('should schedule a workflow whose cron trigger is not the first node', async () => {
+      const wf = cronWorkflow({ id: 'wf-late-cron' });
+      // Prepend a non-trigger node so the cron trigger is no longer nodes[0].
+      (wf.definition.nodes as unknown[]).unshift({
+        id: 'note-1',
+        type: 'sticky',
+        name: 'Note',
+        position: { x: 0, y: 0 },
+        config: {},
+      });
+      prisma.workflow.findMany.mockResolvedValue([wf]);
+
+      await service.reconcile();
+
+      const ids = queue.upsertJobScheduler.mock.calls.map((c) => c[0]);
+      expect(ids).toEqual(['cron:wf-late-cron']);
+    });
+
     it('should remove orphaned schedulers that no longer match any active cron workflow', async () => {
       prisma.workflow.findMany.mockResolvedValue([cronWorkflow({ id: 'wf-1' })]);
       queue.getJobSchedulers.mockResolvedValue([{ key: 'cron:wf-1' }, { key: 'cron:wf-stale' }]);

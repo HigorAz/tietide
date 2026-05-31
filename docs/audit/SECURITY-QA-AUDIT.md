@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 13   |
+| 3    | Scaling & remaining correctness | 17    | 14   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -268,8 +268,15 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       count cursors without stable per-row identity, which Sheets/Graph tables don't expose; the high-value
       stuck-cursor data-loss bug is closed._ Files: `apps/worker/src/nodes/triggers/poll/sheets-row-added.ts`,
       `apps/worker/src/nodes/triggers/poll/excel-row-added.ts` (+ specs).
-- [ ] **W3.14** Cron trigger only at nodes[0]; idempotency key drifts — scan all nodes; key on scheduled ts.
-      Files: `cron-trigger.service.ts`, `cron-processor.ts`.
+- [x] **W3.14** Cron trigger only at nodes[0] + idempotency key drift — two bugs. (1) `extractCronTrigger`
+      only inspected `definition.nodes[0]`, so any workflow whose cron-trigger node was not first in the array
+      was silently never scheduled; it now scans ALL nodes for the `cron-trigger` type. (2) `computeScheduledFor`
+      keyed the idempotency lock on `job.processedOn` — the worker pickup time, which differs on every
+      attempt/retry, so the same scheduled tick could run twice (each attempt minted a fresh key). It now keys on
+      the SCHEDULED fire time: the BullMQ job-scheduler job id ends in the scheduled epoch millis
+      (`repeat:<key>:<millis>`), parsed via `scheduledMillisFromId`, falling back to the job's enqueue
+      `timestamp` (never `processedOn`), so all attempts of one tick share one stable `cron:<wf>:<iso>` key.
+      Files: `apps/worker/src/cron/cron-trigger.service.ts`, `apps/worker/src/cron/cron-processor.ts` (+ specs).
 - [ ] **W3.15** Calendar empty-poll watermark race — pre-request watermark + overlap. File: `calendar-event-created.ts`.
 - [ ] **W3.16** Log redaction gaps — add `value`/`config` paths, stop logging raw `e.response`, recursive audit sanitize,
       async audit log. Files: `logger.config.ts`, `prisma-connection-resolver.ts`, `audit-log.service.ts`.

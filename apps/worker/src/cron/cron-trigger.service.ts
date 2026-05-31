@@ -118,8 +118,11 @@ export class CronTriggerService implements OnModuleInit {
     if (!def || !Array.isArray(def.nodes) || def.nodes.length === 0) {
       return null;
     }
-    const trigger = def.nodes[0] as WorkflowNode | undefined;
-    if (!trigger || trigger.type !== CRON_TRIGGER_TYPE) {
+    // Scan ALL nodes for the cron trigger — a workflow's node array is not
+    // guaranteed to list the trigger first, so keying off `nodes[0]` silently
+    // failed to schedule any workflow whose cron trigger sat later in the array.
+    const trigger = (def.nodes as WorkflowNode[]).find((n) => n?.type === CRON_TRIGGER_TYPE);
+    if (!trigger) {
       return null;
     }
     const expression = trigger.config?.expression;
