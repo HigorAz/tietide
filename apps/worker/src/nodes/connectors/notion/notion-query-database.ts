@@ -23,6 +23,8 @@ export class NotionQueryDatabaseAction extends BaseConnectorAction<NotionOAuth2C
   readonly name = 'Notion: Query Database';
   readonly description = 'Query rows from a Notion database with filter/sort';
   readonly requiredConnectionType = 'notion';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: NotionClientFactory) {
     super();

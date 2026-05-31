@@ -186,7 +186,7 @@ describe('OutlookCreateDraftAction', () => {
       const result = await action.execute(makeInput({ mockOnDryRun: true }), ctx);
       expect(graphFetch).not.toHaveBeenCalled();
       expect(result.data.mocked).toBe(true);
-      expect(result.data.wouldHaveCreated).toMatchObject({ isReply: false, subject: 'Hello' });
+      expect(result.data).toMatchObject({ dryRun: true, skipped: true });
     });
   });
 });

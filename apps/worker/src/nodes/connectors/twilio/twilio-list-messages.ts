@@ -30,6 +30,8 @@ export class TwilioListMessagesAction extends BaseConnectorAction<TwilioApiKeyCo
   readonly name = 'Twilio: List Messages';
   readonly description = 'List recent Twilio messages, optionally filtered by to/from';
   readonly requiredConnectionType = 'twilio';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: TwilioClientFactory) {
     super();

@@ -1,4 +1,5 @@
 import { api } from './client';
+import { fetchAllPages } from './pagination';
 
 export type EnvVarScope = 'GLOBAL' | 'USER';
 
@@ -22,8 +23,7 @@ export interface UpdateEnvVarBody {
 
 // USER scope
 export async function listUserEnvVars(): Promise<EnvVarView[]> {
-  const { data } = await api.get<EnvVarView[]>('/env-vars');
-  return data;
+  return fetchAllPages<EnvVarView>('/env-vars');
 }
 
 export async function createUserEnvVar(body: CreateEnvVarBody): Promise<EnvVarView> {
@@ -42,8 +42,7 @@ export async function deleteUserEnvVar(id: string): Promise<void> {
 
 // GLOBAL scope (admin)
 export async function listAdminEnvVars(): Promise<EnvVarView[]> {
-  const { data } = await api.get<EnvVarView[]>('/admin/env-vars');
-  return data;
+  return fetchAllPages<EnvVarView>('/admin/env-vars');
 }
 
 export async function createAdminEnvVar(body: CreateEnvVarBody): Promise<EnvVarView> {

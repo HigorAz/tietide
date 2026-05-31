@@ -127,7 +127,7 @@ describe('SecretsService', () => {
   });
 
   describe('list', () => {
-    it('should query Prisma scoped to the caller userId and select safe fields only', async () => {
+    it('should query Prisma scoped to the caller userId with a keyset order and peek', async () => {
       prisma.secret.findMany.mockResolvedValue([]);
 
       await service.list(userId);
@@ -135,11 +135,12 @@ describe('SecretsService', () => {
       expect(prisma.secret.findMany).toHaveBeenCalledWith({
         where: { userId },
         select: { id: true, name: true, createdAt: true, updatedAt: true },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 51,
       });
     });
 
-    it('should return rows without any value or nonce field', async () => {
+    it('should return rows in a paginated envelope without value or nonce', async () => {
       const row = {
         id: secretId,
         name: 'GITHUB_TOKEN',
@@ -150,11 +151,24 @@ describe('SecretsService', () => {
 
       const result = await service.list(userId);
 
-      expect(result).toEqual([row]);
-      result.forEach((r) => {
+      expect(result).toEqual({ items: [row], nextCursor: null });
+      result.items.forEach((r) => {
         expect(r).not.toHaveProperty('value');
         expect(r).not.toHaveProperty('nonce');
       });
+    });
+
+    it('should apply a keyset where-clause when a cursor is supplied', async () => {
+      prisma.secret.findMany.mockResolvedValue([]);
+      const cursor = Buffer.from(
+        JSON.stringify({ v: '2026-04-10T00:00:00.000Z', id: 'sec-x' }),
+        'utf8',
+      ).toString('base64url');
+
+      await service.list(userId, { cursor });
+
+      const call = prisma.secret.findMany.mock.calls[0][0] as { where: { AND?: unknown[] } };
+      expect(call.where.AND).toBeDefined();
     });
   });
 

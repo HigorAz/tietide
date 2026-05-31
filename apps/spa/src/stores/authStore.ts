@@ -42,7 +42,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   register: async (payload) => {
-    return apiRegister(payload);
+    // Auto-login after registration: the API returns an access token, so persist
+    // it and hydrate the user exactly like login() instead of bouncing to /login.
+    const { accessToken } = await apiRegister(payload);
+    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    set({ token: accessToken });
+    const user = await apiGetMe();
+    set({ user });
+    return user;
   },
 
   logout: () => {

@@ -1,5 +1,6 @@
 import type { ConnectionStatus, ConnectionType, ConnectionProvider } from '@tietide/shared';
 import { api } from './client';
+import { fetchAllPages } from './pagination';
 
 export interface ConnectionView {
   id: string;
@@ -43,8 +44,7 @@ export interface StartOAuthParams {
 }
 
 export async function listConnections(): Promise<ConnectionView[]> {
-  const { data } = await api.get<ConnectionView[]>('/connections');
-  return data;
+  return fetchAllPages<ConnectionView>('/connections');
 }
 
 export async function getConnection(id: string): Promise<ConnectionView> {

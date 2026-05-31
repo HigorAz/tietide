@@ -141,7 +141,7 @@ describe('OllamaGenerateAction', () => {
       const result = await action.execute(makeInput({ mockOnDryRun: true }), ctx);
       expect(generate).not.toHaveBeenCalled();
       expect(result.data.mocked).toBe(true);
-      expect(result.data.usage).toEqual({ inputTokens: 0, outputTokens: 0 });
+      expect(result.data).toMatchObject({ dryRun: true, skipped: true });
     });
   });
 

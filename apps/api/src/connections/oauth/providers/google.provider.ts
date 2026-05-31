@@ -68,6 +68,10 @@ export class GoogleOAuthProvider extends BaseOAuthProvider implements OAuthProvi
       prompt: 'consent',
       include_granted_scopes: 'true',
     });
+    if (args.codeChallenge) {
+      params.set('code_challenge', args.codeChallenge);
+      params.set('code_challenge_method', 'S256');
+    }
     return `${AUTHORIZE_URL}?${params.toString()}`;
   }
 
@@ -78,6 +82,7 @@ export class GoogleOAuthProvider extends BaseOAuthProvider implements OAuthProvi
       redirect_uri: args.redirectUri,
       client_id: this.env('GOOGLE_OAUTH_CLIENT_ID'),
       client_secret: this.env('GOOGLE_OAUTH_CLIENT_SECRET'),
+      ...(args.codeVerifier ? { code_verifier: args.codeVerifier } : {}),
     })) as GoogleTokenResponse;
 
     return this.toTokenResult(raw, null);

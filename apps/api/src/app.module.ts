@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { validateEnv } from './common/security/env.validation';
 import { AppLoggerModule } from './common/logger/logger.module';
 import { AppThrottlerModule } from './common/throttler/throttler.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -28,6 +29,9 @@ import { TagsModule } from './tags/tags.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['../../.env', '.env'],
+      // Refuse to boot a production deployment still carrying the sample
+      // secrets from .env.example (no-op outside production).
+      validate: validateEnv,
     }),
     AppLoggerModule,
     AppThrottlerModule,

@@ -211,6 +211,120 @@ describe('WorkflowsService', () => {
       expect(prisma.workflow.create).toHaveBeenCalled();
     });
 
+    describe('node-type allow-list & config safety (W2.7)', () => {
+      async function expectDefinitionRejection(
+        definition: { nodes: unknown[]; edges: unknown[] },
+        messageNeedle: string,
+      ) {
+        const promise = service.create(userId, {
+          name: 'Demo',
+          definition: definition as unknown as typeof validDefinition,
+        });
+        await expect(promise).rejects.toThrow(UnprocessableEntityException);
+        try {
+          await promise;
+        } catch (err) {
+          const body = (err as UnprocessableEntityException).getResponse() as {
+            message: string;
+            issues: { path: unknown[]; message: string }[];
+          };
+          expect(body.message).toBe('Workflow definition is not executable');
+          expect(body.issues.some((i) => i.message.includes(messageNeedle))).toBe(true);
+        }
+        expect(prisma.workflow.create).not.toHaveBeenCalled();
+        expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
+      }
+
+      it('rejects a node whose type is not in the known-node allow-list', async () => {
+        await expectDefinitionRejection(
+          {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'totally-made-up-node',
+                name: 'Evil',
+                position: { x: 0, y: 0 },
+                config: {},
+              },
+            ],
+            edges: [],
+          },
+          'Unknown node type',
+        );
+      });
+
+      it('rejects a node whose config carries a prototype-pollution key', async () => {
+        // `constructor`/`prototype` survive JSON parsing as plain own keys (only
+        // `__proto__` is special-cased away by the runtime), so this exercises
+        // the save-boundary executable-schema gate. The `__proto__` variant is
+        // caught one layer earlier at the HTTP DTO (see safe-node-config spec).
+        await expectDefinitionRejection(
+          {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'manual-trigger',
+                name: 'Start',
+                position: { x: 0, y: 0 },
+                config: { constructor: { polluted: true } },
+              },
+            ],
+            edges: [],
+          },
+          'constructor',
+        );
+      });
+
+      it('rejects a config nested beyond the maximum depth', async () => {
+        let deep: Record<string, unknown> = { leaf: true };
+        for (let i = 0; i < 30; i++) {
+          deep = { nested: deep };
+        }
+        await expectDefinitionRejection(
+          {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'manual-trigger',
+                name: 'Start',
+                position: { x: 0, y: 0 },
+                config: deep,
+              },
+            ],
+            edges: [],
+          },
+          'nesting',
+        );
+      });
+
+      it('accepts a known node type with a normal nested config', async () => {
+        prisma.workflow.create.mockResolvedValue(persisted);
+        await service.create(userId, {
+          name: 'Demo',
+          definition: {
+            nodes: [
+              {
+                id: 'n1',
+                type: 'manual-trigger',
+                name: 'Start',
+                position: { x: 0, y: 0 },
+                config: {},
+              },
+              {
+                id: 'n2',
+                type: 'http-request',
+                name: 'Call',
+                position: { x: 100, y: 0 },
+                config: { method: 'GET', headers: { 'x-a': '1' }, body: { nested: { ok: true } } },
+              },
+            ],
+            edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+          } as unknown as typeof validDefinition,
+        });
+        expect(prisma.workflow.create).toHaveBeenCalled();
+      });
+    });
+
     describe('topology validation', () => {
       const trigger = (id: string, type = 'manual-trigger', name = id) => ({
         id,
@@ -314,7 +428,10 @@ describe('WorkflowsService', () => {
   });
 
   describe('list', () => {
-    it('should query Prisma scoped to the caller userId only', async () => {
+    // The list projection drops the heavy `definition` JSONB (W3.2).
+    const { definition: _omitDef, ...persistedListItem } = persistedResponse;
+
+    it('should query Prisma scoped to the caller userId only with a keyset order', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
       await service.list(userId);
@@ -322,17 +439,69 @@ describe('WorkflowsService', () => {
       expect(prisma.workflow.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         }),
       );
     });
 
-    it('should return the rows mapped to response DTOs', async () => {
+    it('should fetch limit + 1 rows to detect a next page', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      await service.list(userId, { limit: 10 });
+
+      const call = prisma.workflow.findMany.mock.calls[0][0] as { take: number };
+      expect(call.take).toBe(11);
+    });
+
+    it('should return items wrapped with a null nextCursor when not full', async () => {
       prisma.workflow.findMany.mockResolvedValue([persisted]);
 
       const result = await service.list(userId);
 
-      expect(result).toEqual([persistedResponse]);
+      expect(result).toEqual({ items: [persistedListItem], nextCursor: null });
+    });
+
+    it('should NOT request or return the heavy definition field', async () => {
+      prisma.workflow.findMany.mockResolvedValue([persisted]);
+
+      const result = await service.list(userId);
+
+      const call = prisma.workflow.findMany.mock.calls[0][0] as {
+        select: Record<string, unknown>;
+      };
+      expect(call.select.definition).toBeFalsy();
+      expect(result.items[0]).not.toHaveProperty('definition');
+    });
+
+    it('should set nextCursor and slice to the page when an extra row is fetched', async () => {
+      const rows = [
+        { ...persisted, id: 'wf-a', createdAt: new Date('2026-04-03T00:00:00Z') },
+        { ...persisted, id: 'wf-b', createdAt: new Date('2026-04-02T00:00:00Z') },
+        { ...persisted, id: 'wf-c', createdAt: new Date('2026-04-01T00:00:00Z') },
+      ];
+      prisma.workflow.findMany.mockResolvedValue(rows);
+
+      const result = await service.list(userId, { limit: 2 });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items.map((w) => w.id)).toEqual(['wf-a', 'wf-b']);
+      expect(typeof result.nextCursor).toBe('string');
+    });
+
+    it('should apply a keyset where-clause when a cursor is supplied', async () => {
+      prisma.workflow.findMany.mockResolvedValue([persisted]);
+      // Cursor encoding mirrors the service: { v: createdAt ISO, id }.
+      const cursor = Buffer.from(
+        JSON.stringify({ v: '2026-04-10T00:00:00.000Z', id: 'wf-x' }),
+        'utf8',
+      ).toString('base64url');
+
+      await service.list(userId, { cursor });
+
+      const call = prisma.workflow.findMany.mock.calls[0][0] as {
+        where: { AND?: unknown[] };
+      };
+      expect(call.where.AND).toBeDefined();
     });
 
     it('should request the execution count via Prisma _count', async () => {
@@ -349,10 +518,10 @@ describe('WorkflowsService', () => {
     it('should map _count.executions to executionCount', async () => {
       prisma.workflow.findMany.mockResolvedValue([{ ...persisted, _count: { executions: 7 } }]);
 
-      const [row] = await service.list(userId);
+      const { items } = await service.list(userId);
 
-      expect(row.executionCount).toBe(7);
-      expect(row).not.toHaveProperty('_count');
+      expect(items[0].executionCount).toBe(7);
+      expect(items[0]).not.toHaveProperty('_count');
     });
 
     it('should exclude userId from the response select', async () => {
@@ -367,39 +536,23 @@ describe('WorkflowsService', () => {
       expect(call.select.userId).toBeFalsy();
     });
 
-    it('should request the documentation relation with updatedAt and version', async () => {
-      prisma.workflow.findMany.mockResolvedValue([]);
-
-      await service.list(userId);
-
-      const call = prisma.workflow.findMany.mock.calls[0][0] as {
-        select: Record<string, unknown>;
-      };
-      expect(call.select.documentation).toEqual({
-        select: { updatedAt: true, version: true },
-      });
-    });
-
     it('should map documentation { updatedAt, version } to { generatedAt, version }', async () => {
       const docUpdated = new Date('2026-05-01T10:00:00Z');
       prisma.workflow.findMany.mockResolvedValue([
-        {
-          ...persisted,
-          documentation: { updatedAt: docUpdated, version: 3 },
-        },
+        { ...persisted, documentation: { updatedAt: docUpdated, version: 3 } },
       ]);
 
-      const [row] = await service.list(userId);
+      const { items } = await service.list(userId);
 
-      expect(row.documentation).toEqual({ generatedAt: docUpdated, version: 3 });
+      expect(items[0].documentation).toEqual({ generatedAt: docUpdated, version: 3 });
     });
 
     it('should expose documentation as null when none exists', async () => {
       prisma.workflow.findMany.mockResolvedValue([{ ...persisted, documentation: null }]);
 
-      const [row] = await service.list(userId);
+      const { items } = await service.list(userId);
 
-      expect(row.documentation).toBeNull();
+      expect(items[0].documentation).toBeNull();
     });
   });
 
@@ -815,7 +968,9 @@ describe('WorkflowsService', () => {
       const tagRow = { tag: { id: tagUuidA, name: 'client-a', color: '#3366cc' } };
       prisma.workflow.findMany.mockResolvedValue([{ ...persisted, tags: [tagRow] }]);
 
-      const [row] = await service.list(userId);
+      const {
+        items: [row],
+      } = await service.list(userId);
 
       expect(row.tags).toEqual([{ id: tagUuidA, name: 'client-a', color: '#3366cc' }]);
     });

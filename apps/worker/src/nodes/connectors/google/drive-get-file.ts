@@ -22,6 +22,8 @@ export class DriveGetFileAction extends BaseConnectorAction<GoogleOAuth2Config> 
   readonly name = 'Drive: Get File';
   readonly description = 'Fetch Drive file metadata, with optional content download (base64)';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

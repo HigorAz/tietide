@@ -32,6 +32,8 @@ export class SlackGetChannelHistoryAction extends BaseConnectorAction<SlackOAuth
   readonly name = 'Slack: Get Channel History';
   readonly description = 'Read recent messages from a Slack channel';
   readonly requiredConnectionType = 'slack';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: SlackClientFactory) {
     super();

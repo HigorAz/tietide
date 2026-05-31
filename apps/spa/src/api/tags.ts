@@ -1,5 +1,6 @@
 import type { Tag } from '@tietide/shared';
 import { api } from './client';
+import { fetchAllPages } from './pagination';
 
 export interface CreateTagBody {
   name: string;
@@ -12,8 +13,7 @@ export interface UpdateTagBody {
 }
 
 export async function listTags(): Promise<Tag[]> {
-  const { data } = await api.get<Tag[]>('/tags');
-  return data;
+  return fetchAllPages<Tag>('/tags');
 }
 
 export async function createTag(body: CreateTagBody): Promise<Tag> {

@@ -75,11 +75,11 @@ describe('TagsController (integration)', () => {
       await request(app.getHttpServer()).get('/tags').expect(401);
     });
 
-    it('returns 200 with the user tags', async () => {
-      tagsService.list.mockResolvedValue([persisted]);
+    it('returns 200 with a paginated envelope of the user tags', async () => {
+      tagsService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
       const res = await request(app.getHttpServer()).get('/tags').expect(200);
-      expect(res.body).toEqual([persisted]);
-      expect(tagsService.list).toHaveBeenCalledWith('owner-uuid');
+      expect(res.body).toEqual({ items: [persisted], nextCursor: null });
+      expect(tagsService.list).toHaveBeenCalledWith('owner-uuid', {});
     });
   });
 

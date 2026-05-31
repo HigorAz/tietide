@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import type { Folder, Workflow } from '@tietide/shared';
+import type { Folder } from '@tietide/shared';
 import { useWorkflowsStore, type FolderFilter } from '@/stores/workflowsStore';
+import type { WorkflowListItem } from '@/api/workflows';
 import { useFoldersStore } from '@/stores/foldersStore';
 import { useTagsStore } from '@/stores/tagsStore';
 import { WorkflowRow } from '@/components/dashboard/WorkflowRow';
@@ -100,7 +101,7 @@ export function WorkflowsPage(): JSX.Element {
   const toast = useToastStore((s) => s.show);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [toDelete, setToDelete] = useState<Workflow | null>(null);
+  const [toDelete, setToDelete] = useState<WorkflowListItem | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<Folder | null>(null);
   const [showTagManager, setShowTagManager] = useState(false);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(() => new Set());
@@ -316,7 +317,7 @@ export function WorkflowsPage(): JSX.Element {
     async (
       successMessage: (count: number) => string,
       failurePrefix: string,
-      action: (workflow: Workflow) => Promise<unknown>,
+      action: (workflow: WorkflowListItem) => Promise<unknown>,
     ): Promise<void> => {
       const targets = workflows.filter((w) => selectedIds.has(w.id));
       if (targets.length === 0) return;
@@ -411,7 +412,7 @@ export function WorkflowsPage(): JSX.Element {
     }
   };
 
-  const handleImported = (created: Workflow): void => {
+  const handleImported = (created: WorkflowListItem): void => {
     void fetch();
     navigate(`/workflows/${created.id}`, { state: { from: '/workflows' } });
   };

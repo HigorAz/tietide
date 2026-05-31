@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import type { Workflow } from '@tietide/shared';
+import type { WorkflowListItem } from '@/api/workflows';
 import { RecentWorkflowItem } from './RecentWorkflowItem';
 
 export interface RecentWorkflowsSectionProps {
-  workflows: Workflow[];
+  workflows: WorkflowListItem[];
 }
 
 export function RecentWorkflowsSection({ workflows }: RecentWorkflowsSectionProps): JSX.Element {

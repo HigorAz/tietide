@@ -67,7 +67,14 @@ export class HubspotDealChangedTrigger extends BasePushTrigger {
     const cfg = ctx.connection.config as unknown as HubspotApiKeyLike & {
       appClientSecret?: string;
     };
-    const clientSecret = cfg.appClientSecret ?? cfg.accessToken;
+    // Sign with the HubSpot App client secret, never the user access token.
+    const clientSecret = cfg.appClientSecret ?? process.env.HUBSPOT_APP_CLIENT_SECRET;
+    if (!clientSecret) {
+      throw new Error(
+        'HubSpot App client secret is not configured (connection appClientSecret or ' +
+          'HUBSPOT_APP_CLIENT_SECRET) — cannot verify HubSpot webhook signatures.',
+      );
+    }
     return {
       providerSubId: `hubspot:deal-changed:${ctx.workflowId}:${ctx.nodeId}`,
       signingSecret: encodeHubspotSigningSecret(ctx.callbackUrl, clientSecret),

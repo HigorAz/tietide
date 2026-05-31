@@ -24,6 +24,8 @@ export class HubspotGetContactAction extends BaseConnectorAction<HubspotOAuth2Co
   readonly name = 'HubSpot: Get Contact';
   readonly description = 'Fetch a HubSpot contact by ID';
   readonly requiredConnectionType = 'hubspot';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: HubspotClientFactory) {
     super();

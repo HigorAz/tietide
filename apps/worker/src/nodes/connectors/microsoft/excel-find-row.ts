@@ -26,6 +26,8 @@ export class ExcelFindRowAction extends BaseConnectorAction<MicrosoftOAuth2Confi
   readonly description =
     'Find table rows where a column matches a value (exact/contains/startsWith)';
   readonly requiredConnectionType = 'microsoft';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly authService: MicrosoftAuthService) {
     super();

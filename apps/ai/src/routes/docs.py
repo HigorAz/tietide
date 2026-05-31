@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from functools import lru_cache
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from src.auth import require_internal_token
 from src.config import settings
 from src.services.demo_cache import DemoDocumentationCache
 from src.services.documentation import (
@@ -29,7 +31,7 @@ from src.state import get_service_state
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_internal_token)])
 
 
 class GenerateDocsRequest(BaseModel):
@@ -105,6 +107,14 @@ async def generate_docs(
     service: DocumentationService = Depends(get_documentation_service),
     cache: DemoDocumentationCache = Depends(get_demo_cache),
 ) -> GenerateDocsResponse:
+    # Bound the untrusted definition before it reaches the RAG/LLM pipeline.
+    definition_size = len(json.dumps(request.definition).encode("utf-8"))
+    if definition_size > settings.max_definition_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"definition exceeds {settings.max_definition_bytes} bytes",
+        )
+
     payload = request.model_dump()
 
     cached_doc = cache.get(payload)

@@ -24,6 +24,8 @@ export class DiscordGetChannelMessagesAction extends BaseConnectorAction<Discord
   readonly name = 'Discord: Get Channel Messages';
   readonly description = 'Read recent messages from a Discord channel using a bot token';
   readonly requiredConnectionType = 'discord-bot';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: DiscordBotClientFactory) {
     super();

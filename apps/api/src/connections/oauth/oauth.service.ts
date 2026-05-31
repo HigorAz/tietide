@@ -1,12 +1,16 @@
-import { randomBytes } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ConnectionType, PROVIDER_CONFIG_SCHEMAS, type ProviderConfigMap } from '@tietide/shared';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConnectionsService } from '../connections.service';
 import { OAuthProviderRegistry } from './oauth-provider.registry';
 import { OAuthStateService } from './oauth-state.service';
+import { generatePkcePair } from './pkce';
 
 const MAX_ERROR_MESSAGE_LEN = 200;
+/** OAuth state (and its PKCE verifier) lives this long before it is unusable. */
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
 export class OAuthCallbackError extends Error {
   constructor(public readonly providerErrorCode: string) {
@@ -49,6 +53,7 @@ export class OAuthService {
     private readonly state: OAuthStateService,
     private readonly connections: ConnectionsService,
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async start(userId: string, input: OAuthStartInput): Promise<OAuthStartResult> {
@@ -63,7 +68,22 @@ export class OAuthService {
       }
     }
 
-    const nonce = randomBytes(16).toString('hex');
+    // PKCE: keep the verifier server-side, send only the S256 challenge. The
+    // nonce doubles as the OAuthState primary key (jti), making the signed
+    // state single-use.
+    const nonce = randomUUID();
+    const { verifier, challenge } = generatePkcePair();
+
+    await this.prisma.oAuthState.create({
+      data: {
+        jti: nonce,
+        userId,
+        provider: provider.id,
+        codeVerifier: verifier,
+        expiresAt: new Date(Date.now() + OAUTH_STATE_TTL_MS),
+      },
+    });
+
     const stateToken = await this.state.sign({
       userId,
       provider: provider.id,
@@ -77,6 +97,7 @@ export class OAuthService {
       state: stateToken,
       scopes: requestedScopes,
       redirectUri,
+      codeChallenge: challenge,
     });
 
     return { redirectUrl, state: stateToken };
@@ -107,10 +128,28 @@ export class OAuthService {
       throw new BadRequestException('OAuth state provider mismatch');
     }
 
+    // Atomically consume the stored state: updateMany only matches an
+    // unconsumed, unexpired row, so a replayed callback (same nonce/jti) flips
+    // zero rows and is rejected. This is the single-use guarantee.
+    const consumed = await this.prisma.oAuthState.updateMany({
+      where: { jti: decoded.nonce, consumedAt: null, expiresAt: { gt: new Date() } },
+      data: { consumedAt: new Date() },
+    });
+    if (consumed.count !== 1) {
+      throw new BadRequestException('Invalid or expired OAuth state');
+    }
+
+    const stateRow = await this.prisma.oAuthState.findUnique({ where: { jti: decoded.nonce } });
+    // Defence in depth: the signed state and the stored row must agree.
+    if (!stateRow || stateRow.userId !== decoded.userId || stateRow.provider !== decoded.provider) {
+      throw new BadRequestException('Invalid or expired OAuth state');
+    }
+
     const provider = this.registry.get(decoded.provider);
     const exchanged = await provider.exchangeCode({
       code: input.code,
       redirectUri: provider.redirectUri(),
+      codeVerifier: stateRow.codeVerifier,
     });
 
     const schema = PROVIDER_CONFIG_SCHEMAS[provider.id as keyof ProviderConfigMap];

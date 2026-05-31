@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(USER)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password     String
+  name         String
+  role         Role     @default(USER)
+  tokenVersion Int      @default(0) @map("token_version")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   workflows            Workflow[]
   secrets              Secret[]
@@ -81,6 +82,9 @@ model Workflow {
   triggerCursors        TriggerCursor[]
 
   @@index([userId, folderId])
+  // Worker cron/poll schedulers sweep all active workflows globally
+  // (where { isActive: true }) — index it so that scan does not table-scan.
+  @@index([isActive])
   @@map("workflows")
 }
 
@@ -248,6 +252,9 @@ model Connection {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, provider])
+  // OAuth refresh-scan sweeps connections due for refresh
+  // (where { status: ACTIVE, expiresAt: { lt: cutoff } }).
+  @@index([status, expiresAt])
   @@map("connections")
 }
 
@@ -323,4 +330,21 @@ model TriggerCursor {
 
   @@id([workflowId, nodeId])
   @@map("trigger_cursors")
+}
+
+// Short-lived server-side state for the OAuth Authorization Code + PKCE flow.
+// Written at /oauth/start, consumed exactly once at /oauth/callback. Holds the
+// PKCE code_verifier (never sent to the browser) and enforces single-use of the
+// state nonce (jti) so a captured callback URL cannot be replayed.
+model OAuthState {
+  jti          String    @id
+  userId       String    @map("user_id")
+  provider     String
+  codeVerifier String    @map("code_verifier")
+  expiresAt    DateTime  @map("expires_at")
+  consumedAt   DateTime? @map("consumed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("oauth_states")
 }

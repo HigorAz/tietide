@@ -22,6 +22,8 @@ export class MailchimpListCampaignsAction extends BaseConnectorAction<MailchimpA
   readonly name = 'Mailchimp: List Campaigns';
   readonly description = 'List Mailchimp campaigns, optionally filtered by status';
   readonly requiredConnectionType = 'mailchimp';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: MailchimpClientFactory) {
     super();

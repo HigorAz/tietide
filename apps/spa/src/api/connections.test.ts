@@ -49,8 +49,8 @@ describe('connections api', () => {
     mocked.delete.mockReset();
   });
 
-  it('listConnections should GET /connections', async () => {
-    mocked.get.mockResolvedValueOnce({ data: [sampleConnection] });
+  it('listConnections should GET /connections and return the paginated items', async () => {
+    mocked.get.mockResolvedValueOnce({ data: { items: [sampleConnection], nextCursor: null } });
     const result = await listConnections();
     expect(mocked.get).toHaveBeenCalledWith('/connections');
     expect(result).toEqual([sampleConnection]);

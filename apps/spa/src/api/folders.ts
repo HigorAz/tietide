@@ -1,5 +1,6 @@
 import type { Folder } from '@tietide/shared';
 import { api } from './client';
+import { fetchAllPages } from './pagination';
 
 export interface CreateFolderBody {
   name: string;
@@ -17,8 +18,7 @@ export interface DeleteFolderResult {
 }
 
 export async function listFolders(): Promise<Folder[]> {
-  const { data } = await api.get<Folder[]>('/folders');
-  return data;
+  return fetchAllPages<Folder>('/folders');
 }
 
 export async function createFolder(body: CreateFolderBody): Promise<Folder> {

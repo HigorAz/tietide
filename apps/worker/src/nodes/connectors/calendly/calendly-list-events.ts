@@ -22,6 +22,8 @@ export class CalendlyListEventsAction extends BaseConnectorAction<CalendlyApiKey
   readonly name = 'Calendly: List Scheduled Events';
   readonly description = 'List Calendly events for a user, optionally within a time range';
   readonly requiredConnectionType = 'calendly';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: CalendlyClientFactory) {
     super();

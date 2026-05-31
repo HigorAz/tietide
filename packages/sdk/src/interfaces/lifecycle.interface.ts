@@ -28,6 +28,11 @@ export interface SignatureInput {
   rawBody: Uint8Array;
   headers: Record<string, string | string[] | undefined>;
   signingSecret: string;
+  // The inbound request's query string, parsed server-side by the webhook
+  // controller (NOT derived from any client-supplied header). Providers whose
+  // verification depends on a URL secret — e.g. Mailchimp's `?secret=` token —
+  // must read it from here so the trust anchor cannot be spoofed by the caller.
+  query?: Record<string, string | string[] | undefined>;
 }
 
 export interface PollContext {

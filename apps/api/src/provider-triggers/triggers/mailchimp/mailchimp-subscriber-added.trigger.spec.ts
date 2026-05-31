@@ -20,32 +20,32 @@ describe('MailchimpSubscriberAddedTrigger', () => {
   });
 
   describe('verifySignature', () => {
-    it('accepts when x-tietide-callback-secret matches the stored secret', () => {
-      expect(
-        trigger.verifySignature(input({ headers: { 'x-tietide-callback-secret': SECRET } })),
-      ).toBe(true);
+    it('accepts when the server-parsed query secret matches the stored secret', () => {
+      expect(trigger.verifySignature(input({ query: { secret: SECRET } }))).toBe(true);
     });
 
-    it('extracts the secret from x-original-url query param when direct header missing', () => {
+    it('does NOT trust a client-supplied header (forgery vector) — only the server query', () => {
+      // An attacker putting the secret in a header must NOT pass; the secret
+      // must come from the server-parsed query string.
       expect(
         trigger.verifySignature(
           input({
             headers: {
-              'x-original-url': `https://example.com/v1/provider-webhooks/mailchimp/sub?secret=${SECRET}`,
+              'x-tietide-callback-secret': SECRET,
+              'x-original-url': `https://x/?secret=${SECRET}`,
             },
+            query: {},
           }),
         ),
-      ).toBe(true);
-    });
-
-    it('rejects when secret does not match', () => {
-      expect(
-        trigger.verifySignature(input({ headers: { 'x-tietide-callback-secret': 'wrong' } })),
       ).toBe(false);
     });
 
+    it('rejects when the query secret does not match', () => {
+      expect(trigger.verifySignature(input({ query: { secret: 'wrong' } }))).toBe(false);
+    });
+
     it('rejects when no secret is provided', () => {
-      expect(trigger.verifySignature(input({ headers: {} }))).toBe(false);
+      expect(trigger.verifySignature(input({ query: {} }))).toBe(false);
     });
   });
 

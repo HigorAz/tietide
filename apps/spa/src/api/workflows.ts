@@ -1,5 +1,12 @@
 import type { Workflow, WorkflowDefinition } from '@tietide/shared';
 import { api } from './client';
+import { fetchAllPages } from './pagination';
+
+/**
+ * List-view projection of a workflow. The `GET /v1/workflows` list endpoint omits
+ * the heavy `definition` JSONB (W3.2); the editor loads it via `getWorkflow(id)`.
+ */
+export type WorkflowListItem = Omit<Workflow, 'definition'>;
 
 export interface CreateWorkflowBody {
   name: string;
@@ -22,17 +29,15 @@ export interface ListWorkflowsParams {
   tagIds?: string[];
 }
 
-export async function listWorkflows(params: ListWorkflowsParams = {}): Promise<Workflow[]> {
-  const search = new URLSearchParams();
+export async function listWorkflows(params: ListWorkflowsParams = {}): Promise<WorkflowListItem[]> {
+  const query: Record<string, string> = {};
   if (params.folderId !== undefined) {
-    search.set('folderId', params.folderId === null ? 'null' : params.folderId);
+    query.folderId = params.folderId === null ? 'null' : params.folderId;
   }
   if (params.tagIds && params.tagIds.length > 0) {
-    search.set('tagIds', params.tagIds.join(','));
+    query.tagIds = params.tagIds.join(',');
   }
-  const qs = search.toString();
-  const { data } = await api.get<Workflow[]>(`/workflows${qs ? `?${qs}` : ''}`);
-  return data;
+  return fetchAllPages<WorkflowListItem>('/workflows', query);
 }
 
 export async function getWorkflow(id: string): Promise<Workflow> {

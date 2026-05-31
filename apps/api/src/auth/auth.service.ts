@@ -5,18 +5,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { LoginDto } from './dto/login.dto';
 import type { LoginResponseDto } from './dto/login-response.dto';
 import type { RegisterDto } from './dto/register.dto';
+import type { RegisterResponseDto } from './dto/register-response.dto';
 import type { UserResponseDto } from './dto/user-response.dto';
 
 const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class AuthService {
+  // A precomputed hash compared against when the email is not registered, so the
+  // login response takes the same time whether or not the account exists
+  // (defeats the timing oracle that would otherwise enumerate valid emails).
+  private readonly dummyHash = bcrypt.hashSync('tietide-timing-equalizer', BCRYPT_ROUNDS);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<UserResponseDto> {
+  async register(dto: RegisterDto): Promise<RegisterResponseDto> {
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
       select: { id: true },
@@ -42,7 +48,17 @@ export class AuthService {
           createdAt: true,
         },
       });
-      return user;
+      // Auto-login: issue an access token so the SPA can land the user straight
+      // in the app instead of bouncing them to the login screen. A freshly
+      // created user is always at tokenVersion 0 (the column default), so we
+      // embed 0 without re-selecting it (keeps it out of the response body).
+      const accessToken = this.jwt.sign({
+        sub: user.id,
+        email: user.email,
+        role: user.role,
+        tokenVersion: 0,
+      });
+      return { ...user, accessToken, tokenType: 'Bearer' };
     } catch (err) {
       if (this.isUniqueViolation(err)) {
         throw new ConflictException('Email already registered');
@@ -54,14 +70,14 @@ export class AuthService {
   async login(dto: LoginDto): Promise<LoginResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      select: { id: true, email: true, password: true, role: true },
+      select: { id: true, email: true, password: true, role: true, tokenVersion: true },
     });
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
 
-    const passwordMatches = await bcrypt.compare(dto.password, user.password);
-    if (!passwordMatches) {
+    // Always run a bcrypt comparison — against a dummy hash when the user is
+    // missing — so the endpoint's timing does not reveal whether the email is
+    // registered. Decide success only after the comparison.
+    const passwordMatches = await bcrypt.compare(dto.password, user?.password ?? this.dummyHash);
+    if (!user || !passwordMatches) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -69,8 +85,23 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      tokenVersion: user.tokenVersion,
     });
     return { accessToken, tokenType: 'Bearer' };
+  }
+
+  /**
+   * Revoke every outstanding token for a user by bumping their tokenVersion.
+   * The JWT strategy compares the version embedded in each token against the
+   * user's current version on every request, so all previously-issued tokens
+   * stop validating immediately.
+   */
+  async logout(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+      select: { id: true },
+    });
   }
 
   async getProfile(userId: string): Promise<UserResponseDto> {

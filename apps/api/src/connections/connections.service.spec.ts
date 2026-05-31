@@ -70,7 +70,7 @@ describe('ConnectionsService', () => {
   });
 
   describe('list', () => {
-    it('should query Prisma scoped to the caller userId, ordered desc, with metadata-only select', async () => {
+    it('should query Prisma scoped to the caller userId, keyset-ordered, with metadata-only select', async () => {
       prisma.connection.findMany.mockResolvedValue([]);
 
       await service.list(userId);
@@ -88,22 +88,36 @@ describe('ConnectionsService', () => {
           createdAt: true,
           updatedAt: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 51,
       });
     });
 
-    it('should return rows without any encrypted/nonce fields', async () => {
+    it('should return rows in a paginated envelope without any encrypted/nonce fields', async () => {
       prisma.connection.findMany.mockResolvedValue([baseRow]);
 
       const result = await service.list(userId);
 
-      expect(result).toEqual([baseRow]);
-      for (const row of result as unknown as Record<string, unknown>[]) {
+      expect(result).toEqual({ items: [baseRow], nextCursor: null });
+      for (const row of result.items as unknown as Record<string, unknown>[]) {
         expect(row).not.toHaveProperty('configEncrypted');
         expect(row).not.toHaveProperty('configNonce');
         expect(row).not.toHaveProperty('refreshTokenEncrypted');
         expect(row).not.toHaveProperty('refreshTokenNonce');
       }
+    });
+
+    it('should apply a keyset where-clause when a cursor is supplied', async () => {
+      prisma.connection.findMany.mockResolvedValue([]);
+      const cursor = Buffer.from(
+        JSON.stringify({ v: '2026-04-10T00:00:00.000Z', id: 'conn-x' }),
+        'utf8',
+      ).toString('base64url');
+
+      await service.list(userId, { cursor });
+
+      const call = prisma.connection.findMany.mock.calls[0][0] as { where: { AND?: unknown[] } };
+      expect(call.where.AND).toBeDefined();
     });
   });
 

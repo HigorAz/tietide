@@ -82,16 +82,6 @@ export class PollProcessor extends WorkerHost {
       logger: sdkLogger,
     });
 
-    if (result.newCursor !== cursor) {
-      await this.prisma.triggerCursor.upsert({
-        where: { workflowId_nodeId: { workflowId, nodeId } },
-        update: { cursor: result.newCursor, lastPolledAt: new Date() },
-        create: { workflowId, nodeId, cursor: result.newCursor },
-      });
-    }
-
-    if (result.items.length === 0) return;
-
     const triggerType = `poll:${type}`;
     for (const item of result.items) {
       const idempotencyKey = this.idempotencyKey(workflowId, nodeId, item);
@@ -132,6 +122,20 @@ export class PollProcessor extends WorkerHost {
           removeOnFail: { age: 24 * 3600 },
         },
       );
+    }
+
+    // Advance the cursor ONLY after every item has been durably created and
+    // enqueued. If a create/enqueue above throws, process() rejects with the
+    // cursor still at its old value, so the next tick re-polls the same window
+    // and the idempotencyKey dedup skips items that were already enqueued —
+    // making the trigger at-least-once instead of silently dropping the tail.
+    // (Empty-result ticks still advance the watermark via this same path.)
+    if (result.newCursor !== cursor) {
+      await this.prisma.triggerCursor.upsert({
+        where: { workflowId_nodeId: { workflowId, nodeId } },
+        update: { cursor: result.newCursor, lastPolledAt: new Date() },
+        create: { workflowId, nodeId, cursor: result.newCursor },
+      });
     }
   }
 

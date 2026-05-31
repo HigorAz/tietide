@@ -50,13 +50,29 @@ describe('workflows API client', () => {
   });
 
   describe('listWorkflows', () => {
-    it('should GET /workflows and return the array payload', async () => {
-      mockedGet.mockResolvedValueOnce({ data: [sampleWorkflow] });
+    it('should GET /workflows and return the paginated items', async () => {
+      mockedGet.mockResolvedValueOnce({ data: { items: [sampleWorkflow], nextCursor: null } });
 
       const result = await listWorkflows();
 
       expect(mockedGet).toHaveBeenCalledWith('/workflows');
       expect(result).toEqual([sampleWorkflow]);
+    });
+
+    it('should walk nextCursor and accumulate every page', async () => {
+      mockedGet
+        .mockResolvedValueOnce({
+          data: { items: [sampleWorkflow], nextCursor: 'cursor-2' },
+        })
+        .mockResolvedValueOnce({
+          data: { items: [{ ...sampleWorkflow, id: 'wf-2' }], nextCursor: null },
+        });
+
+      const result = await listWorkflows();
+
+      expect(result.map((w) => w.id)).toEqual(['wf-1', 'wf-2']);
+      expect(mockedGet).toHaveBeenNthCalledWith(1, '/workflows');
+      expect(mockedGet).toHaveBeenNthCalledWith(2, '/workflows?cursor=cursor-2');
     });
 
     it('should propagate axios errors', async () => {

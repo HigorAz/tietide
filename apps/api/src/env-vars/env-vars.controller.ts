@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -31,6 +32,8 @@ import { EnvVarsService } from './env-vars.service';
 import { CreateEnvVarDto } from './dto/create-env-var.dto';
 import { UpdateEnvVarDto } from './dto/update-env-var.dto';
 import { EnvVarResponseDto } from './dto/env-var-response.dto';
+import { PaginatedEnvVarsDto } from './dto/env-var-list-response.dto';
+import { PageQueryDto } from '../common/pagination/page-query.dto';
 
 @ApiTags('env-vars')
 @ApiBearerAuth()
@@ -41,10 +44,20 @@ export class EnvVarsController {
   constructor(private readonly envVars: EnvVarsService) {}
 
   @Get()
-  @ApiOperation({ summary: "List the authenticated user's USER-scope env vars (values masked)" })
-  @ApiOkResponse({ type: EnvVarResponseDto, isArray: true })
-  async list(@CurrentUser() user: AuthenticatedUser): Promise<EnvVarResponseDto[]> {
-    return this.envVars.list({ scope: 'USER', ownerUserId: user.id });
+  @ApiOperation({
+    summary: "List the authenticated user's USER-scope env vars (values masked, cursor-paginated)",
+  })
+  @ApiOkResponse({ type: PaginatedEnvVarsDto })
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() page: PageQueryDto,
+  ): Promise<PaginatedEnvVarsDto> {
+    return this.envVars.list({
+      scope: 'USER',
+      ownerUserId: user.id,
+      limit: page.limit,
+      cursor: page.cursor,
+    });
   }
 
   @Post()

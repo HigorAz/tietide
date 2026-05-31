@@ -27,6 +27,8 @@ export class OutlookSearchAction extends BaseConnectorAction<MicrosoftOAuth2Conf
   readonly name = 'Outlook: Search Inbox';
   readonly description = 'Search Outlook messages with Microsoft Search syntax';
   readonly requiredConnectionType = 'microsoft';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly authService: MicrosoftAuthService) {
     super();

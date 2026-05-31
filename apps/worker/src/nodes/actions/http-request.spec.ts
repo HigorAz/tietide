@@ -1,7 +1,12 @@
 import type { ExecutionContext, NodeInput } from '@tietide/sdk';
 import { HttpRequestAction, type FetchLike } from './http-request';
+import type { LookupFn } from './ssrf-guard';
 
 const mockFetch = (impl: FetchLike) => jest.fn<ReturnType<FetchLike>, Parameters<FetchLike>>(impl);
+
+// Stub DNS so test hostnames (api.test, no-such-host.invalid) resolve to a
+// public address and pass the SSRF guard without real network lookups.
+const stubLookup: LookupFn = async () => [{ address: '93.184.216.34', family: 4 }];
 
 const slowFetch = () =>
   mockFetch(
@@ -69,19 +74,19 @@ const textResponse = (
 describe('HttpRequestAction', () => {
   describe('interface metadata', () => {
     it('should expose the http-request type', () => {
-      const action = new HttpRequestAction();
+      const action = new HttpRequestAction(undefined, stubLookup);
       expect(action.type).toBe('http-request');
     });
 
     it('should expose a human-readable name and description', () => {
-      const action = new HttpRequestAction();
+      const action = new HttpRequestAction(undefined, stubLookup);
       expect(action.name).toBe('HTTP Request');
       expect(typeof action.description).toBe('string');
       expect(action.description.length).toBeGreaterThan(0);
     });
 
     it('should be categorized as an action', () => {
-      const action = new HttpRequestAction();
+      const action = new HttpRequestAction(undefined, stubLookup);
       expect(action.category).toBe('action');
     });
   });
@@ -91,7 +96,7 @@ describe('HttpRequestAction', () => {
       const fetchMock = mockFetch(async () =>
         jsonResponse(200, { ok: true, count: 3 }, { 'x-custom': 'abc' }),
       );
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       const result = await action.execute(
         makeInput({ method: 'GET', url: 'https://api.test/items' }),
@@ -110,7 +115,7 @@ describe('HttpRequestAction', () => {
 
     it('should pass method and url to fetch and omit body for GET', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, {}));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await action.execute(
         makeInput({ method: 'GET', url: 'https://api.test/ping' }),
@@ -126,7 +131,7 @@ describe('HttpRequestAction', () => {
 
     it('should default to GET when method is not provided', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, {}));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await action.execute(makeInput({ url: 'https://api.test/' }), makeContext());
 
@@ -135,7 +140,7 @@ describe('HttpRequestAction', () => {
 
     it('should parse plain-text responses as string bodies', async () => {
       const fetchMock = mockFetch(async () => textResponse(200, 'hello'));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       const result = await action.execute(
         makeInput({ method: 'GET', url: 'https://api.test/txt' }),
@@ -149,7 +154,7 @@ describe('HttpRequestAction', () => {
   describe('execute — POST request', () => {
     it('should send JSON body and return the response', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(201, { id: 'new-123' }));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       const result = await action.execute(
         makeInput({
@@ -169,7 +174,7 @@ describe('HttpRequestAction', () => {
 
     it('should set Content-Type: application/json when body is an object and header is not provided', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, {}));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await action.execute(
         makeInput({ method: 'POST', url: 'https://api.test/x', body: { a: 1 } }),
@@ -182,7 +187,7 @@ describe('HttpRequestAction', () => {
 
     it('should send string body verbatim without stringifying it', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, {}));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await action.execute(
         makeInput({ method: 'POST', url: 'https://api.test/x', body: 'raw-string-payload' }),
@@ -194,7 +199,7 @@ describe('HttpRequestAction', () => {
 
     it('should merge custom headers with generated ones', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, {}));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await action.execute(
         makeInput({
@@ -215,7 +220,7 @@ describe('HttpRequestAction', () => {
   describe('execute — timeout', () => {
     it('should abort the request and throw when the configured timeout elapses', async () => {
       const fetchMock = slowFetch();
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await expect(
         action.execute(
@@ -229,19 +234,21 @@ describe('HttpRequestAction', () => {
       jest.useFakeTimers();
       try {
         const fetchMock = slowFetch();
-        const action = new HttpRequestAction(fetchMock);
+        const action = new HttpRequestAction(fetchMock, stubLookup);
 
         const promise = action
           .execute(makeInput({ method: 'GET', url: 'https://api.test/slow' }), makeContext())
           .catch((e: unknown) => e as Error);
 
-        jest.advanceTimersByTime(29_999);
+        // advanceTimersByTimeAsync flushes the SSRF DNS-lookup microtask first,
+        // so the abort timer is scheduled before we advance past it.
+        await jest.advanceTimersByTimeAsync(29_999);
         let settled = false;
         void promise.then(() => (settled = true));
         await Promise.resolve();
         expect(settled).toBe(false);
 
-        jest.advanceTimersByTime(2);
+        await jest.advanceTimersByTimeAsync(2);
         const result = await promise;
         expect(result).toBeInstanceOf(Error);
         expect((result as Error).message).toMatch(/timed out/i);
@@ -254,7 +261,7 @@ describe('HttpRequestAction', () => {
   describe('execute — error handling', () => {
     it('should throw when the response status is >= 400', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(404, { error: 'not found' }));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await expect(
         action.execute(
@@ -266,7 +273,7 @@ describe('HttpRequestAction', () => {
 
     it('should throw when the response status is >= 500', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(503, { error: 'boom' }));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await expect(
         action.execute(makeInput({ method: 'GET', url: 'https://api.test/down' }), makeContext()),
@@ -277,7 +284,7 @@ describe('HttpRequestAction', () => {
       const fetchMock = mockFetch(async () => {
         throw new TypeError('fetch failed: ENOTFOUND');
       });
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       await expect(
         action.execute(
@@ -290,7 +297,10 @@ describe('HttpRequestAction', () => {
 
   describe('execute — validation', () => {
     it('should throw when url is missing', async () => {
-      const action = new HttpRequestAction(mockFetch(async () => jsonResponse(200, {})));
+      const action = new HttpRequestAction(
+        mockFetch(async () => jsonResponse(200, {})),
+        stubLookup,
+      );
 
       await expect(action.execute(makeInput({ method: 'GET' }), makeContext())).rejects.toThrow(
         /url/i,
@@ -298,7 +308,10 @@ describe('HttpRequestAction', () => {
     });
 
     it('should throw when url is not a string', async () => {
-      const action = new HttpRequestAction(mockFetch(async () => jsonResponse(200, {})));
+      const action = new HttpRequestAction(
+        mockFetch(async () => jsonResponse(200, {})),
+        stubLookup,
+      );
 
       await expect(
         action.execute(makeInput({ method: 'GET', url: 123 }), makeContext()),
@@ -309,7 +322,7 @@ describe('HttpRequestAction', () => {
   describe('execute — dry-run mocking', () => {
     it('should return a mock response without invoking fetch when isDryRun + mockOnDryRun', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, {}));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       const result = await action.execute(
         makeInput({
@@ -337,7 +350,7 @@ describe('HttpRequestAction', () => {
 
     it('should still call fetch on dry-run when mockOnDryRun is absent (matches Zapier/n8n)', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       const result = await action.execute(
         makeInput({ method: 'GET', url: 'https://api.test/ping' }),
@@ -349,9 +362,22 @@ describe('HttpRequestAction', () => {
       expect(result.data).not.toHaveProperty('mocked');
     });
 
+    it('should NEVER call fetch for a mutating method on dry-run, even without mockOnDryRun (safe-by-default)', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      const result = await action.execute(
+        makeInput({ method: 'POST', url: 'https://api.test/charge', body: { amount: 100 } }),
+        makeContext({ isDryRun: true }),
+      );
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.data).toMatchObject({ mocked: true, dryRun: true, skipped: true });
+    });
+
     it('should call fetch normally when mockOnDryRun is set but isDryRun is false (regular run)', async () => {
       const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
-      const action = new HttpRequestAction(fetchMock);
+      const action = new HttpRequestAction(fetchMock, stubLookup);
 
       const result = await action.execute(
         makeInput({ method: 'GET', url: 'https://api.test/ping', mockOnDryRun: true }),
@@ -361,6 +387,77 @@ describe('HttpRequestAction', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(result.data.statusCode).toBe(200);
       expect(result.data).not.toHaveProperty('mocked');
+    });
+  });
+
+  describe('SSRF guard', () => {
+    it.each([
+      ['cloud metadata', 'http://169.254.169.254/latest/meta-data/'],
+      ['loopback IPv4', 'http://127.0.0.1/admin'],
+      ['private 10/8', 'http://10.0.0.5/'],
+      ['private 192.168/16', 'http://192.168.1.1/'],
+      ['private 172.16/12', 'http://172.16.0.1/'],
+      ['IPv6 loopback', 'http://[::1]/'],
+      ['localhost', 'http://localhost:8000/'],
+    ])('blocks %s and never calls fetch', async (_label, url) => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await expect(
+        action.execute(makeInput({ method: 'GET', url }), makeContext()),
+      ).rejects.toThrow(/private or internal|localhost/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('blocks non-http(s) schemes', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await expect(
+        action.execute(makeInput({ method: 'GET', url: 'file:///etc/passwd' }), makeContext()),
+      ).rejects.toThrow(/scheme/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('blocks a hostname that resolves to a private address (DNS-based SSRF)', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const privateLookup: LookupFn = async () => [{ address: '10.1.2.3', family: 4 }];
+      const action = new HttpRequestAction(fetchMock, privateLookup);
+
+      await expect(
+        action.execute(
+          makeInput({ method: 'GET', url: 'https://evil.example.com/' }),
+          makeContext(),
+        ),
+      ).rejects.toThrow(/private or internal/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('allows a public address through to fetch', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      const result = await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/items' }),
+        makeContext(),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.data.statusCode).toBe(200);
+    });
+  });
+
+  describe('response size cap', () => {
+    it('rejects a response whose Content-Length exceeds the cap', async () => {
+      const big = String(11 * 1024 * 1024);
+      const fetchMock = mockFetch(
+        async () => new Response('x', { status: 200, headers: { 'content-length': big } }),
+      );
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await expect(
+        action.execute(makeInput({ method: 'GET', url: 'https://api.test/huge' }), makeContext()),
+      ).rejects.toThrow(/byte limit/i);
     });
   });
 });

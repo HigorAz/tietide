@@ -204,6 +204,9 @@ import {
   HubspotDealChangedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
+import { SheetsRowAddedTrigger } from '../nodes/triggers/poll/sheets-row-added';
+import { GmailLabelAddedTrigger } from '../nodes/triggers/poll/gmail-label-added';
+import { CalendarEventCreatedTrigger } from '../nodes/triggers/poll/calendar-event-created';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
 import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated';
 import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
@@ -412,6 +415,9 @@ import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created
     CalendlyEventScheduledPassthrough,
     TrelloCardChangedPassthrough,
     GmailMessageReceivedExecutor,
+    SheetsRowAddedTrigger,
+    GmailLabelAddedTrigger,
+    CalendarEventCreatedTrigger,
     ExcelRowAddedTrigger,
     ExcelRowUpdatedTrigger,
     CalendarEventUpdatedTrigger,
@@ -543,6 +549,9 @@ export class EngineModule implements OnModuleInit {
     private readonly trelloCardChanged: TrelloCardChangedPassthrough,
     private readonly calendarEventUpdated: CalendarEventUpdatedTrigger,
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
+    private readonly sheetsRowAdded: SheetsRowAddedTrigger,
+    private readonly gmailLabelAdded: GmailLabelAddedTrigger,
+    private readonly calendarEventCreated: CalendarEventCreatedTrigger,
     private readonly driveFileUpdated: DriveFileUpdatedPassthrough,
     private readonly notionGetPage: NotionGetPageAction,
     private readonly notionUpdatePage: NotionUpdatePageAction,
@@ -653,6 +662,9 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.outlookMessageFlagged);
     this.registry.register(this.outlookMessageWithAttachment);
     this.registry.register(this.onedriveFileAdded);
+    this.registry.register(this.sheetsRowAdded);
+    this.registry.register(this.gmailLabelAdded);
+    this.registry.register(this.calendarEventCreated);
     this.registry.register(this.excelRowAdded);
     this.registry.register(this.excelRowUpdated);
     this.registry.register(this.slackPostMessage);

@@ -19,6 +19,8 @@ export class TrelloListCardsAction extends BaseConnectorAction<TrelloApiKeyConfi
   readonly name = 'Trello: List Cards';
   readonly description = 'List cards on a Trello board or list';
   readonly requiredConnectionType = 'trello';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly client: TrelloClientFactory) {
     super();

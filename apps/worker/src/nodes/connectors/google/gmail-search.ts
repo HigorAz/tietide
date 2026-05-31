@@ -17,6 +17,8 @@ export class GmailSearchAction extends BaseConnectorAction<GoogleOAuth2Config> {
   readonly name = 'Gmail: Search Messages';
   readonly description = 'Search Gmail messages with Gmail search syntax';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

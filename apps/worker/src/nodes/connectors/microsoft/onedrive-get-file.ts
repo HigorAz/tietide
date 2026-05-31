@@ -32,6 +32,8 @@ export class OnedriveGetFileAction extends BaseConnectorAction<MicrosoftOAuth2Co
   readonly name = 'OneDrive: Get File';
   readonly description = 'Fetch OneDrive file metadata and optionally download its content';
   readonly requiredConnectionType = 'microsoft';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly authService: MicrosoftAuthService) {
     super();

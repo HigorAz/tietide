@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import type { ConnectionStatus, ConnectionType } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService, type EncryptedPayload } from '../crypto/crypto.service';
@@ -7,6 +8,10 @@ import type { UpdateConnectionDto } from './dto/update-connection.dto';
 import type { ConnectionResponseDto } from './dto/connection-response.dto';
 import { ProviderHealthRegistry } from './health/provider-health.registry';
 import type { ProviderHealthResult } from './health/provider-health.types';
+import { decodeKeysetCursor } from '../common/pagination/cursor';
+import { buildPage, keysetWhere, type Page } from '../common/pagination/paginate';
+import { resolveLimit } from '../common/pagination/page-query.dto';
+import type { PageRequest } from '../common/pagination/page-request';
 
 const HEALTH_CHECK_TIMEOUT_MS = 5000;
 
@@ -42,12 +47,32 @@ export class ConnectionsService {
     private readonly health: ProviderHealthRegistry,
   ) {}
 
-  async list(userId: string): Promise<ConnectionResponseDto[]> {
-    return this.prisma.connection.findMany({
-      where: { userId },
+  async list(userId: string, page: PageRequest = {}): Promise<Page<ConnectionResponseDto>> {
+    const limit = resolveLimit(page.limit);
+    let where: Prisma.ConnectionWhereInput = { userId };
+    if (page.cursor) {
+      const cursor = decodeKeysetCursor(page.cursor);
+      where = {
+        AND: [
+          { userId },
+          keysetWhere('createdAt', 'desc', new Date(cursor.v as string), cursor.id),
+        ],
+      } as Prisma.ConnectionWhereInput;
+    }
+
+    const peeked = await this.prisma.connection.findMany({
+      where,
       select: SAFE_SELECT,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: limit + 1,
     });
+
+    return buildPage(
+      peeked,
+      limit,
+      (row) => row,
+      (row) => ({ v: row.createdAt.toISOString(), id: row.id }),
+    );
   }
 
   async findOne(userId: string, id: string): Promise<ConnectionResponseDto> {

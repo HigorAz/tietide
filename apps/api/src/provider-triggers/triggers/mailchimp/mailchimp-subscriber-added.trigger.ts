@@ -26,11 +26,10 @@ interface MailchimpNodeConfig {
 // and POSTs to it; you protect the endpoint by including a hard-to-guess token in
 // the URL itself. We generate a 32-byte random token and append it as a query
 // param `?secret=<token>` to the callback URL. verifySignature reads that param
-// from the request headers' x-secret-shadow (the controller injects it from the
-// query string before delivery — see provider-webhooks logic) and compares it
-// constant-time. If we cannot detect the secret in headers, we re-extract it
-// from the original request URL via the `x-original-url` header that the
-// controller forwards.
+// from `input.query` — the request's query string parsed SERVER-SIDE by the
+// webhook controller — and compares it constant-time. We deliberately do NOT
+// trust any client-supplied header (e.g. x-original-url): doing so would let an
+// attacker who learned the URL secret forge events by sending it in a header.
 @Injectable()
 export class MailchimpSubscriberAddedTrigger extends BasePushTrigger {
   readonly type = MAILCHIMP_SUBSCRIBER_ADDED_TYPE;
@@ -129,33 +128,9 @@ export class MailchimpSubscriberAddedTrigger extends BasePushTrigger {
   }
 
   private extractSecret(input: SignatureInput): string | null {
-    // The provider-webhooks controller forwards the inbound URL's query
-    // through a synthetic header `x-tietide-callback-secret` so triggers can
-    // extract it without needing the URL builder. If absent, peek at
-    // `x-original-url` as a fallback.
-    const direct = this.headerOf(input.headers, 'x-tietide-callback-secret');
-    if (direct) return direct;
-    const original = this.headerOf(input.headers, 'x-original-url');
-    if (!original) return null;
-    try {
-      const u = new URL(original);
-      return u.searchParams.get('secret');
-    } catch {
-      return null;
-    }
-  }
-
-  private headerOf(
-    headers: Record<string, string | string[] | undefined>,
-    name: string,
-  ): string | null {
-    const lower = name.toLowerCase();
-    for (const [k, v] of Object.entries(headers)) {
-      if (k.toLowerCase() !== lower) continue;
-      if (typeof v === 'string') return v;
-      if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'string') return v[0];
-    }
-    return null;
+    // Read the URL secret strictly from the server-parsed query string. Never
+    // from a client-controlled header — that was the forgery vector.
+    return this.firstQuery(input.query ?? {}, 'secret');
   }
 
   private firstQuery(

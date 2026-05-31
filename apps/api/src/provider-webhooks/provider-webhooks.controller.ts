@@ -87,6 +87,7 @@ export class ProviderWebhooksController {
       subscriptionId,
       rawBody,
       headers,
+      query,
       requestId: extractRequestId(req),
     });
 

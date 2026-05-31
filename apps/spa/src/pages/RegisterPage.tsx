@@ -39,7 +39,8 @@ export function RegisterPage(): JSX.Element {
   const onSubmit = handleSubmit(async (values) => {
     try {
       await registerUser(values);
-      navigate('/login', { replace: true, state: { justRegistered: true } });
+      // Registration auto-logs in, so land the user straight in the app.
+      navigate('/', { replace: true });
     } catch (err) {
       const status = getStatus(err);
       const message =

@@ -4,11 +4,15 @@ export interface AuthorizeUrlArgs {
   state: string;
   scopes: readonly string[];
   redirectUri: string;
+  /** PKCE code challenge (base64url SHA-256 of the verifier), method S256. */
+  codeChallenge?: string;
 }
 
 export interface ExchangeCodeArgs {
   code: string;
   redirectUri: string;
+  /** PKCE code verifier, sent to prove possession of the challenge. */
+  codeVerifier?: string;
 }
 
 export interface TokenExchangeResult {

@@ -26,6 +26,8 @@ export class SheetsFindRowAction extends BaseConnectorAction<GoogleOAuth2Config>
   readonly name = 'Sheets: Find Row';
   readonly description = 'Find rows in a Google Sheet where a column equals a value';
   readonly requiredConnectionType = 'google';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(
     private readonly authService: GoogleAuthService,

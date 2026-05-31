@@ -27,6 +27,8 @@ export class OnedriveListFilesAction extends BaseConnectorAction<MicrosoftOAuth2
   readonly name = 'OneDrive: List Files';
   readonly description = 'List items in a OneDrive folder (by id, path, or the drive root)';
   readonly requiredConnectionType = 'microsoft';
+  // Read-only: still executes during a dry-run (no external mutation).
+  protected readonly sideEffect = false;
 
   constructor(private readonly authService: MicrosoftAuthService) {
     super();
