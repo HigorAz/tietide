@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { PinoLogger } from 'nestjs-pino';
-import type { WorkflowDefinition } from '@tietide/shared';
+import { PILL_SAMPLE_KEY, type WorkflowDefinition } from '@tietide/shared';
 import type { INodeExecutor, NodeInput, NodeOutput, ExecutionContext } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
@@ -632,6 +632,38 @@ describe('WorkflowRunner', () => {
       const input = exec.execute.mock.calls[0][0];
       expect(input.connectionId).toBe('conn-xyz');
       expect(input.params).toEqual({ connectionId: 'conn-xyz', other: 'value' });
+    });
+
+    it('should strip the reserved __pillSample key from executor params', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'A',
+            type: 'a',
+            name: 'A',
+            position: { x: 0, y: 0 },
+            config: {
+              [PILL_SAMPLE_KEY]: { foo: 'bar' },
+              connectionId: 'conn-xyz',
+              url: 'https://example.com',
+            },
+          },
+        ],
+        edges: [],
+      };
+
+      await runner.run({ executionId: 'exec-pill', workflowId: 'wf-1', definition: def });
+
+      const input = exec.execute.mock.calls[0][0];
+      // The declared output sample feeds only the picker — it must never reach
+      // the executor's params, but the strip is surgical: real config keys and
+      // the lifted connectionId survive untouched.
+      expect(input.params).not.toHaveProperty(PILL_SAMPLE_KEY);
+      expect(input.params).toEqual({ connectionId: 'conn-xyz', url: 'https://example.com' });
+      expect(input.connectionId).toBe('conn-xyz');
     });
 
     it('should leave input.connectionId undefined when node has no connectionId in config', async () => {
