@@ -206,3 +206,54 @@ describe('walkSchema', () => {
     expect(() => walkSchema(recursive as z.ZodTypeAny)).not.toThrow();
   });
 });
+
+describe('getUpstreamSchemas source precedence', () => {
+  // A (http-request: concrete schema + example) -> B (target).
+  const nodes = [
+    mkNode('A', NodeType.HTTP_REQUEST, 'First'),
+    mkNode('B', NodeType.HTTP_REQUEST, 'Second'),
+  ];
+  const edges = [mkEdge('A', 'B')];
+  const pathsForA = (opts?: Parameters<typeof getUpstreamSchemas>[3]): string[] =>
+    getUpstreamSchemas('B', nodes, edges, opts)
+      .suggestions.filter((s) => s.nodeId === 'A')
+      .map((s) => s.path);
+
+  it('uses the concrete static schema over the curated example when no opts given', () => {
+    const paths = pathsForA();
+    // schema exposes `body` as an opaque field; the example would expand `body.result`
+    expect(paths).toContain('body');
+    expect(paths).toContain('statusCode');
+    expect(paths).not.toContain('body.result');
+  });
+
+  it('lets a live output override the static schema', () => {
+    const paths = pathsForA({
+      liveNodes: new Map([['A', { output: { liveOnly: 'y' } }]]),
+    });
+    expect(paths).toEqual(['liveOnly']);
+  });
+
+  it('lets a per-node override beat both live output and the schema', () => {
+    const paths = pathsForA({
+      overrides: { A: { overrideOnly: 'x' } },
+      liveNodes: new Map([['A', { output: { liveOnly: 'y' } }]]),
+    });
+    expect(paths).toEqual(['overrideOnly']);
+  });
+
+  it('ignores a null live output and falls back to the schema', () => {
+    const paths = pathsForA({ liveNodes: new Map([['A', { output: null }]]) });
+    expect(paths).toContain('statusCode');
+  });
+
+  it('only records a Zod type in byNode for schema-sourced nodes', () => {
+    const live = getUpstreamSchemas('B', nodes, edges, {
+      liveNodes: new Map([['A', { output: { liveOnly: 'y' } }]]),
+    });
+    expect(live.byNode.A).toBeUndefined();
+
+    const schema = getUpstreamSchemas('B', nodes, edges);
+    expect(schema.byNode.A).toBeDefined();
+  });
+});
