@@ -5,6 +5,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
 import { cn } from '@/utils/cn';
 import { BottomSheet } from './BottomSheet';
 import { FORM_REGISTRY } from './config/formRegistry';
+import { TestNodeButton } from './config/TestNodeButton';
 import { NodeGlyph } from './NodeGlyph';
 import { NodePreviewPanel } from './preview/NodePreviewPanel';
 import { NodeRunInspection } from './NodeRunInspection';
@@ -86,6 +87,10 @@ export function NodeConfigPanel() {
             node fails.
           </span>
         </label>
+      </div>
+
+      <div className="mt-4 border-t border-white/5 pt-3">
+        <TestNodeButton nodeId={selectedNodeId} />
       </div>
     </>
   );
