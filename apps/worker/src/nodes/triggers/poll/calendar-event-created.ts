@@ -10,6 +10,12 @@ import { isGoogleAuthError, wrapGoogleAuthError } from '../../connectors/google/
 
 export const CALENDAR_EVENT_CREATED_TYPE = 'calendar-event-created';
 
+// On an empty poll the cursor advances to a watermark captured BEFORE the request,
+// minus this overlap, so an event created while the request is in flight (or not yet
+// visible to Google's index) is re-covered by the next poll rather than skipped. The
+// poll-processor's idempotencyKey dedups any event the overlapping window re-emits.
+const WATERMARK_OVERLAP_MS = 30_000;
+
 interface CalendarEventCreatedConfig {
   calendarId?: unknown;
 }
@@ -60,6 +66,11 @@ export class CalendarEventCreatedTrigger extends BasePollTrigger {
       refreshToken?: string;
     };
 
+    // Capture the empty-poll watermark BEFORE issuing the request (see W3.15): if
+    // we instead used "now" after the response, an event created during the
+    // in-flight window would be skipped forever.
+    const watermarkMs = Date.now() - WATERMARK_OVERLAP_MS;
+
     const calendar = this.clients.calendar({
       auth: this.authService.buildClient(conn),
     });
@@ -104,11 +115,14 @@ export class CalendarEventCreatedTrigger extends BasePollTrigger {
       if (createdMs > maxCreatedMs) maxCreatedMs = createdMs;
     }
 
-    // Advance the cursor to the latest emitted event's `created`. If nothing
-    // was emitted, advance to "now" so we don't refetch the same updatedMin
-    // window forever (Google returns updates to existing events too).
+    // Advance the cursor to the latest emitted event's `created`. If nothing was
+    // emitted, advance to the pre-request watermark (clamped so it never regresses
+    // below the current cursor) instead of "now" — that closes the in-flight race
+    // while still moving forward so we don't refetch the same window forever.
     const newCursor =
-      items.length > 0 ? new Date(maxCreatedMs).toISOString() : new Date().toISOString();
+      items.length > 0
+        ? new Date(maxCreatedMs).toISOString()
+        : new Date(Math.max(cursorMs, watermarkMs)).toISOString();
 
     return { items, newCursor };
   }

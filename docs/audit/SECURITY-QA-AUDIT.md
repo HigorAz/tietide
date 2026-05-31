@@ -21,7 +21,7 @@
 | 0    | Auto-login after register       | 1     | 1    |
 | 1    | Confirmed critical / high       | 8     | 7    |
 | 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 14   |
+| 3    | Scaling & remaining correctness | 17    | 15   |
 | 4    | Frontend QA / low               | 5     | 0    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
@@ -277,7 +277,15 @@ retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.en
       (`repeat:<key>:<millis>`), parsed via `scheduledMillisFromId`, falling back to the job's enqueue
       `timestamp` (never `processedOn`), so all attempts of one tick share one stable `cron:<wf>:<iso>` key.
       Files: `apps/worker/src/cron/cron-trigger.service.ts`, `apps/worker/src/cron/cron-processor.ts` (+ specs).
-- [ ] **W3.15** Calendar empty-poll watermark race — pre-request watermark + overlap. File: `calendar-event-created.ts`.
+- [x] **W3.15** Calendar empty-poll watermark race — on a poll that emitted no events the cursor advanced to
+      `new Date()` captured AFTER the `events.list` response, so an event created while the request was in flight
+      (its `created` falling between the old cursor and that post-response "now") was skipped forever. The
+      watermark is now captured BEFORE the request, minus a 30s overlap that absorbs Google's index lag, and
+      clamped so it never regresses below the current cursor (`max(cursorMs, watermarkMs)`) — closing the race
+      while still moving forward so the same `updatedMin` window isn't refetched indefinitely. Any event the
+      overlapping window re-emits is deduped by the poll-processor's idempotencyKey. File:
+      `apps/worker/src/nodes/triggers/poll/calendar-event-created.ts` (+ spec: a fake-timer test where the
+      mocked request advances the clock 2 min proves the cursor stays at the pre-request watermark).
 - [ ] **W3.16** Log redaction gaps — add `value`/`config` paths, stop logging raw `e.response`, recursive audit sanitize,
       async audit log. Files: `logger.config.ts`, `prisma-connection-resolver.ts`, `audit-log.service.ts`.
 - [ ] **W3.17** Single static master key, no rotation — key-id/version + keyring + re-encrypt migration.
