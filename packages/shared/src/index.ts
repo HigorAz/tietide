@@ -31,6 +31,11 @@ export {
   NODE_GROUP_LABELS,
 } from './types/node.types.js';
 export { ConnectionType, ConnectionStatus, ConnectionProvider } from './types/connections.types.js';
+export {
+  PILL_SAMPLE_KEY,
+  RESERVED_CONFIG_KEYS,
+  type ReservedConfigKey,
+} from './constants/reserved-config.js';
 
 // Schemas
 export {

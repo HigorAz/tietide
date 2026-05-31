@@ -112,6 +112,38 @@ export class ExecutionsController {
       requestId: extractRequestId(req),
     });
   }
+
+  @Post('nodes/:nodeId/test')
+  @Throttle(EXECUTE_THROTTLE)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Run a single node against real credentials and capture its output',
+    description:
+      'Builds a minimal subgraph (the node plus its ancestors) and runs it as a non-dry-run ' +
+      'execution, so side-effecting connectors fire with live credentials. Used to capture an ' +
+      'output sample for data-pill mapping.',
+  })
+  @ApiAcceptedResponse({
+    type: ExecutionResponseDto,
+    description: 'Node-test execution accepted and enqueued',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid input' })
+  @ApiNotFoundResponse({ description: 'Workflow or node not found' })
+  @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
+  async testNode(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('nodeId') nodeId: string,
+    @Body() dto: TestExecutionDto,
+    @Req() req: Request & { id?: string },
+  ): Promise<ExecutionResponseDto> {
+    return this.executions.triggerNodeTest(user.id, id, nodeId, {
+      definition: dto.definition as unknown as WorkflowDefinition,
+      triggerData: dto.triggerData,
+      requestId: extractRequestId(req),
+    });
+  }
 }
 
 function extractRequestId(req: Request & { id?: string }): string | undefined {

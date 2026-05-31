@@ -1,4 +1,5 @@
 import { useMemo, type MouseEvent as ReactMouseEvent } from 'react';
+import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
@@ -27,10 +28,24 @@ export function DataPillPicker(): JSX.Element | null {
   const liveNodes = useExecutionLiveStore((s) => s.nodes);
   const isMobile = useIsMobile();
 
+  // A user-declared (or test-captured) `__pillSample` is the top-priority pill
+  // source (#259) — it overrides the node's static schema. Keyed by nodeId for
+  // `getUpstreamSchemas`. Stored as a JSON string by the form; tolerate an
+  // already-structured value too. Invalid/empty samples are ignored.
+  const overrides = useMemo<Record<string, unknown>>(() => {
+    const map: Record<string, unknown> = {};
+    for (const n of nodes) {
+      const parsed = parsePillSample(n.data.config?.[PILL_SAMPLE_KEY]);
+      if (parsed !== undefined) map[n.id] = parsed;
+    }
+    return map;
+  }, [nodes]);
+
   const suggestions = useMemo<PathSuggestion[]>(() => {
     if (!activePillField) return [];
-    return getUpstreamSchemas(activePillField.nodeId, nodes, edges, { liveNodes }).suggestions;
-  }, [activePillField, nodes, edges, liveNodes]);
+    return getUpstreamSchemas(activePillField.nodeId, nodes, edges, { liveNodes, overrides })
+      .suggestions;
+  }, [activePillField, nodes, edges, liveNodes, overrides]);
 
   if (!activePillField) return null;
 
@@ -103,4 +118,25 @@ export function DataPillPicker(): JSX.Element | null {
       {list}
     </div>
   );
+}
+
+/**
+ * Coerce a stored `__pillSample` config value into a structured override for the
+ * picker. Strings are parsed as JSON; already-structured objects/arrays pass
+ * through. Empty strings, invalid JSON, and bare primitives yield `undefined`
+ * so the picker falls back to the node's schema.
+ */
+function parsePillSample(raw: unknown): unknown {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return undefined;
+    }
+  }
+  if (typeof raw === 'object') return raw;
+  return undefined;
 }

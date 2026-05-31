@@ -90,3 +90,20 @@ export async function testWorkflow(
   const { data } = await api.post<ExecuteWorkflowResponse>(`/workflows/${workflowId}/test`, body);
   return data;
 }
+
+export async function testNode(
+  workflowId: string,
+  nodeId: string,
+  definition: WorkflowDefinition,
+  triggerData?: Record<string, unknown>,
+): Promise<ExecuteWorkflowResponse> {
+  const body: { definition: WorkflowDefinition; triggerData?: Record<string, unknown> } = {
+    definition,
+  };
+  if (triggerData !== undefined) body.triggerData = triggerData;
+  const { data } = await api.post<ExecuteWorkflowResponse>(
+    `/workflows/${workflowId}/nodes/${nodeId}/test`,
+    body,
+  );
+  return data;
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { Edge, Node } from 'reactflow';
-import { NodeType } from '@tietide/shared';
+import { NodeType, PILL_SAMPLE_KEY } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { DataPillPicker } from './DataPillPicker';
@@ -92,6 +92,57 @@ describe('DataPillPicker', () => {
     });
     render(<DataPillPicker />);
     expect(screen.getByText(/no upstream outputs/i)).toBeInTheDocument();
+  });
+
+  const pickerText = (): string =>
+    within(screen.getByTestId('data-pill-picker'))
+      .getAllByTestId('data-pill-picker-option')
+      .map((o) => o.textContent ?? '')
+      .join(' ');
+
+  it('uses a declared __pillSample as the highest-priority pill source', () => {
+    useEditorStore.setState({
+      nodes: [
+        {
+          ...mkNode('A', NodeType.HTTP_REQUEST, 'First HTTP'),
+          data: {
+            label: 'First HTTP',
+            nodeType: NodeType.HTTP_REQUEST,
+            config: { [PILL_SAMPLE_KEY]: JSON.stringify({ customField: 'x' }) },
+          },
+        },
+        mkNode('B', NodeType.HTTP_REQUEST, 'Second HTTP'),
+      ],
+      edges: [mkEdge('A', 'B')],
+      activePillField: { nodeId: 'B', insert: vi.fn() },
+    });
+    render(<DataPillPicker />);
+
+    const text = pickerText();
+    // The declared sample overrides the concrete http-request schema entirely.
+    expect(text).toContain('{{A.customField}}');
+    expect(text).not.toContain('{{A.statusCode}}');
+  });
+
+  it('ignores an invalid __pillSample and falls back to the node schema', () => {
+    useEditorStore.setState({
+      nodes: [
+        {
+          ...mkNode('A', NodeType.HTTP_REQUEST, 'First HTTP'),
+          data: {
+            label: 'First HTTP',
+            nodeType: NodeType.HTTP_REQUEST,
+            config: { [PILL_SAMPLE_KEY]: '{not valid json' },
+          },
+        },
+        mkNode('B', NodeType.HTTP_REQUEST, 'Second HTTP'),
+      ],
+      edges: [mkEdge('A', 'B')],
+      activePillField: { nodeId: 'B', insert: vi.fn() },
+    });
+    render(<DataPillPicker />);
+
+    expect(pickerText()).toContain('{{A.statusCode}}');
   });
 
   it('renders as a bottom sheet on mobile', () => {
