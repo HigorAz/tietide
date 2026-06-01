@@ -38,6 +38,10 @@ const vm = require('node:vm');
 try {
   const sandbox = Object.create(null);
   sandbox.input = workerData.input;
+  // \`$nodes\` is the full upstream output scope keyed by node id, so user code can
+  // read sibling/ancestor outputs directly (vs \`input\`, the flattened last
+  // predecessor). Defaults to {} when there is no upstream.
+  sandbox.$nodes = workerData.scope || {};
   sandbox.JSON = JSON;
   sandbox.Math = Math;
   sandbox.Date = Date;
@@ -106,7 +110,7 @@ export class CodeAction implements INodeExecutor {
     }
 
     const started = Date.now();
-    const result = await this.runInSandbox(params.code, input.data, params.timeoutMs);
+    const result = await this.runInSandbox(params.code, input.data, input.scope, params.timeoutMs);
     const duration = Date.now() - started;
 
     return {
@@ -134,14 +138,18 @@ export class CodeAction implements INodeExecutor {
   private runInSandbox(
     userCode: string,
     input: Record<string, unknown>,
+    scope: Record<string, unknown> | undefined,
     timeoutMs: number,
   ): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      // workerData must be structured-cloneable. The caller's input is JSON
-      // round-tripped at the engine boundary, so values here are already safe.
+      // workerData must be structured-cloneable. Both `input` and `scope` are
+      // JSON round-tripped at the engine boundary, so values here are already safe.
+      // `scope` can be large (it holds every upstream node's output) — the 128MB
+      // per-worker heap cap (MEMORY_LIMIT_MB) bounds it: an oversized scope simply
+      // OOMs the worker, which fails the node cleanly via the exit handler below.
       const worker = new Worker(WORKER_SOURCE, {
         eval: true,
-        workerData: { code: userCode, input, timeoutMs },
+        workerData: { code: userCode, input, scope: scope ?? {}, timeoutMs },
         resourceLimits: {
           maxOldGenerationSizeMb: MEMORY_LIMIT_MB,
           maxYoungGenerationSizeMb: 16,
