@@ -12,6 +12,7 @@ import { WebhookTrigger } from '../nodes/triggers/webhook-trigger';
 import { ExecutionEventsModule } from '../events/execution-events.module';
 import { EngineService } from './engine.service';
 import { WorkflowRunner } from './workflow-runner';
+import { IteratorExecutor } from './iterator-executor';
 import { SECRET_RESOLVER } from './secret-resolver';
 import { PrismaSecretResolver } from './prisma-secret-resolver';
 import { ENV_VAR_RESOLVER } from './env-var-resolver';
@@ -221,6 +222,7 @@ import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created
   providers: [
     NodeRegistry,
     WorkflowRunner,
+    IteratorExecutor,
     EngineService,
     ManualTrigger,
     CronTrigger,
