@@ -63,7 +63,16 @@ export class SheetsRowAddedTrigger extends BasePollTrigger {
       return { items: [], newCursor: String(totalRows) };
     }
 
-    if (totalRows <= previousCount) {
+    if (totalRows < previousCount) {
+      // The row count regressed (rows were deleted or the range was edited). A
+      // count cursor can't identify which rows are new after a structural change,
+      // so re-baseline to the current size rather than holding the old peak —
+      // otherwise every row added until the table re-exceeds that peak would be
+      // silently dropped (the cursor would stay stuck high forever).
+      return { items: [], newCursor: String(totalRows) };
+    }
+
+    if (totalRows === previousCount) {
       return { items: [], newCursor: String(previousCount) };
     }
 

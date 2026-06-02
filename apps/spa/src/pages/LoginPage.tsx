@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
+import { resolveAuthErrorMessage } from '@/utils/authError';
 
 const inputClasses = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
@@ -42,8 +43,15 @@ export function LoginPage(): JSX.Element {
       navigate('/', { replace: true });
     } catch (err) {
       const status = getStatus(err);
-      const message =
-        status === 401 ? 'Invalid credentials' : 'Something went wrong. Please try again.';
+      let message: string;
+      if (status === 401) {
+        message = 'Invalid credentials';
+      } else if (status === 403) {
+        // The account exists but the email isn't verified yet.
+        message = 'Please verify your email before signing in. Check your inbox for the link.';
+      } else {
+        message = resolveAuthErrorMessage(err);
+      }
       toast({ tone: 'error', message });
     }
   });

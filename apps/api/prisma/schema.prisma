@@ -8,25 +8,46 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  password     String
-  name         String
-  role         Role     @default(USER)
-  tokenVersion Int      @default(0) @map("token_version")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  name          String
+  role          Role     @default(USER)
+  tokenVersion  Int      @default(0) @map("token_version")
+  emailVerified Boolean  @default(false) @map("email_verified")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  workflows            Workflow[]
-  secrets              Secret[]
-  connections          Connection[]
-  auditLogs            AuditLog[]
-  workflowVersions     WorkflowVersion[]
-  environmentVariables EnvironmentVariable[]
-  folders              Folder[]
-  tags                 Tag[]
+  workflows               Workflow[]
+  secrets                 Secret[]
+  connections             Connection[]
+  auditLogs               AuditLog[]
+  workflowVersions        WorkflowVersion[]
+  environmentVariables    EnvironmentVariable[]
+  folders                 Folder[]
+  tags                    Tag[]
+  emailVerificationTokens EmailVerificationToken[]
 
   @@map("users")
+}
+
+// Single-use, hashed email-verification tokens. The raw token is emailed to the
+// user; only its SHA-256 hash is stored, so a DB leak cannot be used to verify
+// accounts. Consumed (single-use) and expiry-bounded — mirrors the OAuthState
+// anti-replay pattern (W2.1).
+model EmailVerificationToken {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
 }
 
 enum Role {

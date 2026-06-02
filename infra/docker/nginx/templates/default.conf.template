@@ -1,0 +1,114 @@
+# TieTide edge reverse proxy (W3.8)
+#
+# Rendered at container start by the nginx image's envsubst step: ${DOMAIN} is the
+# only substituted token (it is the single env var passed to the `edge` service),
+# so nginx runtime variables like $host / $uri / $http_upgrade are left untouched.
+#
+# Routing:
+#   https://${DOMAIN}/v1/*      -> api:3030  (REST + Socket.IO websockets)
+#   https://${DOMAIN}/webhooks/* -> api:3030  (inbound provider webhooks)
+#   https://${DOMAIN}/*         -> spa:8080  (static SPA bundle)
+# The AI service and /metrics are intentionally NOT proxied — they stay private.
+
+# Upstreams resolved on the internal compose network.
+upstream tietide_api {
+    server api:3030;
+}
+upstream tietide_spa {
+    server spa:8080;
+}
+
+# Map the websocket Upgrade header so non-websocket requests don't send Connection: upgrade.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# ---- HTTP :80 — ACME challenge + redirect everything else to HTTPS -----------
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    server_tokens off;
+
+    # Let's Encrypt http-01 webroot challenge (served before the redirect).
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Loopback health probe for the container HEALTHCHECK (no redirect).
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 'ok';
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ---- HTTPS :443 — TLS termination + reverse proxy ----------------------------
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${DOMAIN};
+
+    server_tokens off;
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # Security headers (the API also sets its own via Helmet; keep them at the edge
+    # too — see docs/deployment.md §6). HSTS preload-eligible: 2 years.
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # Required for the OAuth popup -> opener postMessage bridge on /connections.
+    add_header Cross-Origin-Opener-Policy "same-origin-allow-popups" always;
+
+    # Cap upload size at the edge; the API enforces its own BODY_LIMIT (default 1mb)
+    # behind this. Raised here to allow file-upload action nodes (e.g. S3 upload).
+    client_max_body_size 25m;
+
+    # API — REST + Socket.IO (the /v1/ws/* execution stream needs HTTP/1.1 upgrade).
+    location /v1/ {
+        proxy_pass http://tietide_api;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    # Inbound provider/generic webhooks (documented at /webhooks/* in deployment.md).
+    location /webhooks/ {
+        proxy_pass http://tietide_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SPA static bundle (served by the spa container's own nginx).
+    location / {
+        proxy_pass http://tietide_spa;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

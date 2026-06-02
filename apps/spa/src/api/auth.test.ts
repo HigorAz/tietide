@@ -9,7 +9,7 @@ vi.mock('./client', () => ({
 }));
 
 import { api } from './client';
-import { login, register, getMe } from './auth';
+import { login, register, verifyEmail, getMe } from './auth';
 
 const mockedPost = vi.mocked(api.post);
 const mockedGet = vi.mocked(api.get);
@@ -51,8 +51,8 @@ describe('auth API', () => {
   });
 
   describe('register', () => {
-    it('should POST /auth/register with name, email, and password and return the created user', async () => {
-      mockedPost.mockResolvedValueOnce({ data: sampleUser });
+    it('should POST /auth/register and return the neutral message envelope', async () => {
+      mockedPost.mockResolvedValueOnce({ data: { message: 'check your inbox' } });
 
       const result = await register({
         name: 'Alice',
@@ -65,7 +65,18 @@ describe('auth API', () => {
         email: 'alice@example.com',
         password: 'password123',
       });
-      expect(result).toEqual(sampleUser);
+      expect(result).toEqual({ message: 'check your inbox' });
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('should POST /auth/verify-email with the token and return the session envelope', async () => {
+      mockedPost.mockResolvedValueOnce({ data: { accessToken: 'jwt', tokenType: 'Bearer' } });
+
+      const result = await verifyEmail('tok-123');
+
+      expect(mockedPost).toHaveBeenCalledWith('/auth/verify-email', { token: 'tok-123' });
+      expect(result).toEqual({ accessToken: 'jwt', tokenType: 'Bearer' });
     });
   });
 

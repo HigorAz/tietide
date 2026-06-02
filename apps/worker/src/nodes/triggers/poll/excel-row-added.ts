@@ -6,7 +6,7 @@ import {
   type PollResult,
 } from '@tietide/sdk';
 import type { MicrosoftOAuth2Config } from '@tietide/shared';
-import { MicrosoftAuthService } from '../../connectors/microsoft/microsoft-auth';
+import { GraphHttpError, MicrosoftAuthService } from '../../connectors/microsoft/microsoft-auth';
 
 export const EXCEL_ROW_ADDED_TYPE = 'excel-row-added';
 
@@ -44,19 +44,17 @@ export class ExcelRowAddedTrigger extends BasePollTrigger {
     }
     const tableName = cfg.tableName && cfg.tableName.length > 0 ? cfg.tableName : 'Table1';
     const previousCount = parseCursor(ctx.cursor);
+    const conn = ctx.connection as DecryptedConnection<MicrosoftOAuth2Config>;
 
-    const basePath =
+    const tablePath =
       `/v1.0/me/drive/items/${encodeURIComponent(cfg.workbookId)}` +
       `/workbook/worksheets('${encodeURIComponent(cfg.worksheet)}')` +
-      `/tables('${encodeURIComponent(tableName)}')` +
-      `/rows`;
+      `/tables('${encodeURIComponent(tableName)}')`;
+    const rowsPath = `${tablePath}/rows`;
 
-    const path = ctx.cursor === null ? basePath : `${basePath}?$skip=${previousCount}&$top=200`;
+    const path = ctx.cursor === null ? rowsPath : `${rowsPath}?$skip=${previousCount}&$top=200`;
 
-    const response = await this.auth.graphFetch<{ value?: RowPayload[] }>(
-      ctx.connection as DecryptedConnection<MicrosoftOAuth2Config>,
-      path,
-    );
+    const response = await this.auth.graphFetch<{ value?: RowPayload[] }>(conn, path);
 
     const fetched = response.data?.value ?? [];
 
@@ -66,6 +64,15 @@ export class ExcelRowAddedTrigger extends BasePollTrigger {
     }
 
     if (fetched.length === 0) {
+      // An empty page at $skip=previousCount is ambiguous: either no rows were
+      // added, or the table shrank below the cursor (deleted rows). The latter
+      // would leave the cursor stuck high, silently dropping every row added until
+      // the table re-exceeds the old size. Disambiguate via the table's real
+      // data-row count and re-baseline on a regression.
+      const totalRows = await this.fetchDataRowCount(conn, tablePath);
+      if (totalRows < previousCount) {
+        return { items: [], newCursor: String(totalRows) };
+      }
       return { items: [], newCursor: String(previousCount) };
     }
 
@@ -78,6 +85,25 @@ export class ExcelRowAddedTrigger extends BasePollTrigger {
     }));
 
     return { items, newCursor: String(previousCount + fetched.length) };
+  }
+
+  // The table's current data-row count (excludes the header). `dataBodyRange` 404s
+  // when the table has no data rows, which we map to 0 — the regression check then
+  // correctly re-baselines an empty table's cursor back to 0.
+  private async fetchDataRowCount(
+    conn: DecryptedConnection<MicrosoftOAuth2Config>,
+    tablePath: string,
+  ): Promise<number> {
+    try {
+      const res = await this.auth.graphFetch<{ rowCount?: number }>(
+        conn,
+        `${tablePath}/dataBodyRange?%24select=rowCount`,
+      );
+      return res.data?.rowCount ?? 0;
+    } catch (err) {
+      if (err instanceof GraphHttpError && err.response.status === 404) return 0;
+      throw err;
+    }
   }
 }
 

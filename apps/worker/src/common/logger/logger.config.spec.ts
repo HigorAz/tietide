@@ -45,6 +45,13 @@ describe('buildLoggerOptions (worker)', () => {
       );
       expect(redact.censor).toBe('[REDACTED]');
     });
+
+    it('should censor secret value and connection config blobs (W3.16)', () => {
+      const { redact } = pinoHttpFrom(buildLoggerOptions({}));
+      expect(redact.paths).toEqual(
+        expect.arrayContaining(['value', 'config', '*.value', '*.config', '*.configEncrypted']),
+      );
+    });
   });
 
   describe('autoLogging', () => {

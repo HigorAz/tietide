@@ -111,15 +111,40 @@ describe('ExcelRowAddedTrigger', () => {
   });
 
   it('emits nothing and keeps cursor unchanged when no new rows', async () => {
-    graphFetch.mockResolvedValue({
-      status: 200,
-      data: { value: [] },
-    } as GraphResponse);
+    graphFetch
+      .mockResolvedValueOnce({ status: 200, data: { value: [] } } as GraphResponse)
+      // Disambiguation probe: the table still has 5 data rows — no regression.
+      .mockResolvedValueOnce({ status: 200, data: { rowCount: 5 } } as GraphResponse);
 
     const result = await trigger.poll(makeCtx('5'));
 
     expect(result.items).toEqual([]);
     expect(result.newCursor).toBe('5');
+  });
+
+  it('re-baselines the cursor (not stuck high) when the table shrank below the cursor', async () => {
+    graphFetch
+      .mockResolvedValueOnce({ status: 200, data: { value: [] } } as GraphResponse)
+      // Only 2 data rows remain — a regression from the cursor of 5.
+      .mockResolvedValueOnce({ status: 200, data: { rowCount: 2 } } as GraphResponse);
+
+    const result = await trigger.poll(makeCtx('5'));
+
+    expect(result.items).toEqual([]);
+    expect(result.newCursor).toBe('2');
+    const probePath = (graphFetch.mock.calls[1] as [unknown, string])[1];
+    expect(probePath).toContain('dataBodyRange');
+  });
+
+  it('treats a 404 on the row-count probe (emptied table) as zero rows and re-baselines', async () => {
+    graphFetch
+      .mockResolvedValueOnce({ status: 200, data: { value: [] } } as GraphResponse)
+      .mockRejectedValueOnce(new GraphHttpError(404, { code: 'ItemNotFound' }));
+
+    const result = await trigger.poll(makeCtx('5'));
+
+    expect(result.items).toEqual([]);
+    expect(result.newCursor).toBe('0');
   });
 
   it('throws when required config is missing', async () => {

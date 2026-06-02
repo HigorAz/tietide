@@ -25,6 +25,7 @@ import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/con
 import { CircularDependencyError, topologicalSort } from './topological-sort';
 import { buildBodyDefinition, extractBodySubgraph, validateBodySubgraph } from './iterator-runner';
 import { ITERATOR_NODE_TYPE } from '../nodes/logic/iterator';
+import { isUniqueViolation } from '../common/prisma-error';
 
 export const MAX_RECURSION_DEPTH = 5;
 
@@ -82,6 +83,12 @@ export interface RunResult {
   status: 'SUCCESS' | 'FAILED';
   error?: string;
   failedNodeId?: string;
+  // Whether re-running this execution could plausibly succeed. A node-level
+  // runtime failure (a flaky HTTP call, a transient DB error) is retryable;
+  // a structural defect (unknown node type, a cycle, the recursion limit) will
+  // always fail, so retrying is pointless. EngineService uses this to decide
+  // whether to surface the failure to BullMQ for a retry (W1.8).
+  retryable?: boolean;
 }
 
 @Injectable()
@@ -124,7 +131,11 @@ export class WorkflowRunner {
     const runLog = this.buildRunLogger({ requestId: args.requestId });
 
     if (depth > MAX_RECURSION_DEPTH) {
-      return { status: 'FAILED', error: new RecursionDepthExceededError(depth).message };
+      return {
+        status: 'FAILED',
+        error: new RecursionDepthExceededError(depth).message,
+        retryable: false,
+      };
     }
 
     // Sticky notes are non-executing canvas annotations: no executor, no
@@ -150,9 +161,9 @@ export class WorkflowRunner {
       order = topologicalSort(executableDefinition);
     } catch (err) {
       if (err instanceof CircularDependencyError) {
-        return { status: 'FAILED', error: err.message };
+        return { status: 'FAILED', error: err.message, retryable: false };
       }
-      return { status: 'FAILED', error: (err as Error).message };
+      return { status: 'FAILED', error: (err as Error).message, retryable: false };
     }
 
     // Load merged env-var scope once per execution. The resolver caches by
@@ -163,7 +174,11 @@ export class WorkflowRunner {
     for (const nodeId of order) {
       const n = executableDefinition.nodes.find((x) => x.id === nodeId)!;
       if (!this.registry.has(n.type)) {
-        return { status: 'FAILED', error: `No executor registered for node type "${n.type}"` };
+        return {
+          status: 'FAILED',
+          error: `No executor registered for node type "${n.type}"`,
+          retryable: false,
+        };
       }
     }
 
@@ -179,16 +194,59 @@ export class WorkflowRunner {
       outgoingEdges.get(e.source)!.push(e);
     }
 
+    // Step-level resume (W1.8): a BullMQ retry re-processes the SAME executionId.
+    // Reuse the recorded output of any side-effecting ACTION node that already
+    // SUCCEEDED so the retry does not re-fire its external side effect; every
+    // other node (pure logic / triggers, and the node that failed) is re-run.
+    const reusable = await this.loadResumableOutputs(executionId, nodeById);
+
     const outputs = new Map<string, NodeOutput>();
     const reachable = new Set<string>([order[0]]);
     const executionOrder: string[] = [];
+    // Final recorded status per node, so an unreachable node can tell WHY it was
+    // not run (a conditional branched around it = SKIPPED, vs an upstream failure
+    // abandoned the path = CANCELLED) by inspecting its predecessors (W3.12).
+    const statusByNode = new Map<string, string>();
     let failure: { nodeId: string; error: string } | null = null;
 
     for (const nodeId of order) {
       const n = nodeById.get(nodeId)!;
 
-      if (failure || !reachable.has(nodeId)) {
+      // A hard failure with no error-handler aborts the rest of the run: every
+      // remaining node is CANCELLED regardless of why it would not have run.
+      if (failure) {
         await this.recordCancelled(executionId, n);
+        statusByNode.set(n.id, 'CANCELLED');
+        continue;
+      }
+      if (!reachable.has(nodeId)) {
+        const reason = this.classifyUnreached(incomingEdges.get(n.id) ?? [], statusByNode);
+        if (reason === 'CANCELLED') {
+          await this.recordCancelled(executionId, n);
+          statusByNode.set(n.id, 'CANCELLED');
+        } else {
+          await this.recordUnreachedSkipped(executionId, n);
+          statusByNode.set(n.id, 'SKIPPED');
+        }
+        continue;
+      }
+
+      // Resume: this side-effecting action already SUCCEEDED on a prior attempt.
+      // Restore its recorded output and routing instead of re-executing it, so the
+      // retry does not re-fire the side effect. Actions route via plain 'success'
+      // (they never set metadata.branch), so reachability stays faithful (W1.8).
+      const reusedData = reusable.get(n.id);
+      if (reusedData !== undefined) {
+        const reusedOutput: NodeOutput = { data: reusedData };
+        outputs.set(n.id, reusedOutput);
+        executionOrder.push(n.id);
+        statusByNode.set(n.id, 'SUCCESS');
+        this.propagateReachability(
+          reusedOutput,
+          outgoingEdges.get(n.id) ?? [],
+          reachable,
+          'success',
+        );
         continue;
       }
 
@@ -202,6 +260,7 @@ export class WorkflowRunner {
 
       if (n.skipped === true && !this.isTriggerNode(n)) {
         await this.recordSkipped(executionId, n, input.data);
+        statusByNode.set(n.id, 'SKIPPED');
         const passthroughOutput: NodeOutput = { data: input.data };
         outputs.set(n.id, passthroughOutput);
         executionOrder.push(n.id);
@@ -231,6 +290,7 @@ export class WorkflowRunner {
           envScope,
           requestId: args.requestId,
         });
+        statusByNode.set(n.id, iterResult.status);
         if (iterResult.status === 'FAILED') {
           failure = { nodeId: n.id, error: iterResult.error ?? 'Iterator failed' };
         }
@@ -258,7 +318,14 @@ export class WorkflowRunner {
       const started = Date.now();
       try {
         const executor = this.registry.resolve(n.type)!;
-        const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun, depth);
+        const ctx = this.buildContext(
+          executionId,
+          workflowId,
+          n.id,
+          isDryRun,
+          depth,
+          args.requestId,
+        );
         const resolvedInput = this.resolveInputTemplates(input, executionOrder, outputs, envScope);
         const output = await executor.execute(resolvedInput, ctx);
         const durationMs = Date.now() - started;
@@ -266,6 +333,7 @@ export class WorkflowRunner {
 
         outputs.set(n.id, output);
         executionOrder.push(n.id);
+        statusByNode.set(n.id, 'SUCCESS');
 
         await this.prisma.executionStep.update({
           where: { id: step.id },
@@ -300,6 +368,7 @@ export class WorkflowRunner {
         const message = e.message ?? 'Unknown error';
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
+        statusByNode.set(n.id, 'FAILED');
         runLog.warn(
           {
             executionId,
@@ -358,9 +427,65 @@ export class WorkflowRunner {
     }
 
     if (failure) {
-      return { status: 'FAILED', error: failure.error, failedNodeId: failure.nodeId };
+      // A node threw at runtime — retryable (a flaky dependency may recover). The
+      // step-level resume above means a BullMQ retry won't re-fire nodes that
+      // already succeeded, so re-running this execution is safe.
+      return {
+        status: 'FAILED',
+        error: failure.error,
+        failedNodeId: failure.nodeId,
+        retryable: true,
+      };
     }
     return { status: 'SUCCESS' };
+  }
+
+  // Load the outputs that a re-run may reuse. On the first attempt there are no
+  // prior steps and this is a no-op. On a retry (same executionId), the recorded
+  // output of every side-effecting ACTION node that already SUCCEEDED is returned
+  // for reuse, and all other prior step rows are dropped so the re-run records
+  // fresh attempts (pure logic/trigger nodes and the failed node re-execute). Only
+  // ACTION nodes are reused because they are the side-effecting ones and they route
+  // via plain 'success' — logic nodes carry branch metadata that is not persisted,
+  // so they must re-run to reproduce their routing (W1.8).
+  private async loadResumableOutputs(
+    executionId: string,
+    nodeById: Map<string, WorkflowNode>,
+  ): Promise<Map<string, Record<string, unknown>>> {
+    const priorSteps = await this.prisma.executionStep.findMany({
+      where: { executionId },
+      select: { id: true, nodeId: true, status: true, outputData: true },
+    });
+    if (priorSteps.length === 0) return new Map();
+
+    const reusable = new Map<string, Record<string, unknown>>();
+    const keepStepIds: string[] = [];
+    for (const step of priorSteps) {
+      const node = nodeById.get(step.nodeId);
+      if (
+        step.status === 'SUCCESS' &&
+        node !== undefined &&
+        step.outputData != null &&
+        this.isActionNode(node)
+      ) {
+        reusable.set(step.nodeId, step.outputData as Record<string, unknown>);
+        keepStepIds.push(step.id);
+      }
+    }
+
+    if (keepStepIds.length === 0) {
+      await this.prisma.executionStep.deleteMany({ where: { executionId } });
+    } else {
+      await this.prisma.executionStep.deleteMany({
+        where: { executionId, id: { notIn: keepStepIds } },
+      });
+    }
+
+    return reusable;
+  }
+
+  private isActionNode(n: WorkflowNode): boolean {
+    return this.registry.resolve(n.type)?.category === NodeCategory.ACTION;
   }
 
   private resolveInputTemplates(
@@ -394,13 +519,18 @@ export class WorkflowRunner {
     if (incoming.length === 0) {
       data = triggerData ?? {};
     } else {
-      const executedPredecessors = executionOrder.filter((id) =>
-        incoming.some((e) => e.source === id),
+      // Only predecessors that actually produced an output (executed or
+      // skipped-passthrough) feed this node; cancelled/unreached ones do not.
+      const predecessorIds = executionOrder.filter(
+        (id) => incoming.some((e) => e.source === id) && outputs.has(id),
       );
-      const last = executedPredecessors[executedPredecessors.length - 1];
-      if (last) {
-        data = outputs.get(last)?.data ?? {};
-      }
+      // input.data is the flat output of the LAST executed predecessor (the
+      // established passthrough contract). On fan-in, every predecessor's output
+      // is still exposed to the executor via input.scope (the `$nodes` map) and
+      // `{{nodeId.field}}` template refs, so no branch is lost — W3.10's goal,
+      // now carried by scope rather than by overloading input.data (#260).
+      const lastId = predecessorIds[predecessorIds.length - 1];
+      data = lastId ? (outputs.get(lastId)?.data ?? {}) : {};
     }
     const rawConnectionId = (n.config as { connectionId?: unknown }).connectionId;
     const connectionId = typeof rawConnectionId === 'string' ? rawConnectionId : undefined;
@@ -432,8 +562,11 @@ export class WorkflowRunner {
     }
   }
 
+  // A node that will not run because an upstream failure abandoned its path. Recorded
+  // in a single write — the status is terminal at creation, so the prior redundant
+  // create-then-update-to-the-same-status pair is collapsed (W3.12).
   private async recordCancelled(executionId: string, n: WorkflowNode): Promise<void> {
-    const step = await this.prisma.executionStep.create({
+    await this.prisma.executionStep.create({
       data: {
         executionId,
         nodeId: n.id,
@@ -442,10 +575,42 @@ export class WorkflowRunner {
         status: 'CANCELLED',
       },
     });
-    await this.prisma.executionStep.update({
-      where: { id: step.id },
-      data: { nodeId: n.id, status: 'CANCELLED' },
+  }
+
+  // A node that will not run because normal conditional control flow routed around
+  // it (the branch it sits on was not selected). Distinct from CANCELLED, which
+  // implies a failure aborted the path. Single terminal write.
+  private async recordUnreachedSkipped(executionId: string, n: WorkflowNode): Promise<void> {
+    await this.prisma.executionStep.create({
+      data: {
+        executionId,
+        nodeId: n.id,
+        nodeType: n.type,
+        nodeName: n.name,
+        status: 'SKIPPED',
+      },
     });
+  }
+
+  // Classify why an unreachable node (with no global failure in effect) did not run:
+  // SKIPPED when a conditional branched around it, CANCELLED when an upstream failure
+  // or an un-fired error-handler edge abandoned its path. Predecessors are processed
+  // earlier in topological order, so their final status is already known.
+  private classifyUnreached(
+    incoming: WorkflowEdge[],
+    statusByNode: Map<string, string>,
+  ): 'CANCELLED' | 'SKIPPED' {
+    for (const e of incoming) {
+      // An error-handler edge that did not fire (we are unreachable) means its source
+      // did not route here — the handler is a contingency that was cancelled.
+      if ((e.kind ?? 'success') === 'error') return 'CANCELLED';
+      // A success edge that was not taken because its source failed/was cancelled
+      // propagates the cancellation; a conditional that simply chose another branch
+      // (source SUCCESS) or a skipped source leaves us SKIPPED.
+      const sourceStatus = statusByNode.get(e.source);
+      if (sourceStatus === 'FAILED' || sourceStatus === 'CANCELLED') return 'CANCELLED';
+    }
+    return 'SKIPPED';
   }
 
   private isTriggerNode(n: WorkflowNode): boolean {
@@ -618,19 +783,34 @@ export class WorkflowRunner {
     for (let index = 0; index < total; index++) {
       const item = items[index];
       const iterStartedAt = new Date();
-      const child = await this.prisma.workflowExecution.create({
-        data: {
-          workflowId,
-          parentExecutionId,
-          status: 'RUNNING',
-          triggerType: 'iterator',
-          triggerData: { item, index, total } as object,
-          isDryRun,
-          startedAt: iterStartedAt,
-        },
-        select: { id: true },
+
+      // Tie each iteration child to (parent execution, iterator node, index) so a
+      // re-processed parent (e.g. a future BullMQ retry — see W1.8) reuses the
+      // child it already ran instead of duplicating the iteration's side effects.
+      // Scoped per workflow via the child's @@unique([workflowId, idempotencyKey]).
+      const iterKey = `iterator:${parentExecutionId}:${n.id}:${index}`;
+      const priorChild = await this.prisma.workflowExecution.findFirst({
+        where: { workflowId, idempotencyKey: iterKey },
+        select: { id: true, status: true },
       });
-      const childExecutionId = child.id;
+      if (priorChild?.status === 'SUCCESS') {
+        // Already completed on a previous attempt — count it and skip re-running.
+        succeeded += 1;
+        continue;
+      }
+
+      const childExecutionId = priorChild
+        ? priorChild.id // prior attempt created it but did not finish — re-run in place
+        : await this.createIterationChild({
+            workflowId,
+            parentExecutionId,
+            item,
+            index,
+            total,
+            isDryRun,
+            iterStartedAt,
+            idempotencyKey: iterKey,
+          });
 
       await this.events.publishIterationStarted({
         executionId: parentExecutionId,
@@ -769,12 +949,52 @@ export class WorkflowRunner {
     return { status: 'SUCCESS' };
   }
 
+  // Create one iteration's child execution, tolerating a concurrent attempt that
+  // wins the unique-key race by reusing the row it created.
+  private async createIterationChild(args: {
+    workflowId: string;
+    parentExecutionId: string;
+    item: unknown;
+    index: number;
+    total: number;
+    isDryRun: boolean;
+    iterStartedAt: Date;
+    idempotencyKey: string;
+  }): Promise<string> {
+    try {
+      const child = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId: args.workflowId,
+          parentExecutionId: args.parentExecutionId,
+          status: 'RUNNING',
+          triggerType: 'iterator',
+          triggerData: { item: args.item, index: args.index, total: args.total } as object,
+          isDryRun: args.isDryRun,
+          startedAt: args.iterStartedAt,
+          idempotencyKey: args.idempotencyKey,
+        },
+        select: { id: true },
+      });
+      return child.id;
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const winner = await this.prisma.workflowExecution.findFirst({
+          where: { workflowId: args.workflowId, idempotencyKey: args.idempotencyKey },
+          select: { id: true },
+        });
+        if (winner) return winner.id;
+      }
+      throw err;
+    }
+  }
+
   private buildContext(
     executionId: string,
     workflowId: string,
     nodeId: string,
     isDryRun: boolean,
     depth: number,
+    requestId: string | undefined,
   ): ExecutionContext {
     const secrets = this.secretResolver;
     const connections = this.connectionResolver;
@@ -791,6 +1011,7 @@ export class WorkflowRunner {
       logger,
       isDryRun,
       depth,
+      requestId,
       getSecret: (name: string) => secrets.getSecret(executionId, name),
       getConnection: <TConfig = Record<string, unknown>>(connectionId: string) =>
         connections.getConnection<TConfig>(executionId, connectionId),

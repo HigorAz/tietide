@@ -337,6 +337,49 @@ For everything else, the right answer is to fix the client — not loosen the se
 
 ---
 
+## Master-key rotation (`ENCRYPTION_MASTER_KEY`)
+
+The encryption layer is a **keyring** (W3.17): new data is always encrypted with the
+primary `ENCRYPTION_MASTER_KEY`, while `ENCRYPTION_MASTER_KEYS_OLD` (comma-separated
+base64 keys) holds former keys for **decryption only**. Because the cipher
+(XChaCha20-Poly1305) is authenticated, `decrypt` tries each key and accepts the one
+whose tag verifies — so rotation needs **no ciphertext-format change and no migration**.
+
+Rotate with zero downtime:
+
+```bash
+# 1. Generate a new 32-byte key.
+openssl rand -base64 32        # -> NEW_KEY
+
+# 2. In .env, make the NEW key primary and demote the current key to the old-keys ring:
+#    ENCRYPTION_MASTER_KEY=<NEW_KEY>
+#    ENCRYPTION_MASTER_KEYS_OLD=<previous ENCRYPTION_MASTER_KEY value>
+#    (append more, comma-separated, if several historical keys are still in use)
+
+# 3. Recreate the API + worker so both load the new keyring.
+docker rm -f tietide-api tietide-worker
+docker run -d --name tietide-api    --network "$NETWORK" --env-file .env -p 127.0.0.1:3030:3030 tietide-api:latest
+docker run -d --name tietide-worker --network "$NETWORK" --env-file .env tietide-worker:latest
+```
+
+From this point, every NEW secret/connection/env-var is encrypted with `NEW_KEY`; rows
+written under the old key keep decrypting transparently.
+
+**Retiring the old key (optional re-encryption migration — not yet automated):** to
+drop `ENCRYPTION_MASTER_KEYS_OLD` entirely, every row encrypted under the old key must
+first be re-encrypted under the new primary. A migration job would, per affected table
+(`Secret.value`, `Connection.configEncrypted`/`refreshTokenEncrypted`,
+`EnvironmentVariable.valueEnc`, `ProviderSubscription.secretEnc`), `decrypt` (the
+keyring picks the old key) and `encrypt` (writes with the new primary), in batches. Once
+every row is re-encrypted, remove the old key from `ENCRYPTION_MASTER_KEYS_OLD` and
+recreate the apps. Until that job exists, **keep the old key in the ring** — removing it
+prematurely makes old rows permanently undecryptable.
+
+> Losing every key for a given row (primary + all olds) makes that row unrecoverable —
+> store retired keys out-of-band until their re-encryption is confirmed.
+
+---
+
 ## When in doubt
 
 1. Check `/v1/health` first — it is the cheapest signal.

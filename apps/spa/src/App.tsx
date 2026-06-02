@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { WorkflowEditorPage } from '@/pages/WorkflowEditorPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { RegisterPage } from '@/pages/RegisterPage';
+import { VerifyEmailPage } from '@/pages/VerifyEmailPage';
 import { HomePage } from '@/pages/HomePage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { WorkflowsPage } from '@/pages/WorkflowsPage';
@@ -12,7 +13,7 @@ import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { SettingsEnvVarsPage } from '@/pages/settings/EnvVarsPage';
 import { AdminEnvVarsPage } from '@/pages/admin/EnvVarsPage';
 import { AuditLogPage } from '@/pages/admin/AuditLogPage';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { AdminRoute, ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppShell } from '@/components/layout/AppShell';
 import { RootLayout } from '@/components/layout/RootLayout';
 
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/register', element: <RegisterPage /> },
+      { path: '/verify-email', element: <VerifyEmailPage /> },
       {
         element: (
           <ProtectedRoute>
@@ -38,8 +40,22 @@ const router = createBrowserRouter([
           { path: '/connections', element: <ConnectionsPage /> },
           { path: '/settings', element: <PlaceholderPage title="Account settings" /> },
           { path: '/settings/env-vars', element: <SettingsEnvVarsPage /> },
-          { path: '/admin/env-vars', element: <AdminEnvVarsPage /> },
-          { path: '/admin/audit', element: <AuditLogPage /> },
+          {
+            path: '/admin/env-vars',
+            element: (
+              <AdminRoute>
+                <AdminEnvVarsPage />
+              </AdminRoute>
+            ),
+          },
+          {
+            path: '/admin/audit',
+            element: (
+              <AdminRoute>
+                <AuditLogPage />
+              </AdminRoute>
+            ),
+          },
         ],
       },
       { path: '*', element: <Navigate to="/login" replace /> },
