@@ -20,7 +20,6 @@ describe('WorkflowDocumentationController (integration)', () => {
   let docs: {
     findExisting: jest.Mock;
     regenerate: jest.Mock;
-    generateLegacy: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
 
@@ -41,8 +40,6 @@ describe('WorkflowDocumentationController (integration)', () => {
     model: 'llama3.1:8b',
     generatedAt: updatedAt,
   };
-  const legacyResult = { ...result, cached: false };
-
   // ETag / Last-Modified are second-resolution. Truncate updatedAt to seconds.
   const lastModifiedSeconds = Math.floor(updatedAt.getTime() / 1000) * 1000;
   const expectedEtag = `"${uuid}-${lastModifiedSeconds}"`;
@@ -52,7 +49,6 @@ describe('WorkflowDocumentationController (integration)', () => {
     docs = {
       findExisting: jest.fn(),
       regenerate: jest.fn(),
-      generateLegacy: jest.fn(),
     };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
 
@@ -240,38 +236,9 @@ describe('WorkflowDocumentationController (integration)', () => {
     });
   });
 
-  describe('POST /workflows/:id/generate-docs (deprecated alias)', () => {
-    it('should return 200 with the legacy body including the cached field', async () => {
-      docs.generateLegacy.mockResolvedValue(legacyResult);
-
-      const res = await request(app.getHttpServer())
-        .post(`/workflows/${uuid}/generate-docs`)
-        .expect(200);
-
-      expect(docs.generateLegacy).toHaveBeenCalledWith('owner-uuid', uuid);
-      expect(res.body).toMatchObject({
-        workflowId: uuid,
-        cached: false,
-      });
-    });
-
-    it('should set the Deprecation response header', async () => {
-      docs.generateLegacy.mockResolvedValue(legacyResult);
-
-      const res = await request(app.getHttpServer())
-        .post(`/workflows/${uuid}/generate-docs`)
-        .expect(200);
-
-      expect(res.headers.deprecation).toBe('true');
-      expect(res.headers.sunset).toBeDefined();
-    });
-
-    it('should return 503 when the underlying service is unavailable', async () => {
-      docs.generateLegacy.mockRejectedValue(
-        new ServiceUnavailableException('AI service unavailable'),
-      );
-
-      await request(app.getHttpServer()).post(`/workflows/${uuid}/generate-docs`).expect(503);
+  describe('POST /workflows/:id/generate-docs (removed legacy alias, #214)', () => {
+    it('should return 404 — the deprecated alias is gone (use documentation/regenerate)', async () => {
+      await request(app.getHttpServer()).post(`/workflows/${uuid}/generate-docs`).expect(404);
     });
   });
 });

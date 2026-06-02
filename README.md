@@ -865,7 +865,7 @@ Complemento ao modelo C4 da [Seção 3.2.3](#323-modelos-c4) — mostra portas, 
 
 **Fluxo de requisição.** A SPA chama a API REST; a API persiste no PostgreSQL e enfileira jobs na Valkey; o Worker consome o job, executa o DAG de nós do workflow (topological sort de Kahn) e persiste cada `ExecutionStep`; a SPA faz polling do status da execução.
 
-**Fluxo de IA (RAG).** `POST /v1/workflows/:id/generate-docs` → API → serviço FastAPI → ChromaDB (recuperação RAG) → Ollama (`llama3.1:8b`) → documentação em markdown persistida em `WorkflowDocumentation`.
+**Fluxo de IA (RAG).** `POST /v1/workflows/:id/documentation/regenerate` → API → serviço FastAPI → ChromaDB (recuperação RAG) → Ollama (`llama3.1:8b`) → documentação em markdown persistida em `WorkflowDocumentation`.
 
 **Camadas.** Controllers → Services → Repositories/Adapters. A lógica de negócio mora apenas nos services — o padrão consolidado na [Seção 3.2.2](#322-padrões-de-arquitetura).
 
