@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { visibleNavItems } from './navItems';
 import { SidebarItem } from './SidebarItem';
 import { SidebarFooter } from './SidebarFooter';
+import logoIcon from '@/assets/brand/logo-icon.png';
 
 export const SIDEBAR_STORAGE_KEY = 'tietide-sidebar-collapsed';
 
@@ -58,11 +59,11 @@ export function Sidebar(): JSX.Element {
       >
         {!collapsed ? (
           <span className="inline-flex items-center gap-2 text-sm font-semibold text-text-primary">
-            <img src="/logo.jpg" alt="" aria-hidden className="h-6 w-6 rounded-sm" />
+            <img src={logoIcon} alt="" aria-hidden className="h-6 w-6" />
             TieTide
           </span>
         ) : (
-          <img src="/logo.jpg" alt="TieTide" className="h-6 w-6 rounded-sm" />
+          <img src={logoIcon} alt="TieTide" className="h-6 w-6" />
         )}
         <button
           type="button"
