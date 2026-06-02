@@ -1,0 +1,86 @@
+import { NodeCategory, NodeGroup, NodeType, type NodeTypeDefinition } from '../node-enums.js';
+
+export const HUBSPOT_NODES: NodeTypeDefinition[] = [
+  {
+    type: NodeType.HUBSPOT_CREATE_CONTACT,
+    name: 'HubSpot: Create Contact',
+    description: 'Create a contact in HubSpot CRM',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_CREATE_DEAL,
+    name: 'HubSpot: Create Deal',
+    description: 'Create a deal and optionally associate contacts',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_CONTACT_CHANGED,
+    name: 'HubSpot: Contact Changed',
+    description:
+      'Trigger when a HubSpot contact is created, updated, or deleted (push, X-HubSpot-Signature-v3)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMERCE_TRIGGERS,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_FIND_CONTACT,
+    name: 'HubSpot: Find Contact',
+    description: 'Find a HubSpot contact by email address (search API)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_GET_CONTACT,
+    name: 'HubSpot: Get Contact',
+    description: 'Fetch a HubSpot contact by ID',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_UPDATE_CONTACT,
+    name: 'HubSpot: Update Contact',
+    description: 'Update properties on an existing HubSpot contact',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_UPDATE_DEAL,
+    name: 'HubSpot: Update Deal',
+    description: 'Update properties on an existing HubSpot deal',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_CREATE_COMPANY,
+    name: 'HubSpot: Create Company',
+    description: 'Create a company in HubSpot CRM',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_CREATE_NOTE,
+    name: 'HubSpot: Create Note',
+    description: 'Create a note, optionally associated with a contact or deal',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'hubspot',
+  },
+  {
+    type: NodeType.HUBSPOT_DEAL_CHANGED,
+    name: 'HubSpot: Deal Changed',
+    description:
+      'Trigger when a HubSpot deal is created, updated, or deleted (push, X-HubSpot-Signature-v3)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMERCE_TRIGGERS,
+    provider: 'hubspot',
+  },
+];
