@@ -18,6 +18,7 @@ import { ExecutionEventsService } from '../events/execution-events.service';
 import { ManualTrigger } from '../nodes/triggers/manual-trigger';
 import { IteratorNode } from '../nodes/logic/iterator';
 import { WorkflowRunner } from './workflow-runner';
+import { IteratorExecutor } from './iterator-executor';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
@@ -251,6 +252,7 @@ describe('WorkflowRunner — iterator integration', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowRunner,
+        IteratorExecutor,
         NodeRegistry,
         { provide: PrismaService, useValue: prisma },
         { provide: SECRET_RESOLVER, useValue: secretResolver },

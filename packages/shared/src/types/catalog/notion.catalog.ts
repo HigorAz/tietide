@@ -1,0 +1,68 @@
+import { NodeCategory, NodeGroup, NodeType, type NodeTypeDefinition } from '../node-enums.js';
+
+export const NOTION_NODES: NodeTypeDefinition[] = [
+  {
+    type: NodeType.NOTION_CREATE_PAGE,
+    name: 'Notion: Create Page',
+    description: 'Create a new page under a parent page or database',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'notion',
+  },
+  {
+    type: NodeType.NOTION_QUERY_DATABASE,
+    name: 'Notion: Query Database',
+    description: 'Query rows from a Notion database with filter/sort',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'notion',
+  },
+  {
+    type: NodeType.NOTION_GET_PAGE,
+    name: 'Notion: Get Page',
+    description: 'Retrieve a Notion page and its properties by ID',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'notion',
+  },
+  {
+    type: NodeType.NOTION_UPDATE_PAGE,
+    name: 'Notion: Update Page',
+    description: 'Update a Notion page’s properties or archive/restore it',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'notion',
+  },
+  {
+    type: NodeType.NOTION_APPEND_BLOCKS,
+    name: 'Notion: Append Blocks',
+    description: 'Append content blocks to a Notion page or block',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'notion',
+  },
+  {
+    type: NodeType.NOTION_GET_BLOCK_CHILDREN,
+    name: 'Notion: Get Block Children',
+    description: 'Read the content blocks of a Notion page or block (paginated)',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'notion',
+  },
+  {
+    type: NodeType.NOTION_FIND_DATABASE_ITEM,
+    name: 'Notion: Find Database Item',
+    description: 'Query a Notion database and return the first matching item',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.PRODUCTIVITY,
+    provider: 'notion',
+  },
+  {
+    type: NodeType.NOTION_DATABASE_ITEM_UPDATED,
+    name: 'Notion: Database Item Updated',
+    description: 'Trigger when a Notion database item is edited (poll, last_edited_time cursor)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.PRODUCTIVITY_TRIGGERS,
+    provider: 'notion',
+  },
+];

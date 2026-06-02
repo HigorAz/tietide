@@ -1,0 +1,68 @@
+import { NodeCategory, NodeGroup, NodeType, type NodeTypeDefinition } from '../node-enums.js';
+
+export const MAILCHIMP_NODES: NodeTypeDefinition[] = [
+  {
+    type: NodeType.MAILCHIMP_ADD_SUBSCRIBER,
+    name: 'Mailchimp: Add Subscriber',
+    description: 'Add a subscriber to a Mailchimp audience list',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_SEND_CAMPAIGN,
+    name: 'Mailchimp: Send Campaign',
+    description: 'Send a previously-created Mailchimp campaign',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_SUBSCRIBER_ADDED,
+    name: 'Mailchimp: Subscriber Added',
+    description: 'Trigger on Mailchimp audience events (subscribe / unsubscribe / cleaned)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMERCE_TRIGGERS,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_GET_SUBSCRIBER,
+    name: 'Mailchimp: Get Subscriber',
+    description: 'Fetch a Mailchimp audience member by email',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_UPDATE_SUBSCRIBER,
+    name: 'Mailchimp: Update Subscriber',
+    description: 'Update a Mailchimp member’s status or merge fields',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_UNSUBSCRIBE,
+    name: 'Mailchimp: Unsubscribe',
+    description: 'Unsubscribe a member from a Mailchimp audience',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_ADD_TAG,
+    name: 'Mailchimp: Add Tag',
+    description: 'Add one or more tags to a Mailchimp audience member',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+  {
+    type: NodeType.MAILCHIMP_LIST_CAMPAIGNS,
+    name: 'Mailchimp: List Campaigns',
+    description: 'List Mailchimp campaigns, optionally filtered by status',
+    category: NodeCategory.ACTION,
+    group: NodeGroup.COMMERCE,
+    provider: 'mailchimp',
+  },
+];

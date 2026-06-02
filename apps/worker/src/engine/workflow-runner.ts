@@ -3,19 +3,13 @@ import { PinoLogger } from 'nestjs-pino';
 
 type PinoChildLogger = ReturnType<PinoLogger['logger']['child']>;
 import {
-  ITERATOR_MAX_ITEMS_DEFAULT,
-  NODE_CATALOG,
   NodeCategory,
   NodeType,
-  RESERVED_CONFIG_KEYS,
-  iteratorConfigSchema,
-  resolveTemplate,
-  type EnvScope,
   type WorkflowDefinition,
   type WorkflowNode,
   type WorkflowEdge,
 } from '@tietide/shared';
-import type { ExecutionContext, Logger as SdkLogger, NodeInput, NodeOutput } from '@tietide/sdk';
+import type { ExecutionContext, Logger as SdkLogger, NodeOutput } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
 import { ExecutionEventsService } from '../events/execution-events.service';
@@ -23,9 +17,16 @@ import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
 import { CircularDependencyError, topologicalSort } from './topological-sort';
-import { buildBodyDefinition, extractBodySubgraph, validateBodySubgraph } from './iterator-runner';
 import { ITERATOR_NODE_TYPE } from '../nodes/logic/iterator';
-import { isUniqueViolation } from '../common/prisma-error';
+import { IteratorExecutor } from './iterator-executor';
+import {
+  buildInput,
+  classifyUnreached,
+  extractErrorCode,
+  isTriggerNode,
+  propagateReachability,
+  resolveInputTemplates,
+} from './runner-helpers';
 
 export const MAX_RECURSION_DEPTH = 5;
 
@@ -37,28 +38,6 @@ export class RecursionDepthExceededError extends Error {
     );
     this.name = 'RecursionDepthExceededError';
   }
-}
-
-function extractErrorCode(err: unknown): string | undefined {
-  if (err && typeof err === 'object' && 'code' in err) {
-    const code = (err as { code: unknown }).code;
-    if (typeof code === 'string') return code;
-  }
-  return undefined;
-}
-
-/**
- * Drop editor-only reserved keys (e.g. the data-pill `__pillSample`) from a node
- * config so they never reach an executor's params. Returns the original object
- * untouched when no reserved key is present (avoids needless allocation).
- */
-function stripReservedConfigKeys(config: Record<string, unknown>): Record<string, unknown> {
-  if (!RESERVED_CONFIG_KEYS.some((key) => key in config)) return config;
-  const sanitized: Record<string, unknown> = { ...config };
-  for (const key of RESERVED_CONFIG_KEYS) {
-    delete sanitized[key];
-  }
-  return sanitized;
 }
 
 export interface RunArgs {
@@ -100,6 +79,7 @@ export class WorkflowRunner {
     @Inject(ENV_VAR_RESOLVER) private readonly envVarResolver: EnvVarResolver,
     @Inject(CONNECTION_RESOLVER) private readonly connectionResolver: ConnectionResolver,
     private readonly events: ExecutionEventsService,
+    private readonly iterator: IteratorExecutor,
     private readonly log: PinoLogger,
   ) {
     this.log.setContext(WorkflowRunner.name);
@@ -220,7 +200,7 @@ export class WorkflowRunner {
         continue;
       }
       if (!reachable.has(nodeId)) {
-        const reason = this.classifyUnreached(incomingEdges.get(n.id) ?? [], statusByNode);
+        const reason = classifyUnreached(incomingEdges.get(n.id) ?? [], statusByNode);
         if (reason === 'CANCELLED') {
           await this.recordCancelled(executionId, n);
           statusByNode.set(n.id, 'CANCELLED');
@@ -241,16 +221,11 @@ export class WorkflowRunner {
         outputs.set(n.id, reusedOutput);
         executionOrder.push(n.id);
         statusByNode.set(n.id, 'SUCCESS');
-        this.propagateReachability(
-          reusedOutput,
-          outgoingEdges.get(n.id) ?? [],
-          reachable,
-          'success',
-        );
+        propagateReachability(reusedOutput, outgoingEdges.get(n.id) ?? [], reachable, 'success');
         continue;
       }
 
-      const input = this.buildInput(
+      const input = buildInput(
         n,
         executionOrder,
         incomingEdges.get(n.id) ?? [],
@@ -258,13 +233,13 @@ export class WorkflowRunner {
         triggerData,
       );
 
-      if (n.skipped === true && !this.isTriggerNode(n)) {
+      if (n.skipped === true && !isTriggerNode(n)) {
         await this.recordSkipped(executionId, n, input.data);
         statusByNode.set(n.id, 'SKIPPED');
         const passthroughOutput: NodeOutput = { data: input.data };
         outputs.set(n.id, passthroughOutput);
         executionOrder.push(n.id);
-        this.propagateReachability(
+        propagateReachability(
           passthroughOutput,
           outgoingEdges.get(n.id) ?? [],
           reachable,
@@ -274,7 +249,7 @@ export class WorkflowRunner {
       }
 
       if (n.type === ITERATOR_NODE_TYPE) {
-        const iterResult = await this.runIteratorNode({
+        const iterResult = await this.iterator.run({
           iteratorNode: n,
           rootDefinition: definition,
           parentExecutionId: executionId,
@@ -289,6 +264,7 @@ export class WorkflowRunner {
           isDryRun,
           envScope,
           requestId: args.requestId,
+          runChild: (childArgs) => this.run(childArgs),
         });
         statusByNode.set(n.id, iterResult.status);
         if (iterResult.status === 'FAILED') {
@@ -326,7 +302,7 @@ export class WorkflowRunner {
           depth,
           args.requestId,
         );
-        const resolvedInput = this.resolveInputTemplates(input, executionOrder, outputs, envScope);
+        const resolvedInput = resolveInputTemplates(input, executionOrder, outputs, envScope);
         const output = await executor.execute(resolvedInput, ctx);
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
@@ -357,7 +333,7 @@ export class WorkflowRunner {
           output: output.data,
         });
 
-        this.propagateReachability(output, outgoingEdges.get(n.id) ?? [], reachable, 'success');
+        propagateReachability(output, outgoingEdges.get(n.id) ?? [], reachable, 'success');
       } catch (err) {
         const e = err as Error & {
           stack?: string;
@@ -419,7 +395,7 @@ export class WorkflowRunner {
           const errorOutput: NodeOutput = { data: { error: errorPayload } };
           outputs.set(n.id, errorOutput);
           executionOrder.push(n.id);
-          this.propagateReachability(errorOutput, outgoing, reachable, 'error');
+          propagateReachability(errorOutput, outgoing, reachable, 'error');
         } else {
           failure = { nodeId: n.id, error: message };
         }
@@ -488,80 +464,6 @@ export class WorkflowRunner {
     return this.registry.resolve(n.type)?.category === NodeCategory.ACTION;
   }
 
-  private resolveInputTemplates(
-    input: NodeInput,
-    executionOrder: string[],
-    outputs: Map<string, NodeOutput>,
-    envScope: EnvScope,
-  ): NodeInput {
-    const scope: Record<string, unknown> = {};
-    for (const id of executionOrder) {
-      const out = outputs.get(id);
-      if (out) scope[id] = out.data;
-    }
-    const resolvedParams = resolveTemplate(input.params, scope, envScope) as Record<
-      string,
-      unknown
-    >;
-    // Surface the same upstream scope that drove template resolution so executors
-    // (e.g. the Code node's `$nodes`) can read sibling/ancestor outputs directly.
-    return { ...input, params: resolvedParams, scope };
-  }
-
-  private buildInput(
-    n: WorkflowNode,
-    executionOrder: string[],
-    incoming: WorkflowEdge[],
-    outputs: Map<string, NodeOutput>,
-    triggerData?: Record<string, unknown>,
-  ) {
-    let data: Record<string, unknown> = {};
-    if (incoming.length === 0) {
-      data = triggerData ?? {};
-    } else {
-      // Only predecessors that actually produced an output (executed or
-      // skipped-passthrough) feed this node; cancelled/unreached ones do not.
-      const predecessorIds = executionOrder.filter(
-        (id) => incoming.some((e) => e.source === id) && outputs.has(id),
-      );
-      // input.data is the flat output of the LAST executed predecessor (the
-      // established passthrough contract). On fan-in, every predecessor's output
-      // is still exposed to the executor via input.scope (the `$nodes` map) and
-      // `{{nodeId.field}}` template refs, so no branch is lost — W3.10's goal,
-      // now carried by scope rather than by overloading input.data (#260).
-      const lastId = predecessorIds[predecessorIds.length - 1];
-      data = lastId ? (outputs.get(lastId)?.data ?? {}) : {};
-    }
-    const rawConnectionId = (n.config as { connectionId?: unknown }).connectionId;
-    const connectionId = typeof rawConnectionId === 'string' ? rawConnectionId : undefined;
-    // Reserved keys (e.g. the data-pill `__pillSample`) live on the node config
-    // for the editor only — strip them so they never reach the executor's params.
-    const params = stripReservedConfigKeys(n.config);
-    return connectionId ? { data, params, connectionId } : { data, params };
-  }
-
-  private propagateReachability(
-    output: NodeOutput,
-    outgoing: WorkflowEdge[],
-    reachable: Set<string>,
-    outcome: 'success' | 'error',
-  ): void {
-    const branch = output.metadata?.branch as string | undefined;
-    for (const e of outgoing) {
-      const edgeKind = e.kind ?? 'success';
-      if (edgeKind !== outcome) continue;
-      if (outcome === 'error') {
-        reachable.add(e.target);
-        continue;
-      }
-      if (e.sourceHandle === undefined) {
-        reachable.add(e.target);
-      } else if (branch !== undefined && e.sourceHandle === branch) {
-        reachable.add(e.target);
-      }
-    }
-  }
-
   // A node that will not run because an upstream failure abandoned its path. Recorded
   // in a single write — the status is terminal at creation, so the prior redundant
   // create-then-update-to-the-same-status pair is collapsed (W3.12).
@@ -590,31 +492,6 @@ export class WorkflowRunner {
         status: 'SKIPPED',
       },
     });
-  }
-
-  // Classify why an unreachable node (with no global failure in effect) did not run:
-  // SKIPPED when a conditional branched around it, CANCELLED when an upstream failure
-  // or an un-fired error-handler edge abandoned its path. Predecessors are processed
-  // earlier in topological order, so their final status is already known.
-  private classifyUnreached(
-    incoming: WorkflowEdge[],
-    statusByNode: Map<string, string>,
-  ): 'CANCELLED' | 'SKIPPED' {
-    for (const e of incoming) {
-      // An error-handler edge that did not fire (we are unreachable) means its source
-      // did not route here — the handler is a contingency that was cancelled.
-      if ((e.kind ?? 'success') === 'error') return 'CANCELLED';
-      // A success edge that was not taken because its source failed/was cancelled
-      // propagates the cancellation; a conditional that simply chose another branch
-      // (source SUCCESS) or a skipped source leaves us SKIPPED.
-      const sourceStatus = statusByNode.get(e.source);
-      if (sourceStatus === 'FAILED' || sourceStatus === 'CANCELLED') return 'CANCELLED';
-    }
-    return 'SKIPPED';
-  }
-
-  private isTriggerNode(n: WorkflowNode): boolean {
-    return NODE_CATALOG.find((d) => d.type === n.type)?.category === NodeCategory.TRIGGER;
   }
 
   private async recordSkipped(
@@ -656,336 +533,6 @@ export class WorkflowRunner {
       input: forwardedInput,
       output: passthroughOutput,
     });
-  }
-
-  private async runIteratorNode(opts: {
-    iteratorNode: WorkflowNode;
-    rootDefinition: WorkflowDefinition;
-    parentExecutionId: string;
-    workflowId: string;
-    depth: number;
-    triggerData: Record<string, unknown> | undefined;
-    incoming: WorkflowEdge[];
-    outgoing: WorkflowEdge[];
-    executionOrder: string[];
-    outputs: Map<string, NodeOutput>;
-    reachable: Set<string>;
-    isDryRun: boolean;
-    envScope: EnvScope;
-    requestId: string | undefined;
-  }): Promise<{ status: 'SUCCESS' | 'FAILED'; error?: string }> {
-    const {
-      iteratorNode: n,
-      rootDefinition,
-      parentExecutionId,
-      workflowId,
-      depth,
-      triggerData,
-      incoming,
-      outgoing,
-      executionOrder,
-      outputs,
-      reachable,
-      isDryRun,
-      envScope,
-      requestId,
-    } = opts;
-
-    const startedAt = new Date();
-    const step = await this.prisma.executionStep.create({
-      data: {
-        executionId: parentExecutionId,
-        nodeId: n.id,
-        nodeType: n.type,
-        nodeName: n.name,
-        status: 'RUNNING',
-        startedAt,
-      },
-    });
-    await this.events.publishStepStarted({
-      executionId: parentExecutionId,
-      nodeId: n.id,
-      nodeType: n.type,
-      startedAt,
-    });
-
-    const builtInput = this.buildInput(n, executionOrder, incoming, outputs, triggerData);
-
-    const fail = async (error: string): Promise<{ status: 'FAILED'; error: string }> => {
-      const finishedAt = new Date();
-      const durationMs = finishedAt.getTime() - startedAt.getTime();
-      await this.prisma.executionStep.update({
-        where: { id: step.id },
-        data: {
-          nodeId: n.id,
-          status: 'FAILED',
-          inputData: builtInput.data as object,
-          error,
-          finishedAt,
-          durationMs,
-        },
-      });
-      await this.events.publishStepFailed({
-        executionId: parentExecutionId,
-        nodeId: n.id,
-        nodeType: n.type,
-        startedAt,
-        finishedAt,
-        durationMs,
-        input: builtInput.data,
-        error: { message: error },
-      });
-      return { status: 'FAILED', error };
-    };
-
-    let parsedConfig: ReturnType<typeof iteratorConfigSchema.parse>;
-    try {
-      parsedConfig = iteratorConfigSchema.parse(n.config);
-    } catch (err) {
-      return await fail(`Invalid iterator config: ${(err as Error).message}`);
-    }
-
-    let resolvedItems: unknown;
-    try {
-      const resolvedInput = this.resolveInputTemplates(
-        builtInput,
-        executionOrder,
-        outputs,
-        envScope,
-      );
-      resolvedItems = (resolvedInput.params as Record<string, unknown>).arrayPath;
-    } catch (err) {
-      return await fail(`Failed to resolve iterator arrayPath: ${(err as Error).message}`);
-    }
-
-    if (!Array.isArray(resolvedItems)) {
-      return await fail(
-        `Iterator arrayPath did not resolve to an array (got ${typeof resolvedItems}). ` +
-          `Use a data pill that points at an array, e.g. {{http_1.response.body.items}}.`,
-      );
-    }
-
-    const items = resolvedItems;
-    const cap = parsedConfig.maxItems ?? ITERATOR_MAX_ITEMS_DEFAULT;
-    const total = Math.min(items.length, cap);
-
-    let bodyInfo: ReturnType<typeof extractBodySubgraph>;
-    try {
-      bodyInfo = extractBodySubgraph(rootDefinition, n.id);
-      validateBodySubgraph(rootDefinition, n.id, bodyInfo.bodyNodeIds);
-    } catch (err) {
-      return await fail((err as Error).message);
-    }
-
-    let succeeded = 0;
-    let failed = 0;
-
-    for (let index = 0; index < total; index++) {
-      const item = items[index];
-      const iterStartedAt = new Date();
-
-      // Tie each iteration child to (parent execution, iterator node, index) so a
-      // re-processed parent (e.g. a future BullMQ retry — see W1.8) reuses the
-      // child it already ran instead of duplicating the iteration's side effects.
-      // Scoped per workflow via the child's @@unique([workflowId, idempotencyKey]).
-      const iterKey = `iterator:${parentExecutionId}:${n.id}:${index}`;
-      const priorChild = await this.prisma.workflowExecution.findFirst({
-        where: { workflowId, idempotencyKey: iterKey },
-        select: { id: true, status: true },
-      });
-      if (priorChild?.status === 'SUCCESS') {
-        // Already completed on a previous attempt — count it and skip re-running.
-        succeeded += 1;
-        continue;
-      }
-
-      const childExecutionId = priorChild
-        ? priorChild.id // prior attempt created it but did not finish — re-run in place
-        : await this.createIterationChild({
-            workflowId,
-            parentExecutionId,
-            item,
-            index,
-            total,
-            isDryRun,
-            iterStartedAt,
-            idempotencyKey: iterKey,
-          });
-
-      await this.events.publishIterationStarted({
-        executionId: parentExecutionId,
-        nodeId: n.id,
-        iterationIndex: index,
-        iterationTotal: total,
-        childExecutionId,
-        startedAt: iterStartedAt,
-      });
-
-      let iterStatus: 'SUCCESS' | 'FAILED' = 'SUCCESS';
-      let iterError: string | undefined;
-
-      if (bodyInfo.bodyNodeIds.size === 0) {
-        // No body — nothing to run for this iteration. The child execution
-        // remains a record of the iteration scope for traceability.
-        iterStatus = 'SUCCESS';
-      } else {
-        const bodyDef = buildBodyDefinition({
-          definition: rootDefinition,
-          iteratorNodeId: n.id,
-          bodyNodeIds: bodyInfo.bodyNodeIds,
-          bodyEntryNodeIds: bodyInfo.bodyEntryNodeIds,
-          syntheticTriggerId: n.id,
-        });
-        const childResult = await this.run({
-          executionId: childExecutionId,
-          workflowId,
-          definition: bodyDef,
-          triggerData: { item, index, total },
-          isDryRun,
-          parentExecutionId,
-          depth: depth + 1,
-          requestId,
-        });
-        iterStatus = childResult.status;
-        iterError = childResult.error;
-      }
-
-      const iterFinishedAt = new Date();
-      const iterDuration = iterFinishedAt.getTime() - iterStartedAt.getTime();
-
-      await this.prisma.workflowExecution.update({
-        where: { id: childExecutionId },
-        data: {
-          status: iterStatus,
-          finishedAt: iterFinishedAt,
-          error: iterError ?? null,
-        },
-      });
-      await this.events.publishIterationCompleted({
-        executionId: parentExecutionId,
-        nodeId: n.id,
-        iterationIndex: index,
-        iterationTotal: total,
-        childExecutionId,
-        startedAt: iterStartedAt,
-        finishedAt: iterFinishedAt,
-        durationMs: iterDuration,
-        status: iterStatus,
-        ...(iterError ? { error: { message: iterError } } : {}),
-      });
-
-      if (iterStatus === 'SUCCESS') {
-        succeeded += 1;
-      } else {
-        failed += 1;
-        if (!parsedConfig.continueOnError) break;
-      }
-    }
-
-    const finishedAt = new Date();
-    const durationMs = finishedAt.getTime() - startedAt.getTime();
-
-    if (failed > 0 && !parsedConfig.continueOnError) {
-      const message = `Iterator failed: iteration ${succeeded} of ${total} reported FAILED`;
-      await this.prisma.executionStep.update({
-        where: { id: step.id },
-        data: {
-          nodeId: n.id,
-          status: 'FAILED',
-          inputData: builtInput.data as object,
-          error: message,
-          finishedAt,
-          durationMs,
-        },
-      });
-      await this.events.publishStepFailed({
-        executionId: parentExecutionId,
-        nodeId: n.id,
-        nodeType: n.type,
-        startedAt,
-        finishedAt,
-        durationMs,
-        input: builtInput.data,
-        error: { message },
-      });
-      return { status: 'FAILED', error: message };
-    }
-
-    const iteratorOutputData = { total, succeeded, failed };
-    const iteratorOutput: NodeOutput = {
-      data: iteratorOutputData,
-      // 'done' branch: only edges leaving the iterator's `done` source-handle
-      // propagate. Body-handle edges have already been consumed via child
-      // executions and must NOT fire again in the parent loop.
-      metadata: { branch: 'done' },
-    };
-
-    await this.prisma.executionStep.update({
-      where: { id: step.id },
-      data: {
-        nodeId: n.id,
-        status: 'SUCCESS',
-        inputData: builtInput.data as object,
-        outputData: iteratorOutputData as object,
-        finishedAt,
-        durationMs,
-      },
-    });
-    await this.events.publishStepCompleted({
-      executionId: parentExecutionId,
-      nodeId: n.id,
-      nodeType: n.type,
-      startedAt,
-      finishedAt,
-      durationMs,
-      input: builtInput.data,
-      output: iteratorOutputData,
-    });
-
-    outputs.set(n.id, iteratorOutput);
-    executionOrder.push(n.id);
-    this.propagateReachability(iteratorOutput, outgoing, reachable, 'success');
-
-    return { status: 'SUCCESS' };
-  }
-
-  // Create one iteration's child execution, tolerating a concurrent attempt that
-  // wins the unique-key race by reusing the row it created.
-  private async createIterationChild(args: {
-    workflowId: string;
-    parentExecutionId: string;
-    item: unknown;
-    index: number;
-    total: number;
-    isDryRun: boolean;
-    iterStartedAt: Date;
-    idempotencyKey: string;
-  }): Promise<string> {
-    try {
-      const child = await this.prisma.workflowExecution.create({
-        data: {
-          workflowId: args.workflowId,
-          parentExecutionId: args.parentExecutionId,
-          status: 'RUNNING',
-          triggerType: 'iterator',
-          triggerData: { item: args.item, index: args.index, total: args.total } as object,
-          isDryRun: args.isDryRun,
-          startedAt: args.iterStartedAt,
-          idempotencyKey: args.idempotencyKey,
-        },
-        select: { id: true },
-      });
-      return child.id;
-    } catch (err) {
-      if (isUniqueViolation(err)) {
-        const winner = await this.prisma.workflowExecution.findFirst({
-          where: { workflowId: args.workflowId, idempotencyKey: args.idempotencyKey },
-          select: { id: true },
-        });
-        if (winner) return winner.id;
-      }
-      throw err;
-    }
   }
 
   private buildContext(
