@@ -18,14 +18,11 @@ contract is documented in [CLAUDE.md §11](../../CLAUDE.md).
   and the sandbox details in
   [apps/worker/src/nodes/actions/code.ts](../worker/src/nodes/actions/code.ts).
 
-## [Deprecated]
+### Removed
 
-- **`POST /v1/workflows/:id/generate-docs`** — sunset **2026-07-04**.
-  - Replaced by `POST /v1/workflows/:id/documentation/regenerate` (explicit
-    regeneration) and `GET /v1/workflows/:id/documentation` (cached read).
-  - Both responses already carry HTTP `Deprecation: true` and
-    `Sunset: Sat, 04 Jul 2026 00:00:00 GMT` headers; clients can detect and
-    migrate without server changes.
-  - Removal tracked in a follow-up GitHub issue (sunset milestone). The route
-    will return `410 Gone` after the sunset date and be removed from the
-    Swagger surface in the same release.
+- **`POST /v1/workflows/:id/generate-docs`** — the deprecated documentation alias
+  has been removed; the route now returns `404`. Use
+  `POST /v1/workflows/:id/documentation/regenerate` (explicit regeneration) and
+  `GET /v1/workflows/:id/documentation` (cached read) instead. Removed ahead of
+  the previously published `2026-07-04` sunset: the SPA already calls the
+  replacements and there are no remaining clients of the alias. (#214)

@@ -82,7 +82,7 @@ A second `[TieTide] health check RECOVERED` email confirms `healthcheck-alert.sh
 ### Detect
 
 - `/v1/health` returns 200 with `"status": "degraded"` and `"ai": "disconnected"`.
-- `POST /v1/workflows/:id/generate-docs` returns 502/503.
+- `POST /v1/workflows/:id/documentation/regenerate` returns 502/503.
 
 ### Diagnose
 
