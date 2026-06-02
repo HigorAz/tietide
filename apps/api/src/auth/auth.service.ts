@@ -1,14 +1,39 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailerService } from '../mailer/mailer.service';
 import type { LoginDto } from './dto/login.dto';
 import type { LoginResponseDto } from './dto/login-response.dto';
 import type { RegisterDto } from './dto/register.dto';
 import type { RegisterResponseDto } from './dto/register-response.dto';
 import type { UserResponseDto } from './dto/user-response.dto';
+import type { VerifyEmailDto } from './dto/verify-email.dto';
 
 const BCRYPT_ROUNDS = 12;
+
+// Verification links are single-use and short-lived.
+export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+// Identical response for every register outcome (new email, taken-but-verified,
+// taken-but-unverified, race loss) so the endpoint cannot be used to enumerate
+// which emails are registered (W2.1).
+const NEUTRAL_REGISTER_RESPONSE: RegisterResponseDto = {
+  message: 'If that email can be used, check your inbox to finish creating your account.',
+};
+
+interface SessionUser {
+  id: string;
+  email: string;
+  role: string;
+  tokenVersion: number;
+}
 
 @Injectable()
 export class AuthService {
@@ -20,57 +45,60 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly mailer: MailerService,
   ) {}
 
   async register(dto: RegisterDto): Promise<RegisterResponseDto> {
+    // Hash unconditionally (even when the email is already taken and we won't
+    // create a user) so the dominant cost is paid on every path and the response
+    // timing does not betray whether the account exists.
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+
     const existing = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      select: { id: true },
+      select: { id: true, emailVerified: true },
     });
-    if (existing) {
-      throw new ConflictException('Email already registered');
-    }
 
-    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    if (existing) {
+      // Never disclose that the email is taken. A still-unverified account gets a
+      // fresh verification link (this doubles as "resend"); a verified one gets a
+      // heads-up that someone tried to register, nudging them to sign in.
+      if (existing.emailVerified) {
+        await this.mailer.sendAlreadyRegisteredEmail(dto.email);
+      } else {
+        await this.issueVerificationToken(existing.id, dto.email);
+      }
+      return NEUTRAL_REGISTER_RESPONSE;
+    }
 
     try {
       const user = await this.prisma.user.create({
-        data: {
-          email: dto.email,
-          name: dto.name,
-          password: passwordHash,
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          createdAt: true,
-        },
+        data: { email: dto.email, name: dto.name, password: passwordHash },
+        select: { id: true },
       });
-      // Auto-login: issue an access token so the SPA can land the user straight
-      // in the app instead of bouncing them to the login screen. A freshly
-      // created user is always at tokenVersion 0 (the column default), so we
-      // embed 0 without re-selecting it (keeps it out of the response body).
-      const accessToken = this.jwt.sign({
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        tokenVersion: 0,
-      });
-      return { ...user, accessToken, tokenType: 'Bearer' };
+      await this.issueVerificationToken(user.id, dto.email);
     } catch (err) {
-      if (this.isUniqueViolation(err)) {
-        throw new ConflictException('Email already registered');
+      // Lost a concurrent create race for the same email — treat it exactly like
+      // the already-registered path so the response stays neutral.
+      if (!this.isUniqueViolation(err)) {
+        throw err;
       }
-      throw err;
     }
+
+    return NEUTRAL_REGISTER_RESPONSE;
   }
 
   async login(dto: LoginDto): Promise<LoginResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
-      select: { id: true, email: true, password: true, role: true, tokenVersion: true },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        role: true,
+        tokenVersion: true,
+        emailVerified: true,
+      },
     });
 
     // Always run a bcrypt comparison — against a dummy hash when the user is
@@ -81,13 +109,51 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const accessToken = this.jwt.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      tokenVersion: user.tokenVersion,
+    // Only block (and thereby reveal "unverified") AFTER the credentials are
+    // confirmed, so this never becomes an enumeration signal for a bad password.
+    if (!user.emailVerified) {
+      throw new ForbiddenException(
+        'Please verify your email before signing in. Check your inbox for the verification link.',
+      );
+    }
+
+    return this.signSession(user);
+  }
+
+  /**
+   * Consume a verification token: marks the user verified and issues a session
+   * (the verification-link click is where auto-login happens, now that register
+   * no longer hands back a token).
+   */
+  async verifyEmail(dto: VerifyEmailDto): Promise<LoginResponseDto> {
+    const tokenHash = createHash('sha256').update(dto.token).digest('hex');
+    const now = new Date();
+
+    const record = await this.prisma.emailVerificationToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true },
     });
-    return { accessToken, tokenType: 'Bearer' };
+    if (!record) {
+      throw new BadRequestException('This verification link is invalid or has expired.');
+    }
+
+    // Atomically consume — single-use AND not expired. A replayed or stale link
+    // flips zero rows and is rejected.
+    const consumed = await this.prisma.emailVerificationToken.updateMany({
+      where: { id: record.id, consumedAt: null, expiresAt: { gt: now } },
+      data: { consumedAt: now },
+    });
+    if (consumed.count !== 1) {
+      throw new BadRequestException('This verification link is invalid or has expired.');
+    }
+
+    const user = await this.prisma.user.update({
+      where: { id: record.userId },
+      data: { emailVerified: true },
+      select: { id: true, email: true, role: true, tokenVersion: true },
+    });
+
+    return this.signSession(user);
   }
 
   /**
@@ -113,6 +179,27 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
     return user;
+  }
+
+  private async issueVerificationToken(userId: string, email: string): Promise<void> {
+    const rawToken = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
+
+    await this.prisma.emailVerificationToken.create({
+      data: { userId, tokenHash, expiresAt },
+    });
+    await this.mailer.sendVerificationEmail(email, rawToken);
+  }
+
+  private signSession(user: SessionUser): LoginResponseDto {
+    const accessToken = this.jwt.sign({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tokenVersion: user.tokenVersion,
+    });
+    return { accessToken, tokenType: 'Bearer' };
   }
 
   private isUniqueViolation(err: unknown): boolean {

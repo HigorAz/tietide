@@ -2,17 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import type { PublicUser } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
 import { initialToastState, useToastStore } from '@/stores/toastStore';
 import { RegisterPage } from './RegisterPage';
-
-const sampleUser: PublicUser = {
-  id: 'user-1',
-  email: 'alice@example.com',
-  name: 'Alice',
-  role: 'USER',
-};
 
 const initialAuthState = useAuthStore.getState();
 
@@ -50,8 +42,8 @@ describe('RegisterPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('should call authStore.register and navigate to the app (/) on success (auto-login)', async () => {
-    const registerMock = vi.fn().mockResolvedValueOnce(sampleUser);
+  it('shows a "check your inbox" confirmation on success and never enters the app', async () => {
+    const registerMock = vi.fn().mockResolvedValueOnce('check your inbox');
     useAuthStore.setState({ register: registerMock });
     const user = userEvent.setup();
 
@@ -69,25 +61,24 @@ describe('RegisterPage', () => {
         password: 'password123',
       });
     });
-    await waitFor(() => {
-      expect(screen.getByText('Dashboard Screen')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('Login Screen')).not.toBeInTheDocument();
+    // No auto-login: a confirmation is shown and the app is not entered.
+    expect(await screen.findByText(/check your inbox/i)).toBeInTheDocument();
+    expect(screen.queryByText('Dashboard Screen')).not.toBeInTheDocument();
   });
 
-  it('should toast an email-already-registered error on 409 responses', async () => {
-    const axiosError = Object.assign(new Error('Conflict'), {
+  it('toasts an actionable error and stays on the form when the request fails', async () => {
+    const networkError = Object.assign(new Error('Network Error'), {
       isAxiosError: true,
-      response: { status: 409 },
+      code: 'ERR_NETWORK',
     });
-    const registerMock = vi.fn().mockRejectedValueOnce(axiosError);
+    const registerMock = vi.fn().mockRejectedValueOnce(networkError);
     useAuthStore.setState({ register: registerMock });
     const user = userEvent.setup();
 
     renderRegister();
 
     await user.type(screen.getByLabelText(/name/i), 'Alice');
-    await user.type(screen.getByLabelText(/email/i), 'taken@example.com');
+    await user.type(screen.getByLabelText(/email/i), 'alice@example.com');
     await user.type(screen.getByLabelText(/password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /create account|sign up|register/i }));
 
@@ -95,10 +86,9 @@ describe('RegisterPage', () => {
       const toasts = useToastStore.getState().toasts;
       expect(toasts).toHaveLength(1);
       expect(toasts[0]).toMatchObject({ tone: 'error' });
-      expect(toasts[0].message).toMatch(/email already registered/i);
     });
-    expect(screen.queryByText('Login Screen')).not.toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    // Stays on the form — no confirmation shown.
+    expect(screen.queryByText(/check your inbox/i)).not.toBeInTheDocument();
   });
 
   it('should render the shared Spinner inside the submit button while creating account', async () => {

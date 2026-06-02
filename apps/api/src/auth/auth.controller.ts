@@ -1,8 +1,9 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
+  ApiBadRequestResponse,
   ApiBearerAuth,
-  ApiConflictResponse,
-  ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
@@ -24,6 +25,7 @@ import { LoginResponseDto } from './dto/login-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RegisterResponseDto } from './dto/register-response.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
 
 @ApiTags('auth')
@@ -38,13 +40,32 @@ export class AuthController {
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
   })
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user (auto-logs in — returns an access token)' })
-  @ApiCreatedResponse({ type: RegisterResponseDto })
-  @ApiConflictResponse({ description: 'Email already registered' })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Register a new user — emails a verification link; returns a neutral message',
+  })
+  @ApiAcceptedResponse({ type: RegisterResponseDto })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async register(@Body() dto: RegisterDto): Promise<RegisterResponseDto> {
     return this.authService.register(dto);
+  }
+
+  @Post('verify-email')
+  @Throttle({
+    [DEFAULT_THROTTLER_NAME]: {
+      ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
+      limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify an email via the emailed token — activates the account and logs in',
+  })
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid or expired verification token' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<LoginResponseDto> {
+    return this.authService.verifyEmail(dto);
   }
 
   @Post('login')
@@ -58,6 +79,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Log in with email + password' })
   @ApiOkResponse({ type: LoginResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
+  @ApiForbiddenResponse({ description: 'Email not verified' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
     return this.authService.login(dto);

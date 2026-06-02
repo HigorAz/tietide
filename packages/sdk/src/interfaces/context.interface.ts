@@ -23,6 +23,11 @@ export interface ExecutionContext {
   // executions started by the API/cron/webhook. Set by the runner so
   // iterator/subworkflow nodes can enforce a recursion-depth limit.
   depth?: number;
+  // Optional, added in @tietide/sdk 2.7.0. The end-to-end correlation id for the
+  // request that started this execution, propagated from the BullMQ job payload.
+  // Logic nodes that spawn child executions (subworkflow/iterator) forward it so
+  // the whole parent->child tree shares one requestId in the logs.
+  requestId?: string;
   getSecret(name: string): Promise<string>;
   getConnection<TConfig = Record<string, unknown>>(
     connectionId: string,

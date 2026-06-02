@@ -17,8 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as the `$nodes` sandbox global. Optional and additive; executors that don't read it
   are unaffected.
 
-> Note: `2.7.0` is reserved by a concurrent branch (`ExecutionContext.requestId?`);
-> this entry intentionally bumps to `2.8.0` to avoid a version collision at merge.
+## [2.7.0] — 2026-05-31
+
+### Added
+
+- `ExecutionContext.requestId?` — the end-to-end correlation id for the request
+  that started the execution, propagated from the BullMQ job payload. Logic nodes
+  that spawn child executions (subworkflow/iterator) forward it so the whole
+  parent→child tree shares one requestId in the logs. Optional and additive;
+  nodes that don't read it are unaffected.
 
 ## [2.6.0] — 2026-05-28
 

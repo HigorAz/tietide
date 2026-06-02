@@ -1,5 +1,10 @@
 import type { ExecutionContext, INestApplication } from '@nestjs/common';
-import { ConflictException, UnauthorizedException, ValidationPipe } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
+  ValidationPipe,
+} from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -12,6 +17,7 @@ describe('AuthController (integration)', () => {
   let authService: {
     register: jest.Mock;
     login: jest.Mock;
+    verifyEmail: jest.Mock;
     getProfile: jest.Mock;
     logout: jest.Mock;
   };
@@ -21,6 +27,7 @@ describe('AuthController (integration)', () => {
     authService = {
       register: jest.fn(),
       login: jest.fn(),
+      verifyEmail: jest.fn(),
       getProfile: jest.fn(),
       logout: jest.fn(),
     };
@@ -65,23 +72,20 @@ describe('AuthController (integration)', () => {
       name: 'Test User',
     };
 
-    it('should return 201 with user data and no password on valid input', async () => {
-      const registered = {
-        id: 'uuid-1',
-        email: validBody.email,
-        name: validBody.name,
-        role: 'USER',
-        createdAt: new Date('2026-04-15T00:00:00Z').toISOString(),
+    it('should return 202 with a neutral message and never an account body (no enumeration)', async () => {
+      const neutral = {
+        message: 'If that email can be used, check your inbox to finish creating your account.',
       };
-      authService.register.mockResolvedValue(registered);
+      authService.register.mockResolvedValue(neutral);
 
       const res = await request(app.getHttpServer())
         .post('/auth/register')
         .send(validBody)
-        .expect(201);
+        .expect(202);
 
-      expect(res.body).toEqual(registered);
-      expect(res.body).not.toHaveProperty('password');
+      expect(res.body).toEqual(neutral);
+      expect(res.body).not.toHaveProperty('accessToken');
+      expect(res.body).not.toHaveProperty('id');
       expect(authService.register).toHaveBeenCalledWith(
         expect.objectContaining({
           email: validBody.email,
@@ -89,15 +93,6 @@ describe('AuthController (integration)', () => {
           name: validBody.name,
         }),
       );
-    });
-
-    it('should return 409 when service throws ConflictException', async () => {
-      authService.register.mockRejectedValue(new ConflictException('Email already registered'));
-
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send({ ...validBody, email: 'dup@example.com' })
-        .expect(409);
     });
 
     it('should return 400 when email format is invalid', async () => {
@@ -146,18 +141,12 @@ describe('AuthController (integration)', () => {
     });
 
     it('should lowercase + trim the email before passing to service', async () => {
-      authService.register.mockResolvedValue({
-        id: 'u',
-        email: 'test@example.com',
-        name: 'T',
-        role: 'USER',
-        createdAt: new Date().toISOString(),
-      });
+      authService.register.mockResolvedValue({ message: 'ok' });
 
       await request(app.getHttpServer())
         .post('/auth/register')
         .send({ email: '  TEST@Example.COM  ', password: 'password123', name: 'T' })
-        .expect(201);
+        .expect(202);
 
       expect(authService.register).toHaveBeenCalledWith(
         expect.objectContaining({ email: 'test@example.com' }),
@@ -215,6 +204,12 @@ describe('AuthController (integration)', () => {
         .expect(401);
     });
 
+    it('should return 403 when the service reports an unverified email', async () => {
+      authService.login.mockRejectedValue(new ForbiddenException('Please verify your email'));
+
+      await request(app.getHttpServer()).post('/auth/login').send(validBody).expect(403);
+    });
+
     it('should return 400 when email format is invalid', async () => {
       await request(app.getHttpServer())
         .post('/auth/login')
@@ -253,6 +248,40 @@ describe('AuthController (integration)', () => {
         .expect(400);
 
       expect(authService.login).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /auth/verify-email', () => {
+    it('should return 200 with an accessToken when the token is valid', async () => {
+      authService.verifyEmail.mockResolvedValue({ accessToken: 'jwt', tokenType: 'Bearer' });
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token: 'a-valid-token-1234567890' })
+        .expect(200);
+
+      expect(res.body).toEqual({ accessToken: 'jwt', tokenType: 'Bearer' });
+      expect(authService.verifyEmail).toHaveBeenCalledWith(
+        expect.objectContaining({ token: 'a-valid-token-1234567890' }),
+      );
+    });
+
+    it('should return 400 when the service rejects an invalid/expired token', async () => {
+      authService.verifyEmail.mockRejectedValue(new BadRequestException('invalid'));
+
+      await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token: 'expired-token-1234567890' })
+        .expect(400);
+    });
+
+    it('should return 400 when the token is missing/too short (DTO validation)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/verify-email')
+        .send({ token: 'short' })
+        .expect(400);
+
+      expect(authService.verifyEmail).not.toHaveBeenCalled();
     });
   });
 

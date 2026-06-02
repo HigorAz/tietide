@@ -26,6 +26,7 @@ describe('CryptoService', () => {
               }
               return config[key] as unknown as T;
             },
+            get: <T>(key: string): T | undefined => config[key] as unknown as T | undefined,
           },
         },
       ],
@@ -131,6 +132,29 @@ describe('CryptoService', () => {
       const second = service.encrypt('world');
 
       expect(() => service.decrypt(first.ciphertext, second.nonce)).toThrow();
+    });
+  });
+
+  describe('master-key rotation', () => {
+    it('decrypts data written under a former key listed in ENCRYPTION_MASTER_KEYS_OLD', async () => {
+      // A secret encrypted before rotation, with what is now the "old" key.
+      const oldService = await buildService({ ENCRYPTION_MASTER_KEY: masterKeyBase64 });
+      const legacy = oldService.encrypt('pre-rotation-secret');
+
+      // Rotate: a fresh primary key, old key retained for decrypt-only.
+      const newKeyBytes = sodium.randombytes_buf(
+        sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES,
+      );
+      const newKeyBase64 = sodium.to_base64(newKeyBytes, sodium.base64_variants.ORIGINAL);
+      const rotated = await buildService({
+        ENCRYPTION_MASTER_KEY: newKeyBase64,
+        ENCRYPTION_MASTER_KEYS_OLD: masterKeyBase64,
+      });
+
+      expect(rotated.decrypt(legacy.ciphertext, legacy.nonce)).toBe('pre-rotation-secret');
+      // New writes use the new primary — the old service can no longer read them.
+      const fresh = rotated.encrypt('post-rotation-secret');
+      expect(() => oldService.decrypt(fresh.ciphertext, fresh.nonce)).toThrow();
     });
   });
 });

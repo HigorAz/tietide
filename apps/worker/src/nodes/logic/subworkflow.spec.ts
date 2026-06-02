@@ -11,7 +11,7 @@ import {
 
 interface PrismaMock {
   workflow: { findFirst: jest.Mock };
-  workflowExecution: { findUnique: jest.Mock; create: jest.Mock };
+  workflowExecution: { findUnique: jest.Mock; findFirst: jest.Mock; create: jest.Mock };
   executionStep: { findFirst: jest.Mock };
 }
 
@@ -46,7 +46,7 @@ describe('SubworkflowAction', () => {
   beforeEach(() => {
     prisma = {
       workflow: { findFirst: jest.fn() },
-      workflowExecution: { findUnique: jest.fn(), create: jest.fn() },
+      workflowExecution: { findUnique: jest.fn(), findFirst: jest.fn(), create: jest.fn() },
       executionStep: { findFirst: jest.fn() },
     };
     engine = { execute: jest.fn(async () => undefined) };
@@ -193,6 +193,92 @@ describe('SubworkflowAction', () => {
 
       await expect(action.execute(baseInput, makeContext())).rejects.toThrow(
         SubworkflowFailedError,
+      );
+    });
+
+    it('should create the child with a deterministic idempotency key scoped to the parent node', async () => {
+      prisma.workflowExecution.findUnique
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
+      prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
+      prisma.workflowExecution.findFirst.mockResolvedValue(null);
+      prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
+      prisma.executionStep.findFirst.mockResolvedValue(null);
+
+      await action.execute(baseInput, makeContext());
+
+      expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            idempotencyKey: `subworkflow:${PARENT_EXEC}:subwf-1`,
+          }),
+        }),
+      );
+    });
+
+    it('should forward the parent requestId to the child engine.execute', async () => {
+      prisma.workflowExecution.findUnique
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
+      prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
+      prisma.workflowExecution.findFirst.mockResolvedValue(null);
+      prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
+      prisma.executionStep.findFirst.mockResolvedValue(null);
+
+      await action.execute(baseInput, makeContext({ requestId: 'req-xyz' }));
+
+      expect(engine.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: 'req-xyz' }),
+      );
+    });
+
+    it('should reuse an already-SUCCESS child from a prior attempt without re-running it', async () => {
+      prisma.workflowExecution.findUnique.mockResolvedValueOnce({
+        id: PARENT_EXEC,
+        workflow: { userId: 'user-a' },
+      });
+      prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
+      // A previous attempt of this same parent execution already ran the child.
+      prisma.workflowExecution.findFirst.mockResolvedValue({
+        id: 'child-prior',
+        status: 'SUCCESS',
+      });
+      prisma.executionStep.findFirst.mockResolvedValueOnce({
+        outputData: { value: { reused: true } },
+      });
+
+      const out = await action.execute(baseInput, makeContext());
+
+      // No duplicate child row, no duplicate side effects.
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(engine.execute).not.toHaveBeenCalled();
+      // Return value comes from the reused child's return step.
+      expect(out.data).toEqual({ reused: true });
+      expect(prisma.executionStep.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ executionId: 'child-prior' }) }),
+      );
+    });
+
+    it('should reuse the existing child row on a P2002 create race instead of failing', async () => {
+      prisma.workflowExecution.findUnique
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
+      prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
+      // First existence check sees nothing; the create then loses the unique race;
+      // the post-catch re-fetch finds the winner.
+      prisma.workflowExecution.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'child-winner', status: 'PENDING' });
+      prisma.workflowExecution.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+      prisma.executionStep.findFirst.mockResolvedValue(null);
+
+      await action.execute(baseInput, makeContext());
+
+      // Ran the winner's child, did not crash on the duplicate.
+      expect(engine.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ executionId: 'child-winner' }),
       );
     });
   });

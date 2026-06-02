@@ -98,15 +98,38 @@ export class ExecutionsService {
         ? (options.triggerData as Prisma.InputJsonValue)
         : undefined;
 
-    const created = await this.prisma.workflowExecution.create({
-      data: {
-        workflowId,
-        status: 'PENDING',
-        triggerType: 'manual',
-        triggerData: triggerDataJson,
-        idempotencyKey: options.idempotencyKey ?? null,
-      },
-    });
+    let created: Awaited<ReturnType<typeof this.prisma.workflowExecution.create>>;
+    try {
+      created = await this.prisma.workflowExecution.create({
+        data: {
+          workflowId,
+          status: 'PENDING',
+          triggerType: 'manual',
+          triggerData: triggerDataJson,
+          idempotencyKey: options.idempotencyKey ?? null,
+        },
+      });
+    } catch (err) {
+      // The pre-create dedup findFirst above is not atomic with this create: a
+      // concurrent trigger carrying the same idempotency key can pass its own
+      // findFirst and create first, leaving us to lose the race on the
+      // @@unique([workflowId, idempotencyKey]) constraint (P2002). Treat that as
+      // a duplicate — return the row the winner created, without enqueuing a
+      // second job. (Null keys never collide: NULLs are distinct in the index.)
+      if (options.idempotencyKey && this.isUniqueViolation(err)) {
+        const winner = await this.prisma.workflowExecution.findFirst({
+          where: { workflowId, idempotencyKey: options.idempotencyKey },
+        });
+        if (winner) {
+          this.log.log(
+            { workflowId, idempotencyKey: options.idempotencyKey, executionId: winner.id },
+            'Concurrent idempotency-key race, returning execution created by the winner',
+          );
+          return this.toResponse(winner);
+        }
+      }
+      throw err;
+    }
 
     const payload: WorkflowExecutionJobPayload = {
       executionId: created.id,
@@ -434,6 +457,15 @@ export class ExecutionsService {
       orderBy: { startedAt: 'asc' },
     });
     return steps.map((s) => this.toStepResponse(s));
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return (
+      typeof err === 'object' &&
+      err !== null &&
+      'code' in err &&
+      (err as { code: unknown }).code === 'P2002'
+    );
   }
 
   private toResponse(row: {

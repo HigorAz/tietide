@@ -19,10 +19,10 @@
 | Wave | Theme                           | Items | Done |
 | ---- | ------------------------------- | ----- | ---- |
 | 0    | Auto-login after register       | 1     | 1    |
-| 1    | Confirmed critical / high       | 8     | 7    |
-| 2    | Medium security                 | 11    | 10   |
-| 3    | Scaling & remaining correctness | 17    | 5    |
-| 4    | Frontend QA / low               | 5     | 0    |
+| 1    | Confirmed critical / high       | 8     | 8    |
+| 2    | Medium security                 | 11    | 11   |
+| 3    | Scaling & remaining correctness | 17    | 17   |
+| 4    | Frontend QA / low               | 5     | 5    |
 | —    | Verified safe (no-fix)          | 3     | n/a  |
 
 ---
@@ -63,15 +63,54 @@
       `prisma migrate deploy` on a live DB._
       Files: `auth.service.ts`, `auth.controller.ts`, `strategies/jwt.strategy.ts`, `schema.prisma`, migration,
       `jwt-auth.guard.spec.ts` (PrismaService stub).
-- [ ] **W1.8** (HIGH / qa) EngineService swallows failures → retry/DLQ dead — re-throw retryable failures so
-      BullMQ attempts/backoff/DLQ work. Files: `apps/worker/src/engine/engine.service.ts`, `workflow.processor.ts`.
-      **DEFERRED**: re-enabling BullMQ retries requires resumable execution first (step checkpointing) or it
-      re-introduces duplicate side-effects on re-run. Do not re-enable retries until step-level resume exists.
+- [x] **W1.8** (HIGH / qa) EngineService swallows failures → retry/DLQ dead — jobs already enqueue with
+      `attempts:3`+exponential backoff and the processor already re-throws, but `EngineService.execute` caught
+      every failure and marked the row FAILED, so BullMQ never saw an error → never retried, never reached the
+      DLQ. Fixed with **step-level resume** (the prerequisite the deferral named) + selective re-throw:
+      (1) **Resume** (`WorkflowRunner`): a BullMQ retry re-processes the SAME `executionId`; the runner now loads
+      the prior `ExecutionStep`s and **reuses the recorded output of every side-effecting ACTION node that already
+      SUCCEEDED** (so the retry does not re-fire it), while dropping and re-running everything else — pure
+      logic/trigger nodes (re-run so a conditional's `metadata.branch`, which is not persisted, is faithfully
+      reproduced) and the node that actually failed. Action nodes are the safe-to-reuse set because they are the
+      side-effecting ones AND route via plain `success` (only `conditional`/`iterator` emit branch metadata, both
+      LOGIC). First attempt has no prior steps → no-op. (2) **Retryable signal**: `RunResult.retryable` —
+      `true` for a node runtime failure, `false` for a structural defect (cycle, unknown node type, recursion
+      limit) that will always re-fail. (3) **Re-throw** (`EngineService`): a retryable failure on a top-level
+      BullMQ job (identified by the processor threading `attemptsAllowed`) is surfaced via `RetryableExecutionError`
+      and the row is **left RUNNING**; the processor's `onFailed` marks it FAILED + publishes the terminal event
+      only once retries are exhausted (reusing the proven `attemptsMade >= attemptsAllowed` gate that already
+      drives the DLQ). Dry-runs, structural failures, and in-process child executions (iterator/subworkflow — no
+      `attemptsAllowed`) keep the original mark-FAILED-and-return path, so subworkflow/iterator semantics are
+      unchanged. Files: `apps/worker/src/engine/workflow-runner.ts`, `engine.service.ts`,
+      `apps/worker/src/processors/workflow.processor.ts` (+ specs).
 
 ## Wave 2 — MEDIUM security
 
-- [~] **W2.1** User enumeration — login is now constant-time (dummy bcrypt on unknown email). Register 409 oracle remains (needs email-verification flow — deferred).
-  File: `auth.service.ts`.
+- [x] **W2.1** User enumeration — login was already constant-time (dummy bcrypt on unknown email); the
+      remaining register **409 oracle is now closed** via a full **email-verification flow**. `register` always
+      responds **202 with a neutral message** ("if that email can be used, check your inbox") for every outcome —
+      new email, taken-but-verified, taken-but-unverified, or a P2002 create-race — so the response no longer
+      reveals whether an account exists; the password is hashed on every path so timing doesn't betray it either.
+      A new email creates an unverified `User` (default `email_verified=false`; existing rows grandfathered to
+      `true` by the migration so they aren't locked out) and emails a single-use, SHA-256-**hashed**, 24h-expiry
+      token (`EmailVerificationToken` table, mirrors the OAuthState anti-replay pattern); a taken-but-unverified
+      email re-sends the link (doubles as resend); a verified one gets a "you already have an account" nudge.
+      `POST /v1/auth/verify-email` atomically consumes the token (`updateMany` single-use + not-expired → count
+      must be 1), marks the user verified, and **issues the session — this is where auto-login now happens** (W0's
+      instant-on-register auto-login is preserved, just moved to the verify-link click, since a token in the
+      register response is itself an enumeration signal). `login` now returns **403** for valid credentials on an
+      unverified account (only after the bcrypt check, so a wrong password still 401s and never reveals verification
+      state). New **MailerService** with a pluggable transport: a **log transport** (writes the email + link to the
+      logs) is the default so dev/CI/registration work with no mail server; **SMTP** (nodemailer, an _optional_ dep,
+      lazily/guarded-imported) activates when `SMTP_HOST` is set. Migration `20260531120000_add_email_verification`
+      (hand-authored — run `prisma migrate deploy`). SPA: register shows a "check your inbox" confirmation (no
+      enumeration via UI); new `/verify-email` page consumes the token and lands the user in the app; login surfaces
+      a "verify your email" message on 403. _Note: a small residual timing difference remains between the create and
+      already-exists paths (extra row writes) — the high-value **status** oracle is closed; full timing-equalisation
+      would need constant-time dummy writes._ Files: `apps/api/prisma/{schema.prisma,migrations/...}`,
+      `apps/api/src/mailer/*`, `apps/api/src/auth/{auth.service,auth.controller,auth.module}.ts` + DTOs,
+      `apps/spa/src/{api/auth.ts,stores/authStore.ts,pages/{RegisterPage,LoginPage,VerifyEmailPage}.tsx,App.tsx}`,
+      `.env.example` (+ specs).
 - [x] **W2.2** Auth throttler IP-only + no trust-proxy — env-driven `TRUST_PROXY` wired in `main.ts` (real client
       IP behind the prod tunnel; never trust-all by default); custom `TieTideThrottlerGuard` (replaces the stock
       global guard) buckets by proxy-aware client IP and, on credential routes, by `ip|email` so one IP can't
@@ -174,34 +213,183 @@
       clamped [1, 3650]); ExecutionSteps cascade-delete via FK. Deletes in 500-row batches (cap 2000 batches/run,
       logs if hit) so no single giant lock. Pure `resolveRetentionDays` + processor unit-tested.
       Files: `apps/worker/src/retention/{retention.config.ts,retention.constants.ts,retention.processor.ts,
-    retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.env.example`.
-- [ ] **W3.6** No metrics — prom-client `/metrics` (queue gauges, duration histograms). API + worker.
-- [ ] **W3.7** Worker no liveness — HTTP liveness/readiness + Docker HEALTHCHECK. Files: `apps/worker/src/main.ts`, Dockerfile.
-- [ ] **W3.8** No prod compose / TLS / secret mgmt — `docker-compose.prod.yml` + nginx TLS. Files: `infra/docker/`.
-- [ ] **W3.9** Idempotency read-then-create races — catch P2002 (manual/poll/cron).
-      Files: `executions.service.ts`, `poll-processor.ts`, `cron-processor.ts`.
-- [ ] **W3.10** Fan-in drops predecessors — merge executed-predecessor outputs keyed by nodeId. File: `workflow-runner.ts`.
-- [ ] **W3.11** Subworkflow/iterator in-process retry dup — tie child re-exec to parent idempotency; propagate requestId.
-      Files: `nodes/logic/subworkflow.ts`, `workflow-runner.ts`.
-- [ ] **W3.12** Conditional CANCELLED vs SKIPPED — distinct status; collapse double write. File: `workflow-runner.ts`.
-- [ ] **W3.13** Count-based poll cursor fragile — stable row identity or regression detection.
-      Files: `sheets-row-added.ts`, `excel-row-added.ts`.
-- [ ] **W3.14** Cron trigger only at nodes[0]; idempotency key drifts — scan all nodes; key on scheduled ts.
-      Files: `cron-trigger.service.ts`, `cron-processor.ts`.
-- [ ] **W3.15** Calendar empty-poll watermark race — pre-request watermark + overlap. File: `calendar-event-created.ts`.
-- [ ] **W3.16** Log redaction gaps — add `value`/`config` paths, stop logging raw `e.response`, recursive audit sanitize,
-      async audit log. Files: `logger.config.ts`, `prisma-connection-resolver.ts`, `audit-log.service.ts`.
-- [ ] **W3.17** Single static master key, no rotation — key-id/version + keyring + re-encrypt migration.
-      File: `packages/crypto/src/crypto-core.ts`. _(May stay documented if too large for MVP.)_
+retention.scheduler.ts,retention.module.ts}` (+ specs), `worker.module.ts`, `.env.example`.
+- [x] **W3.6** No metrics — `prom-client` `/metrics` on both apps. **API**: `MetricsModule` exposes `GET /metrics`
+      (root, excluded from the `/v1` prefix, `@SkipThrottle`) with default process metrics, an
+      `http_request_duration_seconds` histogram (global `HttpMetricsInterceptor`, labelled by matched route so
+      cardinality stays bounded), and `workflow_execution_queue_jobs` gauges (refreshed from BullMQ on scrape).
+      **Worker** (no HTTP layer): a tiny `node:http` server on `METRICS_PORT` (default 9091) serves `/metrics` with
+      default metrics, a `workflow_execution_duration_seconds` histogram (observed in `WorkflowProcessor` by
+      outcome), and the same queue gauges. Both gate on an optional `METRICS_TOKEN` (constant-time bearer; open when
+      unset) since metrics leak operational data. Pure `isMetricsAuthorized` / `resolveMetricsPort` + services +
+      server handler unit-tested.
+      Files: `apps/api/src/metrics/*`, `apps/api/src/{app.module,main}.ts`, `apps/worker/src/metrics/*`,
+      `apps/worker/src/{worker.module,processors/workflow.processor}.ts`, both `package.json`, `.env.example`.
+- [x] **W3.7** Worker no liveness — added `/live` (liveness — always 200, no dependency checks so a transient
+      blip can't get a healthy worker killed) and `/health` (readiness — `WorkerHealthService` pings Postgres via
+      `SELECT 1` and the BullMQ Redis client via `ping`; 200 when both ready, 503 otherwise) to the worker's
+      existing metrics `node:http` server (W3.6); both probes are unauthenticated. Worker `Dockerfile` now `EXPOSE`s
+      the real metrics port (9091, was a stale 9100 placeholder) and gets a `HEALTHCHECK` that probes `/live` via
+      `node` (no curl/wget needed in the alpine runtime). Health service + server routes unit-tested.
+      Files: `apps/worker/src/metrics/{worker-health.service.ts,metrics.server.ts,metrics.module.ts}` (+ specs),
+      `apps/worker/Dockerfile`.
+- [x] **W3.8** No prod compose / TLS / secret mgmt — new standalone `infra/docker/docker-compose.prod.yml`
+      that **builds and wires all four app images** (api/worker/ai/spa) onto the dependency stack behind an
+      **nginx `edge` service that terminates TLS** (Let's Encrypt via a `certbot` companion;
+      `infra/docker/nginx/templates/default.conf.template` routes `/v1/*` + `/webhooks/*` → api, `/*` → spa,
+      with HSTS/X-Frame-Options/COOP headers and Socket.IO upgrade support). PostgreSQL + Valkey get **no
+      `ports:` block** (internal `backend` network only, per `.claude/rules/infrastructure.md`); the AI service
+      and `/metrics` are not proxied (worker metrics bound to `127.0.0.1:${METRICS_PORT}` loopback only);
+      `NODE_ENV=production` is forced on api+worker (activates the W2.9/W2.10 prod hardening); service-name
+      hostnames (`@postgres`, `valkey`, `http://ai:8000`) injected via compose `environment:` overriding the
+      localhost `.env` defaults; `POSTGRES_PASSWORD`/`DOMAIN` fail-fast if unset; SPA API base baked same-origin
+      `/v1` (not the dev `VITE_API_URL`). A `migrate` profile reuses the api **builder** stage (which retains the
+      prisma CLI the slim runtime strips) to run `prisma migrate deploy` — the documented way to apply the three
+      hand-authored migrations on a live DB. Secret mgmt stays `.env`/secret-manager — nothing hardcoded.
+      _Validated with `docker compose config` (the local Docker daemon is down, so container-level `nginx -t`
+      could not run; the template uses only `${DOMAIN}` envsubst and standard proxy directives)._ Files:
+      `infra/docker/docker-compose.prod.yml`, `infra/docker/nginx/templates/default.conf.template`,
+      `infra/docker/nginx/README.md`, `docs/deployment.md`.
+- [x] **W3.9** Idempotency read-then-create races — the three trigger paths all did a non-atomic
+      `findFirst`-then-`create` against `@@unique([workflowId, idempotencyKey])`, so two concurrent
+      triggers carrying the same key both pass the dedup read and the loser crashes on P2002 (or, for the
+      workers, fails the whole tick). Each `create` is now wrapped to catch the unique violation:
+      **manual** (`executions.service.ts`) re-fetches and returns the winner's execution without enqueuing a
+      second job; **cron** (`cron-processor.ts`) logs and returns (the winner already enqueued); **poll**
+      (`poll-processor.ts`) `continue`s to the next item and still advances the cursor (the item is durably
+      handled), distinct from an enqueue failure which rethrows to hold the cursor. Non-P2002 errors rethrow
+      unchanged. Shared pure `isUniqueViolation` helper (`apps/worker/src/common/prisma-error.ts`) backs both
+      workers; the API service keeps a local copy (mirrors the existing provider-webhooks W1.4 pattern).
+      Files: `apps/api/src/executions/executions.service.ts`, `apps/worker/src/poll/poll-processor.ts`,
+      `apps/worker/src/cron/cron-processor.ts`, `apps/worker/src/common/prisma-error.ts` (+ specs).
+- [x] **W3.10** Fan-in drops predecessors — `buildInput` resolved a node's input data from only the _last_
+      executed predecessor (`outputs.get(last)`), so a join/merge node with 2+ in-edges silently lost every
+      branch but one. Now: 0 predecessors → triggerData (unchanged); exactly 1 → that predecessor's output
+      flat (linear-chain passthrough preserved, back-compat); 2+ → outputs merged into one object keyed by
+      source nodeId (`{ <predId>: <output.data>, ... }`) so no branch is dropped. Only predecessors that
+      actually produced output (`outputs.has(id)`) are merged — cancelled/unreached ones are excluded.
+      Template refs `{{nodeId.field}}` were already resolved against the full by-id scope, so they are
+      unaffected. File: `apps/worker/src/engine/workflow-runner.ts` (+ spec: replaced the old "last wins (MVP)"
+      assertion with a keyed-merge assertion, added a single-predecessor flat-passthrough regression test).
+- [x] **W3.11** Subworkflow/iterator in-process retry dup + requestId propagation — both logic nodes spawned a
+      fresh child execution every time they ran, so re-processing a parent execution (a future BullMQ retry —
+      see deferred W1.8) would re-run children and duplicate side effects. Each child is now tied to its parent
+      node via a deterministic idempotencyKey (`subworkflow:<parentExec>:<nodeId>` / `iterator:<parentExec>:
+<nodeId>:<index>`), scoped per target workflow by the existing `@@unique([workflowId, idempotencyKey])`:
+      before spawning, the node looks for an existing child — an already-SUCCESS child is reused without
+      re-running (no duplicate side effects), a prior incomplete child is re-run in place, and the create is
+      P2002-guarded (reuses the winner of a concurrent race). **requestId** is now propagated end-to-end:
+      `ExecutionContext` gained an optional `requestId` (`@tietide/sdk@2.7.0`, additive + CHANGELOG), the runner
+      threads the run's requestId into every node context, and the subworkflow forwards it on the child
+      `engine.execute` (iterator children already received it via `this.run`), so a parent→child execution tree
+      shares one correlation id in the logs. Files: `packages/sdk/src/interfaces/context.interface.ts`,
+      `packages/sdk/CHANGELOG.md` + version bump, `apps/worker/src/nodes/logic/subworkflow.ts`,
+      `apps/worker/src/engine/workflow-runner.ts` (+ subworkflow, runner, and iterator-integration specs).
+- [x] **W3.12** Conditional CANCELLED vs SKIPPED + double write — the runner recorded every non-running node
+      as CANCELLED, conflating "a conditional branched around this node" (normal control flow) with "an upstream
+      failure aborted this path" (an error). A node skipped by a conditional now records **SKIPPED**; CANCELLED
+      is reserved for failure-abandoned paths. The runner tracks each node's final status (`statusByNode`) and,
+      for an unreachable node with no global failure, `classifyUnreached` inspects its incoming edges: an
+      un-fired error-handler edge or a predecessor that FAILED/was CANCELLED ⇒ CANCELLED; a conditional that
+      chose another branch (predecessor SUCCESS) ⇒ SKIPPED. A hard failure with no handler still cancels all
+      remaining nodes. Verified against the existing error-edge tests (un-taken error-handler and
+      success-path-after-failure correctly stay CANCELLED). Also **collapsed the double write**: `recordCancelled`
+      did a redundant create-then-update-to-the-same-status; both it and the new `recordUnreachedSkipped` now do
+      a single terminal create. File: `apps/worker/src/engine/workflow-runner.ts` (+ spec).
+- [x] **W3.13** Count-based poll cursor fragile — both row-count cursors got stuck **high** when a sheet/table
+      shrank (deleted rows): they held the old peak, so every row added until the table re-exceeded that peak was
+      silently dropped. Added **regression detection** that re-baselines the cursor to the current size on a
+      shrink. **Sheets** reads the whole range, so it compares `totalRows < previousCount` directly. **Excel**
+      pages via `$skip`, where an empty page is ambiguous (no-new-rows vs shrink); it now disambiguates only on
+      that empty case with one extra `tables('…')/dataBodyRange?$select=rowCount` probe (a 404 = no data body =
+      0 rows → re-baseline to 0), so the common append/no-change paths stay single-call. _Note: the deeper
+      mid-table-deletion positional drift (a count cursor can't tell a shifted row from a new one) is inherent to
+      count cursors without stable per-row identity, which Sheets/Graph tables don't expose; the high-value
+      stuck-cursor data-loss bug is closed._ Files: `apps/worker/src/nodes/triggers/poll/sheets-row-added.ts`,
+      `apps/worker/src/nodes/triggers/poll/excel-row-added.ts` (+ specs).
+- [x] **W3.14** Cron trigger only at nodes[0] + idempotency key drift — two bugs. (1) `extractCronTrigger`
+      only inspected `definition.nodes[0]`, so any workflow whose cron-trigger node was not first in the array
+      was silently never scheduled; it now scans ALL nodes for the `cron-trigger` type. (2) `computeScheduledFor`
+      keyed the idempotency lock on `job.processedOn` — the worker pickup time, which differs on every
+      attempt/retry, so the same scheduled tick could run twice (each attempt minted a fresh key). It now keys on
+      the SCHEDULED fire time: the BullMQ job-scheduler job id ends in the scheduled epoch millis
+      (`repeat:<key>:<millis>`), parsed via `scheduledMillisFromId`, falling back to the job's enqueue
+      `timestamp` (never `processedOn`), so all attempts of one tick share one stable `cron:<wf>:<iso>` key.
+      Files: `apps/worker/src/cron/cron-trigger.service.ts`, `apps/worker/src/cron/cron-processor.ts` (+ specs).
+- [x] **W3.15** Calendar empty-poll watermark race — on a poll that emitted no events the cursor advanced to
+      `new Date()` captured AFTER the `events.list` response, so an event created while the request was in flight
+      (its `created` falling between the old cursor and that post-response "now") was skipped forever. The
+      watermark is now captured BEFORE the request, minus a 30s overlap that absorbs Google's index lag, and
+      clamped so it never regresses below the current cursor (`max(cursorMs, watermarkMs)`) — closing the race
+      while still moving forward so the same `updatedMin` window isn't refetched indefinitely. Any event the
+      overlapping window re-emits is deduped by the poll-processor's idempotencyKey. File:
+      `apps/worker/src/nodes/triggers/poll/calendar-event-created.ts` (+ spec: a fake-timer test where the
+      mocked request advances the clock 2 min proves the cursor stays at the pre-request watermark).
+- [x] **W3.16** Log redaction gaps — four fixes. (1) Both pino loggers' `REDACT_PATHS` now censor `value`/`config`
+      (Secret/EnvVar plaintext value, connection decrypted-config blob) and their at-rest columns
+      (`configEncrypted`/`configNonce`/`valueEnc`/`valueNonce`), top-level and one-level-nested. (2) The OAuth
+      refresh failure path in `prisma-connection-resolver` logged the raw `e.response` (which carries the request's
+      bearer/refresh token + client secret in headers and possibly token material in the body) — it now logs only
+      `errStatus` (the upstream HTTP status). (3) Audit `sanitizeMetadata` was top-level only, so a secret nested
+      under e.g. `connection.config.accessToken` reached the audit row — it is now a recursive walk over objects
+      AND arrays, with an expanded sensitive-key set (`config`, `accessToken`, `refreshToken`, `*_token`,
+      `client_secret`, the `*Enc`/`*Nonce` columns). (4) `AuditLogService.log` is now fire-and-forget — the write
+      is kicked off synchronously but not awaited, so auditing never adds DB latency to (nor can fail) the request
+      path (it was already best-effort/non-throwing). Files: `apps/{api,worker}/src/common/logger/logger.config.ts`,
+      `apps/worker/src/connections/prisma-connection-resolver.ts`, `apps/api/src/audit/audit-log.service.ts` (+ specs).
+- [x] **W3.17** Single static master key, no rotation — `CryptoCore` is now a **keyring**: the first key is the
+      primary (used for every `encrypt`); additional keys are decrypt-only. Because XChaCha20-Poly1305 is
+      authenticated, `decrypt` tries each key and accepts the one whose tag verifies — so rotation needs **no
+      ciphertext-format change and no migration**. `CryptoService` (api + worker) reads an optional
+      `ENCRYPTION_MASTER_KEYS_OLD` (comma-separated former base64 keys); with it set, it builds the ring via the
+      new `CryptoCore.fromBase64Keyring(primary, [...old])`, otherwise behaviour is identical to before. This
+      enables zero-downtime rotation: deploy a new primary, demote the current key to the old-keys ring, and new
+      writes use the new key while old rows still decrypt. _The optional background **re-encryption migration**
+      (to eventually drop a retired key) is documented as a runbook procedure rather than automated — that piece
+      stays an ops task; removing an old key before its rows are re-encrypted makes them unrecoverable._ Files:
+      `packages/crypto/src/crypto-core.ts`, `apps/{api,worker}/src/crypto/crypto.service.ts`, `.env.example`,
+      `docs/runbook.md` (+ specs).
 
 ## Wave 4 — Frontend QA / low
 
-- [ ] **W4.1** `hydrate()` never called → user lost on refresh — call on mount, gate ProtectedRoute on hydrated flag.
-      Files: `App.tsx`/`RootLayout.tsx`, `ProtectedRoute.tsx`.
-- [ ] **W4.2** No client role guard on admin routes — `AdminRoute`. Files: `ProtectedRoute.tsx`, `App.tsx`.
-- [ ] **W4.3** 401 interceptor hard-reloads — router navigation + session-expired toast. File: `api/client.ts`.
-- [ ] **W4.4** Vague auth error messages — differentiate 429 + network. Files: `LoginPage.tsx`, `RegisterPage.tsx`.
-- [ ] **W4.5** JWT in localStorage (accepted risk) — add CSP to SPA + short TTL (ties W1.7). Files: `authStore.ts`, SPA.
+- [x] **W4.1** `hydrate()` never called → user lost on refresh — the auth store had a `hydrate()` (restore token
+      from localStorage + `getMe()`) that nothing invoked, so after a refresh the token persisted but the `user`
+      object was null forever. `RootLayout` now calls `hydrate()` once on mount; the store gained a `hydrated`
+      flag (set true once hydrate settles, including the no-token and getMe-failure paths), and `hydrate()` now
+      drops an invalid/expired stored token on `getMe` failure so the guard cleanly redirects. `ProtectedRoute`
+      gates on it: no token → `/login`; token present but not yet hydrated → a `role="status"` loading state
+      (no content flash, no premature redirect); hydrated → children. Files: `apps/spa/src/stores/authStore.ts`,
+      `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/components/layout/RootLayout.tsx` (+ tests).
+- [x] **W4.2** No client role guard on admin routes — the `/admin/*` routes sat behind `ProtectedRoute` only
+      (any authenticated user), so a non-admin who navigated there rendered the admin UI and merely saw failed
+      API calls. New `AdminRoute` (in `ProtectedRoute.tsx`) waits for hydration then redirects anyone whose
+      `user.role !== 'ADMIN'` to `/`; `/admin/env-vars` and `/admin/audit` are now wrapped in it (nested inside
+      the existing ProtectedRoute). The backend RolesGuard remains the real authority — this is defense-in-depth + correct UX. Files: `apps/spa/src/components/ProtectedRoute.tsx`, `apps/spa/src/App.tsx` (+ tests).
+- [x] **W4.3** 401 interceptor hard-reloads — the axios response interceptor did `window.location.href =
+'/login'` on every 401, a full-page reload that threw away all in-app state. It now (extracted into a
+      testable `onResponseRejected`) does a **soft logout**: on a 401 _for an authenticated session_ it calls
+      `useAuthStore.logout()` — clearing the token makes `ProtectedRoute` redirect reactively, no reload — and
+      surfaces a session-expired error toast via `useToastStore`. A 401 with no active session (a failed login)
+      is left for the page to handle, and non-401s pass through untouched; the original error is always
+      re-rejected. File: `apps/spa/src/api/client.ts` (+ new `client.test.ts`).
+- [x] **W4.4** Vague auth error messages — both login and register collapsed every non-credential failure into
+      "Something went wrong", so a rate-limited or offline user got no actionable signal. New shared
+      `resolveAuthErrorMessage` (`apps/spa/src/utils/authError.ts`) differentiates **429** ("Too many attempts.
+      Please wait a moment…") and a **no-response / `ERR_NETWORK`** connection failure ("Cannot reach the
+      server. Check your connection…") from a generic server error; each page still handles its own specific
+      status first (login 401 "Invalid credentials", register 409 "Email already registered"). Files:
+      `apps/spa/src/utils/authError.ts`, `apps/spa/src/pages/LoginPage.tsx`, `apps/spa/src/pages/RegisterPage.tsx`
+      (+ helper spec + LoginPage 429/network tests).
+- [x] **W4.5** JWT in localStorage (accepted risk) — the token stays in localStorage (SPA architecture), so the
+      mitigation is to shrink the XSS surface that could read it + limit a stolen token's lifetime. Added a
+      **Content-Security-Policy** (plus `X-Frame-Options: DENY`, `X-Content-Type-Options`, `Referrer-Policy`,
+      COOP) to the SPA's production `nginx.conf`: `default-src 'self'`, `object-src 'none'`,
+      `frame-ancestors 'none'`, scripts/styles restricted to self (+ the Google Fonts origins the app uses),
+      `connect-src 'self' ws: wss:` for the same-origin API + Socket.IO stream. _Deliberately set at the prod
+      nginx layer, NOT as an index.html `<meta>`, because a strict CSP meta would break Vite's dev server (inline
+      scripts/HMR eval)._ Documented a **short access-TTL** recommendation on `JWT_EXPIRES_IN` in `.env.example`,
+      tied to the W1.7 `tokenVersion` revocation (a refresh-token flow to keep short TTLs seamless is a noted
+      follow-up). Files: `apps/spa/nginx.conf`, `.env.example`.
 
 ---
 

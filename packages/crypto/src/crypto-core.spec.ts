@@ -108,4 +108,63 @@ describe('CryptoCore', () => {
       expect(() => coreB.decrypt(ciphertext, nonce)).toThrow();
     });
   });
+
+  describe('keyring (master-key rotation, W3.17)', () => {
+    let newKey: Uint8Array;
+    let oldKey: Uint8Array;
+
+    beforeAll(() => {
+      newKey = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES);
+      oldKey = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_KEYBYTES);
+    });
+
+    it('should still decrypt data written under a former primary key after rotation', () => {
+      // Pre-rotation: a secret was encrypted with the old key.
+      const { ciphertext, nonce } = new CryptoCore(oldKey).encrypt('legacy-secret');
+
+      // Post-rotation: new key is primary, old key kept for decrypt-only.
+      const rotated = new CryptoCore([newKey, oldKey]);
+      expect(rotated.decrypt(ciphertext, nonce)).toBe('legacy-secret');
+    });
+
+    it('should encrypt new data with the primary (first) key only', () => {
+      const rotated = new CryptoCore([newKey, oldKey]);
+      const { ciphertext, nonce } = rotated.encrypt('fresh');
+
+      // Decryptable with the new key, NOT with the old one — proves the primary
+      // key was used for the write.
+      expect(new CryptoCore(newKey).decrypt(ciphertext, nonce)).toBe('fresh');
+      expect(() => new CryptoCore(oldKey).decrypt(ciphertext, nonce)).toThrow();
+    });
+
+    it('should throw when no key in the ring can authenticate the ciphertext', () => {
+      const { ciphertext, nonce } = new CryptoCore(oldKey).encrypt('secret');
+      const ringWithoutOldKey = new CryptoCore([newKey]);
+
+      expect(() => ringWithoutOldKey.decrypt(ciphertext, nonce)).toThrow();
+    });
+
+    it('should reject an empty keyring', () => {
+      expect(() => new CryptoCore([])).toThrow(/at least one key/i);
+    });
+
+    it('fromBase64Keyring should round-trip and decrypt a former-key ciphertext', async () => {
+      const newB64 = sodium.to_base64(newKey, sodium.base64_variants.ORIGINAL);
+      const oldB64 = sodium.to_base64(oldKey, sodium.base64_variants.ORIGINAL);
+
+      const { ciphertext, nonce } = new CryptoCore(oldKey).encrypt('via-base64');
+      const ring = await CryptoCore.fromBase64Keyring(newB64, [oldB64]);
+
+      expect(ring.decrypt(ciphertext, nonce)).toBe('via-base64');
+      const fresh = ring.encrypt('written-now');
+      expect(ring.decrypt(fresh.ciphertext, fresh.nonce)).toBe('written-now');
+    });
+
+    it('fromBase64Keyring should reject a malformed additional key', async () => {
+      const newB64 = sodium.to_base64(newKey, sodium.base64_variants.ORIGINAL);
+      await expect(CryptoCore.fromBase64Keyring(newB64, ['not!valid!base64!!!'])).rejects.toThrow(
+        /base64/i,
+      );
+    });
+  });
 });

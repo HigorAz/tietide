@@ -135,6 +135,26 @@ describe('CalendarEventCreatedTrigger', () => {
     );
   });
 
+  it('advances an empty poll to a PRE-request watermark, not the post-response time', async () => {
+    // The poll starts 5 minutes after the cursor; the API call then "takes" 2
+    // minutes (an event could be created during that window). The empty-poll
+    // cursor must NOT jump to the post-response time (12:07), which would skip any
+    // event created in the request window — it must stay at/below the pre-request
+    // watermark (~12:05) so the next poll re-covers that window.
+    jest.setSystemTime(new Date('2026-05-08T12:05:00.000Z'));
+    calendarClient.events.list.mockImplementation(async () => {
+      jest.advanceTimersByTime(120_000); // request in flight for 2 minutes → now = 12:07
+      return { data: { items: [] } };
+    });
+
+    const result = await trigger.poll(makeCtx('2026-05-08T12:00:00.000Z'));
+
+    expect(result.items).toEqual([]);
+    const cursorMs = new Date(result.newCursor).getTime();
+    expect(cursorMs).toBeLessThanOrEqual(new Date('2026-05-08T12:05:00.000Z').getTime());
+    expect(cursorMs).toBeGreaterThanOrEqual(new Date('2026-05-08T12:00:00.000Z').getTime());
+  });
+
   it('throws ConnectionAuthError on 401 (will be picked up by PollProcessor)', async () => {
     const err = Object.assign(new Error('Token expired'), { response: { status: 401 } });
     calendarClient.events.list.mockRejectedValue(err);

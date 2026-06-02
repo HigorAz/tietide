@@ -1,4 +1,6 @@
-import axios from 'axios';
+import axios, { type AxiosError } from 'axios';
+import { useAuthStore } from '@/stores/authStore';
+import { useToastStore } from '@/stores/toastStore';
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/v1',
@@ -13,13 +15,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('tietide-token');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  },
-);
+// On a 401 for an authenticated session, soft-logout: clearing the auth store makes
+// ProtectedRoute reactively redirect to /login WITHOUT a full-page reload (the old
+// `window.location.href` threw away all SPA state), and surface a session-expired
+// toast. A 401 with no active session (e.g. a failed login attempt) is left for the
+// calling page to handle.
+export function onResponseRejected(error: AxiosError): Promise<never> {
+  if (error.response?.status === 401 && useAuthStore.getState().token) {
+    useAuthStore.getState().logout();
+    useToastStore.getState().show({
+      tone: 'error',
+      message: 'Your session has expired. Please sign in again.',
+    });
+  }
+  return Promise.reject(error);
+}
+
+api.interceptors.response.use((response) => response, onResponseRejected);

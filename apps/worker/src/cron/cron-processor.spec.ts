@@ -14,7 +14,10 @@ interface QueueMock {
   add: jest.Mock;
 }
 
-const buildJob = (overrides: Partial<CronFirePayload> = {}): Job<CronFirePayload> => {
+const buildJob = (
+  overrides: Partial<CronFirePayload> = {},
+  jobOverrides: Partial<Job<CronFirePayload>> = {},
+): Job<CronFirePayload> => {
   const data: CronFirePayload = {
     workflowId: 'wf-1',
     userId: 'user-1',
@@ -22,11 +25,16 @@ const buildJob = (overrides: Partial<CronFirePayload> = {}): Job<CronFirePayload
     ...overrides,
   };
   return {
-    id: 'job-1',
+    // BullMQ job-scheduler job id: ends in the scheduled epoch millis.
+    id: 'repeat:cron:wf-1:1700000000000',
     name: 'cron-fire',
     data,
     opts: { repeat: { pattern: data.expression } },
-    processedOn: 1700000000000,
+    timestamp: 1700000000000,
+    // Processing time deliberately differs from the scheduled time — it must NOT
+    // leak into the idempotency key.
+    processedOn: 1700000005000,
+    ...jobOverrides,
   } as unknown as Job<CronFirePayload>;
 };
 
@@ -96,6 +104,24 @@ describe('CronProcessor', () => {
       );
     });
 
+    it('keys idempotency on the scheduled time, stable across processing-time (processedOn) drift', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: 'wf-1',
+        userId: 'user-1',
+        isActive: true,
+      });
+
+      // Same scheduled tick (same scheduler job id), processed at two very
+      // different wall-clock moments — the dedup key must be identical.
+      await processor.process(buildJob({}, { processedOn: 1700000009999 }));
+      await processor.process(buildJob({}, { processedOn: 1700000088888 }));
+
+      const k1 = prisma.workflowExecution.create.mock.calls[0][0].data.idempotencyKey;
+      const k2 = prisma.workflowExecution.create.mock.calls[1][0].data.idempotencyKey;
+      expect(k1).toBe(k2);
+      expect(k1).toBe(`cron:wf-1:${new Date(1700000000000).toISOString()}`);
+    });
+
     it('should enqueue an execution job to the workflow-execution queue with the userId from DB', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
@@ -151,6 +177,40 @@ describe('CronProcessor', () => {
       await processor.process(buildJob());
 
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(executionQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('should treat a concurrent insert that loses the unique-constraint race (P2002) as a duplicate', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: 'wf-1',
+        userId: 'user-1',
+        isActive: true,
+      });
+      // The pre-create findFirst sees nothing, but a concurrent tick commits the
+      // same cron:<wf>:<ts> key first, so create loses on the unique constraint.
+      prisma.workflowExecution.findFirst.mockResolvedValue(null);
+      prisma.workflowExecution.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      await expect(processor.process(buildJob())).resolves.toBeUndefined();
+
+      // The winner already enqueued the run — we must not enqueue a duplicate.
+      expect(executionQueue.add).not.toHaveBeenCalled();
+    });
+
+    it('should rethrow a non-unique create error so the tick fails and retries', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: 'wf-1',
+        userId: 'user-1',
+        isActive: true,
+      });
+      prisma.workflowExecution.findFirst.mockResolvedValue(null);
+      prisma.workflowExecution.create.mockRejectedValue(
+        Object.assign(new Error('db down'), { code: 'P1001' }),
+      );
+
+      await expect(processor.process(buildJob())).rejects.toThrow('db down');
       expect(executionQueue.add).not.toHaveBeenCalled();
     });
   });

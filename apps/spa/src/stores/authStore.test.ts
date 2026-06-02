@@ -4,14 +4,21 @@ import type { PublicUser } from '@tietide/shared';
 vi.mock('@/api/auth', () => ({
   login: vi.fn(),
   register: vi.fn(),
+  verifyEmail: vi.fn(),
   getMe: vi.fn(),
 }));
 
-import { login as apiLogin, register as apiRegister, getMe as apiGetMe } from '@/api/auth';
+import {
+  login as apiLogin,
+  register as apiRegister,
+  verifyEmail as apiVerifyEmail,
+  getMe as apiGetMe,
+} from '@/api/auth';
 import { useAuthStore, TOKEN_STORAGE_KEY } from './authStore';
 
 const mockedLogin = vi.mocked(apiLogin);
 const mockedRegister = vi.mocked(apiRegister);
+const mockedVerifyEmail = vi.mocked(apiVerifyEmail);
 const mockedGetMe = vi.mocked(apiGetMe);
 
 const sampleUser: PublicUser = {
@@ -22,7 +29,7 @@ const sampleUser: PublicUser = {
 };
 
 const resetStore = (): void => {
-  useAuthStore.setState({ user: null, token: null });
+  useAuthStore.setState({ user: null, token: null, hydrated: false });
   localStorage.clear();
 };
 
@@ -31,6 +38,7 @@ describe('authStore', () => {
     resetStore();
     mockedLogin.mockReset();
     mockedRegister.mockReset();
+    mockedVerifyEmail.mockReset();
     mockedGetMe.mockReset();
   });
 
@@ -63,27 +71,23 @@ describe('authStore', () => {
   });
 
   describe('register', () => {
-    it('should auto-login: store the token, hydrate the user, and return it on success', async () => {
-      mockedRegister.mockResolvedValueOnce({
-        ...sampleUser,
-        accessToken: 'jwt-reg',
-        tokenType: 'Bearer',
-      });
-      mockedGetMe.mockResolvedValueOnce(sampleUser);
+    it('does NOT log in — returns the neutral message and never sets a token', async () => {
+      mockedRegister.mockResolvedValueOnce({ message: 'check your inbox' });
 
       const result = await useAuthStore
         .getState()
         .register({ name: 'Alice', email: 'alice@example.com', password: 'password123' });
 
-      expect(result).toEqual(sampleUser);
+      expect(result).toBe('check your inbox');
       const state = useAuthStore.getState();
-      expect(state.token).toBe('jwt-reg');
-      expect(state.user).toEqual(sampleUser);
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('jwt-reg');
+      expect(state.token).toBeNull();
+      expect(state.user).toBeNull();
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+      expect(mockedGetMe).not.toHaveBeenCalled();
     });
 
-    it('should propagate errors (e.g. 409 duplicate email) without touching state', async () => {
-      const err = new Error('409');
+    it('should propagate errors without touching state', async () => {
+      const err = new Error('500');
       mockedRegister.mockRejectedValueOnce(err);
 
       await expect(
@@ -93,6 +97,30 @@ describe('authStore', () => {
       ).rejects.toBe(err);
 
       expect(useAuthStore.getState().token).toBeNull();
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('stores the token + hydrates the user on success (auto-login)', async () => {
+      mockedVerifyEmail.mockResolvedValueOnce({ accessToken: 'jwt-verify', tokenType: 'Bearer' });
+      mockedGetMe.mockResolvedValueOnce(sampleUser);
+
+      await useAuthStore.getState().verifyEmail('a-token');
+
+      const state = useAuthStore.getState();
+      expect(mockedVerifyEmail).toHaveBeenCalledWith('a-token');
+      expect(state.token).toBe('jwt-verify');
+      expect(state.user).toEqual(sampleUser);
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('jwt-verify');
+    });
+
+    it('does not write a token when verification fails', async () => {
+      mockedVerifyEmail.mockRejectedValueOnce(new Error('400'));
+
+      await expect(useAuthStore.getState().verifyEmail('bad')).rejects.toThrow('400');
+
+      expect(useAuthStore.getState().token).toBeNull();
+      expect(mockedGetMe).not.toHaveBeenCalled();
     });
   });
 
@@ -120,13 +148,28 @@ describe('authStore', () => {
       const state = useAuthStore.getState();
       expect(state.token).toBe('jwt-123');
       expect(state.user).toEqual(sampleUser);
+      expect(state.hydrated).toBe(true);
     });
 
-    it('should be a no-op when no token is stored', async () => {
+    it('should be a no-op when no token is stored, but still mark hydrated', async () => {
       await useAuthStore.getState().hydrate();
 
       expect(mockedGetMe).not.toHaveBeenCalled();
       expect(useAuthStore.getState().token).toBeNull();
+      expect(useAuthStore.getState().hydrated).toBe(true);
+    });
+
+    it('should drop an invalid stored token (and mark hydrated) when getMe fails', async () => {
+      localStorage.setItem(TOKEN_STORAGE_KEY, 'expired-jwt');
+      mockedGetMe.mockRejectedValueOnce(new Error('401 Unauthorized'));
+
+      await useAuthStore.getState().hydrate();
+
+      const state = useAuthStore.getState();
+      expect(state.token).toBeNull();
+      expect(state.user).toBeNull();
+      expect(state.hydrated).toBe(true);
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     });
   });
 });

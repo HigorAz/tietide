@@ -2,7 +2,12 @@
 
 How to deploy TieTide to a self-hosted VPS using Docker Compose.
 
-> **Status**: MVP. The compose file at `infra/docker/docker-compose.yml` provisions only the **stateful dependencies** (PostgreSQL, Valkey, Ollama, ChromaDB, Mailhog). The `api`, `worker`, `spa`, and `ai` apps each ship a `Dockerfile` and are intended to be built and run alongside that stack — production compose extension is the operator's responsibility for now.
+> **Status**: MVP. Two compose files ship:
+>
+> - `infra/docker/docker-compose.yml` (dev) — provisions only the **stateful dependencies** (PostgreSQL, Valkey, Ollama, ChromaDB, Mailhog), all ports published to the host for local development.
+> - `infra/docker/docker-compose.prod.yml` (prod) — a self-contained stack that **builds and wires all four app images** (api, worker, ai, spa) onto the dependencies behind an **nginx edge proxy that terminates TLS**. PostgreSQL and Valkey are **not** published to the host (internal network only). See [§5.5 Production compose](#55-production-compose-recommended) and [`infra/docker/nginx/README.md`](../infra/docker/nginx/README.md) for TLS setup.
+>
+> The manual `docker run` walkthrough (§5) remains valid for operators who prefer running the apps outside compose or behind their own Traefik/nginx-proxy.
 
 ---
 
@@ -266,11 +271,51 @@ docker exec -it tietide-api pnpm --filter @tietide/api prisma migrate deploy
 
 (`migrate deploy` is the production-safe command — it never resets the database, never prompts.)
 
+### 5.5 Production compose (recommended)
+
+Instead of the manual `docker run` steps above, `infra/docker/docker-compose.prod.yml` brings up the **entire stack** — the four app images plus the dependencies — behind an nginx edge proxy that terminates TLS. It is a standalone file (not an overlay on the dev compose), so the database and queue are simply never given a `ports:` block and stay on the internal network.
+
+```bash
+cd /opt/tietide
+COMPOSE="docker compose -f infra/docker/docker-compose.prod.yml --env-file .env"
+
+# 1. DOMAIN + ACME_EMAIL must be set in .env; seed TLS certs first (one-time).
+#    See infra/docker/nginx/README.md §2 for the bootstrap dance.
+
+# 2. Build the four app images.
+$COMPOSE build
+
+# 3. Apply migrations once BEFORE starting the apps (the slim runtime image has no
+#    prisma CLI; the `migrate` profile reuses the api builder stage, which does).
+$COMPOSE --profile migrate run --rm migrate
+
+# 4. Start everything.
+$COMPOSE up -d
+
+# 5. Verify.
+$COMPOSE ps
+curl -fsS https://$DOMAIN/v1/health/live
+```
+
+What the prod compose does differently from the dev compose and the manual run:
+
+| Concern               | How it is handled                                                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Postgres/Valkey ports | **Not published** — reachable only via the internal `backend` network by service name.                                                                            |
+| App ↔ infra hostnames | Set in the compose `environment:` (`DATABASE_URL=…@postgres`, `REDIS_HOST=valkey`, `AI_SERVICE_URL=http://ai:8000`) — overrides the localhost defaults in `.env`. |
+| TLS                   | The `edge` nginx service terminates TLS on 80/443; certs from Let's Encrypt via the `certbot` companion ([nginx/README.md](../infra/docker/nginx/README.md)).     |
+| Worker metrics        | Bound to `127.0.0.1:${METRICS_PORT}` only (loopback) so host-level Prometheus can scrape it without public exposure; gate with `METRICS_TOKEN`.                   |
+| AI service            | No published port and not proxied by the edge — private to the internal network.                                                                                  |
+| SPA API base URL      | Baked as same-origin `/v1` at build time (set `SPA_API_BASE_URL` to override); the dev `VITE_API_URL=localhost` is deliberately **not** used.                     |
+| `NODE_ENV`            | Forced to `production` for api + worker (activates Helmet/CSP/HSTS, CORS enforcement, env validation).                                                            |
+
+`POSTGRES_PASSWORD` and `DOMAIN` are required (the compose fails fast with a clear message if either is unset). Production secrets still come from the `.env` file / your secret manager — nothing is hardcoded in the compose.
+
 ---
 
 ## 6. Reverse proxy + TLS
 
-TieTide expects a reverse proxy in front of the API and SPA — Traefik or nginx-proxy with `acme-companion` are both fine. The minimum routing rules:
+TieTide expects a reverse proxy in front of the API and SPA. The production compose (§5.5) **ships one** — the `edge` nginx service ([`infra/docker/nginx/templates/default.conf.template`](../infra/docker/nginx/templates/default.conf.template)) already implements the routing and headers below, with Let's Encrypt certs via the `certbot` companion. If you are not using the prod compose, Traefik or nginx-proxy with `acme-companion` are equally fine. The minimum routing rules:
 
 | External                                 | Internal           |
 | ---------------------------------------- | ------------------ |
@@ -360,7 +405,7 @@ Before pointing real users at the deployment:
 
 - [ ] All `.env` placeholders replaced — grep for `change-in-production`, `your-`, `base64-encoded-32-byte`.
 - [ ] `JWT_SECRET`, `ENCRYPTION_MASTER_KEY`, `WEBHOOK_HMAC_SECRET`, `BACKUP_ENCRYPTION_KEY` rotated, stored out of band.
-- [ ] PostgreSQL port (5432) and Valkey port (6379) **not** published on the public interface (the dev compose file maps them; either remove the `ports:` block in a `docker-compose.prod.yml` overlay or rely on the firewall).
+- [ ] PostgreSQL port (5432) and Valkey port (6379) **not** published on the public interface — `docker-compose.prod.yml` already omits their `ports:` blocks (internal network only); if you instead run the dev compose, remove those mappings or rely on the firewall.
 - [ ] `CORS_ORIGIN` matches the real frontend domain — no `*`, no `localhost`.
 - [ ] TLS reachable, HSTS preload eligible.
 - [ ] Backup cron scheduled, first dump verified by listing `${BACKUP_DIR}`.

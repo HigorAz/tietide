@@ -98,6 +98,8 @@ const errorEdge = (id: string, source: string, target: string) => ({
 interface PrismaStepMock {
   create: jest.Mock;
   update: jest.Mock;
+  findMany: jest.Mock;
+  deleteMany: jest.Mock;
 }
 
 interface PrismaMock {
@@ -143,6 +145,10 @@ describe('WorkflowRunner', () => {
           ...data,
         })),
         update: jest.fn(async ({ data }: { data: Record<string, unknown> }) => data),
+        // Step-level resume (W1.8): default to "no prior steps" so the first
+        // attempt of every existing test behaves exactly as before.
+        findMany: jest.fn(async () => []),
+        deleteMany: jest.fn(async () => ({ count: 0 })),
       },
     };
 
@@ -193,6 +199,99 @@ describe('WorkflowRunner', () => {
     }).compile();
 
     runner = moduleRef.get(WorkflowRunner);
+  });
+
+  // Step-level resume: a BullMQ retry re-processes the SAME executionId. The
+  // runner must reuse the recorded output of side-effecting ACTION nodes that
+  // already succeeded (so the retry does not re-fire them) while re-running pure
+  // logic/trigger nodes and the node that actually failed (W1.8).
+  describe('step-level resume (W1.8)', () => {
+    it('reuses a prior SUCCESS action node output instead of re-executing it', async () => {
+      const a = makeExecutor('a', async () => ({ data: { value: 'FRESH' } }), 'action');
+      const b = makeExecutor('b', async () => ({ data: { ok: true } }), 'action');
+      registry.register(a);
+      registry.register(b);
+
+      // A already succeeded on the prior attempt with a recorded output.
+      prisma.executionStep.findMany.mockResolvedValue([
+        { id: 'step-A', nodeId: 'A', status: 'SUCCESS', outputData: { value: 'REUSED' } },
+      ]);
+
+      const def: WorkflowDefinition = {
+        nodes: [node('A', 'a'), node('B', 'b')],
+        edges: [edge('e1', 'A', 'B')],
+      };
+
+      const result = await runner.run({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        definition: def,
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      // A is NOT re-executed (no duplicate side effect)...
+      expect(a.execute).not.toHaveBeenCalled();
+      // ...and B receives A's RECORDED output as its input, not a fresh run.
+      expect(b.execute).toHaveBeenCalledTimes(1);
+      expect(b.execute.mock.calls[0][0].data).toEqual({ value: 'REUSED' });
+    });
+
+    it('re-runs a prior SUCCESS logic node so conditional branch routing is reproduced', async () => {
+      // metadata.branch is not persisted, so logic nodes must always re-run.
+      const cond = makeExecutor(
+        'conditional',
+        async () => ({ data: { branch: true }, metadata: { branch: 'true' } }),
+        'logic',
+      );
+      registry.register(cond);
+
+      prisma.executionStep.findMany.mockResolvedValue([
+        { id: 'step-C', nodeId: 'C', status: 'SUCCESS', outputData: { branch: true } },
+      ]);
+
+      const def: WorkflowDefinition = { nodes: [node('C', 'conditional')], edges: [] };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      expect(cond.execute).toHaveBeenCalledTimes(1);
+    });
+
+    it('drops the non-reused prior steps before re-running', async () => {
+      const a = makeExecutor('a', async () => ({ data: {} }), 'action');
+      const b = makeExecutor('b', async () => ({ data: {} }), 'action');
+      registry.register(a);
+      registry.register(b);
+
+      prisma.executionStep.findMany.mockResolvedValue([
+        { id: 'step-A', nodeId: 'A', status: 'SUCCESS', outputData: { kept: true } },
+        { id: 'step-B', nodeId: 'B', status: 'FAILED', outputData: null },
+      ]);
+
+      const def: WorkflowDefinition = {
+        nodes: [node('A', 'a'), node('B', 'b')],
+        edges: [edge('e1', 'A', 'B')],
+      };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      // Keeps A's reusable SUCCESS step, deletes everything else for the execution.
+      expect(prisma.executionStep.deleteMany).toHaveBeenCalledWith({
+        where: { executionId: 'exec-1', id: { notIn: ['step-A'] } },
+      });
+    });
+
+    it('does not reuse or delete anything on a first attempt (no prior steps)', async () => {
+      const a = makeExecutor('a', async () => ({ data: {} }), 'action');
+      registry.register(a);
+      prisma.executionStep.findMany.mockResolvedValue([]);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      expect(a.execute).toHaveBeenCalledTimes(1);
+      expect(prisma.executionStep.deleteMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('run', () => {
@@ -347,9 +446,12 @@ describe('WorkflowRunner', () => {
       expect(result.status).toBe('FAILED');
       expect(result.failedNodeId).toBe('B');
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+      const writes = [
+        ...prisma.executionStep.create.mock.calls,
+        ...prisma.executionStep.update.mock.calls,
+      ].map((c) => c[0].data);
       const statusByNode = new Map<string, string>();
-      for (const u of updates) statusByNode.set(u.nodeId as string, u.status as string);
+      for (const w of writes) statusByNode.set(w.nodeId as string, w.status as string);
       expect(statusByNode.get('A')).toBe('SUCCESS');
       expect(statusByNode.get('B')).toBe('FAILED');
       expect(statusByNode.get('C')).toBe('CANCELLED');
@@ -456,7 +558,7 @@ describe('WorkflowRunner', () => {
       expect(falsePath.execute).not.toHaveBeenCalled();
     });
 
-    it('should create CANCELLED step records for unreachable branch nodes', async () => {
+    it('should record an un-taken conditional branch node as SKIPPED (not CANCELLED)', async () => {
       registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
       registry.register(
         makeExecutor('if', async () => ({ data: {}, metadata: { branch: 'true' } }), 'logic'),
@@ -480,13 +582,45 @@ describe('WorkflowRunner', () => {
 
       await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
-      const falseUpdate = updates.find((u) => u.nodeId === 'FALSE');
-      expect(falseUpdate).toBeDefined();
-      expect(falseUpdate!.status).toBe('CANCELLED');
+      // The branch was not selected — it was skipped, not cancelled by a failure.
+      const creates = prisma.executionStep.create.mock.calls.map((c) => c[0].data);
+      const falseStep = creates.find((s) => s.nodeId === 'FALSE');
+      expect(falseStep).toBeDefined();
+      expect(falseStep!.status).toBe('SKIPPED');
+      // Single terminal write — no redundant follow-up update for the skipped node.
+      const falseUpdate = prisma.executionStep.update.mock.calls
+        .map((c) => c[0].data)
+        .find((u) => u.nodeId === 'FALSE');
+      expect(falseUpdate).toBeUndefined();
     });
 
-    it('should use the last executed predecessor output when node has multiple in-edges (MVP)', async () => {
+    it('should record a CANCELLED node in a single write (no redundant update)', async () => {
+      registry.register(makeExecutor('a'));
+      registry.register(
+        makeExecutor('b', async () => {
+          throw new Error('boom');
+        }),
+      );
+      registry.register(makeExecutor('c'));
+
+      const def: WorkflowDefinition = {
+        nodes: [node('A', 'a'), node('B', 'b'), node('C', 'c')],
+        edges: [edge('e1', 'A', 'B'), edge('e2', 'B', 'C')],
+      };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      const cCreate = prisma.executionStep.create.mock.calls
+        .map((c) => c[0].data)
+        .find((s) => s.nodeId === 'C');
+      expect(cCreate!.status).toBe('CANCELLED');
+      const cUpdate = prisma.executionStep.update.mock.calls
+        .map((c) => c[0].data)
+        .find((u) => u.nodeId === 'C');
+      expect(cUpdate).toBeUndefined();
+    });
+
+    it('should expose ALL executed predecessor outputs via scope on fan-in (no branch dropped, W3.10)', async () => {
       registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
       registry.register(makeExecutor('leftBranch', async () => ({ data: { src: 'left' } })));
       registry.register(makeExecutor('rightBranch', async () => ({ data: { src: 'right' } })));
@@ -512,7 +646,31 @@ describe('WorkflowRunner', () => {
 
       expect(merge.execute).toHaveBeenCalledTimes(1);
       const mergeInput = merge.execute.mock.calls[0][0];
-      expect(['left', 'right']).toContain(mergeInput.data.src);
+      // No branch is dropped: scope carries every predecessor's output keyed by
+      // source nodeId, so a fan-in/join node can read from every branch (the
+      // anti-data-loss guarantee now lives in scope, not in a keyed `data`).
+      expect(mergeInput.scope).toEqual(
+        expect.objectContaining({ L: { src: 'left' }, R: { src: 'right' } }),
+      );
+      // `data` is the flat output of the last-executed predecessor (passthrough contract).
+      expect([{ src: 'left' }, { src: 'right' }]).toContainEqual(mergeInput.data);
+    });
+
+    it('should keep a single predecessor output flat (linear chain passthrough)', async () => {
+      registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
+      registry.register(makeExecutor('producer', async () => ({ data: { value: 42 } })));
+      const consumer = makeExecutor('consumer');
+      registry.register(consumer);
+
+      const def: WorkflowDefinition = {
+        nodes: [node('T', 'trigger'), node('P', 'producer'), node('C', 'consumer')],
+        edges: [edge('e1', 'T', 'P'), edge('e2', 'P', 'C')],
+      };
+
+      await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+      // One predecessor → flat output, NOT keyed by nodeId (back-compat).
+      expect(consumer.execute.mock.calls[0][0].data).toEqual({ value: 42 });
     });
 
     it('should provide ExecutionContext with correct executionId/workflowId/nodeId', async () => {
@@ -527,6 +685,22 @@ describe('WorkflowRunner', () => {
       expect(ctx.executionId).toBe('exec-42');
       expect(ctx.workflowId).toBe('wf-99');
       expect(ctx.nodeId).toBe('A');
+    });
+
+    it('should expose the run requestId on the node ExecutionContext', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+      await runner.run({
+        executionId: 'exec-1',
+        workflowId: 'wf-1',
+        definition: def,
+        requestId: 'req-corr-1',
+      });
+
+      expect(exec.execute.mock.calls[0][1].requestId).toBe('req-corr-1');
     });
 
     it('should delegate context.getSecret to SecretResolver with executionId', async () => {
@@ -1234,9 +1408,12 @@ describe('WorkflowRunner', () => {
       expect(successPath.execute).not.toHaveBeenCalled();
       expect(handler.execute).toHaveBeenCalledTimes(1);
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+      const writes = [
+        ...prisma.executionStep.create.mock.calls,
+        ...prisma.executionStep.update.mock.calls,
+      ].map((c) => c[0].data);
       const statusByNode = new Map<string, string>();
-      for (const u of updates) statusByNode.set(u.nodeId as string, u.status as string);
+      for (const w of writes) statusByNode.set(w.nodeId as string, w.status as string);
       expect(statusByNode.get('S')).toBe('CANCELLED');
       expect(statusByNode.get('H')).toBe('SUCCESS');
     });
@@ -1264,9 +1441,12 @@ describe('WorkflowRunner', () => {
       expect(successPath.execute).toHaveBeenCalledTimes(1);
       expect(handler.execute).not.toHaveBeenCalled();
 
-      const updates = prisma.executionStep.update.mock.calls.map((c) => c[0].data);
+      const writes = [
+        ...prisma.executionStep.create.mock.calls,
+        ...prisma.executionStep.update.mock.calls,
+      ].map((c) => c[0].data);
       const statusByNode = new Map<string, string>();
-      for (const u of updates) statusByNode.set(u.nodeId as string, u.status as string);
+      for (const w of writes) statusByNode.set(w.nodeId as string, w.status as string);
       expect(statusByNode.get('S')).toBe('SUCCESS');
       expect(statusByNode.get('H')).toBe('CANCELLED');
     });

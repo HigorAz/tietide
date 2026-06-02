@@ -10,6 +10,7 @@ import { PollTriggerRegistry } from './poll-trigger.registry';
 import { PollConnectionLoader } from './poll-connection-loader';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import type { PollFirePayload } from './poll-scheduler.service';
+import { isUniqueViolation } from '../common/prisma-error';
 
 const EXECUTION_QUEUE_NAME = 'workflow-execution';
 const EXECUTION_JOB_NAME = 'execute';
@@ -95,15 +96,34 @@ export class PollProcessor extends WorkerHost {
         continue;
       }
 
-      const created = await this.prisma.workflowExecution.create({
-        data: {
-          workflowId,
-          status: 'PENDING',
-          triggerType,
-          triggerData: item as unknown as Prisma.InputJsonValue,
-          idempotencyKey,
-        },
-      });
+      let created: { id: string };
+      try {
+        created = await this.prisma.workflowExecution.create({
+          data: {
+            workflowId,
+            status: 'PENDING',
+            triggerType,
+            triggerData: item as unknown as Prisma.InputJsonValue,
+            idempotencyKey,
+          },
+        });
+      } catch (err) {
+        // The findFirst dedup above is not atomic with this create: an overlapping
+        // tick (a slow poll whose successor already started) can pass its own
+        // findFirst and commit the same idempotencyKey first, so our create loses
+        // on the @@unique([workflowId, idempotencyKey]) constraint (P2002). The
+        // item is durably created + enqueued by the winner, so skip it and keep
+        // going — the cursor still advances at the end (unlike an enqueue failure,
+        // which rethrows below and holds the cursor for an at-least-once re-poll).
+        if (isUniqueViolation(err)) {
+          this.log.log(
+            { workflowId, nodeId, idempotencyKey },
+            'Concurrent poll item lost the idempotency race, skipping duplicate',
+          );
+          continue;
+        }
+        throw err;
+      }
 
       await this.executionQueue.add(
         EXECUTION_JOB_NAME,

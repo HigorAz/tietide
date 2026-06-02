@@ -52,8 +52,9 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // API versioning prefix
-  app.setGlobalPrefix('v1', { exclude: ['health'] });
+  // API versioning prefix. `health` and `metrics` stay at the root so probes and
+  // Prometheus scrapes hit conventional, unversioned paths.
+  app.setGlobalPrefix('v1', { exclude: ['health', 'metrics'] });
 
   // Global validation pipe — whitelist + forbid unknown fields
   app.useGlobalPipes(
