@@ -620,7 +620,7 @@ describe('WorkflowRunner', () => {
       expect(cUpdate).toBeUndefined();
     });
 
-    it('should merge ALL executed predecessor outputs keyed by nodeId on fan-in', async () => {
+    it('should expose ALL executed predecessor outputs via scope on fan-in (no branch dropped, W3.10)', async () => {
       registry.register(makeExecutor('trigger', async () => ({ data: {} }), 'trigger'));
       registry.register(makeExecutor('leftBranch', async () => ({ data: { src: 'left' } })));
       registry.register(makeExecutor('rightBranch', async () => ({ data: { src: 'right' } })));
@@ -646,9 +646,14 @@ describe('WorkflowRunner', () => {
 
       expect(merge.execute).toHaveBeenCalledTimes(1);
       const mergeInput = merge.execute.mock.calls[0][0];
-      // Neither branch is dropped: both predecessor outputs are present, keyed by
-      // their source nodeId, so a fan-in/join node can read from every branch.
-      expect(mergeInput.data).toEqual({ L: { src: 'left' }, R: { src: 'right' } });
+      // No branch is dropped: scope carries every predecessor's output keyed by
+      // source nodeId, so a fan-in/join node can read from every branch (the
+      // anti-data-loss guarantee now lives in scope, not in a keyed `data`).
+      expect(mergeInput.scope).toEqual(
+        expect.objectContaining({ L: { src: 'left' }, R: { src: 'right' } }),
+      );
+      // `data` is the flat output of the last-executed predecessor (passthrough contract).
+      expect([{ src: 'left' }, { src: 'right' }]).toContainEqual(mergeInput.data);
     });
 
     it('should keep a single predecessor output flat (linear chain passthrough)', async () => {

@@ -524,22 +524,13 @@ export class WorkflowRunner {
       const predecessorIds = executionOrder.filter(
         (id) => incoming.some((e) => e.source === id) && outputs.has(id),
       );
-      if (predecessorIds.length === 1) {
-        // Linear chain: the single predecessor's output IS the input data (flat),
-        // preserving the established passthrough contract.
-        data = outputs.get(predecessorIds[0])?.data ?? {};
-      } else if (predecessorIds.length > 1) {
-        // Fan-in: more than one branch feeds this node. Key each predecessor's
-        // output by its source nodeId so no branch is dropped — the previous
-        // "last executed predecessor wins" behavior silently discarded every
-        // predecessor but one. (Template refs `{{nodeId.field}}` already resolve
-        // against the full by-id output scope, so they are unaffected.)
-        const merged: Record<string, unknown> = {};
-        for (const id of predecessorIds) {
-          merged[id] = outputs.get(id)?.data ?? {};
-        }
-        data = merged;
-      }
+      // input.data is the flat output of the LAST executed predecessor (the
+      // established passthrough contract). On fan-in, every predecessor's output
+      // is still exposed to the executor via input.scope (the `$nodes` map) and
+      // `{{nodeId.field}}` template refs, so no branch is lost — W3.10's goal,
+      // now carried by scope rather than by overloading input.data (#260).
+      const lastId = predecessorIds[predecessorIds.length - 1];
+      data = lastId ? (outputs.get(lastId)?.data ?? {}) : {};
     }
     const rawConnectionId = (n.config as { connectionId?: unknown }).connectionId;
     const connectionId = typeof rawConnectionId === 'string' ? rawConnectionId : undefined;
