@@ -18,10 +18,6 @@ export interface WorkflowDocumentationResult {
   generatedAt: Date;
 }
 
-export type LegacyWorkflowDocumentationResult = WorkflowDocumentationResult & {
-  cached: boolean;
-};
-
 interface AuthorizedWorkflow {
   id: string;
   userId: string;
@@ -61,29 +57,6 @@ export class WorkflowDocumentationService {
   async regenerate(userId: string, workflowId: string): Promise<WorkflowDocumentationResult> {
     const workflow = await this.loadAuthorizedWorkflow(userId, workflowId);
     return this.runAiAndUpsert(workflow);
-  }
-
-  async generateLegacy(
-    userId: string,
-    workflowId: string,
-  ): Promise<LegacyWorkflowDocumentationResult> {
-    const workflow = await this.loadAuthorizedWorkflow(userId, workflowId);
-
-    const cached = await this.prisma.workflowDocumentation.findUnique({ where: { workflowId } });
-    if (cached && cached.version === workflow.version) {
-      return {
-        workflowId,
-        version: cached.version,
-        documentation: cached.documentation,
-        sections: cached.sections as unknown as DocumentationSections,
-        model: cached.model,
-        cached: true,
-        generatedAt: cached.updatedAt,
-      };
-    }
-
-    const fresh = await this.runAiAndUpsert(workflow);
-    return { ...fresh, cached: false };
   }
 
   private async loadAuthorizedWorkflow(

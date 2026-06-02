@@ -39,8 +39,3 @@ export class WorkflowDocumentationResponseDto {
   @ApiProperty({ type: String, format: 'date-time' })
   generatedAt!: Date;
 }
-
-export class LegacyWorkflowDocumentationResponseDto extends WorkflowDocumentationResponseDto {
-  @ApiProperty({ description: 'True when result came from cache (workflow unchanged).' })
-  cached!: boolean;
-}

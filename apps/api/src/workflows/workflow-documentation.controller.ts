@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Header,
   Headers,
   HttpCode,
   HttpStatus,
@@ -36,14 +35,7 @@ import {
 } from '../common/throttler/throttler.config';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
-import {
-  LegacyWorkflowDocumentationResponseDto,
-  WorkflowDocumentationResponseDto,
-} from './dto/workflow-documentation-response.dto';
-
-// Sunset date for the deprecated POST /workflows/:id/generate-docs alias.
-// Per CLAUDE.md §11, deprecated endpoints stay for at least one release.
-const LEGACY_SUNSET_HTTP_DATE = new Date('2026-07-04T00:00:00Z').toUTCString();
+import { WorkflowDocumentationResponseDto } from './dto/workflow-documentation-response.dto';
 
 const AI_DOCS_THROTTLE = {
   [DEFAULT_THROTTLER_NAME]: {
@@ -127,32 +119,6 @@ export class WorkflowDocumentationController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<WorkflowDocumentationResponseDto> {
     return this.docs.regenerate(user.id, id);
-  }
-
-  @Post('generate-docs')
-  @Throttle(AI_DOCS_THROTTLE)
-  @HttpCode(HttpStatus.OK)
-  @Header('Deprecation', 'true')
-  @Header('Sunset', LEGACY_SUNSET_HTTP_DATE)
-  @ApiOperation({
-    deprecated: true,
-    summary: 'DEPRECATED — use GET /documentation or POST /documentation/regenerate',
-    description:
-      'Kept for one release for backwards compatibility. New clients should use ' +
-      'GET /workflows/:id/documentation for reads and POST /workflows/:id/documentation/regenerate ' +
-      'for explicit regeneration.',
-  })
-  @ApiOkResponse({ type: LegacyWorkflowDocumentationResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid workflow id' })
-  @ApiNotFoundResponse({ description: 'Workflow not found' })
-  @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
-  @ApiServiceUnavailableResponse({ description: 'AI service temporarily unavailable' })
-  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
-  async generateLegacy(
-    @CurrentUser() user: AuthenticatedUser,
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-  ): Promise<LegacyWorkflowDocumentationResponseDto> {
-    return this.docs.generateLegacy(user.id, id);
   }
 
   private matchesEtag(ifNoneMatch: string, etag: string): boolean {
