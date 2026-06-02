@@ -7,6 +7,7 @@ import { useToastStore } from '@/stores/toastStore';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { resolveAuthErrorMessage } from '@/utils/authError';
+import logoFull from '@/assets/brand/logo-full.png';
 
 const inputClasses = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
@@ -59,7 +60,7 @@ export function LoginPage(): JSX.Element {
   return (
     <div className="flex min-h-screen items-center justify-center bg-deep-blue px-4 py-12">
       <div className="w-full max-w-sm rounded-lg bg-surface p-8 shadow-xl">
-        <img src="/logo.jpg" alt="TieTide" className="mb-4 h-16 w-16 rounded-md" />
+        <img src={logoFull} alt="TieTide" className="mb-4 h-20 w-auto" />
         <h1 className="mb-1 text-2xl font-semibold text-text-primary">Welcome back</h1>
         <p className="mb-6 text-sm text-text-secondary">Sign in to continue to TieTide.</p>
 
