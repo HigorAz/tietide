@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
 import { ExecutionEventsService } from '../events/execution-events.service';
 import { WorkflowRunner } from './workflow-runner';
+import { IteratorExecutor } from './iterator-executor';
 import { SECRET_RESOLVER, type SecretResolver } from './secret-resolver';
 import { ENV_VAR_RESOLVER, type EnvVarResolver } from './env-var-resolver';
 import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/connection-resolver';
@@ -188,6 +189,7 @@ describe('WorkflowRunner', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         WorkflowRunner,
+        IteratorExecutor,
         { provide: NodeRegistry, useValue: registry },
         { provide: PrismaService, useValue: prisma },
         { provide: SECRET_RESOLVER, useValue: secretResolver },
