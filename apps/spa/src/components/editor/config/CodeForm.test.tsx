@@ -44,4 +44,9 @@ describe('CodeForm', () => {
     render(<CodeForm nodeId={NODE_ID} config={{ code: huge, language: 'javascript' }} />);
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
+
+  it('should render the output-sample (data-pill) field', () => {
+    render(<CodeForm nodeId={NODE_ID} config={{ code: 'x', language: 'javascript' }} />);
+    expect(screen.getByTestId('pill-sample-field')).toBeInTheDocument();
+  });
 });

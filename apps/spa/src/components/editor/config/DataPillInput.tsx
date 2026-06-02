@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -8,12 +9,21 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
+import type { TemplateOperator } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import { getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
-
-const TOKEN_RE = /\{\{\s*([^{}]+?)\s*\}\}/g;
-const RESERVED_RE = /^[A-Z][A-Z0-9_]*$/;
+import {
+  appendOperatorAtCaret,
+  buildPillToken,
+  findClosedTokenBeforeCaret,
+  findOpenTokenStart,
+  insertToken,
+  splitSegments,
+  type ClosedTokenSpan,
+} from '@/lib/dataPillToken';
+import { AppendOperatorMenu } from './AppendOperatorMenu';
+import { PillOverlay } from './PillOverlay';
 
 export interface DataPillInputProps {
   value: string;
@@ -25,37 +35,6 @@ export interface DataPillInputProps {
   type?: 'text' | 'url';
   'aria-invalid'?: boolean;
   'aria-describedby'?: string;
-}
-
-interface Segment {
-  kind: 'literal' | 'token' | 'reserved';
-  text: string;
-}
-
-function splitSegments(value: string): Segment[] {
-  const segs: Segment[] = [];
-  let lastIdx = 0;
-  TOKEN_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = TOKEN_RE.exec(value)) !== null) {
-    if (m.index > lastIdx) {
-      segs.push({ kind: 'literal', text: value.slice(lastIdx, m.index) });
-    }
-    const inner = (m[1] ?? '').trim();
-    segs.push({ kind: RESERVED_RE.test(inner) ? 'reserved' : 'token', text: m[0] });
-    lastIdx = m.index + m[0].length;
-  }
-  if (lastIdx < value.length) segs.push({ kind: 'literal', text: value.slice(lastIdx) });
-  return segs;
-}
-
-function findOpenTokenStart(text: string, caret: number): number | null {
-  const before = text.slice(0, caret);
-  const lastOpen = before.lastIndexOf('{{');
-  if (lastOpen < 0) return null;
-  const lastClose = before.lastIndexOf('}}');
-  if (lastClose > lastOpen) return null;
-  return lastOpen;
 }
 
 export function DataPillInput({
@@ -70,14 +49,24 @@ export function DataPillInput({
 }: DataPillInputProps) {
   const nodes = useEditorStore((s) => s.nodes);
   const edges = useEditorStore((s) => s.edges);
+  const setActivePillField = useEditorStore((s) => s.setActivePillField);
 
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [filterText, setFilterText] = useState('');
+  // #258: when the caret sits right after a closed pill, offer an "append operator" menu.
+  const [appendSpan, setAppendSpan] = useState<ClosedTokenSpan | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
+
+  // Live refs so the stable insert callback registered with the store always
+  // reads the current value/onChange without re-registering on every keystroke.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const upstream = useMemo(() => getUpstreamSchemas(nodeId, nodes, edges), [nodeId, nodes, edges]);
 
@@ -110,6 +99,7 @@ export function DataPillInput({
 
   const refreshAutocomplete = (input: HTMLInputElement) => {
     const caret = input.selectionStart ?? input.value.length;
+    setAppendSpan(findClosedTokenBeforeCaret(input.value, caret));
     const tokenStart = findOpenTokenStart(input.value, caret);
     if (tokenStart === null) {
       setOpen(false);
@@ -156,29 +146,50 @@ export function DataPillInput({
     }
   };
 
-  const insertSuggestion = (suggestion: PathSuggestion) => {
-    const input = inputRef.current;
-    const caret = input?.selectionStart ?? value.length;
-    const tokenStart = input ? findOpenTokenStart(input.value, caret) : null;
-    const tokenText = `{{${suggestion.nodeId}.${suggestion.path}}}`.replace(/\.\s*\}\}$/, '}}');
-    let newValue: string;
-    let newCaret: number;
-    if (tokenStart !== null) {
-      newValue = value.slice(0, tokenStart) + tokenText + value.slice(caret);
-      newCaret = tokenStart + tokenText.length;
-    } else {
-      newValue = value.slice(0, caret) + tokenText + value.slice(caret);
-      newCaret = caret + tokenText.length;
-    }
-    onChange(newValue);
-    setOpen(false);
+  // Re-focus the input and place the caret after a programmatic value change.
+  const focusAtCaret = (caret: number) => {
     setTimeout(() => {
       const el = inputRef.current;
       if (!el) return;
       el.focus();
-      el.setSelectionRange(newCaret, newCaret);
+      el.setSelectionRange(caret, caret);
     }, 0);
   };
+
+  const insertSuggestion = (suggestion: PathSuggestion) => {
+    const input = inputRef.current;
+    const caret = input?.selectionStart ?? value.length;
+    const token = buildPillToken(suggestion.nodeId, suggestion.path);
+    const { value: newValue, caret: newCaret } = insertToken(value, token, caret);
+    onChange(newValue);
+    setOpen(false);
+    focusAtCaret(newCaret);
+  };
+
+  // #258: append a chained operator to the closed pill immediately before the caret.
+  const applyAppendOperator = (op: TemplateOperator) => {
+    if (!appendSpan) return;
+    const { value: newValue, caret: newCaret } = appendOperatorAtCaret(value, appendSpan.end, op);
+    onChange(newValue);
+    setAppendSpan(null);
+    focusAtCaret(newCaret);
+  };
+
+  // Stable insert callback registered with the store on focus. The standalone
+  // DataPillPicker invokes it to insert a token at the live caret position.
+  // Reads value/onChange through refs so its identity never changes.
+  const insertAtCaret = useCallback((token: string) => {
+    const el = inputRef.current;
+    const caret = el?.selectionStart ?? valueRef.current.length;
+    const { value: newValue, caret: newCaret } = insertToken(valueRef.current, token, caret);
+    onChangeRef.current(newValue);
+    setTimeout(() => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(newCaret, newCaret);
+    }, 0);
+  }, []);
 
   const handleOptionMouseDown = (e: ReactMouseEvent<HTMLLIElement>, suggestion: PathSuggestion) => {
     e.preventDefault();
@@ -189,52 +200,12 @@ export function DataPillInput({
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
-      <div
-        aria-hidden="true"
-        data-testid="data-pill-overlay"
-        className={cn(
-          // z-10 lifts the syntax-highlighted overlay above the underlying
-          // <input>, which paints its own bg-elevated background. Without it,
-          // the input's bg covered the overlay and the text was invisible
-          // unless selected (selection highlight paints on top regardless).
-          'pointer-events-none absolute inset-0 z-10 whitespace-pre-wrap break-words',
-          'px-3 py-2 text-sm leading-6',
-        )}
-      >
-        {showPlaceholder && placeholder ? (
-          <span className="text-text-muted">{placeholder}</span>
-        ) : (
-          segments.map((seg, i) => {
-            if (seg.kind === 'literal') {
-              return (
-                <span key={i} className="text-text-primary">
-                  {seg.text}
-                </span>
-              );
-            }
-            if (seg.kind === 'reserved') {
-              return (
-                <span
-                  key={i}
-                  data-testid="data-pill-reserved"
-                  className="rounded bg-amber-400/15 px-1 text-amber-300"
-                >
-                  {seg.text}
-                </span>
-              );
-            }
-            return (
-              <span
-                key={i}
-                data-testid="data-pill-chip"
-                className="rounded bg-accent-teal/15 px-1 text-accent-teal"
-              >
-                {seg.text}
-              </span>
-            );
-          })
-        )}
-      </div>
+      <PillOverlay
+        segments={segments}
+        placeholder={placeholder}
+        showPlaceholder={showPlaceholder}
+      />
+
       <input
         ref={inputRef}
         id={id}
@@ -242,8 +213,12 @@ export function DataPillInput({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onFocus={() => setActivePillField({ nodeId, insert: insertAtCaret })}
+        onBlur={() => setActivePillField(null)}
         onKeyUp={(e) => refreshAutocomplete(e.currentTarget)}
         onClick={(e) => refreshAutocomplete(e.currentTarget)}
+        // onSelect tracks caret moves so the #258 append-operator affordance re-evaluates.
+        onSelect={(e) => refreshAutocomplete(e.currentTarget)}
         role="combobox"
         aria-autocomplete="list"
         aria-expanded={open}
@@ -290,6 +265,7 @@ export function DataPillInput({
           ))}
         </ul>
       )}
+      {appendSpan && <AppendOperatorMenu onAppend={applyAppendOperator} />}
     </div>
   );
 }

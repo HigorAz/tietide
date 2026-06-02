@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { Edge, Node } from 'reactflow';
 import { z } from 'zod';
-import { NodeType } from '@tietide/shared';
+import { NodeType, NodeCategory, NODE_CATALOG, getNodeOutputSchema } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { getUpstreamSchemas, walkSchema } from './upstream-schema';
 
@@ -102,6 +102,71 @@ describe('getUpstreamSchemas', () => {
     const result = getUpstreamSchemas('B', nodes, edges);
     expect(result.suggestions.some((s) => s.nodeId === 'B')).toBe(false);
   });
+
+  // The data-pill picker was empty for ~168 node types because only 11 had a
+  // registered output schema. With the generic fallback, every *catalog* node
+  // type now contributes at least a whole-output pill.
+  it('yields at least one suggestion for an upstream catalog node lacking a concrete schema', () => {
+    const nodes = [mkNode('s', NodeType.SLACK_POST_MESSAGE), mkNode('http', NodeType.HTTP_REQUEST)];
+    const edges = [mkEdge('s', 'http')];
+    const result = getUpstreamSchemas('http', nodes, edges);
+    expect(result.suggestions.some((x) => x.nodeId === 's')).toBe(true);
+  });
+
+  it('exposes concrete fields for a trigger upstream (gmail-message-received)', () => {
+    const nodes = [
+      mkNode('g', NodeType.GMAIL_MESSAGE_RECEIVED),
+      mkNode('http', NodeType.HTTP_REQUEST),
+    ];
+    const edges = [mkEdge('g', 'http')];
+    const result = getUpstreamSchemas('http', nodes, edges);
+    const paths = result.suggestions.filter((s) => s.nodeId === 'g').map((s) => s.path);
+    expect(paths).toContain('subject');
+    expect(paths).toContain('from');
+  });
+
+  it('exposes concrete fields for a Discord trigger upstream (the reported bug)', () => {
+    const nodes = [
+      mkNode('d', NodeType.DISCORD_MESSAGE_RECEIVED),
+      mkNode('gmail', NodeType.GMAIL_SEARCH),
+    ];
+    const edges = [mkEdge('d', 'gmail')];
+    const result = getUpstreamSchemas('gmail', nodes, edges);
+    expect(result.suggestions.some((s) => s.nodeId === 'd')).toBe(true);
+  });
+});
+
+describe('getNodeOutputSchema — coverage', () => {
+  it('returns an output schema for every non-annotation catalog node type', () => {
+    const missing = NODE_CATALOG.filter((d) => d.category !== NodeCategory.ANNOTATION)
+      .filter((d) => !getNodeOutputSchema(d.type))
+      .map((d) => d.type);
+    expect(missing).toEqual([]);
+  });
+
+  it('returns undefined for a type that is not in the catalog', () => {
+    expect(getNodeOutputSchema('totally-unknown-type' as NodeType)).toBeUndefined();
+  });
+
+  it('returns concrete (field-bearing) schemas for high-value triggers', () => {
+    const highValue = [
+      NodeType.GMAIL_MESSAGE_RECEIVED,
+      NodeType.SLACK_MESSAGE_RECEIVED,
+      NodeType.DISCORD_MESSAGE_RECEIVED,
+      NodeType.TELEGRAM_MESSAGE_RECEIVED,
+      NodeType.TWILIO_SMS_RECEIVED,
+      NodeType.STRIPE_EVENT_RECEIVED,
+    ];
+    for (const type of highValue) {
+      const schema = getNodeOutputSchema(type);
+      expect(schema, type).toBeDefined();
+      const paths = walkSchema(schema as z.ZodTypeAny).map((p) => p.path);
+      expect(
+        paths.some((p) => p.length > 0),
+        type,
+      ).toBe(true);
+    }
+  });
 });
 
 describe('walkSchema', () => {
@@ -139,5 +204,56 @@ describe('walkSchema', () => {
     type RecSchema = z.ZodType<unknown>;
     const recursive: RecSchema = z.lazy(() => z.object({ next: recursive }));
     expect(() => walkSchema(recursive as z.ZodTypeAny)).not.toThrow();
+  });
+});
+
+describe('getUpstreamSchemas source precedence', () => {
+  // A (http-request: concrete schema + example) -> B (target).
+  const nodes = [
+    mkNode('A', NodeType.HTTP_REQUEST, 'First'),
+    mkNode('B', NodeType.HTTP_REQUEST, 'Second'),
+  ];
+  const edges = [mkEdge('A', 'B')];
+  const pathsForA = (opts?: Parameters<typeof getUpstreamSchemas>[3]): string[] =>
+    getUpstreamSchemas('B', nodes, edges, opts)
+      .suggestions.filter((s) => s.nodeId === 'A')
+      .map((s) => s.path);
+
+  it('uses the concrete static schema over the curated example when no opts given', () => {
+    const paths = pathsForA();
+    // schema exposes `body` as an opaque field; the example would expand `body.result`
+    expect(paths).toContain('body');
+    expect(paths).toContain('statusCode');
+    expect(paths).not.toContain('body.result');
+  });
+
+  it('lets a live output override the static schema', () => {
+    const paths = pathsForA({
+      liveNodes: new Map([['A', { output: { liveOnly: 'y' } }]]),
+    });
+    expect(paths).toEqual(['liveOnly']);
+  });
+
+  it('lets a per-node override beat both live output and the schema', () => {
+    const paths = pathsForA({
+      overrides: { A: { overrideOnly: 'x' } },
+      liveNodes: new Map([['A', { output: { liveOnly: 'y' } }]]),
+    });
+    expect(paths).toEqual(['overrideOnly']);
+  });
+
+  it('ignores a null live output and falls back to the schema', () => {
+    const paths = pathsForA({ liveNodes: new Map([['A', { output: null }]]) });
+    expect(paths).toContain('statusCode');
+  });
+
+  it('only records a Zod type in byNode for schema-sourced nodes', () => {
+    const live = getUpstreamSchemas('B', nodes, edges, {
+      liveNodes: new Map([['A', { output: { liveOnly: 'y' } }]]),
+    });
+    expect(live.byNode.A).toBeUndefined();
+
+    const schema = getUpstreamSchemas('B', nodes, edges);
+    expect(schema.byNode.A).toBeDefined();
   });
 });

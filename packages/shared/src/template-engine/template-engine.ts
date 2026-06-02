@@ -1,27 +1,16 @@
-export class TemplatePathNotFoundError extends Error {
-  public readonly path: string;
-  constructor(path: string) {
-    super(`Template path not found: ${path}`);
-    this.name = 'TemplatePathNotFoundError';
-    this.path = path;
-  }
-}
+import { EnvVarNotFoundError } from './errors.js';
+import { FORBIDDEN_SEGMENTS, evaluateExpression, stringifyValue } from './expression.js';
 
-export class EnvVarNotFoundError extends Error {
-  public readonly key: string;
-  constructor(key: string) {
-    super(`Env var ${key} not found in user or global scope`);
-    this.name = 'EnvVarNotFoundError';
-    this.key = key;
-  }
-}
+// Re-exported so the public surface (and `index.ts`) is unchanged after the errors.ts split.
+export { TemplatePathNotFoundError, EnvVarNotFoundError } from './errors.js';
+// Operator catalog — single source of truth shared with the SPA "append operator" menu.
+export { TEMPLATE_OPERATORS, type TemplateOperator } from './expression.js';
 
 export type EnvScope = ReadonlyMap<string, string>;
 
 export const TEMPLATE_TOKEN_REGEX = /\{\{\s*([^{}]+?)\s*\}\}/g;
 
 const RESERVED_TOKEN_REGEX = /^[A-Z][A-Z0-9_]*$/;
-const FORBIDDEN_SEGMENTS = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function resolveTemplate<T>(
   value: T,
@@ -89,7 +78,7 @@ function resolveString(
       }
     } else {
       const resolved = lookup(scope, tok.path);
-      result += stringifyForInterpolation(resolved);
+      result += stringifyValue(resolved);
     }
     cursor = tok.index + tok.match.length;
   }
@@ -105,36 +94,10 @@ function lookupEnv(envScope: EnvScope, key: string): string {
   return value;
 }
 
+// Resolve a single token expression (path + optional chained operators). Delegates to the
+// expression engine, which is a strict superset of the original dot-walk.
 function lookup(scope: Record<string, unknown>, path: string): unknown {
-  if (path.length === 0) {
-    throw new TemplatePathNotFoundError(path);
-  }
-  const segments = path.split('.');
-  let current: unknown = scope;
-  for (const segment of segments) {
-    if (FORBIDDEN_SEGMENTS.has(segment)) {
-      throw new TemplatePathNotFoundError(path);
-    }
-    if (current === null || current === undefined || typeof current !== 'object') {
-      throw new TemplatePathNotFoundError(path);
-    }
-    const obj = current as Record<string, unknown>;
-    if (!Object.prototype.hasOwnProperty.call(obj, segment)) {
-      throw new TemplatePathNotFoundError(path);
-    }
-    current = obj[segment];
-  }
-  return current;
-}
-
-function stringifyForInterpolation(value: unknown): string {
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return String(value);
-  }
-  return JSON.stringify(value);
+  return evaluateExpression(scope, path);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

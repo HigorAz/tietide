@@ -157,4 +157,9 @@ describe('HttpRequestForm', () => {
     expect(lastCall?.[0]).toBe(NODE_ID);
     expect(lastCall?.[1]).toEqual({ headers: { 'X-Foo': '' } });
   });
+
+  it('should render the output-sample (data-pill) field', () => {
+    render(<HttpRequestForm nodeId={NODE_ID} config={{ method: 'GET', url: 'https://x.com' }} />);
+    expect(screen.getByTestId('pill-sample-field')).toBeInTheDocument();
+  });
 });

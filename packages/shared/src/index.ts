@@ -31,6 +31,11 @@ export {
   NODE_GROUP_LABELS,
 } from './types/node.types.js';
 export { ConnectionType, ConnectionStatus, ConnectionProvider } from './types/connections.types.js';
+export {
+  PILL_SAMPLE_KEY,
+  RESERVED_CONFIG_KEYS,
+  type ReservedConfigKey,
+} from './constants/reserved-config.js';
 
 // Schemas
 export {
@@ -99,12 +104,15 @@ export {
   cronTriggerOutputSchema,
   manualTriggerOutputSchema,
   httpRequestOutputSchema,
+  codeOutputSchema,
   conditionalOutputSchema,
   iteratorOutputSchema,
   subworkflowOutputSchema,
   returnOutputSchema,
   aiNodeOutputSchema,
   nodeOutputSchemas,
+  GENERIC_OUTPUT_SCHEMA,
+  getNodeOutputSchema,
 } from './schemas/node-output.schema.js';
 export {
   loginFormSchema,
@@ -626,5 +634,7 @@ export {
   TemplatePathNotFoundError,
   EnvVarNotFoundError,
   TEMPLATE_TOKEN_REGEX,
+  TEMPLATE_OPERATORS,
+  type TemplateOperator,
   type EnvScope,
 } from './template-engine/template-engine.js';

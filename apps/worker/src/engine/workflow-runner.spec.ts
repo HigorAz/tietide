@@ -1,6 +1,6 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { PinoLogger } from 'nestjs-pino';
-import type { WorkflowDefinition } from '@tietide/shared';
+import { PILL_SAMPLE_KEY, type WorkflowDefinition } from '@tietide/shared';
 import type { INodeExecutor, NodeInput, NodeOutput, ExecutionContext } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { NodeRegistry } from '../nodes/registry';
@@ -801,6 +801,38 @@ describe('WorkflowRunner', () => {
       const input = exec.execute.mock.calls[0][0];
       expect(input.connectionId).toBe('conn-xyz');
       expect(input.params).toEqual({ connectionId: 'conn-xyz', other: 'value' });
+    });
+
+    it('should strip the reserved __pillSample key from executor params', async () => {
+      const exec = makeExecutor('a');
+      registry.register(exec);
+
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'A',
+            type: 'a',
+            name: 'A',
+            position: { x: 0, y: 0 },
+            config: {
+              [PILL_SAMPLE_KEY]: { foo: 'bar' },
+              connectionId: 'conn-xyz',
+              url: 'https://example.com',
+            },
+          },
+        ],
+        edges: [],
+      };
+
+      await runner.run({ executionId: 'exec-pill', workflowId: 'wf-1', definition: def });
+
+      const input = exec.execute.mock.calls[0][0];
+      // The declared output sample feeds only the picker — it must never reach
+      // the executor's params, but the strip is surgical: real config keys and
+      // the lifted connectionId survive untouched.
+      expect(input.params).not.toHaveProperty(PILL_SAMPLE_KEY);
+      expect(input.params).toEqual({ connectionId: 'conn-xyz', url: 'https://example.com' });
+      expect(input.connectionId).toBe('conn-xyz');
     });
 
     it('should leave input.connectionId undefined when node has no connectionId in config', async () => {
@@ -1751,6 +1783,58 @@ describe('WorkflowRunner', () => {
         }),
         expect.any(Object),
       );
+    });
+  });
+
+  describe('upstream scope ($nodes)', () => {
+    it('should populate input.scope with the full upstream { [nodeId]: data } map (Issue #260)', async () => {
+      registry.register(makeExecutor('trigger', async () => ({ data: { t: true } }), 'trigger'));
+      registry.register(makeExecutor('leftBranch', async () => ({ data: { from: 'A', n: 1 } })));
+      registry.register(makeExecutor('rightBranch', async () => ({ data: { from: 'B', n: 2 } })));
+      const merge = makeExecutor('merge');
+      registry.register(merge);
+
+      const def: WorkflowDefinition = {
+        nodes: [
+          node('T', 'trigger'),
+          node('A', 'leftBranch'),
+          node('B', 'rightBranch'),
+          node('M', 'merge'),
+        ],
+        edges: [
+          edge('e1', 'T', 'A'),
+          edge('e2', 'T', 'B'),
+          edge('e3', 'A', 'M'),
+          edge('e4', 'B', 'M'),
+        ],
+      };
+
+      await runner.run({ executionId: 'exec-scope', workflowId: 'wf-1', definition: def });
+
+      expect(merge.execute).toHaveBeenCalledTimes(1);
+      const mergeInput = merge.execute.mock.calls[0][0];
+      // scope exposes EVERY already-executed node's output keyed by id — even
+      // though `data` (flattened last-predecessor) only carries one branch.
+      expect(mergeInput.scope).toEqual(
+        expect.objectContaining({
+          T: { t: true },
+          A: { from: 'A', n: 1 },
+          B: { from: 'B', n: 2 },
+        }),
+      );
+      expect(['A', 'B']).toContain((mergeInput.data as { from?: string }).from);
+    });
+
+    it('should leave input.scope empty for a root node with no predecessors', async () => {
+      const root = makeExecutor('manual-trigger', async () => ({ data: {} }), 'trigger');
+      registry.register(root);
+
+      const def: WorkflowDefinition = { nodes: [node('T', 'manual-trigger')], edges: [] };
+
+      await runner.run({ executionId: 'exec-scope-root', workflowId: 'wf-1', definition: def });
+
+      const rootInput = root.execute.mock.calls[0][0];
+      expect(rootInput.scope).toEqual({});
     });
   });
 

@@ -791,4 +791,44 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().isDirty).toBe(false);
     });
   });
+
+  describe('activePillField', () => {
+    it('defaults to null', () => {
+      expect(useEditorStore.getState().activePillField).toBeNull();
+    });
+
+    it('sets and clears the active pill field', () => {
+      const insert = () => {};
+      useEditorStore.getState().setActivePillField({ nodeId: 'node-1', insert });
+      expect(useEditorStore.getState().activePillField).toEqual({ nodeId: 'node-1', insert });
+
+      useEditorStore.getState().setActivePillField(null);
+      expect(useEditorStore.getState().activePillField).toBeNull();
+    });
+
+    it('is transient: not captured by undo history and untouched by undo/redo', () => {
+      const { addNode, setActivePillField, undo, redo } = useEditorStore.getState();
+      addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const insert = () => {};
+      setActivePillField({ nodeId: 'node-1', insert });
+
+      undo();
+      // undo rewinds nodes but leaves the transient active field in place
+      expect(useEditorStore.getState().nodes).toHaveLength(0);
+      expect(useEditorStore.getState().activePillField).toEqual({ nodeId: 'node-1', insert });
+
+      redo();
+      expect(useEditorStore.getState().nodes).toHaveLength(1);
+      expect(useEditorStore.getState().activePillField).toEqual({ nodeId: 'node-1', insert });
+    });
+
+    it('clears when a workflow is loaded', () => {
+      useEditorStore.getState().setActivePillField({ nodeId: 'node-1', insert: () => {} });
+      useEditorStore.getState().loadWorkflow({
+        id: 'wf-1',
+        definition: { nodes: [], edges: [] },
+      });
+      expect(useEditorStore.getState().activePillField).toBeNull();
+    });
+  });
 });

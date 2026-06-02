@@ -1,7 +1,9 @@
 import type { Edge, Node } from 'reactflow';
 import type { z } from 'zod';
-import { nodeOutputSchemas } from '@tietide/shared';
+import { getNodeOutputSchema, nodeOutputSchemas } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
+import { NODE_OUTPUT_EXAMPLES } from '@/components/editor/preview/nodeOutputExamples';
+import { derivePathsFromSample } from '@/lib/derive-suggestions';
 
 export interface PathSuggestion {
   nodeId: string;
@@ -15,12 +17,25 @@ export interface UpstreamSchemas {
   suggestions: PathSuggestion[];
 }
 
+/**
+ * Optional richer sources for upstream pills. Both are additive — without them
+ * `getUpstreamSchemas` behaves exactly as before (static schema → example →
+ * generic). `liveNodes` is satisfied by the executionLiveStore's node map; only
+ * its `get` accessor is used (read-only, avoids Map invariance at the boundary).
+ */
+export interface UpstreamSchemaOptions {
+  liveNodes?: { get(nodeId: string): { output: unknown } | undefined };
+  /** Per-node sample override keyed by nodeId. Source lands in #259. */
+  overrides?: Record<string, unknown>;
+}
+
 const MAX_DEPTH = 4;
 
 export function getUpstreamSchemas(
   targetNodeId: string,
   nodes: Node<CustomNodeData>[],
   edges: Edge[],
+  options: UpstreamSchemaOptions = {},
 ): UpstreamSchemas {
   const ancestorsByDistance = bfsAncestors(targetNodeId, edges);
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
@@ -31,11 +46,10 @@ export function getUpstreamSchemas(
   for (const ancestorId of ancestorsByDistance) {
     const node = nodeById.get(ancestorId);
     if (!node) continue;
-    const schema = nodeOutputSchemas[node.data.nodeType];
-    if (!schema) continue;
-    byNode[ancestorId] = schema;
+    const entries = resolveEntries(ancestorId, node.data.nodeType, options, byNode);
+    if (entries.length === 0) continue;
     const label = node.data.label || ancestorId;
-    for (const entry of walkSchema(schema)) {
+    for (const entry of entries) {
       suggestions.push({
         nodeId: ancestorId,
         nodeLabel: label,
@@ -46,6 +60,61 @@ export function getUpstreamSchemas(
   }
 
   return { byNode, suggestions };
+}
+
+interface PathEntry {
+  path: string;
+  type: string;
+}
+
+/**
+ * Resolve one ancestor's pill paths by source precedence:
+ *   per-node override → live output → concrete static schema → example → generic.
+ * Sample sources (override/live/example) derive paths from runtime data;
+ * schema sources walk the Zod schema. `byNode` is populated only for the schema
+ * tiers (the only place a concrete Zod type exists).
+ */
+function resolveEntries(
+  ancestorId: string,
+  nodeType: string,
+  options: UpstreamSchemaOptions,
+  byNode: Record<string, z.ZodTypeAny>,
+): PathEntry[] {
+  const override = options.overrides?.[ancestorId];
+  if (override !== undefined && override !== null) {
+    return derivePathsFromSample(override);
+  }
+
+  const liveOutput = options.liveNodes?.get(ancestorId)?.output;
+  if (liveOutput !== undefined && liveOutput !== null) {
+    return derivePathsFromSample(liveOutput);
+  }
+
+  // Concrete, field-bearing schema beats the curated example so high-value
+  // nodes show their real shape.
+  const concrete = nodeOutputSchemas[nodeType];
+  if (concrete) {
+    byNode[ancestorId] = concrete;
+    return walkSchema(concrete);
+  }
+
+  // Example fallback for types lacking a concrete schema (currently shadowed by
+  // concrete schemas, but kept so a future example-only type derives real paths
+  // before dropping to the generic record pill).
+  const example = NODE_OUTPUT_EXAMPLES[nodeType];
+  if (example !== undefined) {
+    return derivePathsFromSample(example);
+  }
+
+  // Generic whole-output schema for catalog types without anything richer, so
+  // every upstream node still offers at least one pill. Unknown types → none.
+  const generic = getNodeOutputSchema(nodeType);
+  if (generic) {
+    byNode[ancestorId] = generic;
+    return walkSchema(generic);
+  }
+
+  return [];
 }
 
 export function bfsAncestors(targetNodeId: string, edges: Edge[]): string[] {

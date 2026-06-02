@@ -7,6 +7,7 @@ import {
   NODE_CATALOG,
   NodeCategory,
   NodeType,
+  RESERVED_CONFIG_KEYS,
   iteratorConfigSchema,
   resolveTemplate,
   type EnvScope,
@@ -44,6 +45,20 @@ function extractErrorCode(err: unknown): string | undefined {
     if (typeof code === 'string') return code;
   }
   return undefined;
+}
+
+/**
+ * Drop editor-only reserved keys (e.g. the data-pill `__pillSample`) from a node
+ * config so they never reach an executor's params. Returns the original object
+ * untouched when no reserved key is present (avoids needless allocation).
+ */
+function stripReservedConfigKeys(config: Record<string, unknown>): Record<string, unknown> {
+  if (!RESERVED_CONFIG_KEYS.some((key) => key in config)) return config;
+  const sanitized: Record<string, unknown> = { ...config };
+  for (const key of RESERVED_CONFIG_KEYS) {
+    delete sanitized[key];
+  }
+  return sanitized;
 }
 
 export interface RunArgs {
@@ -488,7 +503,9 @@ export class WorkflowRunner {
       string,
       unknown
     >;
-    return { ...input, params: resolvedParams };
+    // Surface the same upstream scope that drove template resolution so executors
+    // (e.g. the Code node's `$nodes`) can read sibling/ancestor outputs directly.
+    return { ...input, params: resolvedParams, scope };
   }
 
   private buildInput(
@@ -526,7 +543,10 @@ export class WorkflowRunner {
     }
     const rawConnectionId = (n.config as { connectionId?: unknown }).connectionId;
     const connectionId = typeof rawConnectionId === 'string' ? rawConnectionId : undefined;
-    return connectionId ? { data, params: n.config, connectionId } : { data, params: n.config };
+    // Reserved keys (e.g. the data-pill `__pillSample`) live on the node config
+    // for the editor only — strip them so they never reach the executor's params.
+    const params = stripReservedConfigKeys(n.config);
+    return connectionId ? { data, params, connectionId } : { data, params };
   }
 
   private propagateReachability(
