@@ -149,6 +149,17 @@ describe('DataPillInput', () => {
     expect(last).toMatch(/\{\{steps\.first_http\.[^}]+\}\}/);
   });
 
+  it('toggles between a single-line input and a multi-line textarea', () => {
+    render(<DataPillInput nodeId={TARGET_ID} value="some long value" onChange={vi.fn()} />);
+    expect(screen.getByRole('combobox').tagName).toBe('INPUT');
+
+    fireEvent.click(screen.getByTestId('data-pill-expand-toggle'));
+    expect(screen.getByRole('combobox').tagName).toBe('TEXTAREA');
+
+    fireEvent.click(screen.getByTestId('data-pill-expand-toggle'));
+    expect(screen.getByRole('combobox').tagName).toBe('INPUT');
+  });
+
   it('closes the autocomplete on Escape without inserting', () => {
     const { nodes, edges } = seedGraph();
     useEditorStore.setState({ nodes, edges });

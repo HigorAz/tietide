@@ -8,7 +8,11 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type RefObject,
+  type SyntheticEvent,
+  type UIEvent as ReactUIEvent,
 } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import type { TemplateOperator } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
@@ -25,6 +29,8 @@ import {
 import { humanizePath } from '@/lib/humanize-path';
 import { AppendOperatorMenu } from './AppendOperatorMenu';
 import { PillOverlay } from './PillOverlay';
+
+type FieldElement = HTMLInputElement | HTMLTextAreaElement;
 
 export interface DataPillInputProps {
   value: string;
@@ -55,10 +61,15 @@ export function DataPillInput({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [filterText, setFilterText] = useState('');
+  // Expandable field: collapsed = single-line <input>, expanded = multi-line
+  // <textarea>. Both share the same caret/value handlers (selectionStart works
+  // on either), so autocomplete and the pill inserter behave identically.
+  const [expanded, setExpanded] = useState(false);
   // #258: when the caret sits right after a closed pill, offer an "append operator" menu.
   const [appendSpan, setAppendSpan] = useState<ClosedTokenSpan | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<FieldElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
 
@@ -98,7 +109,7 @@ export function DataPillInput({
     if (activeIndex >= suggestions.length) setActiveIndex(0);
   }, [suggestions.length, activeIndex]);
 
-  const refreshAutocomplete = (input: HTMLInputElement) => {
+  const refreshAutocomplete = (input: FieldElement) => {
     const caret = input.selectionStart ?? input.value.length;
     setAppendSpan(findClosedTokenBeforeCaret(input.value, caret));
     const tokenStart = findOpenTokenStart(input.value, caret);
@@ -116,12 +127,12 @@ export function DataPillInput({
     setOpen(true);
   };
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<FieldElement>) => {
     onChange(e.target.value);
     refreshAutocomplete(e.target);
   };
 
-  const handleKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: ReactKeyboardEvent<FieldElement>) => {
     if (!open) return;
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -197,45 +208,88 @@ export function DataPillInput({
     insertSuggestion(suggestion);
   };
 
+  // Keep the highlight overlay aligned with the field as it scrolls (horizontally
+  // when collapsed, vertically when expanded past its rows).
+  const syncScroll = (el: FieldElement): void => {
+    const o = overlayRef.current;
+    if (!o) return;
+    o.scrollTop = el.scrollTop;
+    o.scrollLeft = el.scrollLeft;
+  };
+  const refreshFromEvent = (e: SyntheticEvent<FieldElement>): void =>
+    refreshAutocomplete(e.currentTarget);
+  const onScroll = (e: ReactUIEvent<FieldElement>): void => syncScroll(e.currentTarget);
+
   const showPlaceholder = value.length === 0;
+
+  const commonProps = {
+    id,
+    value,
+    onChange: handleChange,
+    onKeyDown: handleKeyDown,
+    onFocus: () => setActivePillField({ nodeId, insert: insertAtCaret }),
+    onBlur: () => setActivePillField(null),
+    onKeyUp: refreshFromEvent,
+    onClick: refreshFromEvent,
+    // onSelect tracks caret moves so the #258 append-operator affordance re-evaluates.
+    onSelect: refreshFromEvent,
+    onScroll,
+    role: 'combobox' as const,
+    'aria-autocomplete': 'list' as const,
+    'aria-expanded': open,
+    'aria-controls': listboxId,
+    'aria-activedescendant':
+      open && suggestions[activeIndex] ? `${listboxId}-${activeIndex}` : undefined,
+    autoComplete: 'off',
+    spellCheck: false,
+  };
+
+  const fieldClass = cn(
+    'relative w-full rounded-md border border-white/5 bg-elevated py-2 pl-3 pr-8 text-sm leading-6',
+    'text-transparent caret-text-primary',
+    'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+  );
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
       <PillOverlay
+        overlayRef={overlayRef}
         segments={segments}
         placeholder={placeholder}
         showPlaceholder={showPlaceholder}
+        multiline={expanded}
       />
 
-      <input
-        ref={inputRef}
-        id={id}
-        type={type ?? 'text'}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setActivePillField({ nodeId, insert: insertAtCaret })}
-        onBlur={() => setActivePillField(null)}
-        onKeyUp={(e) => refreshAutocomplete(e.currentTarget)}
-        onClick={(e) => refreshAutocomplete(e.currentTarget)}
-        // onSelect tracks caret moves so the #258 append-operator affordance re-evaluates.
-        onSelect={(e) => refreshAutocomplete(e.currentTarget)}
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={open}
-        aria-controls={listboxId}
-        aria-activedescendant={
-          open && suggestions[activeIndex] ? `${listboxId}-${activeIndex}` : undefined
-        }
-        autoComplete="off"
-        spellCheck={false}
-        className={cn(
-          'relative w-full rounded-md border border-white/5 bg-elevated px-3 py-2 text-sm leading-6',
-          'text-transparent caret-text-primary',
-          'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-        )}
-        {...rest}
-      />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={expanded ? 'Collapse field' : 'Expand field'}
+        data-testid="data-pill-expand-toggle"
+        // preventDefault keeps the field from blurring (which would close the picker).
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setExpanded((v) => !v)}
+        className="absolute right-1.5 top-1.5 z-20 rounded p-0.5 text-text-muted hover:text-text-primary focus:outline-none"
+      >
+        {expanded ? <Minimize2 size={13} aria-hidden /> : <Maximize2 size={13} aria-hidden />}
+      </button>
+
+      {expanded ? (
+        <textarea
+          ref={inputRef as RefObject<HTMLTextAreaElement>}
+          rows={6}
+          {...commonProps}
+          className={cn(fieldClass, 'resize-none')}
+          {...rest}
+        />
+      ) : (
+        <input
+          ref={inputRef as RefObject<HTMLInputElement>}
+          type={type ?? 'text'}
+          {...commonProps}
+          className={fieldClass}
+          {...rest}
+        />
+      )}
       {open && suggestions.length > 0 && (
         <ul
           id={listboxId}
