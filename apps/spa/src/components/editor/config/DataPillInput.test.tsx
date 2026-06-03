@@ -149,6 +149,29 @@ describe('DataPillInput', () => {
     expect(last).toMatch(/\{\{steps\.first_http\.[^}]+\}\}/);
   });
 
+  it('renders a reference to a missing node as an invalid (red) chip', () => {
+    const token = '{{steps.ghost.statusCode}}';
+    // The token must live in the node's stored config — that's what the
+    // reference validator inspects to decide which pills are broken.
+    useEditorStore.setState({
+      nodes: [
+        mkNode('http-1', NodeType.HTTP_REQUEST, 'First HTTP'),
+        {
+          ...mkNode(TARGET_ID, NodeType.HTTP_REQUEST, 'Second HTTP'),
+          data: {
+            label: 'Second HTTP',
+            nodeType: NodeType.HTTP_REQUEST,
+            config: { url: token },
+          },
+        },
+      ],
+      edges: [mkEdge('http-1', TARGET_ID)],
+    });
+    render(<DataPillInput nodeId={TARGET_ID} value={`x ${token} y`} onChange={() => {}} />);
+    expect(screen.getByTestId('data-pill-invalid')).toBeInTheDocument();
+    expect(screen.queryByTestId('data-pill-chip')).not.toBeInTheDocument();
+  });
+
   it('toggles between a single-line input and a multi-line textarea', () => {
     render(<DataPillInput nodeId={TARGET_ID} value="some long value" onChange={vi.fn()} />);
     expect(screen.getByRole('combobox').tagName).toBe('INPUT');

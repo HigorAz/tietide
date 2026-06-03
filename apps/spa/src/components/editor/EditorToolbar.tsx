@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  AlertTriangle,
   ArrowLeft,
   Download,
   FileText,
@@ -12,6 +13,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import { useEditorStore } from '@/stores/editorStore';
+import { findInvalidReferences } from '@/lib/validate-references';
 import { useToastStore } from '@/stores/toastStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { useDocumentationStore } from '@/stores/documentationStore';
@@ -32,6 +34,8 @@ interface EditorToolbarProps {
 export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const isDirty = useEditorStore((s) => s.isDirty);
   const nodeCount = useEditorStore((s) => s.nodes.length);
+  const nodes = useEditorStore((s) => s.nodes);
+  const edges = useEditorStore((s) => s.edges);
   const past = useEditorStore((s) => s.past);
   const future = useEditorStore((s) => s.future);
   const undo = useEditorStore((s) => s.undo);
@@ -122,10 +126,16 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
     }
   }, [regenerateDocs, toast, workflowId]);
 
+  // Block save/run/test while any data pill points at a deleted/invalid node —
+  // the red pills must be fixed first (referential integrity).
+  const invalidCount = useMemo(() => findInvalidReferences(nodes, edges).length, [nodes, edges]);
+  const hasInvalid = invalidCount > 0;
+  const invalidMessage = `${invalidCount} data-pill reference${invalidCount > 1 ? 's' : ''} point to a deleted/invalid node — fix the red pills to save or run.`;
+
   const docsDisabled = docStatus === 'loading';
-  const saveDisabled = !isDirty || isSaving;
-  const runDisabled = isRunning || isSaving;
-  const testDisabled = isTesting || isSaving || nodeCount === 0;
+  const saveDisabled = !isDirty || isSaving || hasInvalid;
+  const runDisabled = isRunning || isSaving || hasInvalid;
+  const testDisabled = isTesting || isSaving || nodeCount === 0 || hasInvalid;
   const exportDisabled = nodeCount === 0;
   const undoDisabled = past.length === 0;
   const redoDisabled = future.length === 0;
@@ -157,6 +167,19 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
         )}
       >
         <EditorViewTabs />
+        {hasInvalid && (
+          <span
+            role="status"
+            data-testid="invalid-refs-warning"
+            title={invalidMessage}
+            className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-1 text-xs font-medium text-red-400"
+          >
+            <AlertTriangle size={14} aria-hidden />
+            <span className="sr-only sm:not-sr-only">
+              {invalidCount} broken pill{invalidCount > 1 ? 's' : ''}
+            </span>
+          </span>
+        )}
         <ToolbarButton
           label="Undo"
           onClick={undo}
@@ -200,7 +223,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           label={isRunning ? 'Running…' : 'Run'}
           onClick={handleRun}
           disabled={runDisabled}
-          title="Runs the last saved version"
+          title={hasInvalid ? invalidMessage : 'Runs the last saved version'}
           icon={
             isRunning ? (
               <Spinner size="sm" label="Running" />
@@ -222,7 +245,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           label={isTesting ? 'Testing…' : 'Test'}
           onClick={handleTest}
           disabled={testDisabled}
-          title="Runs your current canvas (no save)"
+          title={hasInvalid ? invalidMessage : 'Runs your current canvas (no save)'}
           icon={
             isTesting ? (
               <Spinner size="sm" label="Testing" />

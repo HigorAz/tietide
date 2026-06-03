@@ -27,6 +27,7 @@ import {
   type ClosedTokenSpan,
 } from '@/lib/dataPillToken';
 import { humanizePath } from '@/lib/humanize-path';
+import { invalidTokensForNode } from '@/lib/validate-references';
 import { AppendOperatorMenu } from './AppendOperatorMenu';
 import { PillOverlay } from './PillOverlay';
 
@@ -92,6 +93,10 @@ export function DataPillInput({
   }, [upstream.suggestions, filterText]);
 
   const segments = useMemo(() => splitSegments(value), [value]);
+  const invalidTokens = useMemo(
+    () => invalidTokensForNode(nodeId, nodes, edges),
+    [nodeId, nodes, edges],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -258,6 +263,7 @@ export function DataPillInput({
         placeholder={placeholder}
         showPlaceholder={showPlaceholder}
         multiline={expanded}
+        invalidTokens={invalidTokens}
       />
 
       <button

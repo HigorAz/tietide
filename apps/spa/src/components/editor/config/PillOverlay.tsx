@@ -10,6 +10,8 @@ export interface PillOverlayProps {
   multiline?: boolean;
   /** Scroll-synced with the underlying field so chips stay aligned when it scrolls. */
   overlayRef?: RefObject<HTMLDivElement>;
+  /** Full `{{…}}` tokens that reference a missing/invalid node — rendered red. */
+  invalidTokens?: Set<string>;
 }
 
 /**
@@ -23,6 +25,7 @@ export function PillOverlay({
   showPlaceholder,
   multiline = false,
   overlayRef,
+  invalidTokens,
 }: PillOverlayProps) {
   return (
     <div
@@ -51,15 +54,24 @@ export function PillOverlay({
             );
           }
           const isReserved = seg.kind === 'reserved';
+          const isInvalid = !isReserved && invalidTokens?.has(seg.text) === true;
           return (
             <span
               key={i}
-              data-testid={isReserved ? 'data-pill-reserved' : 'data-pill-chip'}
+              data-testid={
+                isInvalid
+                  ? 'data-pill-invalid'
+                  : isReserved
+                    ? 'data-pill-reserved'
+                    : 'data-pill-chip'
+              }
               className={cn(
                 'rounded px-1',
-                isReserved
-                  ? 'bg-amber-400/15 text-amber-300'
-                  : 'bg-accent-teal/15 text-accent-teal',
+                isInvalid
+                  ? 'bg-red-500/15 text-red-400 underline decoration-wavy'
+                  : isReserved
+                    ? 'bg-amber-400/15 text-amber-300'
+                    : 'bg-accent-teal/15 text-accent-teal',
               )}
             >
               {seg.text}
