@@ -624,6 +624,7 @@ export {
 
 // Utilities
 export { sanitizePayload } from './utils/sanitize-payload.js';
+export { assignNodeAliases, slugifyAlias, TRIGGER_ALIAS } from './utils/node-alias.js';
 export {
   validateWorkflowTopology,
   type WorkflowTopologyIssue,
