@@ -159,6 +159,39 @@ describe('CodeAction', () => {
     });
   });
 
+  describe('execute — INPUT variables', () => {
+    it('should expose declared inputs as bare sandbox variables', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(
+        makeInput({
+          code: 'return { greeting: `Hi ${name}`, doubled: count * 2 };',
+          // Values arrive already template-resolved (any JSON type).
+          inputs: { name: 'bob', count: 21 },
+        }),
+        makeContext(),
+      );
+
+      expect(result.data.result).toEqual({ greeting: 'Hi bob', doubled: 42 });
+    });
+
+    it('should ignore inputs with invalid or reserved keys (defensive)', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(
+        makeInput({
+          code: 'return { ok, inputType: typeof input };',
+          inputs: { ok: 1, 'bad key': 2, input: 9 },
+        }),
+        makeContext(),
+      );
+
+      // 'ok' is bound; 'bad key' (space) and 'input' (reserved) are dropped, so the
+      // built-in `input` (the predecessor data, here {}) is not overridden by 9.
+      expect(result.data.result).toEqual({ ok: 1, inputType: 'object' });
+    });
+  });
+
   describe('execute — error path', () => {
     it('should reject when user code throws', async () => {
       const action = new CodeAction();

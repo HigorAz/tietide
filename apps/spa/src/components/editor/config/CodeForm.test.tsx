@@ -49,4 +49,34 @@ describe('CodeForm', () => {
     render(<CodeForm nodeId={NODE_ID} config={{ code: 'x', language: 'javascript' }} />);
     expect(screen.getByTestId('pill-sample-field')).toBeInTheDocument();
   });
+
+  it('should toggle the example code snippet via the info button', () => {
+    render(<CodeForm nodeId={NODE_ID} config={{ code: 'x', language: 'javascript' }} />);
+    expect(screen.queryByTestId('code-sample')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('code-sample-toggle'));
+    expect(screen.getByTestId('code-sample')).toBeInTheDocument();
+  });
+
+  it('should add an input row and write it under the inputs config key', () => {
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({ updateNodeConfig });
+
+    render(<CodeForm nodeId={NODE_ID} config={{ code: 'x', language: 'javascript' }} />);
+    // The editor starts with one empty row; name it.
+    fireEvent.change(screen.getAllByPlaceholderText('Variable name')[0], {
+      target: { value: 'greeting' },
+    });
+
+    expect(updateNodeConfig).toHaveBeenCalledWith(NODE_ID, { inputs: { greeting: '' } });
+  });
+
+  it('should flag an invalid input variable name', () => {
+    render(
+      <CodeForm
+        nodeId={NODE_ID}
+        config={{ code: 'x', language: 'javascript', inputs: { 'bad name': '1' } }}
+      />,
+    );
+    expect(screen.getByText(/invalid variable name/i)).toBeInTheDocument();
+  });
 });

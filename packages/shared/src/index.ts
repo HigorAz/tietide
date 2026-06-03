@@ -79,6 +79,7 @@ export {
   subworkflowConfigSchema,
   returnConfigSchema,
   ITERATOR_MAX_ITEMS_DEFAULT,
+  isValidCodeInputName,
 } from './schemas/node.schema.js';
 export {
   stickyConfigSchema,
