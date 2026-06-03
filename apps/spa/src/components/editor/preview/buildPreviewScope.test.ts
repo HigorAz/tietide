@@ -114,8 +114,9 @@ describe('buildPreviewScope', () => {
 
     const scope = buildPreviewScope('b', nodes, edges, live);
 
-    // a should appear once; bfsAncestors marks the start node visited so b is excluded.
-    expect(Object.keys(scope)).toEqual(['a']);
+    // a appears once (bfsAncestors marks the start node visited so b is excluded),
+    // plus its 'trigger' alias mirror since a is the trigger node.
+    expect(Object.keys(scope)).toEqual(['a', 'trigger']);
   });
 
   it('should prefer live output over the example when both exist', () => {

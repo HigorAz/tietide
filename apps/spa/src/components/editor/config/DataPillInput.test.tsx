@@ -116,8 +116,9 @@ describe('DataPillInput', () => {
     const listbox = screen.getByTestId('data-pill-listbox');
     const items = within(listbox).getAllByRole('option');
     const allText = items.map((i) => i.textContent ?? '').join(' ');
-    expect(allText).toContain('upstream');
-    expect(allText).not.toContain('unrelated');
+    // The dropdown now shows the node's friendly label, not its raw id.
+    expect(allText).toContain('Upstream');
+    expect(allText).not.toContain('Unrelated');
     expect(allText).not.toContain(TARGET_ID);
   });
 
@@ -144,7 +145,8 @@ describe('DataPillInput', () => {
     const last = onChange.mock.calls.at(-1)?.[0] as string;
     expect(last.startsWith('{{')).toBe(true);
     expect(last.endsWith('}}')).toBe(true);
-    expect(last).toMatch(/\{\{http-1\.[^}]+\}\}/);
+    // 'First HTTP' is a non-trigger action → alias slug 'first_http'.
+    expect(last).toMatch(/\{\{steps\.first_http\.[^}]+\}\}/);
   });
 
   it('closes the autocomplete on Escape without inserting', () => {

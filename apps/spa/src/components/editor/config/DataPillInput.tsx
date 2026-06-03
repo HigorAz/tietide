@@ -22,6 +22,7 @@ import {
   splitSegments,
   type ClosedTokenSpan,
 } from '@/lib/dataPillToken';
+import { humanizePath } from '@/lib/humanize-path';
 import { AppendOperatorMenu } from './AppendOperatorMenu';
 import { PillOverlay } from './PillOverlay';
 
@@ -74,7 +75,7 @@ export function DataPillInput({
     const filter = filterText.toLowerCase();
     if (filter.length === 0) return upstream.suggestions;
     return upstream.suggestions.filter((s) => {
-      const haystack = `${s.nodeId}.${s.path} ${s.nodeLabel}`.toLowerCase();
+      const haystack = `${s.ref}.${s.path} ${s.nodeLabel} ${humanizePath(s.path)}`.toLowerCase();
       return haystack.includes(filter);
     });
   }, [upstream.suggestions, filterText]);
@@ -159,7 +160,7 @@ export function DataPillInput({
   const insertSuggestion = (suggestion: PathSuggestion) => {
     const input = inputRef.current;
     const caret = input?.selectionStart ?? value.length;
-    const token = buildPillToken(suggestion.nodeId, suggestion.path);
+    const token = buildPillToken(suggestion.ref, suggestion.path);
     const { value: newValue, caret: newCaret } = insertToken(value, token, caret);
     onChange(newValue);
     setOpen(false);
@@ -256,9 +257,10 @@ export function DataPillInput({
               )}
               onMouseDown={(e) => handleOptionMouseDown(e, s)}
               onMouseEnter={() => setActiveIndex(i)}
+              title={buildPillToken(s.ref, s.path)}
             >
-              <span className="font-mono">{`{{${s.nodeId}.${s.path}}}`}</span>
-              <span className="ml-2 text-text-muted">
+              <span className="truncate">{humanizePath(s.path)}</span>
+              <span className="ml-2 shrink-0 text-text-muted">
                 {s.nodeLabel} · {s.type}
               </span>
             </li>
