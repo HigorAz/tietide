@@ -2,6 +2,8 @@ export interface WorkflowNode {
   id: string;
   type: string;
   name: string;
+  /** Stable reference alias used by data-pill tokens (`{{steps.<alias>.field}}`). */
+  alias?: string;
   position: { x: number; y: number };
   config: Record<string, unknown>;
   skipped?: boolean;

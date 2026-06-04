@@ -42,12 +42,19 @@ describe('dataPillToken', () => {
   });
 
   describe('buildPillToken', () => {
-    it('builds a nodeId.path token', () => {
+    it('builds a ref.path token', () => {
       expect(buildPillToken('node1', 'user.email')).toBe('{{node1.user.email}}');
     });
 
+    it('builds trigger and steps alias tokens', () => {
+      expect(buildPillToken('trigger', 'channelId')).toBe('{{trigger.channelId}}');
+      expect(buildPillToken('steps.gmail_search', 'subject')).toBe(
+        '{{steps.gmail_search.subject}}',
+      );
+    });
+
     it('drops the trailing dot when the path is empty (whole-output pill)', () => {
-      expect(buildPillToken('node1', '')).toBe('{{node1}}');
+      expect(buildPillToken('trigger', '')).toBe('{{trigger}}');
     });
   });
 

@@ -49,11 +49,12 @@ export function findOpenTokenStart(text: string, caret: number): number | null {
 }
 
 /**
- * Build the `{{nodeId.path}}` token for a suggestion. An empty path yields the
- * whole-output pill `{{nodeId}}` (the trailing `.` is stripped).
+ * Build the `{{ref.path}}` token for a suggestion, where `ref` is the node's
+ * stable alias root (`trigger` or `steps.<alias>`). An empty path yields the
+ * whole-output pill `{{ref}}` (the trailing `.` is stripped).
  */
-export function buildPillToken(nodeId: string, path: string): string {
-  return `{{${nodeId}.${path}}}`.replace(/\.\s*\}\}$/, '}}');
+export function buildPillToken(ref: string, path: string): string {
+  return `{{${ref}.${path}}}`.replace(/\.\s*\}\}$/, '}}');
 }
 
 /**

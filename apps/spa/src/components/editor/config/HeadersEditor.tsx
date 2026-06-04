@@ -7,6 +7,11 @@ interface HeadersEditorProps {
   value: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
   nodeId?: string;
+  /** Labels/placeholders so this key-value editor can be reused beyond HTTP headers. */
+  addLabel?: string;
+  removeLabel?: string;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
 }
 
 interface Row {
@@ -30,7 +35,15 @@ const rowsToRecord = (rows: Row[]): Record<string, string> => {
   return out;
 };
 
-export function HeadersEditor({ value, onChange, nodeId }: HeadersEditorProps) {
+export function HeadersEditor({
+  value,
+  onChange,
+  nodeId,
+  addLabel = 'Add header',
+  removeLabel = 'Remove header',
+  keyPlaceholder = 'Key',
+  valuePlaceholder = 'Value',
+}: HeadersEditorProps) {
   const [rows, setRows] = useState<Row[]>(() => recordToRows(value));
   const [nextId, setNextId] = useState(() => rows.length);
 
@@ -70,7 +83,7 @@ export function HeadersEditor({ value, onChange, nodeId }: HeadersEditorProps) {
         <div key={row.id} className="flex items-center gap-1.5">
           <input
             type="text"
-            placeholder="Key"
+            placeholder={keyPlaceholder}
             value={row.key}
             onChange={(e) => handleKeyChange(row.id, e.target.value)}
             className={cn(inputClass, 'flex-1')}
@@ -79,7 +92,7 @@ export function HeadersEditor({ value, onChange, nodeId }: HeadersEditorProps) {
             <div className="flex-1">
               <DataPillInput
                 nodeId={nodeId}
-                placeholder="Value"
+                placeholder={valuePlaceholder}
                 value={row.value}
                 onChange={(next) => handleValueChange(row.id, next)}
               />
@@ -87,7 +100,7 @@ export function HeadersEditor({ value, onChange, nodeId }: HeadersEditorProps) {
           ) : (
             <input
               type="text"
-              placeholder="Value"
+              placeholder={valuePlaceholder}
               value={row.value}
               onChange={(e) => handleValueChange(row.id, e.target.value)}
               className={cn(inputClass, 'flex-1')}
@@ -95,7 +108,7 @@ export function HeadersEditor({ value, onChange, nodeId }: HeadersEditorProps) {
           )}
           <button
             type="button"
-            aria-label="Remove header"
+            aria-label={removeLabel}
             onClick={() => handleRemove(row.id)}
             className={cn(
               'shrink-0 rounded-md p-1 text-text-muted transition',
@@ -118,7 +131,7 @@ export function HeadersEditor({ value, onChange, nodeId }: HeadersEditorProps) {
         )}
       >
         <Plus size={12} strokeWidth={2} aria-hidden />
-        Add header
+        {addLabel}
       </button>
     </div>
   );

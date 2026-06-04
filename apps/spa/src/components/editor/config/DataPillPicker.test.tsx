@@ -53,9 +53,11 @@ describe('DataPillPicker', () => {
     const listbox = screen.getByTestId('data-pill-picker');
     const options = within(listbox).getAllByTestId('data-pill-picker-option');
     const text = options.map((o) => o.textContent ?? '').join(' ');
-    // A is an http-request upstream of B → its concrete-schema fields appear as pills.
-    expect(text).toContain('{{A.statusCode}}');
-    expect(text).not.toContain('{{B.');
+    // A is an http-request upstream of B → its fields appear as humanized pills
+    // under A's group; B (the target) is not listed.
+    expect(text).toContain('Status Code');
+    expect(screen.getByText('First HTTP')).toBeInTheDocument();
+    expect(screen.queryByText('Second HTTP')).not.toBeInTheDocument();
   });
 
   it('inserts the chosen token via the focused field inserter on mousedown', () => {
@@ -66,11 +68,12 @@ describe('DataPillPicker', () => {
 
     const option = screen
       .getAllByTestId('data-pill-picker-option')
-      .find((o) => o.textContent?.includes('{{A.statusCode}}'));
+      .find((o) => o.textContent?.includes('Status Code'));
     expect(option).toBeDefined();
     fireEvent.mouseDown(option!);
 
-    expect(insert).toHaveBeenCalledWith('{{A.statusCode}}');
+    // A ('First HTTP') is a non-trigger action → alias slug 'first_http'.
+    expect(insert).toHaveBeenCalledWith('{{steps.first_http.statusCode}}');
   });
 
   it('prevents default on mousedown so the focused input does not blur', () => {
@@ -120,8 +123,8 @@ describe('DataPillPicker', () => {
 
     const text = pickerText();
     // The declared sample overrides the concrete http-request schema entirely.
-    expect(text).toContain('{{A.customField}}');
-    expect(text).not.toContain('{{A.statusCode}}');
+    expect(text).toContain('Custom Field');
+    expect(text).not.toContain('Status Code');
   });
 
   it('ignores an invalid __pillSample and falls back to the node schema', () => {
@@ -142,7 +145,7 @@ describe('DataPillPicker', () => {
     });
     render(<DataPillPicker />);
 
-    expect(pickerText()).toContain('{{A.statusCode}}');
+    expect(pickerText()).toContain('Status Code');
   });
 
   it('renders as a bottom sheet on mobile', () => {

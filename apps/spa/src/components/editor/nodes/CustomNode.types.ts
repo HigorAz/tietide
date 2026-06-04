@@ -12,4 +12,6 @@ export interface CustomNodeData {
   config?: Record<string, unknown>;
   skipped?: boolean;
   versionState?: NodeVersionState;
+  /** Stable data-pill reference alias (`{{steps.<alias>.field}}`). */
+  alias?: string;
 }

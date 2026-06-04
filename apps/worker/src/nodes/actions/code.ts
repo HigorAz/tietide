@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Worker } from 'node:worker_threads';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
-import { codeConfigSchema } from '@tietide/shared';
+import { codeConfigSchema, isValidCodeInputName } from '@tietide/shared';
 
 // Sandboxed JavaScript execution.
 //
@@ -21,6 +21,7 @@ const TERMINATE_GRACE_MS = 250;
 interface ParsedParams {
   code: string;
   timeoutMs: number;
+  inputs: Record<string, unknown>;
 }
 
 interface SandboxResult {
@@ -42,6 +43,12 @@ try {
   // read sibling/ancestor outputs directly (vs \`input\`, the flattened last
   // predecessor). Defaults to {} when there is no upstream.
   sandbox.$nodes = workerData.scope || {};
+  // User-declared INPUT variables: each key (already identifier-validated at the
+  // engine boundary) is exposed as a bare global holding its resolved data-pill value.
+  const userInputs = workerData.inputs || {};
+  for (const k of Object.keys(userInputs)) {
+    sandbox[k] = userInputs[k];
+  }
   sandbox.JSON = JSON;
   sandbox.Math = Math;
   sandbox.Date = Date;
@@ -110,7 +117,13 @@ export class CodeAction implements INodeExecutor {
     }
 
     const started = Date.now();
-    const result = await this.runInSandbox(params.code, input.data, input.scope, params.timeoutMs);
+    const result = await this.runInSandbox(
+      params.code,
+      input.data,
+      input.scope,
+      params.inputs,
+      params.timeoutMs,
+    );
     const duration = Date.now() - started;
 
     return {
@@ -132,13 +145,26 @@ export class CodeAction implements INodeExecutor {
     if (typeof raw.timeout === 'number' && Number.isFinite(raw.timeout) && raw.timeout > 0) {
       timeoutMs = Math.min(raw.timeout, MAX_TIMEOUT_MS);
     }
-    return { code: parsed.data.code, timeoutMs };
+    return { code: parsed.data.code, timeoutMs, inputs: this.parseInputs(raw.inputs) };
+  }
+
+  // Resolved INPUT variables (the engine already template-resolved the values).
+  // Keep only safe identifier keys (defense-in-depth; the SPA/schema reject the
+  // rest at save time) so a bad key can never define an unusable sandbox global.
+  private parseInputs(raw: unknown): Record<string, unknown> {
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (isValidCodeInputName(key)) out[key] = value;
+    }
+    return out;
   }
 
   private runInSandbox(
     userCode: string,
     input: Record<string, unknown>,
     scope: Record<string, unknown> | undefined,
+    inputs: Record<string, unknown>,
     timeoutMs: number,
   ): Promise<unknown> {
     return new Promise((resolve, reject) => {
@@ -149,7 +175,7 @@ export class CodeAction implements INodeExecutor {
       // OOMs the worker, which fails the node cleanly via the exit handler below.
       const worker = new Worker(WORKER_SOURCE, {
         eval: true,
-        workerData: { code: userCode, input, scope: scope ?? {}, timeoutMs },
+        workerData: { code: userCode, input, scope: scope ?? {}, inputs, timeoutMs },
         resourceLimits: {
           maxOldGenerationSizeMb: MEMORY_LIMIT_MB,
           maxYoungGenerationSizeMb: 16,

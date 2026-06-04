@@ -12,6 +12,18 @@ const makeRfNode = (
   ...overrides,
 });
 
+// Hydration backfills a stable `alias` on every node; the structural round-trip
+// tests below predate that enrichment, so drop aliases before comparing (alias
+// backfill/persistence has its own dedicated tests).
+const withoutAliases = (def: WorkflowDefinition): WorkflowDefinition => ({
+  ...def,
+  nodes: def.nodes.map((n) => {
+    const copy = { ...n };
+    delete copy.alias;
+    return copy;
+  }),
+});
+
 describe('serialization', () => {
   describe('toWorkflowDefinition', () => {
     it('should return empty nodes and edges when given empty inputs', () => {
@@ -325,7 +337,7 @@ describe('serialization', () => {
       const hydrated = fromWorkflowDefinition(def);
       const roundTripped = toWorkflowDefinition(hydrated.nodes, hydrated.edges);
 
-      expect(roundTripped).toEqual(def);
+      expect(withoutAliases(roundTripped)).toEqual(def);
     });
   });
 
@@ -382,7 +394,7 @@ describe('serialization', () => {
       const hydrated = fromWorkflowDefinition(def);
       const roundTripped = toWorkflowDefinition(hydrated.nodes, hydrated.edges);
 
-      expect(roundTripped).toEqual(def);
+      expect(withoutAliases(roundTripped)).toEqual(def);
     });
   });
 
@@ -414,7 +426,51 @@ describe('serialization', () => {
       const hydrated = fromWorkflowDefinition(def);
       const roundTripped = toWorkflowDefinition(hydrated.nodes, hydrated.edges);
 
-      expect(roundTripped).toEqual(def);
+      expect(withoutAliases(roundTripped)).toEqual(def);
+    });
+  });
+
+  describe('alias handling', () => {
+    it('backfills stable aliases for legacy definitions missing them', () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'n-1',
+            type: NodeType.MANUAL_TRIGGER,
+            name: 'Manual Trigger',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+          {
+            id: 'n-2',
+            type: NodeType.CODE,
+            name: 'Code',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [],
+      };
+
+      const { nodes } = fromWorkflowDefinition(def);
+      expect(nodes[0].data.alias).toBe('trigger');
+      expect(nodes[1].data.alias).toBe('code');
+    });
+
+    it('persists a node alias back into the definition', () => {
+      const rfNode = makeRfNode({
+        id: 'node-abc',
+        data: {
+          label: 'Code',
+          nodeType: NodeType.CODE,
+          status: 'idle',
+          config: {},
+          alias: 'code',
+        },
+      });
+      expect(toWorkflowDefinition([rfNode], [])).toMatchObject({
+        nodes: [{ id: 'node-abc', alias: 'code' }],
+      });
     });
   });
 });

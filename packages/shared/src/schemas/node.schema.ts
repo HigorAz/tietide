@@ -12,9 +12,48 @@ export const conditionalConfigSchema = z.object({
   condition: z.string().min(1),
 });
 
+// Code-node INPUT keys become bare variable names inside the sandbox, so they
+// must be valid JS identifiers and must not shadow the built-in `input`/`$nodes`
+// or a handful of keywords that would make the variable unusable.
+const CODE_INPUT_NAME_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const RESERVED_CODE_INPUT_NAMES = new Set<string>([
+  'input',
+  '$nodes',
+  'return',
+  'await',
+  'const',
+  'let',
+  'var',
+  'function',
+  'this',
+]);
+
+/** True when `name` is usable as a Code-node input variable. */
+export function isValidCodeInputName(name: string): boolean {
+  return CODE_INPUT_NAME_RE.test(name) && !RESERVED_CODE_INPUT_NAMES.has(name);
+}
+
 export const codeConfigSchema = z.object({
   code: z.string().min(1).max(10000),
   language: z.enum(['javascript']).default('javascript'),
+  // Map of variable name → data-pill expression. Each key is exposed as a bare
+  // variable in the sandbox; values are template strings resolved before exec
+  // (so the resolved value may be any JSON type at run time).
+  inputs: z
+    .record(z.string())
+    .optional()
+    .superRefine((inputs, ctx) => {
+      if (!inputs) return;
+      for (const key of Object.keys(inputs)) {
+        if (!isValidCodeInputName(key)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Invalid input variable name "${key}"`,
+            path: [key],
+          });
+        }
+      }
+    }),
 });
 
 export const cronConfigSchema = z.object({

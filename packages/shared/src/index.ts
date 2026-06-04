@@ -79,6 +79,7 @@ export {
   subworkflowConfigSchema,
   returnConfigSchema,
   ITERATOR_MAX_ITEMS_DEFAULT,
+  isValidCodeInputName,
 } from './schemas/node.schema.js';
 export {
   stickyConfigSchema,
@@ -624,6 +625,7 @@ export {
 
 // Utilities
 export { sanitizePayload } from './utils/sanitize-payload.js';
+export { assignNodeAliases, slugifyAlias, TRIGGER_ALIAS } from './utils/node-alias.js';
 export {
   validateWorkflowTopology,
   type WorkflowTopologyIssue,

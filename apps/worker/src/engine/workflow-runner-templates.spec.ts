@@ -259,6 +259,70 @@ describe('WorkflowRunner', () => {
       expect(envVarResolver.releaseExecution).toHaveBeenCalledWith('exec-fail');
     });
 
+    it('should resolve {{trigger.x}}, {{steps.<slug>.x}} and legacy {{nodeId.x}} from the same outputs', async () => {
+      const trigger = makeExecutor(
+        'webhook-trigger',
+        async () => ({ data: { channelId: 'C1' } }),
+        'trigger',
+      );
+      const fetch = makeExecutor('fetch', async () => ({ data: { name: 'bob' } }));
+      const sink = makeExecutor('sink');
+      registry.register(trigger);
+      registry.register(fetch);
+      registry.register(sink);
+
+      const def: WorkflowDefinition = {
+        nodes: [
+          node('wh', 'webhook-trigger'),
+          node('mid', 'fetch', 'Fetch User'),
+          {
+            ...node('out', 'sink'),
+            config: {
+              viaAlias: '{{trigger.channelId}}',
+              viaStep: '{{steps.fetch_user.name}}',
+              viaLegacy: '{{wh.channelId}}',
+            },
+          },
+        ],
+        edges: [edge('e1', 'wh', 'mid'), edge('e2', 'mid', 'out')],
+      };
+
+      const result = await runner.run({
+        executionId: 'exec-alias',
+        workflowId: 'wf-1',
+        definition: def,
+      });
+
+      expect(result.status).toBe('SUCCESS');
+      expect(sink.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: { viaAlias: 'C1', viaStep: 'bob', viaLegacy: 'C1' },
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('should keep input.scope ($nodes) keyed by node id only (no alias keys)', async () => {
+      const trigger = makeExecutor(
+        'webhook-trigger',
+        async () => ({ data: { channelId: 'C1' } }),
+        'trigger',
+      );
+      const sink = makeExecutor('sink');
+      registry.register(trigger);
+      registry.register(sink);
+
+      const def: WorkflowDefinition = {
+        nodes: [node('wh', 'webhook-trigger'), node('out', 'sink')],
+        edges: [edge('e1', 'wh', 'out')],
+      };
+
+      await runner.run({ executionId: 'exec-scope-keys', workflowId: 'wf-1', definition: def });
+
+      const passedInput = sink.execute.mock.calls[0]?.[0];
+      expect(Object.keys(passedInput?.scope ?? {})).toEqual(['wh']);
+    });
+
     it('should resolve env tokens AND data tokens in the same node config', async () => {
       envVarResolver.getEnvScope.mockResolvedValue(
         new Map<string, string>([['BASE_URL', 'https://api.example.com']]),
