@@ -172,15 +172,12 @@ describe('DataPillInput', () => {
     expect(screen.queryByTestId('data-pill-chip')).not.toBeInTheDocument();
   });
 
-  it('toggles between a single-line input and a multi-line textarea', () => {
+  it('renders a multi-line textarea by default with a resize grip', () => {
     render(<DataPillInput nodeId={TARGET_ID} value="some long value" onChange={vi.fn()} />);
-    expect(screen.getByRole('combobox').tagName).toBe('INPUT');
-
-    fireEvent.click(screen.getByTestId('data-pill-expand-toggle'));
-    expect(screen.getByRole('combobox').tagName).toBe('TEXTAREA');
-
-    fireEvent.click(screen.getByTestId('data-pill-expand-toggle'));
-    expect(screen.getByRole('combobox').tagName).toBe('INPUT');
+    const field = screen.getByRole('combobox') as HTMLTextAreaElement;
+    expect(field.tagName).toBe('TEXTAREA');
+    expect(field.style.height).toBe('80px');
+    expect(screen.getByTestId('data-pill-resize')).toBeInTheDocument();
   });
 
   it('closes the autocomplete on Escape without inserting', () => {
