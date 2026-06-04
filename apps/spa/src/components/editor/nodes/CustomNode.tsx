@@ -46,6 +46,7 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
       data-skipped={skipped ? 'true' : 'false'}
       className={cn(
         'relative flex flex-col items-center gap-2 select-none',
+        'transition-transform duration-150 hover:-translate-y-0.5',
         selected &&
           'drop-shadow-[0_0_24px_rgba(0,212,179,0.55)] drop-shadow-[0_0_4px_rgba(0,212,179,0.9)]',
         status === 'running' && 'drop-shadow-[0_0_18px_rgba(0,212,179,0.6)]',
@@ -84,8 +85,10 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
         className={cn(
           'relative flex items-center justify-center rounded-full',
           'h-16 w-16 ring-4 ring-offset-2 ring-offset-deep-blue',
-          'bg-gradient-to-br from-elevated to-surface',
-          'shadow-[inset_0_-4px_8px_rgba(0,0,0,0.35),inset_0_2px_3px_rgba(255,255,255,0.05)]',
+          'bg-gradient-to-br from-elevated to-surface transition-shadow duration-200',
+          // inset shading for a glassy bead + a soft ambient teal glow so nodes
+          // read like glowing buoys on the tide canvas.
+          'shadow-[inset_0_-4px_8px_rgba(0,0,0,0.35),inset_0_2px_3px_rgba(255,255,255,0.05),0_0_24px_-6px_rgba(0,212,179,0.35)]',
           data.versionState
             ? VERSION_STATE_RING_CLASS[data.versionState]
             : STATUS_RING_CLASS[status],
@@ -99,8 +102,9 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
 
       <div
         className={cn(
-          'min-w-[120px] max-w-[180px] rounded-md border px-3 py-2 text-center',
-          'bg-elevated/90 backdrop-blur-sm',
+          'min-w-[120px] max-w-[180px] rounded-lg border px-3 py-2 text-center',
+          'bg-elevated/90 backdrop-blur-sm shadow-[0_6px_16px_-8px_rgba(0,0,0,0.6)]',
+          'transition-colors',
           selected ? 'border-accent-teal' : 'border-white/5',
           skipped && 'border-dashed',
         )}

@@ -41,10 +41,17 @@ const config: Config = {
           '0%': { strokeDashoffset: '28' },
           '100%': { strokeDashoffset: '0' },
         },
+        // Gentle, always-on "tide" flow for idle editor edges (slower + subtler
+        // than the active living-ink flow), echoing the auth-page tide lines.
+        'tide-flow': {
+          '0%': { strokeDashoffset: '24' },
+          '100%': { strokeDashoffset: '0' },
+        },
       },
       animation: {
         'pulse-ring': 'pulse-ring 1.6s ease-in-out infinite',
         'living-ink': 'living-ink 1.2s linear infinite',
+        'tide-flow': 'tide-flow 2.8s linear infinite',
       },
     },
   },
