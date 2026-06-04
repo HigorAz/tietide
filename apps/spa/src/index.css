@@ -40,6 +40,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Keep autofilled inputs on-theme — Chrome/Safari otherwise paint a white fill
+   that breaks the dark surfaces (most visible on the auth pages). */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary);
+  caret-color: var(--text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
+  box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* Touch tuning for the React Flow editor: the default node connection handles
    are ~6px, too small to grab reliably with a finger. Enlarge their hit area
    on phones/tablets without affecting the desktop pointer experience. */

@@ -1,0 +1,170 @@
+/* Bespoke visuals for the split-screen auth pages (login / register / verify).
+   Uses the global design tokens from index.css. Layout-only Tailwind lives in the
+   components; the gradient background, the tide-graph strokes, and the keyframe
+   animations are easier to express here. */
+
+.auth-shell {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  overflow: hidden;
+  /* mirrored atmosphere: vivid teal/blue in the centre, fading to deep-blue both sides */
+  background:
+    radial-gradient(1200px 900px at 50% 28%, rgba(0, 212, 179, 0.17), transparent 60%),
+    radial-gradient(1000px 720px at 50% 110%, rgba(51, 154, 240, 0.1), transparent 60%),
+    var(--bg-deep-blue);
+}
+
+.auth-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.4;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+  -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 70%);
+}
+
+.auth-inner {
+  position: relative;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  min-height: 100vh;
+}
+
+/* ─── tide-graph overlay ─── */
+.auth-flow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+.auth-wave {
+  fill: none;
+  stroke: var(--accent-teal);
+  stroke-linecap: round;
+}
+.auth-wave--dash {
+  stroke-dasharray: 6 9;
+  animation: auth-ink 1.7s linear infinite;
+}
+@keyframes auth-ink {
+  to {
+    stroke-dashoffset: -30;
+  }
+}
+.auth-ring {
+  fill: none;
+  stroke: var(--accent-teal);
+  stroke-width: 2;
+}
+.auth-ring--faint {
+  opacity: 0.34;
+  stroke-width: 1.6;
+}
+.auth-disc {
+  fill: rgba(13, 31, 58, 0.9);
+}
+.auth-icon {
+  fill: none;
+  stroke: #d6f3ec;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.auth-node {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auth-pulse 3s ease-in-out infinite;
+}
+@keyframes auth-pulse {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.auth-ripple {
+  fill: none;
+  stroke: var(--accent-teal);
+  stroke-width: 1.4;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: auth-rp 3.6s ease-out infinite;
+}
+@keyframes auth-rp {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+/* ─── columns (content sits above the flow) ─── */
+.auth-brand,
+.auth-form-col {
+  position: relative;
+  z-index: 2;
+}
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+}
+.auth-form-col {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* TieTide mark shown above the form only when the brand panel collapses (mobile). */
+.auth-mobile-logo {
+  display: none;
+}
+@media (max-width: 920px) {
+  .auth-mobile-logo {
+    display: flex;
+  }
+}
+
+/* ─── responsive: collapse to a single column, hide the decorative flow ─── */
+@media (max-width: 920px) {
+  .auth-shell {
+    background: linear-gradient(180deg, #0e3258, var(--bg-deep-blue) 240px);
+  }
+  .auth-inner {
+    grid-template-columns: 1fr;
+    padding: 38px 26px;
+    gap: 8px;
+  }
+  .auth-flow,
+  .auth-grid {
+    display: none;
+  }
+  .auth-form-col {
+    justify-content: center;
+  }
+}
+
+/* Respect reduced-motion: stop the animated tide. */
+@media (prefers-reduced-motion: reduce) {
+  .auth-wave--dash,
+  .auth-node,
+  .auth-ripple {
+    animation: none;
+  }
+}

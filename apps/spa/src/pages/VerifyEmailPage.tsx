@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { Spinner } from '@/components/ui/Spinner';
+import { AuthLayout } from '@/components/auth/AuthLayout';
 
 type Status = 'verifying' | 'success' | 'error';
 
@@ -38,39 +39,35 @@ export function VerifyEmailPage(): JSX.Element {
   }, [token, verifyEmail, navigate]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-deep-blue px-4 py-12">
-      <div className="w-full max-w-sm rounded-lg bg-surface p-8 text-center shadow-xl">
-        {status === 'verifying' && (
-          <div role="status" className="flex flex-col items-center gap-3">
-            <Spinner size="md" label="Verifying your email" />
-            <p className="text-sm text-text-secondary">Verifying your email…</p>
+    <AuthLayout>
+      {status === 'verifying' && (
+        <div role="status" className="flex flex-col items-start gap-3">
+          <Spinner size="md" label="Verifying your email" />
+          <p className="text-[15px] text-text-secondary">Verifying your email…</p>
+        </div>
+      )}
+
+      {status === 'success' && (
+        <p className="text-[15px] text-text-secondary">Email verified — taking you to TieTide…</p>
+      )}
+
+      {status === 'error' && (
+        <>
+          <h1 className="mb-2 text-3xl font-bold text-text-primary">Verification link invalid</h1>
+          <p className="mb-6 text-[15px] leading-relaxed text-text-secondary">
+            This verification link is invalid or has expired. Register again to receive a fresh
+            link, or sign in if your account is already verified.
+          </p>
+          <div className="flex gap-4 text-sm font-semibold">
+            <Link to="/register" className="text-accent-teal hover:text-accent-teal-hover">
+              Register again
+            </Link>
+            <Link to="/login" className="text-accent-teal hover:text-accent-teal-hover">
+              Sign in
+            </Link>
           </div>
-        )}
-
-        {status === 'success' && (
-          <p className="text-sm text-text-secondary">Email verified — taking you to TieTide…</p>
-        )}
-
-        {status === 'error' && (
-          <>
-            <h1 className="mb-2 text-2xl font-semibold text-text-primary">
-              Verification link invalid
-            </h1>
-            <p className="mb-6 text-sm text-text-secondary">
-              This verification link is invalid or has expired. Register again to receive a fresh
-              link, or sign in if your account is already verified.
-            </p>
-            <div className="flex justify-center gap-4 text-sm font-medium">
-              <Link to="/register" className="text-accent-teal hover:text-accent-teal-hover">
-                Register again
-              </Link>
-              <Link to="/login" className="text-accent-teal hover:text-accent-teal-hover">
-                Sign in
-              </Link>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+        </>
+      )}
+    </AuthLayout>
   );
 }
