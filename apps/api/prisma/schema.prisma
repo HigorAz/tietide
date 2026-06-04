@@ -27,6 +27,7 @@ model User {
   folders                 Folder[]
   tags                    Tag[]
   emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
 
   @@map("users")
 }
@@ -48,6 +49,25 @@ model EmailVerificationToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("email_verification_tokens")
+}
+
+// Single-use, hashed password-reset tokens. Same design as the email-verification
+// tokens: the raw token is emailed, only its SHA-256 hash is stored, single-use
+// (consumedAt) and short-lived (1h). Consuming one sets the new password, bumps
+// tokenVersion (revoking existing sessions), and marks the email verified.
+model PasswordResetToken {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 enum Role {

@@ -45,3 +45,21 @@ export async function getMe(): Promise<PublicUser> {
   const { data } = await api.get<PublicUser>('/auth/me');
   return data;
 }
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+// Requests a password-reset link. Always resolves with a neutral message (the API
+// never reveals whether the email is registered).
+export async function forgotPassword(email: string): Promise<ForgotPasswordResponse> {
+  const { data } = await api.post<ForgotPasswordResponse>('/auth/forgot-password', { email });
+  return data;
+}
+
+// Consumes the single-use reset token, sets the new password, and returns a fresh
+// session (this is where auto-login after reset happens).
+export async function resetPassword(token: string, password: string): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/auth/reset-password', { token, password });
+  return data;
+}

@@ -14,11 +14,13 @@ describe('AuthService', () => {
   let prisma: {
     user: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
     emailVerificationToken: { create: jest.Mock; findUnique: jest.Mock; updateMany: jest.Mock };
+    passwordResetToken: { create: jest.Mock; findUnique: jest.Mock; updateMany: jest.Mock };
   };
   let jwt: { sign: jest.Mock };
   let mailer: {
     sendVerificationEmail: jest.Mock;
     sendAlreadyRegisteredEmail: jest.Mock;
+    sendPasswordResetEmail: jest.Mock;
   };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
@@ -26,11 +28,13 @@ describe('AuthService', () => {
     prisma = {
       user: { findUnique: jest.fn(), create: jest.fn(), update: jest.fn() },
       emailVerificationToken: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
+      passwordResetToken: { create: jest.fn(), findUnique: jest.fn(), updateMany: jest.fn() },
     };
     jwt = { sign: jest.fn() };
     mailer = {
       sendVerificationEmail: jest.fn(async () => undefined),
       sendAlreadyRegisteredEmail: jest.fn(async () => undefined),
+      sendPasswordResetEmail: jest.fn(async () => undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -221,6 +225,97 @@ describe('AuthService', () => {
       const lookup = prisma.emailVerificationToken.findUnique.mock.calls[0][0];
       expect(lookup.where.tokenHash).toEqual(expect.any(String));
       expect(lookup.where.tokenHash).not.toEqual(dto.token);
+    });
+  });
+
+  describe('forgotPassword', () => {
+    const dto = { email: 'test@example.com' };
+    const NEUTRAL = {
+      message: 'If that email is registered, we’ve sent a link to reset your password.',
+    };
+
+    it('emails a single-use reset link (hashed at rest) for a registered email', async () => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'uuid-1' });
+
+      const result = await service.forgotPassword(dto);
+
+      expect(result).toEqual(NEUTRAL);
+      expect(prisma.passwordResetToken.create).toHaveBeenCalledTimes(1);
+      const created = prisma.passwordResetToken.create.mock.calls[0][0];
+      const rawToken = mailer.sendPasswordResetEmail.mock.calls[0][1] as string;
+      expect(mailer.sendPasswordResetEmail).toHaveBeenCalledWith(dto.email, expect.any(String));
+      expect(created.data.tokenHash).toEqual(expect.any(String));
+      expect(created.data.tokenHash).not.toEqual(rawToken);
+      expect(created.data.expiresAt).toBeInstanceOf(Date);
+    });
+
+    it('returns the SAME neutral response for an unknown email and sends nothing (no enumeration)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.forgotPassword(dto);
+
+      expect(result).toEqual(NEUTRAL);
+      expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+      expect(mailer.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('resetPassword', () => {
+    const dto = { token: 'raw-reset-token-1234567890', password: 'newpassword1' };
+
+    it('consumes the token, sets the password, verifies email, bumps tokenVersion, and logs in', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.update.mockResolvedValue({
+        id: 'uuid-1',
+        email: 'test@example.com',
+        role: 'USER',
+        tokenVersion: 3,
+      });
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      const result = await service.resetPassword(dto);
+
+      expect(mockedBcrypt.hash).toHaveBeenCalledWith(dto.password, 12);
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'uuid-1' },
+          data: expect.objectContaining({
+            password: 'hashed_password',
+            emailVerified: true,
+            tokenVersion: { increment: 1 },
+          }),
+        }),
+      );
+      expect(result).toEqual({ accessToken: 'signed.jwt.token', tokenType: 'Bearer' });
+      // The signed session carries the *bumped* version, so it stays valid while
+      // the pre-reset sessions do not.
+      expect(jwt.sign).toHaveBeenCalledWith(expect.objectContaining({ tokenVersion: 3 }));
+    });
+
+    it('looks the token up by its hash, never by the raw value', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await service.resetPassword(dto).catch(() => undefined);
+
+      const lookup = prisma.passwordResetToken.findUnique.mock.calls[0][0];
+      expect(lookup.where.tokenHash).toEqual(expect.any(String));
+      expect(lookup.where.tokenHash).not.toEqual(dto.token);
+    });
+
+    it('rejects an unknown token without touching the user', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an already-consumed or expired token (atomic consume flips 0 rows)', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
+      expect(prisma.user.update).not.toHaveBeenCalled();
     });
   });
 

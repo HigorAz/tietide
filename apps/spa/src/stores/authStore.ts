@@ -4,6 +4,8 @@ import {
   login as apiLogin,
   register as apiRegister,
   verifyEmail as apiVerifyEmail,
+  forgotPassword as apiForgotPassword,
+  resetPassword as apiResetPassword,
   getMe as apiGetMe,
   type LoginCredentials,
   type RegisterPayload,
@@ -27,6 +29,10 @@ export interface AuthActions {
   register: (payload: RegisterPayload) => Promise<string>;
   // Verifies the emailed token and establishes the session (auto-login).
   verifyEmail: (token: string) => Promise<void>;
+  // Requests a reset link; returns the neutral server message for the UI.
+  forgotPassword: (email: string) => Promise<string>;
+  // Consumes the reset token, sets the new password, and establishes the session.
+  resetPassword: (token: string, password: string) => Promise<void>;
   logout: () => void;
   hydrate: () => Promise<void>;
 }
@@ -62,6 +68,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Verifying the emailed token activates the account and returns a session,
     // so persist it and hydrate the user exactly like login() (auto-login).
     const { accessToken } = await apiVerifyEmail(token);
+    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    set({ token: accessToken });
+    const user = await apiGetMe();
+    set({ user });
+  },
+
+  forgotPassword: async (email) => {
+    // Neutral message regardless of whether the email exists — no session change.
+    const { message } = await apiForgotPassword(email);
+    return message;
+  },
+
+  resetPassword: async (token, password) => {
+    // Consuming the reset token returns a fresh session, so persist it and hydrate
+    // the user exactly like login()/verifyEmail() (auto-login after reset).
+    const { accessToken } = await apiResetPassword(token, password);
     localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
     set({ token: accessToken });
     const user = await apiGetMe();
