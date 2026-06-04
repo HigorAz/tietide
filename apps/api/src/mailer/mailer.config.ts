@@ -49,3 +49,7 @@ export function resolveMailConfig(env: Env): MailConfig {
 export function buildVerificationUrl(appUrl: string, token: string): string {
   return `${stripTrailingSlashes(appUrl)}/verify-email?token=${encodeURIComponent(token)}`;
 }
+
+export function buildPasswordResetUrl(appUrl: string, token: string): string {
+  return `${stripTrailingSlashes(appUrl)}/reset-password?token=${encodeURIComponent(token)}`;
+}

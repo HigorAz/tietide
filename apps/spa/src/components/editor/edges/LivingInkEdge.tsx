@@ -59,18 +59,35 @@ function LivingInkEdgeImpl({
           </feMerge>
         </filter>
       </defs>
+      {/* Faint, wider "water-body" underlay beneath the flowing dashes — gives the
+          connection depth, echoing the tide lines on the auth pages. Decorative
+          only (no edge-path class), so it never intercepts edge selection. */}
+      <path
+        d={edgePath}
+        className="pointer-events-none"
+        fill="none"
+        stroke={`url(#${gradientId})`}
+        strokeWidth={8}
+        strokeLinecap="round"
+        opacity={active ? 0.18 : 0.1}
+      />
       <path
         id={id}
         data-testid="living-ink-edge"
         data-active={active ? 'true' : 'false'}
         data-kind={kind}
         d={edgePath}
-        className={cn('react-flow__edge-path', active ? 'animate-living-ink' : 'opacity-40')}
+        // Idle edges flow gently and continuously (tide); an active result-view
+        // segment flows faster/brighter via living-ink.
+        className={cn(
+          'react-flow__edge-path',
+          active ? 'animate-living-ink' : 'animate-tide-flow opacity-70',
+        )}
         fill="none"
         stroke={`url(#${gradientId})`}
-        strokeWidth={2}
+        strokeWidth={2.5}
         strokeLinecap="round"
-        strokeDasharray={isError ? '6 4' : '8 6'}
+        strokeDasharray={isError ? '5 6' : '6 8'}
         filter={`url(#${GLOW_ID})`}
         markerEnd={markerEnd}
       />

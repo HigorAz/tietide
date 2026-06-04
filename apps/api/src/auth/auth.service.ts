@@ -9,10 +9,13 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
+import type { ForgotPasswordDto } from './dto/forgot-password.dto';
+import type { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto';
 import type { LoginDto } from './dto/login.dto';
 import type { LoginResponseDto } from './dto/login-response.dto';
 import type { RegisterDto } from './dto/register.dto';
 import type { RegisterResponseDto } from './dto/register-response.dto';
+import type { ResetPasswordDto } from './dto/reset-password.dto';
 import type { UserResponseDto } from './dto/user-response.dto';
 import type { VerifyEmailDto } from './dto/verify-email.dto';
 
@@ -21,11 +24,21 @@ const BCRYPT_ROUNDS = 12;
 // Verification links are single-use and short-lived.
 export const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
+// Reset links are shorter-lived than verification links (a password change is a
+// higher-stakes action), single-use, and hashed at rest.
+export const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
+
 // Identical response for every register outcome (new email, taken-but-verified,
 // taken-but-unverified, race loss) so the endpoint cannot be used to enumerate
 // which emails are registered (W2.1).
 const NEUTRAL_REGISTER_RESPONSE: RegisterResponseDto = {
   message: 'If that email can be used, check your inbox to finish creating your account.',
+};
+
+// Same neutral-response strategy for forgot-password: identical whether or not
+// the email is registered, so it can't be used to enumerate accounts.
+const NEUTRAL_FORGOT_RESPONSE: ForgotPasswordResponseDto = {
+  message: 'If that email is registered, we’ve sent a link to reset your password.',
 };
 
 interface SessionUser {
@@ -157,6 +170,76 @@ export class AuthService {
   }
 
   /**
+   * Start a password reset: emails a single-use reset link if the address belongs
+   * to a real account. The response is identical regardless, so it cannot be used
+   * to enumerate which emails are registered.
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<ForgotPasswordResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+      select: { id: true },
+    });
+
+    if (user) {
+      await this.issuePasswordResetToken(user.id, dto.email);
+    }
+
+    return NEUTRAL_FORGOT_RESPONSE;
+  }
+
+  /**
+   * Consume a reset token: sets the new password, marks the email verified
+   * (clicking the emailed link proves ownership), bumps tokenVersion to revoke
+   * every existing session, and issues a fresh session (auto-login).
+   */
+  async resetPassword(dto: ResetPasswordDto): Promise<LoginResponseDto> {
+    const tokenHash = createHash('sha256').update(dto.token).digest('hex');
+    const now = new Date();
+
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true },
+    });
+    if (!record) {
+      throw new BadRequestException('This password reset link is invalid or has expired.');
+    }
+
+    // Atomically consume — single-use AND not expired. A replayed or stale link
+    // flips zero rows and is rejected.
+    const consumed = await this.prisma.passwordResetToken.updateMany({
+      where: { id: record.id, consumedAt: null, expiresAt: { gt: now } },
+      data: { consumedAt: now },
+    });
+    if (consumed.count !== 1) {
+      throw new BadRequestException('This password reset link is invalid or has expired.');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+
+    const user = await this.prisma.user.update({
+      where: { id: record.userId },
+      // tokenVersion bump revokes every previously-issued session (including any
+      // an attacker may hold); emailVerified is set because clicking the emailed
+      // link proves control of the inbox.
+      data: {
+        password: passwordHash,
+        emailVerified: true,
+        tokenVersion: { increment: 1 },
+      },
+      select: { id: true, email: true, role: true, tokenVersion: true },
+    });
+
+    // Invalidate any other outstanding reset links for this user so only the one
+    // just used could ever have worked.
+    await this.prisma.passwordResetToken.updateMany({
+      where: { userId: record.userId, consumedAt: null },
+      data: { consumedAt: now },
+    });
+
+    return this.signSession(user);
+  }
+
+  /**
    * Revoke every outstanding token for a user by bumping their tokenVersion.
    * The JWT strategy compares the version embedded in each token against the
    * user's current version on every request, so all previously-issued tokens
@@ -190,6 +273,17 @@ export class AuthService {
       data: { userId, tokenHash, expiresAt },
     });
     await this.mailer.sendVerificationEmail(email, rawToken);
+  }
+
+  private async issuePasswordResetToken(userId: string, email: string): Promise<void> {
+    const rawToken = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+
+    await this.prisma.passwordResetToken.create({
+      data: { userId, tokenHash, expiresAt },
+    });
+    await this.mailer.sendPasswordResetEmail(email, rawToken);
   }
 
   private signSession(user: SessionUser): LoginResponseDto {
