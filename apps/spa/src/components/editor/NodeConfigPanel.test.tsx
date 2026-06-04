@@ -113,6 +113,13 @@ describe('NodeConfigPanel', () => {
 
       expect(useEditorStore.getState().selectedNodeId).toBeNull();
     });
+
+    it('should expose a resize handle and apply an explicit width', () => {
+      seedNodeOfType(NodeType.HTTP_REQUEST);
+      render(<NodeConfigPanel />);
+      expect(screen.getByTestId('node-config-resize')).toBeInTheDocument();
+      expect(screen.getByTestId('node-config-panel').style.width).toBe('320px');
+    });
   });
 
   describe('error handler toggle', () => {

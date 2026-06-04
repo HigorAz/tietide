@@ -6,8 +6,6 @@ export interface PillOverlayProps {
   segments: Segment[];
   placeholder?: string;
   showPlaceholder: boolean;
-  /** Wrap text (expanded textarea) vs. keep it on one clipped line (collapsed input). */
-  multiline?: boolean;
   /** Scroll-synced with the underlying field so chips stay aligned when it scrolls. */
   overlayRef?: RefObject<HTMLDivElement>;
   /** Full `{{…}}` tokens that reference a missing/invalid node — rendered red. */
@@ -23,7 +21,6 @@ export function PillOverlay({
   segments,
   placeholder,
   showPlaceholder,
-  multiline = false,
   overlayRef,
   invalidTokens,
 }: PillOverlayProps) {
@@ -36,10 +33,11 @@ export function PillOverlay({
         // z-10 lifts the overlay above the input, which paints its own bg-elevated
         // background. Without it the input's bg covered the overlay and the text was
         // invisible unless selected (selection highlight paints on top regardless).
-        // overflow-hidden lets us mirror the field's scroll offset; pr-8 leaves room
-        // for the expand toggle so chips never sit under it.
-        'pointer-events-none absolute inset-0 z-10 overflow-hidden py-2 pl-3 pr-8 text-sm leading-6',
-        multiline ? 'whitespace-pre-wrap break-words' : 'whitespace-pre',
+        // overflow-hidden lets us mirror the field's scroll offset. The text wraps
+        // exactly like the underlying textarea — including breaking long unbroken
+        // strings ([overflow-wrap:anywhere]) so nothing spills past the box edge.
+        'pointer-events-none absolute inset-0 z-10 overflow-hidden px-3 py-2 text-sm leading-6',
+        'whitespace-pre-wrap break-words [overflow-wrap:anywhere]',
       )}
     >
       {showPlaceholder && placeholder ? (
