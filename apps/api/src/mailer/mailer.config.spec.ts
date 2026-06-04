@@ -1,6 +1,7 @@
 import {
   DEFAULT_APP_URL,
   DEFAULT_MAIL_FROM,
+  buildPasswordResetUrl,
   buildVerificationUrl,
   resolveMailConfig,
 } from './mailer.config';
@@ -70,6 +71,20 @@ describe('mailer.config', () => {
     it('does not double a trailing slash on the base url', () => {
       expect(buildVerificationUrl('https://app.tietide.com/', 'tok')).toBe(
         'https://app.tietide.com/verify-email?token=tok',
+      );
+    });
+  });
+
+  describe('buildPasswordResetUrl', () => {
+    it('builds a /reset-password URL with the token query-encoded', () => {
+      expect(buildPasswordResetUrl('https://app.tietide.com', 'abc+/=')).toBe(
+        'https://app.tietide.com/reset-password?token=abc%2B%2F%3D',
+      );
+    });
+
+    it('does not double a trailing slash on the base url', () => {
+      expect(buildPasswordResetUrl('https://app.tietide.com/', 'tok')).toBe(
+        'https://app.tietide.com/reset-password?token=tok',
       );
     });
   });

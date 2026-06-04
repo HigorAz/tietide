@@ -1,89 +1,51 @@
 /**
- * Decorative SVG layer rendered behind the React Flow canvas. Mimics the
- * "ink-in-water" plumes from the PROTÓTIPO TIETIDE.jpeg reference — three
- * heavily-blurred navy-blue ellipses that drift slowly along independent
- * paths, so the dark canvas has depth instead of being a flat #0A2540 wash.
+ * Decorative layer rendered behind the React Flow canvas. Mirrors the auth-page
+ * "tide" background — a teal/blue radial glow that is vivid in the centre and
+ * fades to deep-blue on both sides — but a notch darker (lower-alpha glow + a
+ * corner vignette) so the editor canvas reads calmer than the marketing/login
+ * surface while staying on-brand.
  *
  * Notes:
  * - `pointer-events: none` so the layer doesn't intercept pan/zoom gestures.
  * - `aria-hidden` because it's purely decorative.
- * - Animations are gated by `prefers-reduced-motion: reduce` via a CSS-only
- *   `<style>` block so the plumes hold position for motion-sensitive users.
+ * - The slow drift is gated by `prefers-reduced-motion` via a CSS-only block.
  */
 export function InkPlumeBackdrop(): JSX.Element {
   return (
-    <svg
+    <div
       data-testid="ink-plume-backdrop"
       aria-hidden
-      className="pointer-events-none absolute inset-0 z-0 h-full w-full"
-      preserveAspectRatio="xMidYMid slice"
-      viewBox="0 0 1000 700"
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
     >
-      <defs>
-        <radialGradient id="inkPlumeNavy" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#1E3A6B" stopOpacity="0.55" />
-          <stop offset="60%" stopColor="#0E2447" stopOpacity="0.30" />
-          <stop offset="100%" stopColor="#06182E" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="inkPlumeTeal" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#00D4B3" stopOpacity="0.10" />
-          <stop offset="100%" stopColor="#00D4B3" stopOpacity="0" />
-        </radialGradient>
-        <filter id="inkPlumeBlur" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="32" />
-        </filter>
-      </defs>
-
       <style>{`
-        @media (prefers-reduced-motion: reduce) {
-          .ink-plume { animation: none !important; }
+        @media (prefers-reduced-motion: no-preference) {
+          .ink-tide-glow { animation: ink-tide-breathe 18s ease-in-out infinite; }
         }
-        @keyframes ink-drift-1 {
-          0%   { transform: translate(0px, 0px) scale(1); }
-          50%  { transform: translate(40px, -30px) scale(1.08); }
-          100% { transform: translate(0px, 0px) scale(1); }
+        @keyframes ink-tide-breathe {
+          0%, 100% { opacity: 0.85; transform: translate3d(0, 0, 0) scale(1); }
+          50%      { opacity: 1;    transform: translate3d(0, -14px, 0) scale(1.05); }
         }
-        @keyframes ink-drift-2 {
-          0%   { transform: translate(0px, 0px) scale(1); }
-          50%  { transform: translate(-50px, 40px) scale(0.95); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        @keyframes ink-drift-3 {
-          0%   { transform: translate(0px, 0px) scale(1); }
-          50%  { transform: translate(30px, 50px) scale(1.05); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .ink-plume-1 { animation: ink-drift-1 48s ease-in-out infinite; transform-origin: 280px 220px; }
-        .ink-plume-2 { animation: ink-drift-2 60s ease-in-out infinite; transform-origin: 720px 360px; }
-        .ink-plume-3 { animation: ink-drift-3 52s ease-in-out infinite; transform-origin: 520px 580px; }
       `}</style>
 
-      <g filter="url(#inkPlumeBlur)">
-        <ellipse
-          className="ink-plume ink-plume-1"
-          cx="280"
-          cy="220"
-          rx="240"
-          ry="170"
-          fill="url(#inkPlumeNavy)"
-        />
-        <ellipse
-          className="ink-plume ink-plume-2"
-          cx="720"
-          cy="360"
-          rx="280"
-          ry="200"
-          fill="url(#inkPlumeNavy)"
-        />
-        <ellipse
-          className="ink-plume ink-plume-3"
-          cx="520"
-          cy="580"
-          rx="260"
-          ry="180"
-          fill="url(#inkPlumeTeal)"
-        />
-      </g>
-    </svg>
+      {/* mirrored teal/blue glow over deep-blue — lower alpha than the login page */}
+      <div
+        className="ink-tide-glow absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(1100px 820px at 50% 26%, rgba(0, 212, 179, 0.12), transparent 60%),' +
+            'radial-gradient(900px 680px at 50% 112%, rgba(51, 154, 240, 0.08), transparent 60%)',
+        }}
+      />
+
+      {/* corner vignette: darkens the edges so the centre reads brighter and the
+          whole canvas sits a shade darker than the auth background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(135% 135% at 50% 42%, transparent 55%, rgba(3, 14, 28, 0.55) 100%)',
+        }}
+      />
+    </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { registerFormSchema, type RegisterFormValues } from '@tietide/shared';
+import { forgotPasswordFormSchema, type ForgotPasswordFormValues } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 import { Spinner } from '@/components/ui/Spinner';
@@ -11,8 +11,14 @@ import { AuthTextField } from '@/components/auth/AuthTextField';
 import { cn } from '@/utils/cn';
 import { resolveAuthErrorMessage } from '@/utils/authError';
 
-export function RegisterPage(): JSX.Element {
-  const registerUser = useAuthStore((s) => s.register);
+const submitClasses = cn(
+  'mt-1 inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent-teal px-4 py-3 text-[15px] font-bold text-deep-blue',
+  'transition-colors hover:bg-accent-teal-hover',
+  'disabled:cursor-not-allowed disabled:opacity-60',
+);
+
+export function ForgotPasswordPage(): JSX.Element {
+  const forgotPassword = useAuthStore((s) => s.forgotPassword);
   const toast = useToastStore((s) => s.show);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
@@ -20,17 +26,15 @@ export function RegisterPage(): JSX.Element {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerFormSchema),
-    defaultValues: { name: '', email: '', password: '' },
+  } = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordFormSchema),
+    defaultValues: { email: '' },
   });
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await registerUser(values);
-      // No auto-login on register anymore: the API emailed a verification link.
-      // Show a neutral confirmation (identical regardless of whether the email
-      // was new or already taken — no enumeration signal).
+      await forgotPassword(values.email);
+      // Neutral confirmation regardless of whether the email is registered.
       setSubmittedEmail(values.email);
     } catch (err) {
       toast({ tone: 'error', message: resolveAuthErrorMessage(err) });
@@ -42,9 +46,8 @@ export function RegisterPage(): JSX.Element {
       <AuthLayout>
         <h1 className="mb-2 text-3xl font-bold text-text-primary">Check your inbox</h1>
         <p className="mb-6 text-[15px] leading-relaxed text-text-secondary">
-          If <span className="text-text-primary">{submittedEmail}</span> can be used, we&apos;ve
-          sent a verification link. Click it to activate your account and sign in. The link expires
-          in 24 hours.
+          If <span className="text-text-primary">{submittedEmail}</span> is registered, we&apos;ve
+          sent a link to reset your password. The link expires in 1 hour.
         </p>
         <Link to="/login" className="font-semibold text-accent-teal hover:text-accent-teal-hover">
           Back to sign in
@@ -55,20 +58,12 @@ export function RegisterPage(): JSX.Element {
 
   return (
     <AuthLayout>
-      <h1 className="mb-1.5 text-3xl font-bold text-text-primary">Create your account</h1>
+      <h1 className="mb-1.5 text-3xl font-bold text-text-primary">Forgot your password?</h1>
       <p className="mb-[30px] text-[15px] text-text-secondary">
-        Start building integrations in minutes.
+        Enter your email and we&apos;ll send you a link to reset it.
       </p>
 
       <form onSubmit={onSubmit} noValidate>
-        <AuthTextField
-          id="name"
-          label="Name"
-          type="text"
-          autoComplete="name"
-          error={errors.name?.message}
-          {...register('name')}
-        />
         <AuthTextField
           id="email"
           label="Email"
@@ -77,31 +72,15 @@ export function RegisterPage(): JSX.Element {
           error={errors.email?.message}
           {...register('email')}
         />
-        <AuthTextField
-          id="password"
-          label="Password"
-          isPassword
-          autoComplete="new-password"
-          error={errors.password?.message}
-          {...register('password')}
-        />
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className={cn(
-            'mt-1 inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent-teal px-4 py-3 text-[15px] font-bold text-deep-blue',
-            'transition-colors hover:bg-accent-teal-hover',
-            'disabled:cursor-not-allowed disabled:opacity-60',
-          )}
-        >
-          {isSubmitting && <Spinner size="sm" label="Creating account" />}
-          <span>{isSubmitting ? 'Creating account…' : 'Create account'}</span>
+        <button type="submit" disabled={isSubmitting} className={submitClasses}>
+          {isSubmitting && <Spinner size="sm" label="Sending reset link" />}
+          <span>{isSubmitting ? 'Sending…' : 'Send reset link'}</span>
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-text-secondary">
-        Already have an account?{' '}
+        Remembered it?{' '}
         <Link to="/login" className="font-semibold text-accent-teal hover:text-accent-teal-hover">
           Sign in
         </Link>

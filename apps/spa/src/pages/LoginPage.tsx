@@ -5,17 +5,10 @@ import { loginFormSchema, type LoginFormValues } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 import { Spinner } from '@/components/ui/Spinner';
+import { AuthLayout } from '@/components/auth/AuthLayout';
+import { AuthTextField } from '@/components/auth/AuthTextField';
 import { cn } from '@/utils/cn';
 import { resolveAuthErrorMessage } from '@/utils/authError';
-import logoFull from '@/assets/brand/logo-full.png';
-
-const inputClasses = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
-
-const labelClasses = 'mb-1 block text-xs font-medium uppercase tracking-wide text-text-secondary';
 
 interface MaybeAxiosError {
   response?: { status?: number };
@@ -58,75 +51,60 @@ export function LoginPage(): JSX.Element {
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-deep-blue px-4 py-12">
-      <div className="w-full max-w-sm rounded-lg bg-surface p-8 shadow-xl">
-        <img src={logoFull} alt="TieTide" className="mb-4 h-20 w-auto" />
-        <h1 className="mb-1 text-2xl font-semibold text-text-primary">Welcome back</h1>
-        <p className="mb-6 text-sm text-text-secondary">Sign in to continue to TieTide.</p>
+    <AuthLayout>
+      <h1 className="mb-1.5 text-3xl font-bold text-text-primary">Welcome back</h1>
+      <p className="mb-[30px] text-[15px] text-text-secondary">Sign in to continue to TieTide.</p>
 
-        <form onSubmit={onSubmit} noValidate className="space-y-4">
-          <div>
-            <label htmlFor="email" className={labelClasses}>
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              className={inputClasses}
-              aria-invalid={errors.email ? 'true' : 'false'}
-              {...register('email')}
-            />
-            {errors.email && (
-              <p className="mt-1 text-xs text-error" role="alert">
-                {errors.email.message}
-              </p>
-            )}
-          </div>
+      <form onSubmit={onSubmit} noValidate>
+        <AuthTextField
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          error={errors.email?.message}
+          {...register('email')}
+        />
+        <AuthTextField
+          id="password"
+          label="Password"
+          isPassword
+          autoComplete="current-password"
+          error={errors.password?.message}
+          {...register('password')}
+        />
 
-          <div>
-            <label htmlFor="password" className={labelClasses}>
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              className={inputClasses}
-              aria-invalid={errors.password ? 'true' : 'false'}
-              {...register('password')}
-            />
-            {errors.password && (
-              <p className="mt-1 text-xs text-error" role="alert">
-                {errors.password.message}
-              </p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={cn(
-              'inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent-teal px-4 py-2 text-sm font-semibold text-deep-blue',
-              'transition-colors hover:bg-accent-teal-hover',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-            )}
-          >
-            {isSubmitting && <Spinner size="sm" label="Signing in" />}
-            <span>{isSubmitting ? 'Signing in…' : 'Sign in'}</span>
-          </button>
-        </form>
-
-        <p className="mt-6 text-center text-sm text-text-secondary">
-          Don&apos;t have an account?{' '}
+        <div className="mb-6 flex justify-end">
           <Link
-            to="/register"
-            className="font-medium text-accent-teal hover:text-accent-teal-hover"
+            to="/forgot-password"
+            className="text-[13px] font-semibold text-accent-teal hover:text-accent-teal-hover"
           >
-            Register
+            Forgot password?
           </Link>
-        </p>
-      </div>
-    </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className={cn(
+            'mt-1 inline-flex w-full items-center justify-center gap-2 rounded-md bg-accent-teal px-4 py-3 text-[15px] font-bold text-deep-blue',
+            'transition-colors hover:bg-accent-teal-hover',
+            'disabled:cursor-not-allowed disabled:opacity-60',
+          )}
+        >
+          {isSubmitting && <Spinner size="sm" label="Signing in" />}
+          <span>{isSubmitting ? 'Signing in…' : 'Sign in'}</span>
+        </button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-text-secondary">
+        Don&apos;t have an account?{' '}
+        <Link
+          to="/register"
+          className="font-semibold text-accent-teal hover:text-accent-teal-hover"
+        >
+          Register
+        </Link>
+      </p>
+    </AuthLayout>
   );
 }

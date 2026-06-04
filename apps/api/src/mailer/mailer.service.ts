@@ -6,7 +6,12 @@ import {
   type MailMessage,
   type MailTransport,
 } from './mail.transport';
-import { buildVerificationUrl, resolveMailConfig, type MailConfig } from './mailer.config';
+import {
+  buildPasswordResetUrl,
+  buildVerificationUrl,
+  resolveMailConfig,
+  type MailConfig,
+} from './mailer.config';
 
 /**
  * Sends transactional auth emails. The transport is chosen once at construction:
@@ -35,6 +40,19 @@ export class MailerService {
         `Welcome to TieTide!\n\n` +
         `Confirm your email address to activate your account:\n${url}\n\n` +
         `This link expires in 24 hours. If you didn't create an account, you can ignore this email.`,
+    });
+  }
+
+  async sendPasswordResetEmail(to: string, rawToken: string): Promise<void> {
+    const url = buildPasswordResetUrl(this.config.appUrl, rawToken);
+    await this.safeSend({
+      to,
+      subject: 'Reset your TieTide password',
+      text:
+        `We received a request to reset your TieTide password.\n\n` +
+        `Choose a new password here:\n${url}\n\n` +
+        `This link expires in 1 hour and can be used once. ` +
+        `If you didn't request this, you can safely ignore this email — your password won't change.`,
     });
   }
 

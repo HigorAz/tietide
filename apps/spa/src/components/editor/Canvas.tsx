@@ -161,7 +161,7 @@ export function Canvas() {
         fitViewOptions={FIT_VIEW_OPTIONS}
         {...editorTouchProps(isMobile)}
       >
-        <Background gap={16} color="#1A3050" />
+        <Background gap={16} color="#14304d" />
         <Controls />
       </ReactFlow>
       {isDragActive && (

@@ -186,4 +186,18 @@ describe('LoginPage', () => {
     const link = screen.getByRole('link', { name: /register|create an account|sign up/i });
     expect(link).toHaveAttribute('href', '/register');
   });
+
+  it('should toggle password visibility when the show/hide control is clicked', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+
+    const password = screen.getByLabelText(/password/i);
+    expect(password).toHaveAttribute('type', 'password');
+
+    await user.click(screen.getByRole('button', { name: /show/i }));
+    expect(password).toHaveAttribute('type', 'text');
+
+    await user.click(screen.getByRole('button', { name: /hide/i }));
+    expect(password).toHaveAttribute('type', 'password');
+  });
 });

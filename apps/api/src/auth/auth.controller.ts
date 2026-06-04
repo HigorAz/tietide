@@ -20,10 +20,13 @@ import {
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { RegisterResponseDto } from './dto/register-response.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import type { AuthenticatedUser } from './strategies/jwt.strategy';
@@ -66,6 +69,41 @@ export class AuthController {
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<LoginResponseDto> {
     return this.authService.verifyEmail(dto);
+  }
+
+  @Post('forgot-password')
+  @Throttle({
+    [DEFAULT_THROTTLER_NAME]: {
+      ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
+      limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+  })
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Request a password reset — emails a reset link; returns a neutral message',
+  })
+  @ApiAcceptedResponse({ type: ForgotPasswordResponseDto })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<ForgotPasswordResponseDto> {
+    return this.authService.forgotPassword(dto);
+  }
+
+  @Post('reset-password')
+  @Throttle({
+    [DEFAULT_THROTTLER_NAME]: {
+      ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
+      limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Reset a password via the emailed token — sets the password and logs in',
+  })
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid or expired reset token' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<LoginResponseDto> {
+    return this.authService.resetPassword(dto);
   }
 
   @Post('login')

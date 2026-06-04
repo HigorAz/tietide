@@ -35,4 +35,13 @@ describe('MailerService (log transport)', () => {
     expect(logger.log).toHaveBeenCalledTimes(1);
     expect(logger.log.mock.calls[0][0].to).toBe('user@example.com');
   });
+
+  it('logs the password-reset email containing the /reset-password link', async () => {
+    await mailer.sendPasswordResetEmail('user@example.com', 'reset-tok-123');
+
+    expect(logger.log).toHaveBeenCalledTimes(1);
+    const [meta] = logger.log.mock.calls[0];
+    expect(meta.to).toBe('user@example.com');
+    expect(meta.body).toContain('https://app.tietide.com/reset-password?token=reset-tok-123');
+  });
 });

@@ -18,6 +18,8 @@ describe('AuthController (integration)', () => {
     register: jest.Mock;
     login: jest.Mock;
     verifyEmail: jest.Mock;
+    forgotPassword: jest.Mock;
+    resetPassword: jest.Mock;
     getProfile: jest.Mock;
     logout: jest.Mock;
   };
@@ -28,6 +30,8 @@ describe('AuthController (integration)', () => {
       register: jest.fn(),
       login: jest.fn(),
       verifyEmail: jest.fn(),
+      forgotPassword: jest.fn(),
+      resetPassword: jest.fn(),
       getProfile: jest.fn(),
       logout: jest.fn(),
     };
@@ -282,6 +286,99 @@ describe('AuthController (integration)', () => {
         .expect(400);
 
       expect(authService.verifyEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /auth/forgot-password', () => {
+    const neutral = {
+      message: 'If that email is registered, we’ve sent a link to reset your password.',
+    };
+
+    it('should return 202 with a neutral message and never reveal account existence', async () => {
+      authService.forgotPassword.mockResolvedValue(neutral);
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'test@example.com' })
+        .expect(202);
+
+      expect(res.body).toEqual(neutral);
+      expect(authService.forgotPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'test@example.com' }),
+      );
+    });
+
+    it('should lowercase + trim the email before passing to the service', async () => {
+      authService.forgotPassword.mockResolvedValue(neutral);
+
+      await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: '  TEST@Example.COM  ' })
+        .expect(202);
+
+      expect(authService.forgotPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'test@example.com' }),
+      );
+    });
+
+    it('should return 400 when the email format is invalid', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'not-an-email' })
+        .expect(400);
+
+      expect(authService.forgotPassword).not.toHaveBeenCalled();
+    });
+
+    it('should reject unknown fields (forbidNonWhitelisted)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/forgot-password')
+        .send({ email: 'test@example.com', role: 'ADMIN' })
+        .expect(400);
+
+      expect(authService.forgotPassword).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /auth/reset-password', () => {
+    const validBody = { token: 'a-valid-reset-token-1234567890', password: 'newpassword1' };
+
+    it('should return 200 with an accessToken when the token + password are valid', async () => {
+      authService.resetPassword.mockResolvedValue({ accessToken: 'jwt', tokenType: 'Bearer' });
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send(validBody)
+        .expect(200);
+
+      expect(res.body).toEqual({ accessToken: 'jwt', tokenType: 'Bearer' });
+      expect(authService.resetPassword).toHaveBeenCalledWith(
+        expect.objectContaining({ token: validBody.token, password: validBody.password }),
+      );
+    });
+
+    it('should return 400 when the service rejects an invalid/expired token', async () => {
+      authService.resetPassword.mockRejectedValue(new BadRequestException('invalid'));
+
+      await request(app.getHttpServer()).post('/auth/reset-password').send(validBody).expect(400);
+    });
+
+    it('should return 400 when the token is missing/too short (DTO validation)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ token: 'short', password: 'newpassword1' })
+        .expect(400);
+
+      expect(authService.resetPassword).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when the new password is weak (no digit)', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/reset-password')
+        .send({ ...validBody, password: 'onlyletters' })
+        .expect(400);
+
+      expect(authService.resetPassword).not.toHaveBeenCalled();
     });
   });
 
