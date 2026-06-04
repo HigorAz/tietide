@@ -1,24 +1,27 @@
-import { useMemo, type MouseEvent as ReactMouseEvent } from 'react';
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
+import { groupSuggestions } from '@/lib/group-suggestions';
 import { buildPillToken } from '@/lib/dataPillToken';
+import { humanizePath } from '@/lib/humanize-path';
+import { getNodeIcon } from '@/components/editor/nodes/nodeIcons';
 import { cn } from '@/utils/cn';
 import { BottomSheet } from '../BottomSheet';
 
 /**
  * Click-to-insert data-pill panel. Shown beside the config form whenever a
- * DataPillInput is focused (`editorStore.activePillField`). Lists every upstream
- * node's output paths as clickable pills and inserts the chosen token into the
- * focused field via the inserter that field registered on focus.
+ * DataPillInput is focused (`editorStore.activePillField`). Groups every
+ * upstream node's output paths into collapsible, icon-labelled sections with
+ * human-friendly field names and inserts the chosen alias token into the focused
+ * field via the inserter that field registered on focus.
  *
- * Rows use `onMouseDown` + preventDefault so the focused input never blurs — if
- * it did, `activePillField` would clear and the panel would vanish before the
- * click resolved. There is intentionally no filter box for the same reason
- * (a focusable input would steal focus); the inline `{{` dropdown covers
- * type-to-filter.
+ * Rows and headers use `onMouseDown` + preventDefault so the focused input never
+ * blurs — if it did, `activePillField` would clear and the panel would vanish
+ * before the click resolved.
  */
 export function DataPillPicker(): JSX.Element | null {
   const activePillField = useEditorStore((s) => s.activePillField);
@@ -27,6 +30,7 @@ export function DataPillPicker(): JSX.Element | null {
   const edges = useEditorStore((s) => s.edges);
   const liveNodes = useExecutionLiveStore((s) => s.nodes);
   const isMobile = useIsMobile();
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   // A user-declared (or test-captured) `__pillSample` is the top-priority pill
   // source (#259) — it overrides the node's static schema. Keyed by nodeId for
@@ -47,44 +51,75 @@ export function DataPillPicker(): JSX.Element | null {
       .suggestions;
   }, [activePillField, nodes, edges, liveNodes, overrides]);
 
+  const groups = useMemo(() => groupSuggestions(suggestions), [suggestions]);
+
   if (!activePillField) return null;
 
   const insert = activePillField.insert;
   const pick = (e: ReactMouseEvent<HTMLButtonElement>, suggestion: PathSuggestion): void => {
     // Keep the focused input from blurring so activePillField survives the click.
     e.preventDefault();
-    insert(buildPillToken(suggestion.nodeId, suggestion.path));
+    insert(buildPillToken(suggestion.ref, suggestion.path));
+  };
+  const toggle = (e: ReactMouseEvent<HTMLButtonElement>, nodeId: string): void => {
+    e.preventDefault();
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
   };
 
   const list = (
-    <ul
-      role="listbox"
-      aria-label="Upstream data pills"
-      className="min-h-0 flex-1 overflow-y-auto py-1"
-    >
-      {suggestions.length === 0 ? (
-        <li className="px-3 py-2 text-xs text-text-muted">No upstream outputs to reference yet.</li>
+    <div role="listbox" aria-label="Upstream data pills" className="min-h-0 flex-1 overflow-y-auto">
+      {groups.length === 0 ? (
+        <p className="px-3 py-2 text-xs text-text-muted">No upstream outputs to reference yet.</p>
       ) : (
-        suggestions.slice(0, 100).map((s, i) => {
-          const token = buildPillToken(s.nodeId, s.path);
+        groups.map((group) => {
+          const Icon = getNodeIcon(group.nodeType);
+          const isOpen = !collapsed.has(group.nodeId);
           return (
-            <li key={`${s.nodeId}-${s.path}-${i}`} role="option" aria-selected={false}>
+            <section key={group.nodeId} className="border-b border-white/5 last:border-b-0">
               <button
                 type="button"
-                data-testid="data-pill-picker-option"
-                onMouseDown={(e) => pick(e, s)}
-                className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs hover:bg-white/5 focus:bg-white/5 focus:outline-none"
+                data-testid="data-pill-group-header"
+                onMouseDown={(e) => toggle(e, group.nodeId)}
+                aria-expanded={isOpen}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-text-secondary hover:bg-white/5 focus:bg-white/5 focus:outline-none"
               >
-                <span className="truncate font-mono text-accent-teal">{token}</span>
-                <span className="ml-2 shrink-0 text-text-muted">
-                  {s.nodeLabel} · {s.type}
-                </span>
+                {isOpen ? (
+                  <ChevronDown size={14} aria-hidden />
+                ) : (
+                  <ChevronRight size={14} aria-hidden />
+                )}
+                <Icon size={14} className="shrink-0 text-accent-teal" aria-hidden />
+                <span className="truncate">{group.nodeLabel}</span>
+                <span className="ml-auto shrink-0 text-text-muted">{group.suggestions.length}</span>
               </button>
-            </li>
+              {isOpen && (
+                <ul className="pb-1">
+                  {group.suggestions.map((s, i) => (
+                    <li key={`${s.ref}-${s.path}-${i}`} role="option" aria-selected={false}>
+                      <button
+                        type="button"
+                        data-testid="data-pill-picker-option"
+                        onMouseDown={(e) => pick(e, s)}
+                        title={buildPillToken(s.ref, s.path)}
+                        className="flex w-full items-center justify-between gap-2 py-1.5 pl-9 pr-3 text-left text-xs hover:bg-white/5 focus:bg-white/5 focus:outline-none"
+                      >
+                        <span className="truncate text-text-primary">{humanizePath(s.path)}</span>
+                        <span className="ml-2 shrink-0 text-text-muted">{s.type}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           );
         })
       )}
-    </ul>
+    </div>
   );
 
   if (isMobile) {

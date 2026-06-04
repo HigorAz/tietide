@@ -8,7 +8,11 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type RefObject,
+  type SyntheticEvent,
+  type UIEvent as ReactUIEvent,
 } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import type { TemplateOperator } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
@@ -22,8 +26,12 @@ import {
   splitSegments,
   type ClosedTokenSpan,
 } from '@/lib/dataPillToken';
+import { humanizePath } from '@/lib/humanize-path';
+import { invalidTokensForNode } from '@/lib/validate-references';
 import { AppendOperatorMenu } from './AppendOperatorMenu';
 import { PillOverlay } from './PillOverlay';
+
+type FieldElement = HTMLInputElement | HTMLTextAreaElement;
 
 export interface DataPillInputProps {
   value: string;
@@ -54,10 +62,15 @@ export function DataPillInput({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [filterText, setFilterText] = useState('');
+  // Expandable field: collapsed = single-line <input>, expanded = multi-line
+  // <textarea>. Both share the same caret/value handlers (selectionStart works
+  // on either), so autocomplete and the pill inserter behave identically.
+  const [expanded, setExpanded] = useState(false);
   // #258: when the caret sits right after a closed pill, offer an "append operator" menu.
   const [appendSpan, setAppendSpan] = useState<ClosedTokenSpan | null>(null);
 
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<FieldElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
 
@@ -74,12 +87,16 @@ export function DataPillInput({
     const filter = filterText.toLowerCase();
     if (filter.length === 0) return upstream.suggestions;
     return upstream.suggestions.filter((s) => {
-      const haystack = `${s.nodeId}.${s.path} ${s.nodeLabel}`.toLowerCase();
+      const haystack = `${s.ref}.${s.path} ${s.nodeLabel} ${humanizePath(s.path)}`.toLowerCase();
       return haystack.includes(filter);
     });
   }, [upstream.suggestions, filterText]);
 
   const segments = useMemo(() => splitSegments(value), [value]);
+  const invalidTokens = useMemo(
+    () => invalidTokensForNode(nodeId, nodes, edges),
+    [nodeId, nodes, edges],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -97,7 +114,7 @@ export function DataPillInput({
     if (activeIndex >= suggestions.length) setActiveIndex(0);
   }, [suggestions.length, activeIndex]);
 
-  const refreshAutocomplete = (input: HTMLInputElement) => {
+  const refreshAutocomplete = (input: FieldElement) => {
     const caret = input.selectionStart ?? input.value.length;
     setAppendSpan(findClosedTokenBeforeCaret(input.value, caret));
     const tokenStart = findOpenTokenStart(input.value, caret);
@@ -115,12 +132,12 @@ export function DataPillInput({
     setOpen(true);
   };
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<FieldElement>) => {
     onChange(e.target.value);
     refreshAutocomplete(e.target);
   };
 
-  const handleKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: ReactKeyboardEvent<FieldElement>) => {
     if (!open) return;
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -159,7 +176,7 @@ export function DataPillInput({
   const insertSuggestion = (suggestion: PathSuggestion) => {
     const input = inputRef.current;
     const caret = input?.selectionStart ?? value.length;
-    const token = buildPillToken(suggestion.nodeId, suggestion.path);
+    const token = buildPillToken(suggestion.ref, suggestion.path);
     const { value: newValue, caret: newCaret } = insertToken(value, token, caret);
     onChange(newValue);
     setOpen(false);
@@ -196,45 +213,89 @@ export function DataPillInput({
     insertSuggestion(suggestion);
   };
 
+  // Keep the highlight overlay aligned with the field as it scrolls (horizontally
+  // when collapsed, vertically when expanded past its rows).
+  const syncScroll = (el: FieldElement): void => {
+    const o = overlayRef.current;
+    if (!o) return;
+    o.scrollTop = el.scrollTop;
+    o.scrollLeft = el.scrollLeft;
+  };
+  const refreshFromEvent = (e: SyntheticEvent<FieldElement>): void =>
+    refreshAutocomplete(e.currentTarget);
+  const onScroll = (e: ReactUIEvent<FieldElement>): void => syncScroll(e.currentTarget);
+
   const showPlaceholder = value.length === 0;
+
+  const commonProps = {
+    id,
+    value,
+    onChange: handleChange,
+    onKeyDown: handleKeyDown,
+    onFocus: () => setActivePillField({ nodeId, insert: insertAtCaret }),
+    onBlur: () => setActivePillField(null),
+    onKeyUp: refreshFromEvent,
+    onClick: refreshFromEvent,
+    // onSelect tracks caret moves so the #258 append-operator affordance re-evaluates.
+    onSelect: refreshFromEvent,
+    onScroll,
+    role: 'combobox' as const,
+    'aria-autocomplete': 'list' as const,
+    'aria-expanded': open,
+    'aria-controls': listboxId,
+    'aria-activedescendant':
+      open && suggestions[activeIndex] ? `${listboxId}-${activeIndex}` : undefined,
+    autoComplete: 'off',
+    spellCheck: false,
+  };
+
+  const fieldClass = cn(
+    'relative w-full rounded-md border border-white/5 bg-elevated py-2 pl-3 pr-8 text-sm leading-6',
+    'text-transparent caret-text-primary',
+    'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+  );
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
       <PillOverlay
+        overlayRef={overlayRef}
         segments={segments}
         placeholder={placeholder}
         showPlaceholder={showPlaceholder}
+        multiline={expanded}
+        invalidTokens={invalidTokens}
       />
 
-      <input
-        ref={inputRef}
-        id={id}
-        type={type ?? 'text'}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onFocus={() => setActivePillField({ nodeId, insert: insertAtCaret })}
-        onBlur={() => setActivePillField(null)}
-        onKeyUp={(e) => refreshAutocomplete(e.currentTarget)}
-        onClick={(e) => refreshAutocomplete(e.currentTarget)}
-        // onSelect tracks caret moves so the #258 append-operator affordance re-evaluates.
-        onSelect={(e) => refreshAutocomplete(e.currentTarget)}
-        role="combobox"
-        aria-autocomplete="list"
-        aria-expanded={open}
-        aria-controls={listboxId}
-        aria-activedescendant={
-          open && suggestions[activeIndex] ? `${listboxId}-${activeIndex}` : undefined
-        }
-        autoComplete="off"
-        spellCheck={false}
-        className={cn(
-          'relative w-full rounded-md border border-white/5 bg-elevated px-3 py-2 text-sm leading-6',
-          'text-transparent caret-text-primary',
-          'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-        )}
-        {...rest}
-      />
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={expanded ? 'Collapse field' : 'Expand field'}
+        data-testid="data-pill-expand-toggle"
+        // preventDefault keeps the field from blurring (which would close the picker).
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setExpanded((v) => !v)}
+        className="absolute right-1.5 top-1.5 z-20 rounded p-0.5 text-text-muted hover:text-text-primary focus:outline-none"
+      >
+        {expanded ? <Minimize2 size={13} aria-hidden /> : <Maximize2 size={13} aria-hidden />}
+      </button>
+
+      {expanded ? (
+        <textarea
+          ref={inputRef as RefObject<HTMLTextAreaElement>}
+          rows={6}
+          {...commonProps}
+          className={cn(fieldClass, 'resize-none')}
+          {...rest}
+        />
+      ) : (
+        <input
+          ref={inputRef as RefObject<HTMLInputElement>}
+          type={type ?? 'text'}
+          {...commonProps}
+          className={fieldClass}
+          {...rest}
+        />
+      )}
       {open && suggestions.length > 0 && (
         <ul
           id={listboxId}
@@ -256,9 +317,10 @@ export function DataPillInput({
               )}
               onMouseDown={(e) => handleOptionMouseDown(e, s)}
               onMouseEnter={() => setActiveIndex(i)}
+              title={buildPillToken(s.ref, s.path)}
             >
-              <span className="font-mono">{`{{${s.nodeId}.${s.path}}}`}</span>
-              <span className="ml-2 text-text-muted">
+              <span className="truncate">{humanizePath(s.path)}</span>
+              <span className="ml-2 shrink-0 text-text-muted">
                 {s.nodeLabel} · {s.type}
               </span>
             </li>

@@ -2,6 +2,7 @@ import type { Edge, Node } from 'reactflow';
 import {
   NODE_CATALOG,
   NodeType,
+  assignNodeAliases,
   type WorkflowDefinition,
   type WorkflowEdge,
   type WorkflowNode,
@@ -21,6 +22,7 @@ export function toWorkflowDefinition(
         position: { x: n.position.x, y: n.position.y },
         config: n.data.config ?? {},
       };
+      if (n.data.alias) base.alias = n.data.alias;
       if (n.data.skipped) base.skipped = true;
       return base;
     }),
@@ -39,6 +41,11 @@ export function fromWorkflowDefinition(def: WorkflowDefinition): {
   nodes: Node<CustomNodeData>[];
   edges: Edge[];
 } {
+  // Backfill stable aliases for any legacy node missing one, so the editor can
+  // emit/validate `{{steps.<alias>.field}}` tokens immediately. Stored aliases
+  // are honored (assignNodeAliases is idempotent); the result persists on the
+  // next save via toWorkflowDefinition.
+  const aliasMap = assignNodeAliases(def.nodes);
   const nodes = def.nodes.map<Node<CustomNodeData>>((n) => {
     const catalogEntry = NODE_CATALOG.find((d) => d.type === n.type);
     const data: CustomNodeData = {
@@ -47,6 +54,7 @@ export function fromWorkflowDefinition(def: WorkflowDefinition): {
       nodeType: n.type as NodeType,
       status: 'idle',
       config: n.config ?? {},
+      alias: aliasMap.get(n.id),
     };
     if (n.skipped === true) data.skipped = true;
     return {

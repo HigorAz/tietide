@@ -1,6 +1,12 @@
 import type { Edge, Node } from 'reactflow';
 import type { z } from 'zod';
-import { getNodeOutputSchema, nodeOutputSchemas } from '@tietide/shared';
+import {
+  TRIGGER_ALIAS,
+  assignNodeAliases,
+  getNodeOutputSchema,
+  nodeOutputSchemas,
+  type WorkflowNode,
+} from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { NODE_OUTPUT_EXAMPLES } from '@/components/editor/preview/nodeOutputExamples';
 import { derivePathsFromSample } from '@/lib/derive-suggestions';
@@ -8,8 +14,18 @@ import { derivePathsFromSample } from '@/lib/derive-suggestions';
 export interface PathSuggestion {
   nodeId: string;
   nodeLabel: string;
+  /** Node type, for the picker's group icon/catalog name. */
+  nodeType: string;
+  /** Alias root for the emitted token: `trigger` or `steps.<alias>`. */
+  ref: string;
   path: string;
   type: string;
+}
+
+/** Map an ancestor's id to its data-pill ref root (`trigger` / `steps.<alias>`). */
+function refForAlias(alias: string | undefined, fallback: string): string {
+  if (alias === TRIGGER_ALIAS) return TRIGGER_ALIAS;
+  return `steps.${alias ?? fallback}`;
 }
 
 export interface UpstreamSchemas {
@@ -39,6 +55,9 @@ export function getUpstreamSchemas(
 ): UpstreamSchemas {
   const ancestorsByDistance = bfsAncestors(targetNodeId, edges);
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  // Resolve each node's stable alias (the same map the worker builds) so pills
+  // emit `{{trigger.x}}` / `{{steps.<alias>.x}}` tokens.
+  const aliasMap = assignNodeAliases(nodes.map(toAliasInput));
 
   const byNode: Record<string, z.ZodTypeAny> = {};
   const suggestions: PathSuggestion[] = [];
@@ -49,10 +68,13 @@ export function getUpstreamSchemas(
     const entries = resolveEntries(ancestorId, node.data.nodeType, options, byNode);
     if (entries.length === 0) continue;
     const label = node.data.label || ancestorId;
+    const ref = refForAlias(aliasMap.get(ancestorId), ancestorId);
     for (const entry of entries) {
       suggestions.push({
         nodeId: ancestorId,
         nodeLabel: label,
+        nodeType: node.data.nodeType,
+        ref,
         path: entry.path,
         type: entry.type,
       });
@@ -222,4 +244,17 @@ function unwrap(schema: z.ZodTypeAny): z.ZodTypeAny {
 
 function zodTypeLabel(typeName: string): string {
   return typeName.replace(/^Zod/, '').toLowerCase();
+}
+
+// Minimal WorkflowNode projection for assignNodeAliases — only id/type/name/alias
+// drive the alias map (position/config are irrelevant here).
+function toAliasInput(n: Node<CustomNodeData>): WorkflowNode {
+  return {
+    id: n.id,
+    type: n.data.nodeType,
+    name: n.data.label,
+    ...(n.data.alias ? { alias: n.data.alias } : {}),
+    position: { x: 0, y: 0 },
+    config: {},
+  };
 }

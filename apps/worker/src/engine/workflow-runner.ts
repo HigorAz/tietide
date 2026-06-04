@@ -5,6 +5,7 @@ type PinoChildLogger = ReturnType<PinoLogger['logger']['child']>;
 import {
   NodeCategory,
   NodeType,
+  assignNodeAliases,
   type WorkflowDefinition,
   type WorkflowNode,
   type WorkflowEdge,
@@ -146,6 +147,10 @@ export class WorkflowRunner {
       return { status: 'FAILED', error: (err as Error).message, retryable: false };
     }
 
+    // Stable reference aliases (`trigger`, `steps.<slug>`) for data-pill tokens,
+    // computed over the full saved definition so they match what the SPA emitted.
+    const aliasMap = assignNodeAliases(definition.nodes);
+
     // Load merged env-var scope once per execution. The resolver caches by
     // executionId so any later call hits the cache; we fetch eagerly so a
     // missing-execution failure surfaces before nodes start running.
@@ -263,6 +268,7 @@ export class WorkflowRunner {
           reachable,
           isDryRun,
           envScope,
+          aliasMap,
           requestId: args.requestId,
           runChild: (childArgs) => this.run(childArgs),
         });
@@ -302,7 +308,13 @@ export class WorkflowRunner {
           depth,
           args.requestId,
         );
-        const resolvedInput = resolveInputTemplates(input, executionOrder, outputs, envScope);
+        const resolvedInput = resolveInputTemplates(
+          input,
+          executionOrder,
+          outputs,
+          envScope,
+          aliasMap,
+        );
         const output = await executor.execute(resolvedInput, ctx);
         const durationMs = Date.now() - started;
         const finishedAt = new Date();

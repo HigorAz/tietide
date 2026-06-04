@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
 import { cn } from '@/utils/cn';
 import { getExecution, listExecutionSteps, testNode } from '@/api/executions';
+import { invalidTokensForNode } from '@/lib/validate-references';
 import { toWorkflowDefinition } from '../serialization';
 
 interface TestNodeButtonProps {
@@ -34,8 +35,14 @@ export function TestNodeButton({ nodeId }: TestNodeButtonProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // This node can't be tested while it references a deleted/invalid node.
+  const hasInvalid = useMemo(
+    () => invalidTokensForNode(nodeId, nodes, edges).size > 0,
+    [nodeId, nodes, edges],
+  );
+
   const run = async (): Promise<void> => {
-    if (!workflowId || busy) return;
+    if (!workflowId || busy || hasInvalid) return;
     setBusy(true);
     setError(null);
     try {
@@ -79,7 +86,8 @@ export function TestNodeButton({ nodeId }: TestNodeButtonProps) {
       <button
         type="button"
         data-testid="test-node-button"
-        disabled={busy || !workflowId}
+        disabled={busy || !workflowId || hasInvalid}
+        title={hasInvalid ? 'Fix the red data pills on this node first.' : undefined}
         onClick={() => void run()}
         className={cn(
           'w-full rounded-md border border-white/10 bg-elevated px-3 py-2 text-xs font-semibold',

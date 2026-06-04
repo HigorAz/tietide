@@ -532,4 +532,41 @@ describe('EditorToolbar', () => {
       expect(runButton.querySelector('[data-testid="spinner"]')).toBeInTheDocument();
     });
   });
+
+  describe('referential integrity', () => {
+    const brokenGraph = () => {
+      useEditorStore.setState({
+        isDirty: true,
+        nodes: [
+          {
+            id: 't',
+            type: 'custom',
+            position: { x: 0, y: 0 },
+            data: { label: 'Trigger', nodeType: NodeType.MANUAL_TRIGGER, config: {} },
+          },
+          {
+            id: 'b',
+            type: 'custom',
+            position: { x: 0, y: 0 },
+            data: {
+              label: 'Sink',
+              nodeType: NodeType.HTTP_REQUEST,
+              config: { url: '{{steps.ghost.statusCode}}' },
+            },
+          },
+        ],
+        edges: [{ id: 't->b', source: 't', target: 'b' }],
+      });
+    };
+
+    it('disables Save/Run/Test and shows a warning when a reference is broken', () => {
+      brokenGraph();
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      expect(screen.getByTestId('invalid-refs-warning')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /run/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /test/i })).toBeDisabled();
+    });
+  });
 });

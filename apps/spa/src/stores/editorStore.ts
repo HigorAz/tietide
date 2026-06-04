@@ -22,6 +22,7 @@ import {
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { fromWorkflowDefinition } from '@/components/editor/serialization';
 import { buildClipboardPayload, remapClipboardIds, type ClipboardPayload } from '@/lib/clipboard';
+import { ensureNodeAliases } from '@/lib/ensure-node-aliases';
 
 const HISTORY_LIMIT = 50;
 
@@ -181,7 +182,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         },
       };
 
-      commit({ nodes: [...get().nodes, newNode] });
+      // Assign a stable data-pill alias to the new node (deduped against existing).
+      commit({ nodes: ensureNodeAliases([...get().nodes, newNode]) });
     },
 
     setNodes: (nodes) => commit({ nodes }),
@@ -354,10 +356,16 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       if (newNodes.length === 0) return [];
 
       const deselected = prev.nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
-      const selectedNew = newNodes.map((n) => ({ ...n, selected: true }));
+      // Drop any copied alias so pasted nodes get fresh, deduped ones (a paste is
+      // a new node, not the same reference target as the original it was copied from).
+      const selectedNew = newNodes.map((n) => ({
+        ...n,
+        selected: true,
+        data: { ...n.data, alias: undefined },
+      }));
 
       set({
-        nodes: [...deselected, ...selectedNew],
+        nodes: ensureNodeAliases([...deselected, ...selectedNew]),
         edges: [...prev.edges, ...newEdges],
         past: pushSnapshot(prev.past, { nodes: prev.nodes, edges: prev.edges }),
         future: [],

@@ -5,6 +5,7 @@ import {
   NODE_CATALOG,
   NodeCategory,
   RESERVED_CONFIG_KEYS,
+  TRIGGER_ALIAS,
   resolveTemplate,
   type EnvScope,
   type WorkflowNode,
@@ -71,15 +72,35 @@ export function resolveInputTemplates(
   executionOrder: string[],
   outputs: Map<string, NodeOutput>,
   envScope: EnvScope,
+  aliasMap?: ReadonlyMap<string, string>,
 ): NodeInput {
+  // `scope` is the node-id-keyed map surfaced to executors as `$nodes` (the SDK
+  // contract — unchanged). `resolution` additionally carries the friendly alias
+  // roots (`trigger`, `steps.<alias>`) consumed only by template resolution, so
+  // `{{trigger.field}}` / `{{steps.<alias>.field}}` resolve while legacy
+  // `{{node-<id>.field}}` tokens keep working via the node-id keys.
   const scope: Record<string, unknown> = {};
+  const resolution: Record<string, unknown> = {};
+  const steps: Record<string, unknown> = {};
+  let hasSteps = false;
   for (const id of executionOrder) {
     const out = outputs.get(id);
-    if (out) scope[id] = out.data;
+    if (!out) continue;
+    scope[id] = out.data;
+    resolution[id] = out.data;
+    const alias = aliasMap?.get(id);
+    if (alias === TRIGGER_ALIAS) {
+      resolution[TRIGGER_ALIAS] = out.data;
+    } else if (alias !== undefined) {
+      steps[alias] = out.data;
+      hasSteps = true;
+    }
   }
-  const resolvedParams = resolveTemplate(input.params, scope, envScope) as Record<string, unknown>;
-  // Surface the same upstream scope that drove template resolution so executors
-  // (e.g. the Code node's `$nodes`) can read sibling/ancestor outputs directly.
+  if (hasSteps) resolution.steps = steps;
+  const resolvedParams = resolveTemplate(input.params, resolution, envScope) as Record<
+    string,
+    unknown
+  >;
   return { ...input, params: resolvedParams, scope };
 }
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { PILL_SAMPLE_KEY } from '@tietide/shared';
+import { NodeType, PILL_SAMPLE_KEY } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { TestNodeButton } from './TestNodeButton';
 
@@ -76,5 +76,26 @@ describe('TestNodeButton', () => {
 
     await waitFor(() => expect(screen.getByTestId('test-node-error')).toBeInTheDocument());
     expect(updateNodeConfig).not.toHaveBeenCalled();
+  });
+
+  it('is disabled when this node has a broken data-pill reference', () => {
+    useEditorStore.setState({
+      nodes: [
+        {
+          id: NODE_ID,
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Sink',
+            nodeType: NodeType.HTTP_REQUEST,
+            config: { url: '{{steps.ghost.statusCode}}' },
+          },
+        },
+      ],
+      edges: [],
+    });
+
+    render(<TestNodeButton nodeId={NODE_ID} />);
+    expect(screen.getByTestId('test-node-button')).toBeDisabled();
   });
 });

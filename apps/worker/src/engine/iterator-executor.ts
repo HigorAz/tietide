@@ -35,6 +35,7 @@ export interface IteratorRunOptions {
   reachable: Set<string>;
   isDryRun: boolean;
   envScope: EnvScope;
+  aliasMap: ReadonlyMap<string, string>;
   requestId: string | undefined;
   // Re-enter the workflow runner for one iteration's body subgraph. Wired by
   // WorkflowRunner to `(args) => this.run(args)` so recursion stays on the runner.
@@ -63,6 +64,7 @@ export class IteratorExecutor {
       reachable,
       isDryRun,
       envScope,
+      aliasMap,
       requestId,
       runChild,
     } = opts;
@@ -123,7 +125,13 @@ export class IteratorExecutor {
 
     let resolvedItems: unknown;
     try {
-      const resolvedInput = resolveInputTemplates(builtInput, executionOrder, outputs, envScope);
+      const resolvedInput = resolveInputTemplates(
+        builtInput,
+        executionOrder,
+        outputs,
+        envScope,
+        aliasMap,
+      );
       resolvedItems = (resolvedInput.params as Record<string, unknown>).arrayPath;
     } catch (err) {
       return await fail(`Failed to resolve iterator arrayPath: ${(err as Error).message}`);
