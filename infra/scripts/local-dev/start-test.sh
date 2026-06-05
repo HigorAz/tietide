@@ -35,6 +35,11 @@ if ! docker ps --format '{{.Names}}' | grep -q '^valkey-test$'; then
   fi
 fi
 
+# Regenerate the Prisma client so dev-mode nest/vite compile against the current
+# schema (the client lives in node_modules, shared by prod + test).
+echo "→ Generating Prisma client from the schema..."
+pnpm --filter @tietide/api exec prisma generate
+
 start_test_service() {
   local name=$1; shift
   local pidfile="$LOGS/test-$name.pid"
