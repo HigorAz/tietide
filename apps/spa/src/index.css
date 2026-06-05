@@ -6,6 +6,8 @@
 
 :root {
   --bg-deep-blue: #0a2540;
+  /* Editor canvas base — a notch darker than deep-blue (see tailwind `canvas`). */
+  --bg-canvas: #06182e;
   --bg-surface: #112240;
   --bg-elevated: #1a3050;
   --accent-teal: #00d4b3;

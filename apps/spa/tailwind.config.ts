@@ -7,6 +7,9 @@ const config: Config = {
     extend: {
       colors: {
         'deep-blue': '#0A2540',
+        // A notch darker than deep-blue — the workflow editor canvas base, so it
+        // reads calmer/darker than the login surface while staying on-brand.
+        canvas: '#06182E',
         surface: '#112240',
         elevated: '#1A3050',
         'accent-teal': '#00D4B3',
