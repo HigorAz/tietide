@@ -24,6 +24,11 @@ docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
 if [ "${SKIP_BUILD:-0}" = "1" ]; then
   echo "→ SKIP_BUILD=1 — using already-built artifacts (no recompile)"
 else
+  # Regenerate the Prisma client from the current schema BEFORE compiling — `nest
+  # build` does not do this, so a pulled schema change (e.g. a new model) would
+  # otherwise fail to typecheck against a stale generated client.
+  echo "→ Generating Prisma client from the schema..."
+  pnpm --filter @tietide/api exec prisma generate
   echo "→ Building every workspace package in dependency order (this takes a few minutes)..."
   # pnpm -r --filter "./packages/**" build  → builds shared/sdk/crypto/etc. in topological
   # order regardless of how many packages exist. Then build the apps separately so a
