@@ -19,6 +19,10 @@ case ":$PATH:" in *":$PNPM_HOME/bin:"*) ;; *) export PATH="$PNPM_HOME/bin:$PATH"
 
 # Rebuild all workspace packages + apps (prod serves built artifacts).
 rebuild_all() {
+  # Regenerate the Prisma client first so the api typechecks against the schema
+  # that was just pulled (a new model/migration would otherwise break `nest build`
+  # against a stale client).
+  pnpm --filter @tietide/api exec prisma generate
   pnpm -r --filter "./packages/**" build
   pnpm --filter @tietide/api build
   pnpm --filter @tietide/worker build

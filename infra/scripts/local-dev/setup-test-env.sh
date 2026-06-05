@@ -41,6 +41,10 @@ echo "→ Applying migrations to tietide_test..."
 DATABASE_URL="$TEST_DB_URL" \
   pnpm --filter @tietide/api exec prisma migrate deploy
 
+# --- 2b. Generate the Prisma client so the apps compile against the current schema ---
+echo "→ Generating Prisma client..."
+pnpm --filter @tietide/api exec prisma generate
+
 # --- 3. Start the isolated valkey-test container (port 6380) ---
 if docker ps --format '{{.Names}}' | grep -q '^valkey-test$'; then
   echo "→ valkey-test already running"
