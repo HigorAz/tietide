@@ -1,8 +1,9 @@
-import { useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { ChevronDown, ChevronRight, KeyRound } from 'lucide-react';
 import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore } from '@/stores/executionLiveStore';
+import { useEnvVarsStore } from '@/stores/envVarsStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
 import { groupSuggestions } from '@/lib/group-suggestions';
@@ -12,6 +13,11 @@ import { humanizePath } from '@/lib/humanize-path';
 import { getNodeIcon } from '@/components/editor/nodes/nodeIcons';
 import { cn } from '@/utils/cn';
 import { BottomSheet } from '../BottomSheet';
+
+// Sentinel id for the synthetic "Environment variables" section so it shares the
+// same collapse/expand machinery as the real per-node groups without colliding
+// with any node id.
+const ENV_GROUP_ID = '__env';
 
 /**
  * Click-to-insert data-pill panel. Shown beside the config form whenever a
@@ -54,6 +60,14 @@ export function DataPillPicker(): JSX.Element | null {
 
   const groups = useMemo(() => groupSuggestions(suggestions), [suggestions]);
 
+  // Environment variables are a flat, workflow-independent pill source. They
+  // resolve as single UPPER_SNAKE tokens (`{{MY_KEY}}`) at execution time.
+  const envKeys = useEnvVarsStore((s) => s.keys);
+  const loadEnvVars = useEnvVarsStore((s) => s.load);
+  useEffect(() => {
+    if (activePillField) void loadEnvVars();
+  }, [activePillField, loadEnvVars]);
+
   if (!activePillField) return null;
 
   const insert = activePillField.insert;
@@ -61,6 +75,10 @@ export function DataPillPicker(): JSX.Element | null {
     // Keep the focused input from blurring so activePillField survives the click.
     e.preventDefault();
     insert(buildPillToken(suggestion.ref, suggestion.path));
+  };
+  const pickEnv = (e: ReactMouseEvent<HTMLButtonElement>, key: string): void => {
+    e.preventDefault();
+    insert(`{{${key}}}`);
   };
   const toggle = (e: ReactMouseEvent<HTMLButtonElement>, nodeId: string): void => {
     e.preventDefault();
@@ -72,11 +90,15 @@ export function DataPillPicker(): JSX.Element | null {
     });
   };
 
+  const envOpen = !collapsed.has(ENV_GROUP_ID);
+  const isEmpty = groups.length === 0 && envKeys.length === 0;
+
   const list = (
     <div role="listbox" aria-label="Upstream data pills" className="min-h-0 flex-1 overflow-y-auto">
-      {groups.length === 0 ? (
+      {isEmpty && (
         <p className="px-3 py-2 text-xs text-text-muted">No upstream outputs to reference yet.</p>
-      ) : (
+      )}
+      {groups.length > 0 &&
         groups.map((group) => {
           const Icon = getNodeIcon(group.nodeType);
           const isOpen = !collapsed.has(group.nodeId);
@@ -118,7 +140,48 @@ export function DataPillPicker(): JSX.Element | null {
               )}
             </section>
           );
-        })
+        })}
+      {envKeys.length > 0 && (
+        <section
+          key={ENV_GROUP_ID}
+          data-testid="data-pill-env-group"
+          className="border-b border-white/5 last:border-b-0"
+        >
+          <button
+            type="button"
+            data-testid="data-pill-group-header"
+            onMouseDown={(e) => toggle(e, ENV_GROUP_ID)}
+            aria-expanded={envOpen}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-text-secondary hover:bg-white/5 focus:bg-white/5 focus:outline-none"
+          >
+            {envOpen ? (
+              <ChevronDown size={14} aria-hidden />
+            ) : (
+              <ChevronRight size={14} aria-hidden />
+            )}
+            <KeyRound size={14} className="shrink-0 text-accent-teal" aria-hidden />
+            <span className="truncate">Environment variables</span>
+            <span className="ml-auto shrink-0 text-text-muted">{envKeys.length}</span>
+          </button>
+          {envOpen && (
+            <ul className="pb-1">
+              {envKeys.map((key) => (
+                <li key={key} role="option" aria-selected={false}>
+                  <button
+                    type="button"
+                    data-testid="data-pill-env-option"
+                    onMouseDown={(e) => pickEnv(e, key)}
+                    title={`{{${key}}}`}
+                    className="flex w-full items-center justify-between gap-2 py-1.5 pl-9 pr-3 text-left text-xs hover:bg-white/5 focus:bg-white/5 focus:outline-none"
+                  >
+                    <span className="truncate text-text-primary">{key}</span>
+                    <span className="ml-2 shrink-0 text-text-muted">env</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
     </div>
   );
