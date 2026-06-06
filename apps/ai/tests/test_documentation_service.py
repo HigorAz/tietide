@@ -163,6 +163,40 @@ class TestDocumentationService:
             with pytest.raises(DocumentationGenerationError):
                 await service.generate(WORKFLOW)
 
+        async def test_passes_json_schema_when_structured_output_enabled(self):
+            service, llm, _ = _build_service()  # structured_output defaults to True
+
+            await service.generate(WORKFLOW)
+
+            schema = llm.calls[0]["format_schema"]
+            assert schema is not None
+            assert set(schema["required"]) == {
+                "overview",
+                "prerequisites",
+                "trigger",
+                "walkthrough",
+                "data_flow",
+                "decisions",
+                "error_handling",
+            }
+
+        async def test_omits_schema_when_structured_output_disabled(self):
+            embedder = FakeEmbedder()
+            store = FakeVectorStore()
+            _seed(store)
+            retriever = Retriever(embedder=embedder, store=store, top_k=3)
+            llm = FakeLlmClient(response=json.dumps(SECTIONS))
+            service = DocumentationService(
+                retriever=retriever,
+                prompt_builder=PromptBuilder(),
+                llm_client=llm,
+                structured_output=False,
+            )
+
+            await service.generate(WORKFLOW)
+
+            assert llm.calls[0]["format_schema"] is None
+
         async def test_serializes_concurrent_generations(self):
             # Ollama processes one generation at a time; firing two doc requests
             # at once must queue rather than overlap (overlap is what raced the
@@ -173,7 +207,14 @@ class TestDocumentationService:
                     self.in_flight = 0
                     self.max_in_flight = 0
 
-                async def generate(self, prompt: str, *, temperature: float, max_tokens: int) -> str:
+                async def generate(
+                    self,
+                    prompt: str,
+                    *,
+                    temperature: float,
+                    max_tokens: int,
+                    format_schema: dict | None = None,
+                ) -> str:
                     self.in_flight += 1
                     self.max_in_flight = max(self.max_in_flight, self.in_flight)
                     await asyncio.sleep(0.02)

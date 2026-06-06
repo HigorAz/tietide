@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     # Cap on the JSON-serialized definition for /generate-docs, to bound
     # prompt-injection blast radius and memory use (W2.6).
     max_definition_bytes: int = 100_000
+    # Constrain Ollama decoding to the documentation JSON schema (Ollama >= 0.5).
+    # Guarantees the exact section shape and removes parse-failure 502s. Disable
+    # if the deployed Ollama is older — generation falls back to format="json".
+    ollama_structured_output: bool = True
 
     model_config = {"env_prefix": "", "case_sensitive": False}
 

@@ -11,7 +11,7 @@ from typing import Any, Protocol
 from src.services.facts import extract_facts
 from src.services.prompt import PromptBuilder
 from src.services.retriever import Retriever
-from src.services.sections import SECTION_KEYS, SECTION_TITLES
+from src.services.sections import SECTION_KEYS, SECTION_TITLES, build_json_schema
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ class LlmClient(Protocol):
         *,
         temperature: float,
         max_tokens: int,
+        format_schema: dict | None = None,
     ) -> str: ...
 
 
@@ -74,12 +75,14 @@ class DocumentationService:
         temperature: float = 0.3,
         max_tokens: int = 1024,
         max_concurrency: int = 1,
+        structured_output: bool = True,
     ) -> None:
         self.retriever = retriever
         self.prompt_builder = prompt_builder
         self.llm_client = llm_client
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.structured_output = structured_output
         # Ollama serves one generation at a time; serialize calls here so two
         # concurrent doc requests queue cleanly instead of overlapping and
         # racing the request timeout (which surfaced as a 503). Created lazily
@@ -106,11 +109,13 @@ class DocumentationService:
         prompt = self.prompt_builder.build(
             workflow=workflow, context_docs=context_docs, facts=facts
         )
+        format_schema = build_json_schema() if self.structured_output else None
         async with self._semaphore():
             raw = await self.llm_client.generate(
                 prompt,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
+                format_schema=format_schema,
             )
 
         sections = self._parse_sections(raw)

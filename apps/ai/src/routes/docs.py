@@ -91,6 +91,7 @@ def get_documentation_service() -> DocumentationService:
         # Richer, node-by-node documentation (incl. the walkthrough section) needs
         # a larger generation budget than the original terse 5-section output.
         max_tokens=2048,
+        structured_output=settings.ollama_structured_output,
     )
 
 

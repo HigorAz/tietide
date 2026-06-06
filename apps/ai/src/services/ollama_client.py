@@ -46,12 +46,15 @@ class OllamaClient:
         *,
         temperature: float,
         max_tokens: int,
+        format_schema: dict | None = None,
     ) -> str:
+        # A JSON schema constrains decoding to the exact shape (Ollama >= 0.5);
+        # otherwise fall back to free-form JSON mode.
         payload = {
             "model": self.model,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
+            "format": format_schema if format_schema is not None else "json",
             "options": {
                 "temperature": temperature,
                 "num_predict": max_tokens,

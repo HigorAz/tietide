@@ -58,6 +58,26 @@ class TestOllamaClient:
 
             assert captured["body"].get("format") == "json"
 
+        async def test_sends_json_schema_as_format_when_provided(self):
+            captured: dict = {}
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                captured["body"] = json.loads(request.content)
+                return httpx.Response(200, json={"response": "{}", "done": True})
+
+            transport = httpx.MockTransport(handler)
+            client = OllamaClient(
+                base_url="http://ollama:11434",
+                model="llama3.1:8b",
+                timeout=10.0,
+                transport=transport,
+            )
+            schema = {"type": "object", "properties": {"overview": {"type": "string"}}}
+
+            await client.generate("p", temperature=0.3, max_tokens=1024, format_schema=schema)
+
+            assert captured["body"].get("format") == schema
+
         async def test_timeout_raises_typed_error(self):
             def handler(request: httpx.Request) -> httpx.Response:
                 raise httpx.ReadTimeout("slow", request=request)
