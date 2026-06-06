@@ -29,15 +29,16 @@ WORKFLOW = {
 }
 
 SECTIONS = {
-    "objective": "Sync partner orders to internal endpoint daily.",
+    "overview": "Sync partner orders to the internal endpoint daily.",
+    "prerequisites": "Requires the PARTNER_TOKEN secret and an HTTP endpoint.",
+    "trigger": "Cron trigger that fires every day at 09:00.",
     "walkthrough": (
         "1. The cron trigger fires at 09:00 and starts the run. "
         "2. The HTTP request node fetches partner orders and emits the response body."
     ),
-    "triggers": "Cron trigger that fires every day at 09:00.",
-    "actions": "HTTP request to fetch orders, then forward to ingest.",
     "data_flow": "Trigger → fetch → forward.",
     "decisions": "No conditional branches; failure aborts the run.",
+    "error_handling": "No error edges; a failed HTTP call aborts the run.",
 }
 
 
@@ -84,12 +85,13 @@ class TestDocumentationService:
 
             result = await service.generate(WORKFLOW)
 
-            assert result.sections.objective == SECTIONS["objective"]
+            assert result.sections.overview == SECTIONS["overview"]
+            assert result.sections.prerequisites == SECTIONS["prerequisites"]
+            assert result.sections.trigger == SECTIONS["trigger"]
             assert result.sections.walkthrough == SECTIONS["walkthrough"]
-            assert result.sections.triggers == SECTIONS["triggers"]
-            assert result.sections.actions == SECTIONS["actions"]
             assert result.sections.data_flow == SECTIONS["data_flow"]
             assert result.sections.decisions == SECTIONS["decisions"]
+            assert result.sections.error_handling == SECTIONS["error_handling"]
 
         async def test_renders_markdown_documentation(self):
             service, _, _ = _build_service()
@@ -97,13 +99,14 @@ class TestDocumentationService:
             result = await service.generate(WORKFLOW)
 
             assert "# Daily Sync" in result.documentation
-            assert "## Objective" in result.documentation
+            assert "## Overview" in result.documentation
+            assert "## Prerequisites" in result.documentation
+            assert "## Trigger" in result.documentation
             assert "## Walkthrough" in result.documentation
-            assert "## Triggers" in result.documentation
-            assert "## Actions" in result.documentation
             assert "## Data Flow" in result.documentation
             assert "## Decisions" in result.documentation
-            assert SECTIONS["objective"] in result.documentation
+            assert "## Error Handling" in result.documentation
+            assert SECTIONS["overview"] in result.documentation
 
         async def test_calls_llm_with_temperature_and_max_tokens(self):
             service, llm, _ = _build_service()
@@ -192,5 +195,5 @@ class TestDocumentationService:
             )
 
             assert len(results) == 2
-            assert all(r.sections.objective == SECTIONS["objective"] for r in results)
+            assert all(r.sections.overview == SECTIONS["overview"] for r in results)
             assert llm.max_in_flight == 1

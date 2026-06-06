@@ -38,15 +38,19 @@ class GenerateDocsRequest(BaseModel):
     workflow_id: str = Field(..., min_length=1)
     workflow_name: str = Field(..., min_length=1)
     definition: dict[str, Any]
+    # Deterministic ground-truth facts computed by the API. Optional: when absent
+    # the AI service computes its own (label-only) fallback from the definition.
+    facts: dict[str, Any] | None = None
 
 
 class DocumentationSectionsResponse(BaseModel):
-    objective: str
+    overview: str
+    prerequisites: str
+    trigger: str
     walkthrough: str
-    triggers: str
-    actions: str
     data_flow: str
     decisions: str
+    error_handling: str
 
 
 class GenerateDocsResponse(BaseModel):

@@ -21,12 +21,13 @@ from tests.fakes import FakeEmbedder, FakeLlmClient, FakeVectorStore
 
 SECTIONS_JSON = json.dumps(
     {
-        "objective": "o",
+        "overview": "o",
+        "prerequisites": "p",
+        "trigger": "t",
         "walkthrough": "w",
-        "triggers": "t",
-        "actions": "a",
         "data_flow": "d",
         "decisions": "x",
+        "error_handling": "e",
     }
 )
 
@@ -146,12 +147,13 @@ class TestBootstrap:
                     workflow_id=str(workflow["workflow_id"]),
                     workflow_name=str(workflow["workflow_name"]),
                     sections=DocumentationSections(
-                        objective="o",
+                        overview="o",
+                        prerequisites="p",
+                        trigger="t",
                         walkthrough="w",
-                        triggers="t",
-                        actions="a",
                         data_flow="d",
                         decisions="x",
+                        error_handling="e",
                     ),
                     documentation="# md",
                 )
