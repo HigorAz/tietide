@@ -8,6 +8,7 @@ import {
   type EdgeChange,
   type Node,
   type NodeChange,
+  type NodePositionChange,
   type XYPosition,
 } from 'reactflow';
 import {
@@ -49,6 +50,11 @@ export interface EditorState {
   nodes: Node<CustomNodeData>[];
   edges: Edge[];
   isDirty: boolean;
+  // Transient: whether the in-progress node-drag gesture has actually moved a
+  // node. Lets `onNodesChange` tell a real drop from a click (which React Flow
+  // also reports as a no-op `position`/`dragging:false` change). Never captured
+  // by undo history.
+  dragMoved: boolean;
   selectedNodeId: string | null;
   activePillField: ActivePillField | null;
   past: EditorSnapshot[];
@@ -95,6 +101,7 @@ export const initialEditorState: EditorState = {
   nodes: [],
   edges: [],
   isDirty: false,
+  dragMoved: false,
   selectedNodeId: null,
   activePillField: null,
   past: [],
@@ -115,21 +122,24 @@ const pushSnapshot = (past: EditorSnapshot[], snapshot: EditorSnapshot): EditorS
   return next.length > HISTORY_LIMIT ? next.slice(next.length - HISTORY_LIMIT) : next;
 };
 
-const nodeChangeSnapshots = (changes: NodeChange[]): boolean =>
-  changes.some((c) => c.type === 'remove' || (c.type === 'position' && c.dragging === false));
-
 const edgeChangeSnapshots = (changes: EdgeChange[]): boolean =>
   changes.some((c) => c.type === 'remove');
 
-// Reflects whether a batch of React Flow node changes represents an actual
-// edit (vs. transient UI state like selection / measurement / mid-drag).
-// Without this, simply clicking a node flips the workflow to dirty.
-const nodeChangeDirties = (changes: NodeChange[]): boolean =>
-  changes.some((c) => {
-    if (c.type === 'select' || c.type === 'dimensions' || c.type === 'reset') return false;
-    if (c.type === 'position' && c.dragging !== false) return false;
-    return true;
-  });
+// True when a `position` change carries the node to coordinates that differ from
+// where it currently sits. React Flow emits a final `position` change with
+// `dragging:false` even on a plain click (no movement); comparing coordinates
+// is how we tell a real move from that click artefact.
+const nodePositionMoved = (change: NodePositionChange, nodes: Node<CustomNodeData>[]): boolean => {
+  if (!change.position) return false;
+  const node = nodes.find((n) => n.id === change.id);
+  if (!node) return false;
+  return node.position.x !== change.position.x || node.position.y !== change.position.y;
+};
+
+// A drop (`position` + dragging:false) that lands somewhere new — distinct from a
+// click, which releases on the exact spot the node already occupies.
+const nodeDropMoved = (changes: NodeChange[], nodes: Node<CustomNodeData>[]): boolean =>
+  changes.some((c) => c.type === 'position' && c.dragging === false && nodePositionMoved(c, nodes));
 
 const edgeChangeDirties = (changes: EdgeChange[]): boolean =>
   changes.some((c) => c.type !== 'select' && c.type !== 'reset');
@@ -196,15 +206,35 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         prev.selectedNodeId !== null &&
         changes.some((change) => change.type === 'remove' && change.id === prev.selectedNodeId);
       const nextSelection = selectionRemoved ? null : prev.selectedNodeId;
-      const dirties = nodeChangeDirties(changes);
 
-      if (nodeChangeSnapshots(changes)) {
+      // A pure click is reported by React Flow as a `position` change with
+      // `dragging:false` — identical in shape to the drop that ends a real drag.
+      // Treat a release as an edit only when the node actually moved: either
+      // during the gesture (a mid-drag `dragging:true` delta, remembered across
+      // batches via `dragMoved`) or at the drop itself (release coordinates
+      // differ from where the node sits). Otherwise clicking a node would dirty
+      // the workflow and push a bogus undo snapshot.
+      const movedDuringDrag = changes.some(
+        (c) => c.type === 'position' && c.dragging === true && nodePositionMoved(c, prev.nodes),
+      );
+      const gestureMoved = prev.dragMoved || movedDuringDrag;
+      const released = changes.some((c) => c.type === 'position' && c.dragging === false);
+      const realDrop = released && (gestureMoved || nodeDropMoved(changes, prev.nodes));
+
+      // A removal or a genuine drop is the only kind of node change that edits
+      // the workflow; everything else (select / dimensions / reset / mid-drag /
+      // click) is transient. Both dirty the workflow and push an undo snapshot.
+      const removed = changes.some((c) => c.type === 'remove');
+      const edits = removed || realDrop;
+
+      if (edits) {
         set({
           nodes: nextNodes,
           selectedNodeId: nextSelection,
           past: pushSnapshot(prev.past, { nodes: prev.nodes, edges: prev.edges }),
           future: [],
-          isDirty: dirties || prev.isDirty,
+          isDirty: true,
+          dragMoved: false,
         });
         return;
       }
@@ -212,7 +242,8 @@ export const useEditorStore = create<EditorStore>((set, get) => {
       set({
         nodes: nextNodes,
         selectedNodeId: nextSelection,
-        ...(dirties ? { isDirty: true } : {}),
+        // Carry mid-drag movement forward across batches; clear it on release.
+        dragMoved: released ? false : gestureMoved,
       });
     },
 
@@ -411,6 +442,7 @@ export const useEditorStore = create<EditorStore>((set, get) => {
         nodes,
         edges,
         isDirty: false,
+        dragMoved: false,
         selectedNodeId: null,
         activePillField: null,
         past: [],
