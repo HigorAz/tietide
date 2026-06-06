@@ -24,22 +24,33 @@ FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH=/venv/bin:$PATH \
-    AI_PORT=8000
+    AI_PORT=8000 \
+    HF_HOME=/app/.cache/huggingface \
+    SENTENCE_TRANSFORMERS_HOME=/app/.cache/sentence-transformers
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tini curl \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system tietide \
     && useradd --system --gid tietide --uid 1001 --home /app tietide \
-    && mkdir -p /app
+    && mkdir -p /app/.cache \
+    && chown -R tietide:tietide /app
 
 WORKDIR /app
 
 COPY --from=builder /venv /venv
-COPY --chown=tietide:tietide apps/ai/src ./src
-COPY --chown=tietide:tietide apps/ai/pyproject.toml ./pyproject.toml
 
 USER tietide
+
+# Bake the sentence-transformers embedding model into the image so the RAG
+# pipeline never downloads at runtime (the non-root user has no writable global
+# HF cache — that surfaced as PermissionError: '/app/.cache' on first request).
+# Placed BEFORE the source COPY so editing app code doesn't re-download it; the
+# cache dirs live under /app (owned by tietide via the chown above).
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
+COPY --chown=tietide:tietide apps/ai/src ./src
+COPY --chown=tietide:tietide apps/ai/pyproject.toml ./pyproject.toml
 
 EXPOSE 8000
 

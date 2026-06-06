@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
-from src.lifespan import bootstrap
+from src.lifespan import bootstrap, build_lifespan
 from src.services.documentation import (
     DocumentationGenerationError,
     DocumentationSections,
@@ -167,3 +168,28 @@ class TestBootstrap:
         )
 
         assert state.demo_cache.size() == 1
+
+
+class TestBuildLifespan:
+    async def test_lifespan_does_not_block_on_slow_bootstrap(self):
+        # A warm-up that blocks forever must NOT delay the server coming up:
+        # the lifespan schedules bootstrap in the background and yields at once.
+        release = asyncio.Event()
+
+        class BlockingLlm:
+            async def generate(self, prompt: str, *, temperature: float, max_tokens: int) -> str:
+                await release.wait()
+                return "ok"
+
+        service, _ = _make_doc_service()
+        lifespan = build_lifespan(
+            llm_client_factory=lambda: BlockingLlm(),
+            doc_service_factory=lambda: service,
+            demo_workflows_loader=lambda: [],
+        )
+
+        async with asyncio.timeout(1):
+            async with lifespan(app=None):  # type: ignore[arg-type]
+                # Reaching here proves startup did not await the blocked warm-up.
+                pass
+        release.set()
