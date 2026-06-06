@@ -14,8 +14,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/ai/requirements.txt ./requirements.txt
+# Install the CPU-only torch build BEFORE the rest so sentence-transformers does
+# not pull the multi-GB CUDA wheels (nvidia-*/cuda-*). The service only uses
+# torch for CPU embeddings (all-MiniLM-L6-v2); the LLM runs in Ollama. This keeps
+# the image ~1GB instead of ~9GB and, crucially, lets the image build fit on CI
+# runners — the CUDA build exhausted the runner disk and the build was killed.
 RUN python -m venv /venv \
     && /venv/bin/pip install --upgrade pip \
+    && /venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch \
     && /venv/bin/pip install -r requirements.txt
 
 # ---- Runtime stage ---------------------------------------------------------
