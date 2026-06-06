@@ -21,9 +21,10 @@ fi
 
 cd "$REPO"
 
-# Prod docker deps must be up (test stack shares Postgres + Ollama + Chroma with prod)
-echo "→ Ensuring shared Docker dependencies are up..."
-docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
+# Prod docker deps must be up (test stack shares Postgres + Ollama + Chroma + the
+# AI docs service with prod — one AI container on :8000 serves both stacks).
+echo "→ Ensuring shared Docker dependencies are up (incl. the AI docs service)..."
+docker compose -f infra/docker/docker-compose.yml --env-file .env up -d --build
 
 # Test stack uses its own Valkey for isolated BullMQ queues
 if ! docker ps --format '{{.Names}}' | grep -q '^valkey-test$'; then

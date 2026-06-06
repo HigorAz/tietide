@@ -15,8 +15,15 @@ export NVM_DIR="$HOME/.nvm"
 
 cd "$REPO"
 
-echo "→ Starting Docker dependencies..."
-docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
+echo "→ Starting Docker dependencies (incl. the AI docs service)..."
+# Rebuild the locally-built `ai` image from source unless SKIP_BUILD=1 (the
+# zero-downtime deploy path, which rebuilds out-of-band). The pip layer is
+# cached, so a rebuild only re-copies apps/ai source.
+if [ "${SKIP_BUILD:-0}" = "1" ]; then
+  docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
+else
+  docker compose -f infra/docker/docker-compose.yml --env-file .env up -d --build
+fi
 
 # SKIP_BUILD=1 launches the existing build without recompiling — used by
 # deploy-production.sh, which rebuilds artifacts while the old services stay up
@@ -87,6 +94,8 @@ echo "→ Waiting for services to come up..."
 ready=0
 wait_for_port api 3030 || ready=1
 wait_for_port spa 5173 || ready=1
+# AI docs service (FastAPI, in Docker) — publishes :8000.
+wait_for_port ai 8000 || ready=1
 # worker exposes no port — confirm its tracked process is still alive
 if [ -f "$LOGS/worker.pid" ] && kill -0 "$(cat "$LOGS/worker.pid")" 2>/dev/null; then
   echo "  ✓ worker process alive"

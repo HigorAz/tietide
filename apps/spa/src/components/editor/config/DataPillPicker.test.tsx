@@ -3,10 +3,16 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { Edge, Node } from 'reactflow';
 import { NodeType, PILL_SAMPLE_KEY } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
+import { useEnvVarsStore } from '@/stores/envVarsStore';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { DataPillPicker } from './DataPillPicker';
 
 vi.mock('@/hooks/useMediaQuery', () => ({ useIsMobile: vi.fn(() => false) }));
+// Stub the env-vars API so the picker's lazy load() never hits the network.
+vi.mock('@/api/envVars', () => ({
+  listUserEnvVars: vi.fn(async () => []),
+  listAdminEnvVars: vi.fn(async () => []),
+}));
 import { useIsMobile } from '@/hooks/useMediaQuery';
 const mockUseIsMobile = vi.mocked(useIsMobile);
 
@@ -36,6 +42,9 @@ const seed = (): void => {
 describe('DataPillPicker', () => {
   beforeEach(() => {
     useEditorStore.setState({ ...initialEditorState });
+    // Mark the env store 'ready' (empty) so load() short-circuits and no env
+    // section renders unless a test opts in by seeding keys.
+    useEnvVarsStore.setState({ keys: [], status: 'ready', error: null });
     mockUseIsMobile.mockReturnValue(false);
   });
 
@@ -146,6 +155,37 @@ describe('DataPillPicker', () => {
     render(<DataPillPicker />);
 
     expect(pickerText()).toContain('Status Code');
+  });
+
+  it('renders an Environment variables block from the env store', () => {
+    useEnvVarsStore.setState({ keys: ['API_KEY', 'WEBHOOK_SECRET'], status: 'ready', error: null });
+    useEditorStore.setState({
+      nodes: [mkNode('solo', NodeType.HTTP_REQUEST)],
+      edges: [],
+      activePillField: { nodeId: 'solo', insert: vi.fn() },
+    });
+    render(<DataPillPicker />);
+
+    const envGroup = screen.getByTestId('data-pill-env-group');
+    expect(within(envGroup).getByText('Environment variables')).toBeInTheDocument();
+    const options = within(envGroup).getAllByTestId('data-pill-env-option');
+    expect(options.map((o) => o.textContent ?? '').join(' ')).toContain('API_KEY');
+    // No upstream nodes, but env vars exist → the empty state is suppressed.
+    expect(screen.queryByText(/no upstream outputs/i)).not.toBeInTheDocument();
+  });
+
+  it('inserts a single UPPER_SNAKE token for an env var', () => {
+    useEnvVarsStore.setState({ keys: ['API_KEY'], status: 'ready', error: null });
+    const insert = vi.fn();
+    useEditorStore.setState({
+      nodes: [mkNode('solo', NodeType.HTTP_REQUEST)],
+      edges: [],
+      activePillField: { nodeId: 'solo', insert },
+    });
+    render(<DataPillPicker />);
+
+    fireEvent.mouseDown(screen.getByTestId('data-pill-env-option'));
+    expect(insert).toHaveBeenCalledWith('{{API_KEY}}');
   });
 
   it('renders as a bottom sheet on mobile', () => {
