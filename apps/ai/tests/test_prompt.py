@@ -46,9 +46,18 @@ class TestPromptBuilder:
 
             prompt = builder.build(workflow=WORKFLOW, context_docs=CONTEXT_DOCS)
 
-            for key in ("objective", "triggers", "actions", "data_flow", "decisions"):
+            for key in ("objective", "walkthrough", "triggers", "actions", "data_flow", "decisions"):
                 assert key in prompt
             assert "json" in prompt.lower()
+
+        def test_requests_a_step_by_step_walkthrough(self):
+            builder = PromptBuilder()
+
+            prompt = builder.build(workflow=WORKFLOW, context_docs=CONTEXT_DOCS)
+
+            lowered = prompt.lower()
+            assert "walkthrough" in lowered
+            assert "step" in lowered or "node-by-node" in lowered
 
         def test_includes_workflow_definition(self):
             builder = PromptBuilder()

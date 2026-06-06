@@ -91,19 +91,22 @@ export function InspectorDocumentationPanel(): JSX.Element {
           {(
             [
               ['Objective', docs.sections.objective],
+              ['Walkthrough', docs.sections.walkthrough],
               ['Triggers', docs.sections.triggers],
               ['Actions', docs.sections.actions],
               ['Data flow', docs.sections.dataFlow],
               ['Decisions', docs.sections.decisions],
             ] as const
-          ).map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                {label}
-              </dt>
-              <dd className="mt-0.5 text-text-primary">{value}</dd>
-            </div>
-          ))}
+          )
+            .filter(([, value]) => Boolean(value))
+            .map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
+                  {label}
+                </dt>
+                <dd className="mt-0.5 text-text-primary">{value}</dd>
+              </div>
+            ))}
         </dl>
       </div>
     </div>

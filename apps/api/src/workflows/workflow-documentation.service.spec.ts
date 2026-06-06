@@ -36,6 +36,7 @@ describe('WorkflowDocumentationService', () => {
 
   const generatedSections = {
     objective: 'obj',
+    walkthrough: 'wt',
     triggers: 'trig',
     actions: 'act',
     dataFlow: 'flow',

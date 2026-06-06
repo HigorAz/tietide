@@ -27,6 +27,7 @@ describe('WorkflowDocumentationController (integration)', () => {
   const updatedAt = new Date('2026-04-26T01:00:00Z');
   const sections = {
     objective: 'obj',
+    walkthrough: 'wt',
     triggers: 'trig',
     actions: 'act',
     dataFlow: 'flow',

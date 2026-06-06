@@ -4,6 +4,11 @@ export class DocumentationSectionsDto {
   @ApiProperty()
   objective!: string;
 
+  @ApiProperty({
+    description: 'Ordered, node-by-node walkthrough of how the workflow executes.',
+  })
+  walkthrough!: string;
+
   @ApiProperty()
   triggers!: string;
 

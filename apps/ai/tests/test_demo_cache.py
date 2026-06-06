@@ -12,6 +12,7 @@ def _make_doc(workflow_id: str = "wf1", workflow_name: str = "W") -> GeneratedDo
         workflow_name=workflow_name,
         sections=DocumentationSections(
             objective="o",
+            walkthrough="w",
             triggers="t",
             actions="a",
             data_flow="d",

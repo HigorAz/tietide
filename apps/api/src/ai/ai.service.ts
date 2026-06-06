@@ -16,6 +16,7 @@ export interface GenerateDocsParams {
 
 export interface DocumentationSections {
   objective: string;
+  walkthrough: string;
   triggers: string;
   actions: string;
   dataFlow: string;
@@ -35,6 +36,7 @@ interface AiServiceRawResponse {
   model?: unknown;
   sections?: {
     objective?: unknown;
+    walkthrough?: unknown;
     triggers?: unknown;
     actions?: unknown;
     data_flow?: unknown;
@@ -104,7 +106,7 @@ export class AiService {
       throw new AiServiceUnavailableError('AI service returned an unparseable response');
     }
 
-    const { objective, triggers, actions, data_flow: dataFlow, decisions } = sections;
+    const { objective, walkthrough, triggers, actions, data_flow: dataFlow, decisions } = sections;
 
     if (
       typeof objective !== 'string' ||
@@ -118,7 +120,16 @@ export class AiService {
 
     return {
       documentation,
-      sections: { objective, triggers, actions, dataFlow, decisions },
+      sections: {
+        objective,
+        // Tolerate AI services predating the walkthrough section so the API
+        // stays forward/backward compatible across deploys.
+        walkthrough: typeof walkthrough === 'string' ? walkthrough : '',
+        triggers,
+        actions,
+        dataFlow,
+        decisions,
+      },
       model,
     };
   }

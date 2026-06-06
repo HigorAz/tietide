@@ -22,6 +22,7 @@ const sample: WorkflowDocumentationResponse = {
   documentation: '# Demo Workflow\n\nThis is **generated** documentation.',
   sections: {
     objective: 'Move data from A to B',
+    walkthrough: 'Step 1 trigger fires, step 2 HTTP request runs.',
     triggers: 'Manual',
     actions: 'HTTP request',
     dataFlow: 'A → B',
@@ -107,6 +108,23 @@ describe('DocumentationPanel', () => {
 
       expect(await screen.findByRole('heading', { name: /demo workflow/i })).toBeInTheDocument();
       expect(screen.getByText(/move data from a to b/i)).toBeInTheDocument();
+      expect(screen.getByText(/walkthrough/i)).toBeInTheDocument();
+      expect(screen.getByText(/step 1 trigger fires/i)).toBeInTheDocument();
+    });
+
+    it('should omit the walkthrough row for docs generated before it shipped', async () => {
+      const legacy: WorkflowDocumentationResponse = {
+        ...sample,
+        sections: { ...sample.sections, walkthrough: undefined },
+      };
+      mockedRegenerate.mockResolvedValueOnce(legacy);
+
+      render(<DocumentationPanel workflowId="wf-1" />);
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /generate documentation/i }));
+
+      expect(await screen.findByText(/move data from a to b/i)).toBeInTheDocument();
+      expect(screen.queryByText(/walkthrough/i)).not.toBeInTheDocument();
     });
 
     it('should expose a copy-to-clipboard button that copies the raw markdown', async () => {

@@ -29,6 +29,10 @@ WORKFLOW = {
 
 SECTIONS = {
     "objective": "Sync partner orders to internal endpoint daily.",
+    "walkthrough": (
+        "1. The cron trigger fires at 09:00 and starts the run. "
+        "2. The HTTP request node fetches partner orders and emits the response body."
+    ),
     "triggers": "Cron trigger that fires every day at 09:00.",
     "actions": "HTTP request to fetch orders, then forward to ingest.",
     "data_flow": "Trigger → fetch → forward.",
@@ -80,6 +84,7 @@ class TestDocumentationService:
             result = await service.generate(WORKFLOW)
 
             assert result.sections.objective == SECTIONS["objective"]
+            assert result.sections.walkthrough == SECTIONS["walkthrough"]
             assert result.sections.triggers == SECTIONS["triggers"]
             assert result.sections.actions == SECTIONS["actions"]
             assert result.sections.data_flow == SECTIONS["data_flow"]
@@ -92,6 +97,7 @@ class TestDocumentationService:
 
             assert "# Daily Sync" in result.documentation
             assert "## Objective" in result.documentation
+            assert "## Walkthrough" in result.documentation
             assert "## Triggers" in result.documentation
             assert "## Actions" in result.documentation
             assert "## Data Flow" in result.documentation

@@ -22,6 +22,10 @@ from tests.fakes import FakeEmbedder, FakeLlmClient, FakeVectorStore
 
 SECTIONS = {
     "objective": "Manually call a health endpoint and surface the response.",
+    "walkthrough": (
+        "1. A user starts the manual trigger. "
+        "2. The HTTP request node issues a GET to the health endpoint and emits the response."
+    ),
     "triggers": "Manual trigger started by a user.",
     "actions": "HTTP GET to https://api.example.com/health.",
     "data_flow": "trigger → http",
@@ -110,6 +114,7 @@ class TestGenerateDocsRoute:
         body = response.json()
         assert body["workflow_id"] == "wf-123"
         assert body["sections"]["objective"] == SECTIONS["objective"]
+        assert body["sections"]["walkthrough"] == SECTIONS["walkthrough"]
         assert body["sections"]["triggers"] == SECTIONS["triggers"]
         assert body["sections"]["actions"] == SECTIONS["actions"]
         assert body["sections"]["data_flow"] == SECTIONS["data_flow"]
@@ -124,7 +129,14 @@ class TestGenerateDocsRoute:
 
         assert response.status_code == 200
         markdown = response.json()["documentation"]
-        for header in ("## Objective", "## Triggers", "## Actions", "## Data Flow", "## Decisions"):
+        for header in (
+            "## Objective",
+            "## Walkthrough",
+            "## Triggers",
+            "## Actions",
+            "## Data Flow",
+            "## Decisions",
+        ):
             assert header in markdown
 
     async def test_rag_context_is_used_in_prompt(self, docs_client_factory):
@@ -191,6 +203,7 @@ class TestGenerateDocsRoute:
             workflow_name="Manual Health Check",
             sections=DocumentationSections(
                 objective="cached-objective",
+                walkthrough="cached-walkthrough",
                 triggers="cached-triggers",
                 actions="cached-actions",
                 data_flow="cached-data-flow",
@@ -231,6 +244,7 @@ class TestGenerateDocsRoute:
                 workflow_name="Other",
                 sections=DocumentationSections(
                     objective="no",
+                    walkthrough="no",
                     triggers="no",
                     actions="no",
                     data_flow="no",

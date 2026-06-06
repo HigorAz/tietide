@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 REQUIRED_SECTIONS: tuple[str, ...] = (
     "objective",
+    "walkthrough",
     "triggers",
     "actions",
     "data_flow",
@@ -39,6 +40,7 @@ class LlmClient(Protocol):
 @dataclass(frozen=True)
 class DocumentationSections:
     objective: str
+    walkthrough: str
     triggers: str
     actions: str
     data_flow: str
@@ -47,6 +49,7 @@ class DocumentationSections:
     def as_dict(self) -> dict[str, str]:
         return {
             "objective": self.objective,
+            "walkthrough": self.walkthrough,
             "triggers": self.triggers,
             "actions": self.actions,
             "data_flow": self.data_flow,
@@ -138,6 +141,7 @@ class DocumentationService:
 
         return DocumentationSections(
             objective=str(payload["objective"]),
+            walkthrough=str(payload["walkthrough"]),
             triggers=str(payload["triggers"]),
             actions=str(payload["actions"]),
             data_flow=str(payload["data_flow"]),
@@ -149,6 +153,7 @@ class DocumentationService:
         return (
             f"# {name}\n\n"
             f"## Objective\n{sections.objective}\n\n"
+            f"## Walkthrough\n{sections.walkthrough}\n\n"
             f"## Triggers\n{sections.triggers}\n\n"
             f"## Actions\n{sections.actions}\n\n"
             f"## Data Flow\n{sections.data_flow}\n\n"

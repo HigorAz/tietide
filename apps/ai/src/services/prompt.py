@@ -7,18 +7,29 @@ from typing import Any
 
 SYSTEM_INSTRUCTION = (
     "You are a technical writer documenting integration workflows for the TieTide iPaaS platform. "
-    "Your job is to read a workflow definition (a JSON graph of nodes and edges) and produce "
-    "concise, accurate documentation aimed at engineers who will operate the workflow."
+    "You read a workflow definition (a JSON graph of nodes and edges, each node carrying its type "
+    "and configuration) and produce thorough, accurate documentation that teaches an engineer how "
+    "the workflow actually works — not just what it is. Explain the mechanics: trace execution from "
+    "the trigger through every node, and for each step describe what it does, the configuration that "
+    "matters, the data it consumes, and the data it produces. Ground every statement in the supplied "
+    "definition; never invent nodes, fields, or behaviour that is not present."
 )
 
 OUTPUT_INSTRUCTION = (
     "Reply with a single JSON object — no prose before or after — with exactly these string keys:\n"
-    '  - "objective": one or two sentences describing what the workflow accomplishes.\n'
-    '  - "triggers": how and when the workflow starts.\n'
-    '  - "actions": the sequence of actions performed, in order.\n'
-    '  - "data_flow": how data moves between nodes.\n'
-    '  - "decisions": any conditional branches or routing logic; "None" if none.\n'
-    "Keep each value under 4 sentences. Do not add extra keys."
+    '  - "objective": 2-4 sentences on what the workflow accomplishes and the problem it solves.\n'
+    '  - "walkthrough": the heart of the documentation — an ordered, step-by-step explanation of\n'
+    "      the execution, one step per node in the order they run. For each node explain what it\n"
+    "      does, the key configuration values that drive it, the data it reads from upstream nodes,\n"
+    "      and the data it hands downstream. Reference nodes by their label/type so the reader can\n"
+    "      map each step back to the canvas. Use as many sentences as the workflow needs; be\n"
+    "      detailed and concrete rather than terse.\n"
+    '  - "triggers": how and when the workflow starts, including the trigger configuration.\n'
+    '  - "actions": each action node and the role it plays — explain its purpose, not just a list.\n'
+    '  - "data_flow": how data is shaped and passed between nodes, including any transformations.\n'
+    '  - "decisions": any conditional branches or routing logic and the conditions that select each\n'
+    '      path; "None" if there are none.\n'
+    "Write in clear prose. Do not add extra keys."
 )
 
 

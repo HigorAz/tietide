@@ -10,7 +10,7 @@ def _make_dummy_doc() -> GeneratedDocumentation:
         workflow_id="demo-1",
         workflow_name="D",
         sections=DocumentationSections(
-            objective="o", triggers="t", actions="a", data_flow="d", decisions="x"
+            objective="o", walkthrough="w", triggers="t", actions="a", data_flow="d", decisions="x"
         ),
         documentation="# md",
     )

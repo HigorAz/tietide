@@ -3,6 +3,9 @@ import { api } from './client';
 
 export interface DocumentationSections {
   objective: string;
+  // Optional: documentation generated before the walkthrough section shipped
+  // (cached rows) won't carry it.
+  walkthrough?: string;
   triggers: string;
   actions: string;
   dataFlow: string;

@@ -49,6 +49,7 @@ describe('AiService', () => {
           documentation: '# Demo\nGenerated text',
           sections: {
             objective: 'obj',
+            walkthrough: 'wt',
             triggers: 'trig',
             actions: 'act',
             data_flow: 'flow',
@@ -79,6 +80,7 @@ describe('AiService', () => {
         documentation: '# Demo\nGenerated text',
         sections: {
           objective: 'obj',
+          walkthrough: 'wt',
           triggers: 'trig',
           actions: 'act',
           dataFlow: 'flow',
