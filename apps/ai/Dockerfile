@@ -39,18 +39,19 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=builder /venv /venv
+COPY --chown=tietide:tietide apps/ai/src ./src
+COPY --chown=tietide:tietide apps/ai/pyproject.toml ./pyproject.toml
 
 USER tietide
 
-# Bake the sentence-transformers embedding model into the image so the RAG
-# pipeline never downloads at runtime (the non-root user has no writable global
-# HF cache — that surfaced as PermissionError: '/app/.cache' on first request).
-# Placed BEFORE the source COPY so editing app code doesn't re-download it; the
-# cache dirs live under /app (owned by tietide via the chown above).
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
-
-COPY --chown=tietide:tietide apps/ai/src ./src
-COPY --chown=tietide:tietide apps/ai/pyproject.toml ./pyproject.toml
+# The sentence-transformers embedding model (all-MiniLM-L6-v2) downloads on first
+# use into HF_HOME / SENTENCE_TRANSFORMERS_HOME, which point at the tietide-owned
+# /app/.cache (created above). That writable cache is the actual fix for the
+# original PermissionError: '/app/.cache' — the non-root user could not create
+# the default HF cache. We deliberately do NOT prefetch the model at build time:
+# that made the image build depend on a slow, rate-limited HuggingFace download
+# in CI. The first request pays a one-off download, hidden by the background
+# warm-up in the lifespan.
 
 EXPOSE 8000
 
