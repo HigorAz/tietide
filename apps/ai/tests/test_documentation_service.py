@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -158,3 +159,38 @@ class TestDocumentationService:
 
             with pytest.raises(DocumentationGenerationError):
                 await service.generate(WORKFLOW)
+
+        async def test_serializes_concurrent_generations(self):
+            # Ollama processes one generation at a time; firing two doc requests
+            # at once must queue rather than overlap (overlap is what raced the
+            # request timeout and produced a 503).
+            class _TrackingLlm:
+                def __init__(self, response: str) -> None:
+                    self.response = response
+                    self.in_flight = 0
+                    self.max_in_flight = 0
+
+                async def generate(self, prompt: str, *, temperature: float, max_tokens: int) -> str:
+                    self.in_flight += 1
+                    self.max_in_flight = max(self.max_in_flight, self.in_flight)
+                    await asyncio.sleep(0.02)
+                    self.in_flight -= 1
+                    return self.response
+
+            llm = _TrackingLlm(json.dumps(SECTIONS))
+            store = FakeVectorStore()
+            _seed(store)
+            retriever = Retriever(embedder=FakeEmbedder(), store=store, top_k=3)
+            service = DocumentationService(
+                retriever=retriever,
+                prompt_builder=PromptBuilder(),
+                llm_client=llm,
+            )
+
+            results = await asyncio.gather(
+                service.generate(WORKFLOW), service.generate(WORKFLOW)
+            )
+
+            assert len(results) == 2
+            assert all(r.sections.objective == SECTIONS["objective"] for r in results)
+            assert llm.max_in_flight == 1

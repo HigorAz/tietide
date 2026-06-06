@@ -63,7 +63,10 @@ def get_ollama_client() -> OllamaClient:
     return OllamaClient(
         base_url=settings.ollama_base_url,
         model=settings.ollama_model,
-        timeout=120.0,
+        # Generous timeout: doc generation is serialized (one at a time), so a
+        # queued second request must wait out the first plus its own (now richer,
+        # longer) generation without tripping a false 503.
+        timeout=300.0,
     )
 
 

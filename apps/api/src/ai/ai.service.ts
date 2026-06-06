@@ -55,7 +55,11 @@ export class AiService {
     this.baseUrl = (
       this.config.get<string>('AI_SERVICE_URL', 'http://localhost:8000') ?? 'http://localhost:8000'
     ).replace(/\/+$/, '');
-    this.timeoutMs = Number(this.config.get<string>('AI_SERVICE_TIMEOUT_MS', '120000'));
+    // Doc generation is serialized in the AI service and now produces richer,
+    // longer output, so a queued request can legitimately take minutes. Keep the
+    // API's client timeout comfortably above the AI service's own (300s) Ollama
+    // timeout so a slow-but-healthy generation isn't aborted as a false 503.
+    this.timeoutMs = Number(this.config.get<string>('AI_SERVICE_TIMEOUT_MS', '300000'));
     // Shared secret the AI service requires once configured. Empty in local dev
     // (the AI service then skips the check).
     this.internalToken = this.config.get<string>('INTERNAL_AI_TOKEN', '') ?? '';

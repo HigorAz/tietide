@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -84,12 +85,24 @@ class DocumentationService:
         llm_client: LlmClient,
         temperature: float = 0.3,
         max_tokens: int = 1024,
+        max_concurrency: int = 1,
     ) -> None:
         self.retriever = retriever
         self.prompt_builder = prompt_builder
         self.llm_client = llm_client
         self.temperature = temperature
         self.max_tokens = max_tokens
+        # Ollama serves one generation at a time; serialize calls here so two
+        # concurrent doc requests queue cleanly instead of overlapping and
+        # racing the request timeout (which surfaced as a 503). Created lazily
+        # so it binds to the running event loop on first use.
+        self._max_concurrency = max_concurrency
+        self._llm_semaphore: asyncio.Semaphore | None = None
+
+    def _semaphore(self) -> asyncio.Semaphore:
+        if self._llm_semaphore is None:
+            self._llm_semaphore = asyncio.Semaphore(self._max_concurrency)
+        return self._llm_semaphore
 
     async def generate(self, workflow: dict[str, Any]) -> GeneratedDocumentation:
         workflow_id = str(workflow.get("workflow_id", ""))
@@ -99,11 +112,12 @@ class DocumentationService:
         context_docs = self.retriever.retrieve(query)
 
         prompt = self.prompt_builder.build(workflow=workflow, context_docs=context_docs)
-        raw = await self.llm_client.generate(
-            prompt,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        )
+        async with self._semaphore():
+            raw = await self.llm_client.generate(
+                prompt,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
 
         sections = self._parse_sections(raw)
         markdown = self._render_markdown(workflow_name, sections)
