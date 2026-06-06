@@ -33,8 +33,11 @@ services:
       - '11434:11434'
     volumes:
       - ollama_data:/root/.ollama
+    # The ollama image ships neither curl nor wget, so a curl-based check is
+    # permanently "unhealthy" — which blocks dependents (the ai service) from
+    # starting. `ollama list` hits the local server via the bundled CLI.
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:11434/api/tags']
+      test: ['CMD', 'ollama', 'list']
       interval: 10s
       timeout: 5s
       retries: 10
