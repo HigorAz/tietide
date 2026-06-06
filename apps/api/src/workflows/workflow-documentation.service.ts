@@ -6,8 +6,10 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import type { WorkflowDefinition } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService, AiServiceUnavailableError, type DocumentationSections } from '../ai/ai.service';
+import { extractWorkflowFacts } from '../ai/workflow-facts';
 
 export interface WorkflowDocumentationResult {
   workflowId: string;
@@ -80,10 +82,14 @@ export class WorkflowDocumentationService {
   private async runAiAndUpsert(workflow: AuthorizedWorkflow): Promise<WorkflowDocumentationResult> {
     let generated;
     try {
+      // Ground the LLM in computed facts so it documents the real graph,
+      // connections, and branches rather than inferring them from raw JSON.
+      const facts = extractWorkflowFacts(workflow.definition as unknown as WorkflowDefinition);
       generated = await this.ai.generateDocs({
         workflowId: workflow.id,
         workflowName: workflow.name,
         definition: workflow.definition as Record<string, unknown>,
+        facts,
       });
     } catch (err) {
       if (err instanceof AiServiceUnavailableError) {

@@ -1,25 +1,36 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class DocumentationSectionsDto {
-  @ApiProperty()
-  objective!: string;
+  @ApiProperty({ description: 'What the workflow accomplishes and the problem it solves.' })
+  overview!: string;
 
-  @ApiProperty({
-    description: 'Ordered, node-by-node walkthrough of how the workflow executes.',
-  })
+  @ApiProperty({ description: 'Connections, secrets, and env vars the workflow requires to run.' })
+  prerequisites!: string;
+
+  @ApiProperty({ description: 'How and when the workflow starts (trigger + config).' })
+  trigger!: string;
+
+  @ApiProperty({ description: 'Ordered, node-by-node walkthrough of how the workflow executes.' })
   walkthrough!: string;
 
-  @ApiProperty()
-  triggers!: string;
-
-  @ApiProperty()
-  actions!: string;
-
-  @ApiProperty()
+  @ApiProperty({ description: 'How data is shaped and passed between nodes.' })
   dataFlow!: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Conditional branches and routing logic; "None" if none.' })
   decisions!: string;
+
+  @ApiProperty({ description: 'Failure paths, error edges, and retry behavior; "None" if none.' })
+  errorHandling!: string;
+
+  // Legacy keys — present only on documentation generated before the redesign.
+  @ApiProperty({ required: false, deprecated: true })
+  objective?: string;
+
+  @ApiProperty({ required: false, deprecated: true })
+  triggers?: string;
+
+  @ApiProperty({ required: false, deprecated: true })
+  actions?: string;
 }
 
 export class WorkflowDocumentationResponseDto {
