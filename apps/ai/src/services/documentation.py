@@ -8,6 +8,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from src.services.facts import extract_facts
 from src.services.prompt import PromptBuilder
 from src.services.retriever import Retriever
 from src.services.sections import SECTION_KEYS, SECTION_TITLES
@@ -98,7 +99,10 @@ class DocumentationService:
         query = self._build_retrieval_query(workflow_name, workflow.get("definition", {}))
         context_docs = self.retriever.retrieve(query)
 
-        facts = workflow.get("facts")
+        # Prefer API-computed facts (catalog-aware); otherwise compute a
+        # label-only fallback so docs are grounded even on direct calls
+        # (e.g. demo-cache priming at startup).
+        facts = workflow.get("facts") or extract_facts(workflow.get("definition") or {})
         prompt = self.prompt_builder.build(
             workflow=workflow, context_docs=context_docs, facts=facts
         )
