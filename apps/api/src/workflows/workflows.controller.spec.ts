@@ -347,6 +347,42 @@ describe('WorkflowsController (integration)', () => {
       });
     });
 
+    it('should accept node alias/skipped and edge kind fields (data-pills #270)', async () => {
+      // The SPA serializer emits `alias`/`skipped` on every node and `kind` on
+      // error edges. These are valid per the shared Zod schema, so the DTO must
+      // whitelist them — otherwise forbidNonWhitelisted rejects every save (400).
+      const definition = {
+        nodes: [
+          {
+            id: 'n1',
+            type: 'manual-trigger',
+            name: 'Start',
+            alias: 'trigger',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+          {
+            id: 'n2',
+            type: 'code',
+            name: 'Code',
+            alias: 'code_1',
+            skipped: true,
+            position: { x: 0, y: 120 },
+            config: {},
+          },
+        ],
+        edges: [{ id: 'e1', source: 'n1', target: 'n2', kind: 'error' as const }],
+      };
+      workflowsService.update.mockResolvedValueOnce({ ...persisted, definition, version: 2 });
+
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}`)
+        .send({ definition })
+        .expect(200);
+
+      expect(workflowsService.update).toHaveBeenCalledWith('owner-uuid', uuid, { definition });
+    });
+
     it('should return 400 when id is not a UUID', async () => {
       await request(app.getHttpServer())
         .patch('/workflows/not-a-uuid')

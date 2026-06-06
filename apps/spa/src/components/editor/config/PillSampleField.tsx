@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
+import { parseJsonSample } from '@/lib/parseJsonSample';
 import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from './formRegistry';
 
@@ -33,19 +34,16 @@ export function PillSampleField({ nodeId, config }: NodeConfigFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleBlur = () => {
-    const trimmed = text.trim();
-    if (trimmed === '') {
-      setError(null);
-      updateNodeConfig(nodeId, { [PILL_SAMPLE_KEY]: undefined });
+    // Tolerant parse: smart quotes / non-breaking spaces from pasted text would
+    // otherwise fail a bare JSON.parse and silently drop the sample (which then
+    // never reaches the data-pill picker as an override).
+    const result = parseJsonSample(text);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    try {
-      const parsed: unknown = JSON.parse(trimmed);
-      setError(null);
-      updateNodeConfig(nodeId, { [PILL_SAMPLE_KEY]: parsed });
-    } catch {
-      setError('Output sample is not valid JSON.');
-    }
+    setError(null);
+    updateNodeConfig(nodeId, { [PILL_SAMPLE_KEY]: result.value });
   };
 
   return (

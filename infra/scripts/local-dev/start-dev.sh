@@ -14,8 +14,10 @@ export NVM_DIR="$HOME/.nvm"
 
 cd "$REPO"
 
-echo "→ Starting Docker dependencies (postgres / valkey / ollama / chromadb / mailhog)..."
-docker compose -f infra/docker/docker-compose.yml --env-file .env up -d
+echo "→ Starting Docker dependencies (postgres / valkey / ollama / chromadb / mailhog / ai)..."
+# --build keeps the locally-built `ai` image in sync with apps/ai source. The
+# expensive pip layer is cached, so subsequent starts only re-copy the source.
+docker compose -f infra/docker/docker-compose.yml --env-file .env up -d --build
 
 start_service() {
   local name=$1; shift
@@ -64,6 +66,8 @@ echo "→ Waiting for services to come up..."
 ready=0
 wait_for_port api 3030 180 || ready=1
 wait_for_port spa 5173 120 || ready=1
+# AI docs service (FastAPI, in Docker) — publishes :8000.
+wait_for_port ai 8000 120 || ready=1
 # worker exposes no port — confirm its tracked process is still alive
 if [ -f "$LOGS/worker.pid" ] && kill -0 "$(cat "$LOGS/worker.pid")" 2>/dev/null; then
   echo "  ✓ worker process alive"

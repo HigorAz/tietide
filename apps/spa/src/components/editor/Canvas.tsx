@@ -136,7 +136,7 @@ export function Canvas() {
       data-tour="editor-canvas"
       data-drag-active={isDragActive ? 'true' : 'false'}
       className={cn(
-        'relative h-full w-full flex-1 bg-deep-blue transition-shadow',
+        'relative h-full w-full flex-1 bg-canvas transition-shadow',
         isDragActive && 'ring-2 ring-inset ring-accent-teal/70',
       )}
       onDragOver={handleDragOver}
@@ -161,7 +161,7 @@ export function Canvas() {
         fitViewOptions={FIT_VIEW_OPTIONS}
         {...editorTouchProps(isMobile)}
       >
-        <Background gap={16} color="#14304d" />
+        <Background gap={16} color="#102338" />
         <Controls />
       </ReactFlow>
       {isDragActive && (
