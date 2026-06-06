@@ -3,11 +3,20 @@
   "description": "Probes a critical service every 5 minutes and pages on-call only when the health check returns unhealthy.",
   "definition": {
     "nodes": [
-      { "id": "every_5min", "type": "cron-trigger", "params": { "cron": "*/5 * * * *" } },
+      {
+        "id": "every_5min",
+        "type": "cron-trigger",
+        "name": "Every 5 Minutes",
+        "position": { "x": 80, "y": 200 },
+        "config": { "cron": "*/5 * * * *" }
+      },
       {
         "id": "probe",
         "type": "http-request",
-        "params": {
+        "name": "Probe Health",
+        "alias": "probe",
+        "position": { "x": 340, "y": 200 },
+        "config": {
           "url": "https://api.internal.example.com/health",
           "method": "GET",
           "timeout": 3000
@@ -16,24 +25,28 @@
       {
         "id": "is_unhealthy",
         "type": "conditional",
-        "params": { "condition": "{{steps.probe.body.status}} != \"ok\"" }
+        "name": "Unhealthy?",
+        "position": { "x": 600, "y": 200 },
+        "config": { "condition": "{{steps.probe.body.status}} != \"ok\"" }
       },
       {
         "id": "page",
         "type": "http-request",
-        "params": {
+        "name": "Page On-Call",
+        "position": { "x": 860, "y": 120 },
+        "config": {
           "url": "https://hooks.pagerduty.com/incident",
           "method": "POST",
-          "headers": { "authorization": "Bearer ${PD_TOKEN}" },
+          "headers": { "authorization": "Bearer {{secrets.PD_TOKEN}}" },
           "body": { "service": "internal-api", "severity": "critical" }
         }
       }
     ],
     "edges": [
-      { "from": "every_5min", "to": "probe" },
-      { "from": "probe", "to": "is_unhealthy" },
-      { "from": "is_unhealthy", "to": "page", "branch": "true" }
+      { "id": "e1", "source": "every_5min", "target": "probe" },
+      { "id": "e2", "source": "probe", "target": "is_unhealthy" },
+      { "id": "e3", "source": "is_unhealthy", "target": "page", "sourceHandle": "true" }
     ]
   },
-  "expected_documentation": "## Periodic Service Health Probe with Alerting\n\nRuns every 5 minutes, probes the internal API, and only pages on-call when the response indicates the service is unhealthy.\n\n### Steps\n1. **Cron Trigger** — Fires at `*/5 * * * *` (every 5 minutes).\n2. **HTTP Request — probe** — GET the `/health` endpoint with a 3 second timeout.\n3. **Conditional** — Evaluates whether `status != \"ok\"`.\n4. **HTTP Request — page** — POST a critical incident to PagerDuty (only on the true branch).\n\n### Use cases\n- Synthetic monitoring with active alerting\n- Reduced alert noise via conditional gating\n\n### Failure modes\n- Probe timeout itself counts as unhealthy and triggers the page branch\n- PagerDuty webhook failure means the incident is not created"
+  "expected_documentation": "# Periodic Service Health Probe with Alerting\n\n## Overview\nContinuously monitors a critical service and pages on-call only when it reports unhealthy, keeping alert noise low.\n\n## Prerequisites\nRequires the PD_TOKEN secret for PagerDuty, and reaches api.internal.example.com and hooks.pagerduty.com.\n\n## Trigger\nCron Trigger — fires every 5 minutes (cron `*/5 * * * *`).\n\n## Walkthrough\n1. Every 5 Minutes (Cron Trigger) starts the run on schedule.\n2. Probe Health (HTTP Request) GETs the internal `/health` endpoint with a 3000 ms timeout.\n3. Unhealthy? (Conditional) checks whether the probed status is not \"ok\".\n4. On true, Page On-Call (HTTP Request) POSTs a critical incident to PagerDuty using the PD_TOKEN secret.\n\n## Data Flow\nProbe Health's `status` field drives the condition; no data flows on the healthy path.\n\n## Decisions\nUnhealthy?: when `{{steps.probe.body.status}} != \"ok\"` the run takes the true path to Page On-Call; otherwise it ends.\n\n## Error Handling\nNone configured: a probe timeout counts as unhealthy and pages; a PagerDuty failure means the incident is not created.\n"
 }

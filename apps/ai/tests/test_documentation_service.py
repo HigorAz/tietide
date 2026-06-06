@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -28,11 +29,16 @@ WORKFLOW = {
 }
 
 SECTIONS = {
-    "objective": "Sync partner orders to internal endpoint daily.",
-    "triggers": "Cron trigger that fires every day at 09:00.",
-    "actions": "HTTP request to fetch orders, then forward to ingest.",
+    "overview": "Sync partner orders to the internal endpoint daily.",
+    "prerequisites": "Requires the PARTNER_TOKEN secret and an HTTP endpoint.",
+    "trigger": "Cron trigger that fires every day at 09:00.",
+    "walkthrough": (
+        "1. The cron trigger fires at 09:00 and starts the run. "
+        "2. The HTTP request node fetches partner orders and emits the response body."
+    ),
     "data_flow": "Trigger → fetch → forward.",
     "decisions": "No conditional branches; failure aborts the run.",
+    "error_handling": "No error edges; a failed HTTP call aborts the run.",
 }
 
 
@@ -79,11 +85,13 @@ class TestDocumentationService:
 
             result = await service.generate(WORKFLOW)
 
-            assert result.sections.objective == SECTIONS["objective"]
-            assert result.sections.triggers == SECTIONS["triggers"]
-            assert result.sections.actions == SECTIONS["actions"]
+            assert result.sections.overview == SECTIONS["overview"]
+            assert result.sections.prerequisites == SECTIONS["prerequisites"]
+            assert result.sections.trigger == SECTIONS["trigger"]
+            assert result.sections.walkthrough == SECTIONS["walkthrough"]
             assert result.sections.data_flow == SECTIONS["data_flow"]
             assert result.sections.decisions == SECTIONS["decisions"]
+            assert result.sections.error_handling == SECTIONS["error_handling"]
 
         async def test_renders_markdown_documentation(self):
             service, _, _ = _build_service()
@@ -91,12 +99,14 @@ class TestDocumentationService:
             result = await service.generate(WORKFLOW)
 
             assert "# Daily Sync" in result.documentation
-            assert "## Objective" in result.documentation
-            assert "## Triggers" in result.documentation
-            assert "## Actions" in result.documentation
+            assert "## Overview" in result.documentation
+            assert "## Prerequisites" in result.documentation
+            assert "## Trigger" in result.documentation
+            assert "## Walkthrough" in result.documentation
             assert "## Data Flow" in result.documentation
             assert "## Decisions" in result.documentation
-            assert SECTIONS["objective"] in result.documentation
+            assert "## Error Handling" in result.documentation
+            assert SECTIONS["overview"] in result.documentation
 
         async def test_calls_llm_with_temperature_and_max_tokens(self):
             service, llm, _ = _build_service()
@@ -152,3 +162,79 @@ class TestDocumentationService:
 
             with pytest.raises(DocumentationGenerationError):
                 await service.generate(WORKFLOW)
+
+        async def test_passes_json_schema_when_structured_output_enabled(self):
+            service, llm, _ = _build_service()  # structured_output defaults to True
+
+            await service.generate(WORKFLOW)
+
+            schema = llm.calls[0]["format_schema"]
+            assert schema is not None
+            assert set(schema["required"]) == {
+                "overview",
+                "prerequisites",
+                "trigger",
+                "walkthrough",
+                "data_flow",
+                "decisions",
+                "error_handling",
+            }
+
+        async def test_omits_schema_when_structured_output_disabled(self):
+            embedder = FakeEmbedder()
+            store = FakeVectorStore()
+            _seed(store)
+            retriever = Retriever(embedder=embedder, store=store, top_k=3)
+            llm = FakeLlmClient(response=json.dumps(SECTIONS))
+            service = DocumentationService(
+                retriever=retriever,
+                prompt_builder=PromptBuilder(),
+                llm_client=llm,
+                structured_output=False,
+            )
+
+            await service.generate(WORKFLOW)
+
+            assert llm.calls[0]["format_schema"] is None
+
+        async def test_serializes_concurrent_generations(self):
+            # Ollama processes one generation at a time; firing two doc requests
+            # at once must queue rather than overlap (overlap is what raced the
+            # request timeout and produced a 503).
+            class _TrackingLlm:
+                def __init__(self, response: str) -> None:
+                    self.response = response
+                    self.in_flight = 0
+                    self.max_in_flight = 0
+
+                async def generate(
+                    self,
+                    prompt: str,
+                    *,
+                    temperature: float,
+                    max_tokens: int,
+                    format_schema: dict | None = None,
+                ) -> str:
+                    self.in_flight += 1
+                    self.max_in_flight = max(self.max_in_flight, self.in_flight)
+                    await asyncio.sleep(0.02)
+                    self.in_flight -= 1
+                    return self.response
+
+            llm = _TrackingLlm(json.dumps(SECTIONS))
+            store = FakeVectorStore()
+            _seed(store)
+            retriever = Retriever(embedder=FakeEmbedder(), store=store, top_k=3)
+            service = DocumentationService(
+                retriever=retriever,
+                prompt_builder=PromptBuilder(),
+                llm_client=llm,
+            )
+
+            results = await asyncio.gather(
+                service.generate(WORKFLOW), service.generate(WORKFLOW)
+            )
+
+            assert len(results) == 2
+            assert all(r.sections.overview == SECTIONS["overview"] for r in results)
+            assert llm.max_in_flight == 1

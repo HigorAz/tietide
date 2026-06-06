@@ -168,20 +168,25 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
                 <dl className="space-y-2 border-t border-white/10 pt-3 text-sm">
                   {(
                     [
-                      ['Objective', docs.sections.objective],
-                      ['Triggers', docs.sections.triggers],
+                      ['Overview', docs.sections.overview ?? docs.sections.objective],
+                      ['Prerequisites', docs.sections.prerequisites],
+                      ['Trigger', docs.sections.trigger ?? docs.sections.triggers],
+                      ['Walkthrough', docs.sections.walkthrough],
                       ['Actions', docs.sections.actions],
                       ['Data flow', docs.sections.dataFlow],
                       ['Decisions', docs.sections.decisions],
+                      ['Error handling', docs.sections.errorHandling],
                     ] as const
-                  ).map(([label, value]) => (
-                    <div key={label}>
-                      <dt className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                        {label}
-                      </dt>
-                      <dd className="mt-0.5 text-text-primary">{value}</dd>
-                    </div>
-                  ))}
+                  )
+                    .filter(([, value]) => Boolean(value))
+                    .map(([label, value]) => (
+                      <div key={label}>
+                        <dt className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                          {label}
+                        </dt>
+                        <dd className="mt-0.5 text-text-primary">{value}</dd>
+                      </div>
+                    ))}
                 </dl>
               </div>
             )}

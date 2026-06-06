@@ -1,5 +1,11 @@
 import { useCallback, useState, type DragEvent } from 'react';
-import ReactFlow, { Background, Controls, useReactFlow, type Node } from 'reactflow';
+import ReactFlow, {
+  Background,
+  BackgroundVariant,
+  Controls,
+  useReactFlow,
+  type Node,
+} from 'reactflow';
 import 'reactflow/dist/style.css';
 import type { NodeType } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
@@ -161,7 +167,11 @@ export function Canvas() {
         fitViewOptions={FIT_VIEW_OPTIONS}
         {...editorTouchProps(isMobile)}
       >
-        <Background gap={16} color="#102338" />
+        {/* Faint line grid mirroring the login page's `.auth-grid` (34px,
+            rgba(255,255,255,0.05)) — uniform (no fade) and panning with the
+            canvas so the editor reads on-brand but a notch darker. */}
+        <Background variant={BackgroundVariant.Lines} gap={34} color="rgba(255, 255, 255, 0.05)" />
+
         <Controls />
       </ReactFlow>
       {isDragActive && (

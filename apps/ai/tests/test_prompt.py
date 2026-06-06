@@ -46,9 +46,26 @@ class TestPromptBuilder:
 
             prompt = builder.build(workflow=WORKFLOW, context_docs=CONTEXT_DOCS)
 
-            for key in ("objective", "triggers", "actions", "data_flow", "decisions"):
+            for key in (
+                "overview",
+                "prerequisites",
+                "trigger",
+                "walkthrough",
+                "data_flow",
+                "decisions",
+                "error_handling",
+            ):
                 assert key in prompt
             assert "json" in prompt.lower()
+
+        def test_requests_a_step_by_step_walkthrough(self):
+            builder = PromptBuilder()
+
+            prompt = builder.build(workflow=WORKFLOW, context_docs=CONTEXT_DOCS)
+
+            lowered = prompt.lower()
+            assert "walkthrough" in lowered
+            assert "step" in lowered or "node-by-node" in lowered
 
         def test_includes_workflow_definition(self):
             builder = PromptBuilder()
@@ -90,3 +107,53 @@ class TestPromptBuilder:
             without_ctx = builder.build(workflow=WORKFLOW, context_docs=[])
 
             assert len(with_ctx) > len(without_ctx)
+
+        def test_includes_a_style_guide(self):
+            builder = PromptBuilder()
+
+            prompt = builder.build(workflow=WORKFLOW, context_docs=[])
+
+            lowered = prompt.lower()
+            assert "style guide" in lowered
+            assert "active voice" in lowered
+            assert "never invent" in lowered
+
+        def test_renders_ground_truth_facts_when_provided(self):
+            builder = PromptBuilder()
+            facts = {
+                "nodes": [
+                    {"id": "t", "label": "Daily 9am", "type": "cron-trigger", "category": "trigger"},
+                    {
+                        "id": "p",
+                        "label": "Notify Slack",
+                        "type": "slack-post-message",
+                        "category": "action",
+                        "provider": "slack",
+                    },
+                ],
+                "executionOrder": ["t", "p"],
+                "trigger": {"id": "t", "label": "Daily 9am", "type": "cron-trigger", "config": {}},
+                "branches": [],
+                "errorEdges": [],
+                "prerequisites": {
+                    "connections": [{"provider": "slack", "nodeLabels": ["Notify Slack"]}],
+                    "secrets": ["PARTNER_TOKEN"],
+                    "envVars": [],
+                    "externalEndpoints": [],
+                },
+                "dataPillRefs": [],
+            }
+
+            prompt = builder.build(workflow=WORKFLOW, context_docs=[], facts=facts)
+
+            assert "Ground truth" in prompt
+            assert "Notify Slack" in prompt
+            assert "PARTNER_TOKEN" in prompt
+            assert "Daily 9am -> Notify Slack" in prompt
+
+        def test_omits_facts_block_when_absent(self):
+            builder = PromptBuilder()
+
+            prompt = builder.build(workflow=WORKFLOW, context_docs=[])
+
+            assert "Ground truth" not in prompt

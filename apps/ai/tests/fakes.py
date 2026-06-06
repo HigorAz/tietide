@@ -91,9 +91,21 @@ class FakeLlmClient:
         self.calls: list[dict[str, Any]] = []
         self.raise_exc: Exception | None = None
 
-    async def generate(self, prompt: str, *, temperature: float, max_tokens: int) -> str:
+    async def generate(
+        self,
+        prompt: str,
+        *,
+        temperature: float,
+        max_tokens: int,
+        format_schema: dict | None = None,
+    ) -> str:
         self.calls.append(
-            {"prompt": prompt, "temperature": temperature, "max_tokens": max_tokens}
+            {
+                "prompt": prompt,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "format_schema": format_schema,
+            }
         )
         if self.raise_exc is not None:
             raise self.raise_exc

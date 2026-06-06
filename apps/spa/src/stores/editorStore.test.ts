@@ -151,6 +151,31 @@ describe('editorStore', () => {
       onNodesChange([{ id: nodeId, type: 'position', position: { x: 5, y: 5 }, dragging: false }]);
       expect(useEditorStore.getState().isDirty).toBe(true);
     });
+
+    it('should not dirty the store on a no-op click (drop at the same position)', () => {
+      const { addNode, onNodesChange } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+      useEditorStore.setState({ isDirty: false });
+
+      // React Flow emits a final position change with dragging:false even on a
+      // plain click. Same coordinates → nothing actually moved → stay clean.
+      onNodesChange([{ id: nodeId, type: 'position', position: { x: 0, y: 0 }, dragging: false }]);
+
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('should not dirty the store on a click reported as drag start+stop in place', () => {
+      const { addNode, onNodesChange } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const nodeId = useEditorStore.getState().nodes[0].id;
+      useEditorStore.setState({ isDirty: false });
+
+      onNodesChange([{ id: nodeId, type: 'position', position: { x: 0, y: 0 }, dragging: true }]);
+      onNodesChange([{ id: nodeId, type: 'position', position: { x: 0, y: 0 }, dragging: false }]);
+
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
   });
 
   describe('onEdgesChange', () => {

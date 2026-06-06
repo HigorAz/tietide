@@ -48,11 +48,13 @@ describe('AiService', () => {
           workflow_name: 'Demo',
           documentation: '# Demo\nGenerated text',
           sections: {
-            objective: 'obj',
-            triggers: 'trig',
-            actions: 'act',
+            overview: 'ov',
+            prerequisites: 'pre',
+            trigger: 'trig',
+            walkthrough: 'wt',
             data_flow: 'flow',
             decisions: 'dec',
+            error_handling: 'err',
           },
           model: 'llama3.1:8b',
         }),
@@ -78,13 +80,90 @@ describe('AiService', () => {
       expect(result).toEqual({
         documentation: '# Demo\nGenerated text',
         sections: {
-          objective: 'obj',
-          triggers: 'trig',
-          actions: 'act',
+          overview: 'ov',
+          prerequisites: 'pre',
+          trigger: 'trig',
+          walkthrough: 'wt',
           dataFlow: 'flow',
           decisions: 'dec',
+          errorHandling: 'err',
         },
         model: 'llama3.1:8b',
+      });
+    });
+
+    it('should include facts in the request body when provided', async () => {
+      const fetchMock = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          documentation: '# Demo',
+          sections: {
+            overview: 'ov',
+            prerequisites: 'pre',
+            trigger: 'trig',
+            walkthrough: 'wt',
+            data_flow: 'flow',
+            decisions: 'dec',
+            error_handling: 'err',
+          },
+          model: 'llama3.1:8b',
+        }),
+      });
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      const facts = {
+        nodes: [],
+        executionOrder: [],
+        trigger: null,
+        branches: [],
+        errorEdges: [],
+        prerequisites: { connections: [], secrets: [], envVars: [], externalEndpoints: [] },
+        dataPillRefs: [],
+      };
+      await service.generateDocs({ workflowId: 'wf-1', workflowName: 'Demo', definition, facts });
+
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(init.body as string)).toMatchObject({ facts });
+    });
+
+    it('should tolerantly parse legacy section keys from older AI responses', async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          documentation: '# Legacy',
+          sections: {
+            objective: 'obj',
+            walkthrough: 'wt',
+            triggers: 'trig',
+            actions: 'act',
+            data_flow: 'flow',
+            decisions: 'dec',
+          },
+          model: 'llama3.1:8b',
+        }),
+      }) as unknown as typeof fetch;
+
+      const result = await service.generateDocs({
+        workflowId: 'wf-1',
+        workflowName: 'Demo',
+        definition,
+      });
+
+      // New keys default to '' (absent in the legacy response) except those that
+      // map directly (walkthrough, dataFlow, decisions); legacy keys pass through.
+      expect(result.sections).toMatchObject({
+        objective: 'obj',
+        triggers: 'trig',
+        actions: 'act',
+        walkthrough: 'wt',
+        dataFlow: 'flow',
+        decisions: 'dec',
+        overview: '',
+        prerequisites: '',
+        trigger: '',
+        errorHandling: '',
       });
     });
 

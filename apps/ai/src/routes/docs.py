@@ -38,14 +38,19 @@ class GenerateDocsRequest(BaseModel):
     workflow_id: str = Field(..., min_length=1)
     workflow_name: str = Field(..., min_length=1)
     definition: dict[str, Any]
+    # Deterministic ground-truth facts computed by the API. Optional: when absent
+    # the AI service computes its own (label-only) fallback from the definition.
+    facts: dict[str, Any] | None = None
 
 
 class DocumentationSectionsResponse(BaseModel):
-    objective: str
-    triggers: str
-    actions: str
+    overview: str
+    prerequisites: str
+    trigger: str
+    walkthrough: str
     data_flow: str
     decisions: str
+    error_handling: str
 
 
 class GenerateDocsResponse(BaseModel):
@@ -62,7 +67,10 @@ def get_ollama_client() -> OllamaClient:
     return OllamaClient(
         base_url=settings.ollama_base_url,
         model=settings.ollama_model,
-        timeout=120.0,
+        # Generous timeout: doc generation is serialized (one at a time), so a
+        # queued second request must wait out the first plus its own (now richer,
+        # longer) generation without tripping a false 503.
+        timeout=300.0,
     )
 
 
@@ -80,7 +88,10 @@ def get_documentation_service() -> DocumentationService:
         prompt_builder=PromptBuilder(),
         llm_client=get_ollama_client(),
         temperature=0.3,
-        max_tokens=1024,
+        # Richer, node-by-node documentation (incl. the walkthrough section) needs
+        # a larger generation budget than the original terse 5-section output.
+        max_tokens=2048,
+        structured_output=settings.ollama_structured_output,
     )
 
 
