@@ -21,11 +21,16 @@ from src.services.retriever import Retriever
 from tests.fakes import FakeEmbedder, FakeLlmClient, FakeVectorStore
 
 SECTIONS = {
-    "objective": "Manually call a health endpoint and surface the response.",
-    "triggers": "Manual trigger started by a user.",
-    "actions": "HTTP GET to https://api.example.com/health.",
+    "overview": "Manually call a health endpoint and surface the response.",
+    "prerequisites": "No connections; calls a public health endpoint.",
+    "trigger": "Manual trigger started by a user.",
+    "walkthrough": (
+        "1. A user starts the manual trigger. "
+        "2. The HTTP request node issues a GET to the health endpoint and emits the response."
+    ),
     "data_flow": "trigger → http",
     "decisions": "No conditional logic.",
+    "error_handling": "No error edges; a failed request aborts the run.",
 }
 
 
@@ -109,11 +114,13 @@ class TestGenerateDocsRoute:
         assert response.status_code == 200
         body = response.json()
         assert body["workflow_id"] == "wf-123"
-        assert body["sections"]["objective"] == SECTIONS["objective"]
-        assert body["sections"]["triggers"] == SECTIONS["triggers"]
-        assert body["sections"]["actions"] == SECTIONS["actions"]
+        assert body["sections"]["overview"] == SECTIONS["overview"]
+        assert body["sections"]["prerequisites"] == SECTIONS["prerequisites"]
+        assert body["sections"]["trigger"] == SECTIONS["trigger"]
+        assert body["sections"]["walkthrough"] == SECTIONS["walkthrough"]
         assert body["sections"]["data_flow"] == SECTIONS["data_flow"]
         assert body["sections"]["decisions"] == SECTIONS["decisions"]
+        assert body["sections"]["error_handling"] == SECTIONS["error_handling"]
         assert "Manual Health Check" in body["documentation"]
 
     async def test_documentation_includes_all_required_sections(self, docs_client_factory):
@@ -124,7 +131,15 @@ class TestGenerateDocsRoute:
 
         assert response.status_code == 200
         markdown = response.json()["documentation"]
-        for header in ("## Objective", "## Triggers", "## Actions", "## Data Flow", "## Decisions"):
+        for header in (
+            "## Overview",
+            "## Prerequisites",
+            "## Trigger",
+            "## Walkthrough",
+            "## Data Flow",
+            "## Decisions",
+            "## Error Handling",
+        ):
             assert header in markdown
 
     async def test_rag_context_is_used_in_prompt(self, docs_client_factory):
@@ -190,11 +205,13 @@ class TestGenerateDocsRoute:
             workflow_id="wf-123",
             workflow_name="Manual Health Check",
             sections=DocumentationSections(
-                objective="cached-objective",
-                triggers="cached-triggers",
-                actions="cached-actions",
+                overview="cached-overview",
+                prerequisites="cached-prerequisites",
+                trigger="cached-trigger",
+                walkthrough="cached-walkthrough",
                 data_flow="cached-data-flow",
                 decisions="cached-decisions",
+                error_handling="cached-error-handling",
             ),
             documentation="# cached markdown",
         )
@@ -208,7 +225,7 @@ class TestGenerateDocsRoute:
 
         assert response.status_code == 200
         body = response.json()
-        assert body["sections"]["objective"] == "cached-objective"
+        assert body["sections"]["overview"] == "cached-overview"
         assert body["documentation"] == "# cached markdown"
         assert llm.calls == []
 
@@ -230,11 +247,13 @@ class TestGenerateDocsRoute:
                 workflow_id="other-wf",
                 workflow_name="Other",
                 sections=DocumentationSections(
-                    objective="no",
-                    triggers="no",
-                    actions="no",
+                    overview="no",
+                    prerequisites="no",
+                    trigger="no",
+                    walkthrough="no",
                     data_flow="no",
                     decisions="no",
+                    error_handling="no",
                 ),
                 documentation="# wrong",
             ),

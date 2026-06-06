@@ -2,24 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from src.services.facts import extract_facts
 from src.services.prompt import PromptBuilder
 from src.services.retriever import Retriever
+from src.services.sections import SECTION_KEYS, SECTION_TITLES, build_json_schema
 
 logger = logging.getLogger(__name__)
 
-
-REQUIRED_SECTIONS: tuple[str, ...] = (
-    "objective",
-    "triggers",
-    "actions",
-    "data_flow",
-    "decisions",
-)
+REQUIRED_SECTIONS: tuple[str, ...] = SECTION_KEYS
 
 
 class DocumentationGenerationError(Exception):
@@ -33,25 +29,22 @@ class LlmClient(Protocol):
         *,
         temperature: float,
         max_tokens: int,
+        format_schema: dict | None = None,
     ) -> str: ...
 
 
 @dataclass(frozen=True)
 class DocumentationSections:
-    objective: str
-    triggers: str
-    actions: str
+    overview: str
+    prerequisites: str
+    trigger: str
+    walkthrough: str
     data_flow: str
     decisions: str
+    error_handling: str
 
     def as_dict(self) -> dict[str, str]:
-        return {
-            "objective": self.objective,
-            "triggers": self.triggers,
-            "actions": self.actions,
-            "data_flow": self.data_flow,
-            "decisions": self.decisions,
-        }
+        return {key: getattr(self, key) for key in SECTION_KEYS}
 
 
 @dataclass(frozen=True)
@@ -81,12 +74,26 @@ class DocumentationService:
         llm_client: LlmClient,
         temperature: float = 0.3,
         max_tokens: int = 1024,
+        max_concurrency: int = 1,
+        structured_output: bool = True,
     ) -> None:
         self.retriever = retriever
         self.prompt_builder = prompt_builder
         self.llm_client = llm_client
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.structured_output = structured_output
+        # Ollama serves one generation at a time; serialize calls here so two
+        # concurrent doc requests queue cleanly instead of overlapping and
+        # racing the request timeout (which surfaced as a 503). Created lazily
+        # so it binds to the running event loop on first use.
+        self._max_concurrency = max_concurrency
+        self._llm_semaphore: asyncio.Semaphore | None = None
+
+    def _semaphore(self) -> asyncio.Semaphore:
+        if self._llm_semaphore is None:
+            self._llm_semaphore = asyncio.Semaphore(self._max_concurrency)
+        return self._llm_semaphore
 
     async def generate(self, workflow: dict[str, Any]) -> GeneratedDocumentation:
         workflow_id = str(workflow.get("workflow_id", ""))
@@ -95,12 +102,21 @@ class DocumentationService:
         query = self._build_retrieval_query(workflow_name, workflow.get("definition", {}))
         context_docs = self.retriever.retrieve(query)
 
-        prompt = self.prompt_builder.build(workflow=workflow, context_docs=context_docs)
-        raw = await self.llm_client.generate(
-            prompt,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
+        # Prefer API-computed facts (catalog-aware); otherwise compute a
+        # label-only fallback so docs are grounded even on direct calls
+        # (e.g. demo-cache priming at startup).
+        facts = workflow.get("facts") or extract_facts(workflow.get("definition") or {})
+        prompt = self.prompt_builder.build(
+            workflow=workflow, context_docs=context_docs, facts=facts
         )
+        format_schema = build_json_schema() if self.structured_output else None
+        async with self._semaphore():
+            raw = await self.llm_client.generate(
+                prompt,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                format_schema=format_schema,
+            )
 
         sections = self._parse_sections(raw)
         markdown = self._render_markdown(workflow_name, sections)
@@ -136,21 +152,11 @@ class DocumentationService:
                 f"Model response missing required sections: {', '.join(missing)}"
             )
 
-        return DocumentationSections(
-            objective=str(payload["objective"]),
-            triggers=str(payload["triggers"]),
-            actions=str(payload["actions"]),
-            data_flow=str(payload["data_flow"]),
-            decisions=str(payload["decisions"]),
-        )
+        return DocumentationSections(**{key: str(payload[key]) for key in SECTION_KEYS})
 
     @staticmethod
     def _render_markdown(name: str, sections: DocumentationSections) -> str:
-        return (
-            f"# {name}\n\n"
-            f"## Objective\n{sections.objective}\n\n"
-            f"## Triggers\n{sections.triggers}\n\n"
-            f"## Actions\n{sections.actions}\n\n"
-            f"## Data Flow\n{sections.data_flow}\n\n"
-            f"## Decisions\n{sections.decisions}\n"
+        body = "".join(
+            f"## {SECTION_TITLES[key]}\n{getattr(sections, key)}\n\n" for key in SECTION_KEYS
         )
+        return f"# {name}\n\n{body}".rstrip() + "\n"

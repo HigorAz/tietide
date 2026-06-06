@@ -26,11 +26,13 @@ describe('WorkflowDocumentationController (integration)', () => {
   const uuid = '550e8400-e29b-41d4-a716-446655440000';
   const updatedAt = new Date('2026-04-26T01:00:00Z');
   const sections = {
-    objective: 'obj',
-    triggers: 'trig',
-    actions: 'act',
+    overview: 'ov',
+    prerequisites: 'pre',
+    trigger: 'trig',
+    walkthrough: 'wt',
     dataFlow: 'flow',
     decisions: 'dec',
+    errorHandling: 'err',
   };
   const result = {
     workflowId: uuid,

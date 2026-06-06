@@ -129,6 +129,17 @@ describe('editorStore — history and workflow lifecycle', () => {
 
       expect(useEditorStore.getState().past.length).toBe(historyBefore);
     });
+
+    it('should NOT push a snapshot for a no-op click (drop at the same position)', () => {
+      const { addNode, onNodesChange } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      const id = useEditorStore.getState().nodes[0].id;
+      const historyBefore = useEditorStore.getState().past.length;
+
+      onNodesChange([{ id, type: 'position', position: { x: 0, y: 0 }, dragging: false }]);
+
+      expect(useEditorStore.getState().past.length).toBe(historyBefore);
+    });
   });
 
   describe('loadWorkflow', () => {

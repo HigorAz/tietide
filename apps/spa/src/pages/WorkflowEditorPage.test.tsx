@@ -20,6 +20,7 @@ vi.mock('reactflow', () => ({
     <div data-testid="reactflow-stub">{children}</div>
   ),
   Background: () => null,
+  BackgroundVariant: { Lines: 'lines', Dots: 'dots', Cross: 'cross' },
   Controls: () => null,
   MiniMap: () => null,
   ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,

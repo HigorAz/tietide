@@ -35,11 +35,13 @@ describe('WorkflowDocumentationService', () => {
   };
 
   const generatedSections = {
-    objective: 'obj',
-    triggers: 'trig',
-    actions: 'act',
+    overview: 'ov',
+    prerequisites: 'pre',
+    trigger: 'trig',
+    walkthrough: 'wt',
     dataFlow: 'flow',
     decisions: 'dec',
+    errorHandling: 'err',
   };
 
   const cachedRow = {
@@ -148,11 +150,14 @@ describe('WorkflowDocumentationService', () => {
       const result = await service.regenerate(userId, workflowId);
 
       expect(ai.generateDocs).toHaveBeenCalledTimes(1);
-      expect(ai.generateDocs).toHaveBeenCalledWith({
-        workflowId,
-        workflowName: 'Demo',
-        definition,
-      });
+      expect(ai.generateDocs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workflowId,
+          workflowName: 'Demo',
+          definition,
+          facts: expect.objectContaining({ nodes: expect.any(Array) }),
+        }),
+      );
       expect(prisma.workflowDocumentation.upsert).toHaveBeenCalledWith({
         where: { workflowId },
         create: {

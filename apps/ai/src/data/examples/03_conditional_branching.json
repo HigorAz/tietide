@@ -3,11 +3,20 @@
   "description": "Fetches an order and routes execution to different notification endpoints based on the order status.",
   "definition": {
     "nodes": [
-      { "id": "trigger", "type": "manual-trigger", "params": {} },
+      {
+        "id": "trigger",
+        "type": "manual-trigger",
+        "name": "Start",
+        "position": { "x": 80, "y": 200 },
+        "config": {}
+      },
       {
         "id": "lookup",
         "type": "http-request",
-        "params": {
+        "name": "Look Up Order",
+        "alias": "lookup",
+        "position": { "x": 340, "y": 200 },
+        "config": {
           "url": "https://api.example.com/orders/{{trigger.data.orderId}}",
           "method": "GET"
         }
@@ -15,12 +24,16 @@
       {
         "id": "is_failed",
         "type": "conditional",
-        "params": { "condition": "{{steps.lookup.body.status}} == \"failed\"" }
+        "name": "Order Failed?",
+        "position": { "x": 600, "y": 200 },
+        "config": { "condition": "{{steps.lookup.body.status}} == \"failed\"" }
       },
       {
         "id": "notify_failure",
         "type": "http-request",
-        "params": {
+        "name": "Alert Failure",
+        "position": { "x": 860, "y": 120 },
+        "config": {
           "url": "https://hooks.example.com/alerts/order-failed",
           "method": "POST",
           "body": { "orderId": "{{trigger.data.orderId}}" }
@@ -29,7 +42,9 @@
       {
         "id": "notify_ok",
         "type": "http-request",
-        "params": {
+        "name": "Log Success",
+        "position": { "x": 860, "y": 280 },
+        "config": {
           "url": "https://hooks.example.com/log/order-ok",
           "method": "POST",
           "body": { "orderId": "{{trigger.data.orderId}}" }
@@ -37,11 +52,11 @@
       }
     ],
     "edges": [
-      { "from": "trigger", "to": "lookup" },
-      { "from": "lookup", "to": "is_failed" },
-      { "from": "is_failed", "to": "notify_failure", "branch": "true" },
-      { "from": "is_failed", "to": "notify_ok", "branch": "false" }
+      { "id": "e1", "source": "trigger", "target": "lookup" },
+      { "id": "e2", "source": "lookup", "target": "is_failed" },
+      { "id": "e3", "source": "is_failed", "target": "notify_failure", "sourceHandle": "true" },
+      { "id": "e4", "source": "is_failed", "target": "notify_ok", "sourceHandle": "false" }
     ]
   },
-  "expected_documentation": "## Order Status Conditional Notification\n\nLooks up an order by ID and notifies the appropriate downstream endpoint depending on the status field.\n\n### Steps\n1. **Manual Trigger** — Receives `orderId` in input data.\n2. **HTTP Request — lookup** — Fetches the order from the orders API.\n3. **Conditional** — Evaluates `status == \"failed\"`.\n4. **HTTP Request — notify_failure** — Posts to the failure alert webhook (true branch).\n5. **HTTP Request — notify_ok** — Posts to the success log webhook (false branch).\n\n### Use cases\n- Routing alerts based on business outcome\n- Multi-path workflows that diverge after a check\n\n### Failure modes\n- Missing `orderId` in trigger input causes URL interpolation failure\n- Conditional with malformed expression raises a node error"
+  "expected_documentation": "# Order Status Conditional Notification\n\n## Overview\nLooks up an order by ID and notifies the right downstream endpoint depending on whether the order failed.\n\n## Prerequisites\nNone. The workflow calls api.example.com and hooks.example.com with no connections or secrets.\n\n## Trigger\nManual Trigger — started by a user; expects an `orderId` in the input data.\n\n## Walkthrough\n1. Start (Manual Trigger) receives `orderId`.\n2. Look Up Order (HTTP Request) GETs the order from the orders API, interpolating `{{trigger.data.orderId}}` into the URL.\n3. Order Failed? (Conditional) evaluates whether the looked-up status equals \"failed\".\n4. On true, Alert Failure (HTTP Request) POSTs to the failure webhook; on false, Log Success (HTTP Request) POSTs to the success log.\n\n## Data Flow\nThe trigger's `orderId` flows into the lookup URL and both webhook bodies; the lookup's `status` field drives the branch.\n\n## Decisions\nOrder Failed?: when `{{steps.lookup.body.status}} == \"failed\"` the run takes the true path to Alert Failure, otherwise the false path to Log Success.\n\n## Error Handling\nNone configured: a missing `orderId` breaks URL interpolation, and a malformed condition raises a node error.\n"
 }
