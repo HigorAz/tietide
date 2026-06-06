@@ -168,12 +168,14 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
                 <dl className="space-y-2 border-t border-white/10 pt-3 text-sm">
                   {(
                     [
-                      ['Objective', docs.sections.objective],
+                      ['Overview', docs.sections.overview ?? docs.sections.objective],
+                      ['Prerequisites', docs.sections.prerequisites],
+                      ['Trigger', docs.sections.trigger ?? docs.sections.triggers],
                       ['Walkthrough', docs.sections.walkthrough],
-                      ['Triggers', docs.sections.triggers],
                       ['Actions', docs.sections.actions],
                       ['Data flow', docs.sections.dataFlow],
                       ['Decisions', docs.sections.decisions],
+                      ['Error handling', docs.sections.errorHandling],
                     ] as const
                   )
                     .filter(([, value]) => Boolean(value))

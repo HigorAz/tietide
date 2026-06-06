@@ -90,12 +90,14 @@ export function InspectorDocumentationPanel(): JSX.Element {
         <dl className="mt-3 space-y-2 border-t border-white/10 pt-3 text-[11px]">
           {(
             [
-              ['Objective', docs.sections.objective],
+              ['Overview', docs.sections.overview ?? docs.sections.objective],
+              ['Prerequisites', docs.sections.prerequisites],
+              ['Trigger', docs.sections.trigger ?? docs.sections.triggers],
               ['Walkthrough', docs.sections.walkthrough],
-              ['Triggers', docs.sections.triggers],
               ['Actions', docs.sections.actions],
               ['Data flow', docs.sections.dataFlow],
               ['Decisions', docs.sections.decisions],
+              ['Error handling', docs.sections.errorHandling],
             ] as const
           )
             .filter(([, value]) => Boolean(value))

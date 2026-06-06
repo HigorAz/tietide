@@ -21,12 +21,13 @@ const sample: WorkflowDocumentationResponse = {
   version: 3,
   documentation: '# Demo Workflow\n\nThis is **generated** documentation.',
   sections: {
-    objective: 'Move data from A to B',
+    overview: 'Move data from A to B',
+    prerequisites: 'Requires a Slack connection',
+    trigger: 'Manual',
     walkthrough: 'Step 1 trigger fires, step 2 HTTP request runs.',
-    triggers: 'Manual',
-    actions: 'HTTP request',
     dataFlow: 'A → B',
     decisions: 'None',
+    errorHandling: 'Retries twice on failure',
   },
   model: 'llama3.1:8b',
   generatedAt: '2026-04-26T01:00:00Z',
@@ -108,14 +109,25 @@ describe('DocumentationPanel', () => {
 
       expect(await screen.findByRole('heading', { name: /demo workflow/i })).toBeInTheDocument();
       expect(screen.getByText(/move data from a to b/i)).toBeInTheDocument();
-      expect(screen.getByText(/walkthrough/i)).toBeInTheDocument();
+      // New runbook sections render.
+      expect(screen.getByText('Overview')).toBeInTheDocument();
+      expect(screen.getByText('Prerequisites')).toBeInTheDocument();
+      expect(screen.getByText('Walkthrough')).toBeInTheDocument();
+      expect(screen.getByText('Error handling')).toBeInTheDocument();
       expect(screen.getByText(/step 1 trigger fires/i)).toBeInTheDocument();
     });
 
-    it('should omit the walkthrough row for docs generated before it shipped', async () => {
+    it('should render legacy section keys from docs generated before the redesign', async () => {
       const legacy: WorkflowDocumentationResponse = {
         ...sample,
-        sections: { ...sample.sections, walkthrough: undefined },
+        sections: {
+          objective: 'Legacy objective text',
+          walkthrough: 'Legacy walkthrough',
+          triggers: 'Manual',
+          actions: 'HTTP request',
+          dataFlow: 'A → B',
+          decisions: 'None',
+        },
       };
       mockedRegenerate.mockResolvedValueOnce(legacy);
 
@@ -123,8 +135,13 @@ describe('DocumentationPanel', () => {
       const user = userEvent.setup();
       await user.click(await screen.findByRole('button', { name: /generate documentation/i }));
 
-      expect(await screen.findByText(/move data from a to b/i)).toBeInTheDocument();
-      expect(screen.queryByText(/walkthrough/i)).not.toBeInTheDocument();
+      // Legacy objective surfaces under the Overview label; Actions still shows.
+      expect(await screen.findByText(/legacy objective text/i)).toBeInTheDocument();
+      expect(screen.getByText('Overview')).toBeInTheDocument();
+      expect(screen.getByText('Actions')).toBeInTheDocument();
+      // New-only sections are absent for legacy docs.
+      expect(screen.queryByText('Prerequisites')).not.toBeInTheDocument();
+      expect(screen.queryByText('Error handling')).not.toBeInTheDocument();
     });
 
     it('should expose a copy-to-clipboard button that copies the raw markdown', async () => {

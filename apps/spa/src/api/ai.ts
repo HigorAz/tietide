@@ -1,15 +1,23 @@
 import { AxiosError } from 'axios';
 import { api } from './client';
 
+/**
+ * Documentation sections. The current model is a runbook/Diátaxis hybrid; the
+ * legacy keys (objective/triggers/actions) appear only on documentation
+ * generated before the redesign. All optional so both shapes render safely.
+ */
 export interface DocumentationSections {
-  objective: string;
-  // Optional: documentation generated before the walkthrough section shipped
-  // (cached rows) won't carry it.
+  overview?: string;
+  prerequisites?: string;
+  trigger?: string;
   walkthrough?: string;
-  triggers: string;
-  actions: string;
-  dataFlow: string;
-  decisions: string;
+  dataFlow?: string;
+  decisions?: string;
+  errorHandling?: string;
+  // Legacy keys.
+  objective?: string;
+  triggers?: string;
+  actions?: string;
 }
 
 export interface WorkflowDocumentationResponse {
