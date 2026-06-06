@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -107,15 +108,28 @@ def build_lifespan(
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         state = get_service_state()
+
+        async def _run_bootstrap() -> None:
+            try:
+                await bootstrap(
+                    state,
+                    llm_client=llm_client_factory(),
+                    demo_workflows=demo_workflows_loader(),
+                    doc_service=doc_service_factory(),
+                )
+            except Exception:
+                logger.exception("Bootstrap failed during startup")
+
+        # Run warm-up + demo-cache priming in the BACKGROUND so the server starts
+        # serving immediately. On a CPU box each demo doc is a slow llama
+        # generation; awaiting them here blocked uvicorn startup for minutes
+        # (and tripped the readiness probe) on every boot. /health reflects
+        # `warmed_up` as it progresses; real requests work on-demand meanwhile.
+        task = asyncio.create_task(_run_bootstrap())
         try:
-            await bootstrap(
-                state,
-                llm_client=llm_client_factory(),
-                demo_workflows=demo_workflows_loader(),
-                doc_service=doc_service_factory(),
-            )
-        except Exception:
-            logger.exception("Bootstrap failed during startup")
-        yield
+            yield
+        finally:
+            if not task.done():
+                task.cancel()
 
     return lifespan
