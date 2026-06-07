@@ -102,6 +102,30 @@ describe('WorkflowDocumentationController (integration)', () => {
       expect(res.body).not.toHaveProperty('cached');
     });
 
+    it('sets Cache-Control: no-cache so the browser revalidates instead of serving a stale doc', async () => {
+      // Without this, browsers heuristically cache the doc (~10% of its age) and
+      // serve the stale copy to every poll during regeneration — the SPA never
+      // sees the freshly generated doc and times out. (Regression: prod docs bug.)
+      docs.findExisting.mockResolvedValue(result);
+
+      const res = await request(app.getHttpServer())
+        .get(`/workflows/${uuid}/documentation`)
+        .expect(200);
+
+      expect(res.headers['cache-control']).toMatch(/no-cache/);
+    });
+
+    it('sets Cache-Control: no-cache on 304 responses too', async () => {
+      docs.findExisting.mockResolvedValue(result);
+
+      const res = await request(app.getHttpServer())
+        .get(`/workflows/${uuid}/documentation`)
+        .set('If-None-Match', expectedEtag)
+        .expect(304);
+
+      expect(res.headers['cache-control']).toMatch(/no-cache/);
+    });
+
     it('should return 404 when no documentation exists for the workflow', async () => {
       docs.findExisting.mockResolvedValue(null);
 
