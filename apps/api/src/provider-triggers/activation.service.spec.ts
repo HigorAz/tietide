@@ -43,6 +43,7 @@ describe('ActivationService', () => {
   let pushTrigger: { onActivate: jest.Mock; onDeactivate: jest.Mock; verifySignature: jest.Mock };
 
   const userId = 'user-1';
+  const organizationId = 'org-1';
   const workflowId = 'wf-1';
   const connectionId = 'conn-1';
   const callbackBase = 'https://api.tietide.dev';
@@ -137,7 +138,7 @@ describe('ActivationService', () => {
 
   describe('activateForWorkflow', () => {
     it('should call onActivate per push trigger node and persist a ProviderSubscription', async () => {
-      await service.activateForWorkflow({ workflowId, userId, definition });
+      await service.activateForWorkflow({ workflowId, organizationId, userId, definition });
 
       expect(pushTrigger.onActivate).toHaveBeenCalledTimes(1);
       const args = pushTrigger.onActivate.mock.calls[0]?.[0] as Record<string, unknown>;
@@ -185,9 +186,9 @@ describe('ActivationService', () => {
     it('should propagate provider error so the surrounding transaction rolls back', async () => {
       pushTrigger.onActivate.mockRejectedValueOnce(new Error('Stripe down'));
 
-      await expect(service.activateForWorkflow({ workflowId, userId, definition })).rejects.toThrow(
-        'Stripe down',
-      );
+      await expect(
+        service.activateForWorkflow({ workflowId, organizationId, userId, definition }),
+      ).rejects.toThrow('Stripe down');
 
       expect(prisma.providerSubscription.upsert).not.toHaveBeenCalled();
     });
@@ -206,7 +207,7 @@ describe('ActivationService', () => {
         edges: [],
       } as unknown as Prisma.JsonValue;
 
-      await service.activateForWorkflow({ workflowId, userId, definition: plain });
+      await service.activateForWorkflow({ workflowId, organizationId, userId, definition: plain });
       expect(pushTrigger.onActivate).not.toHaveBeenCalled();
       expect(prisma.providerSubscription.upsert).not.toHaveBeenCalled();
     });
@@ -226,16 +227,16 @@ describe('ActivationService', () => {
       } as unknown as Prisma.JsonValue;
 
       await expect(
-        service.activateForWorkflow({ workflowId, userId, definition: noConn }),
+        service.activateForWorkflow({ workflowId, organizationId, userId, definition: noConn }),
       ).rejects.toThrow(/connectionId/i);
     });
 
     it('should throw when the connection does not belong to the workflow owner', async () => {
       prisma.connection.findFirst.mockResolvedValueOnce(null);
 
-      await expect(service.activateForWorkflow({ workflowId, userId, definition })).rejects.toThrow(
-        /connection/i,
-      );
+      await expect(
+        service.activateForWorkflow({ workflowId, organizationId, userId, definition }),
+      ).rejects.toThrow(/connection/i);
     });
   });
 
@@ -253,7 +254,7 @@ describe('ActivationService', () => {
         },
       ]);
 
-      await service.deactivateForWorkflow({ workflowId, userId, definition });
+      await service.deactivateForWorkflow({ workflowId, organizationId, userId, definition });
 
       expect(pushTrigger.onDeactivate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -281,7 +282,7 @@ describe('ActivationService', () => {
       ]);
       pushTrigger.onDeactivate.mockRejectedValueOnce(new Error('provider unreachable'));
 
-      await service.deactivateForWorkflow({ workflowId, userId, definition });
+      await service.deactivateForWorkflow({ workflowId, organizationId, userId, definition });
 
       expect(prisma.providerSubscription.delete).toHaveBeenCalled();
     });
@@ -289,7 +290,7 @@ describe('ActivationService', () => {
     it('should be a no-op when there are no existing subscriptions', async () => {
       prisma.providerSubscription.findMany.mockResolvedValueOnce([]);
 
-      await service.deactivateForWorkflow({ workflowId, userId, definition });
+      await service.deactivateForWorkflow({ workflowId, organizationId, userId, definition });
 
       expect(pushTrigger.onDeactivate).not.toHaveBeenCalled();
       expect(prisma.providerSubscription.delete).not.toHaveBeenCalled();
@@ -362,7 +363,7 @@ describe('ActivationService', () => {
         expiresAt: new Date('2026-05-09T00:00:00Z'),
         workflow: {
           id: workflowId,
-          userId,
+          organizationId,
           isActive: true,
           definition: microsoftDefinition,
         },
@@ -408,7 +409,7 @@ describe('ActivationService', () => {
         expiresAt: new Date('2026-05-09T00:00:00Z'),
         workflow: {
           id: workflowId,
-          userId,
+          organizationId,
           isActive: true,
           definition: microsoftDefinition,
         },

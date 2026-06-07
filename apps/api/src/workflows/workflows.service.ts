@@ -317,6 +317,7 @@ export class WorkflowsService {
         if (willDeactivate) {
           await this.activation.deactivateForWorkflow({
             workflowId: id,
+            organizationId,
             userId,
             definition: existing.definition,
             tx,
@@ -326,6 +327,7 @@ export class WorkflowsService {
         if (willActivate) {
           await this.activation.activateForWorkflow({
             workflowId: id,
+            organizationId,
             userId,
             definition: definitionForActivation,
             tx,
@@ -373,6 +375,7 @@ export class WorkflowsService {
     if (existing.isActive) {
       await this.activation.deactivateForWorkflow({
         workflowId: id,
+        organizationId,
         userId,
         definition: existing.definition,
       });
