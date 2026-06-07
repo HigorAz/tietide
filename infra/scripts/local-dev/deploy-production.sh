@@ -8,6 +8,17 @@ set -euo pipefail
 REPO_DIR="${HOME}/tietide"
 BRANCH="Production"
 
+# Where to publish the SHA prod is currently serving. The API reads the same path
+# (DEPLOYED_SHA_FILE) and exposes it on /v1/health/live; the promote-to-production
+# workflow polls that endpoint to confirm this deploy actually went live.
+MARKER_FILE="${DEPLOYED_SHA_FILE:-${HOME}/tietide-scripts/deployed-sha}"
+
+write_marker() {
+  mkdir -p "$(dirname "${MARKER_FILE}")"
+  printf '%s\n' "$1" > "${MARKER_FILE}"
+  echo "→ Marked deployed SHA ${1:0:7} → ${MARKER_FILE}"
+}
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
@@ -59,6 +70,9 @@ NEW_HEAD=$(git rev-parse HEAD)
 
 if [ "${OLD_HEAD}" = "${NEW_HEAD}" ]; then
   echo "✓ Already up to date (${NEW_HEAD:0:7}). Nothing to do."
+  # Keep the marker authoritative even on no-op runs (e.g. first run after this
+  # marker was introduced, or if it was deleted).
+  write_marker "${NEW_HEAD}"
   exit 0
 fi
 
@@ -83,6 +97,11 @@ fi
 # Rebuild artifacts + restart when running CODE changed. Prod serves built
 # output (`node dist/main`, `vite preview` on dist/) with NO hot reload, so a
 # pull alone never goes live — dist/ must be rebuilt and the services restarted.
+# Tracks whether NEW_HEAD is actually the code now being served. Stays true unless
+# we rebuilt but couldn't safely restart (old build still live) — in which case the
+# marker must NOT advance, or the promote workflow would go green prematurely.
+SERVING_NEW_HEAD=true
+
 if ! git diff --quiet "${OLD_HEAD}" "${NEW_HEAD}" -- apps/ packages/; then
   echo "→ App/package code changed — rebuilding artifacts (services stay up during build)"
   rebuild_all
@@ -92,6 +111,7 @@ if ! git diff --quiet "${OLD_HEAD}" "${NEW_HEAD}" -- apps/ packages/; then
     echo n | "${HOME}/tietide-scripts/stop-all.sh"
     SKIP_BUILD=1 "${HOME}/tietide-scripts/start-prod.sh"
   else
+    SERVING_NEW_HEAD=false
     echo ""
     echo "⚠ Rebuilt, but NOT auto-restarting under the systemd timer:"
     echo "  tietide-deploy.service has KillMode=control-group, which would reap the"
@@ -108,4 +128,12 @@ echo ""
 echo "Files changed in this deploy:"
 git diff --stat "${OLD_HEAD}" "${NEW_HEAD}"
 echo ""
+# Publish the now-serving SHA so the promote-to-production workflow can confirm the
+# deploy landed. Skipped when we rebuilt but couldn't restart — the marker then
+# stays at OLD_HEAD until a manual restart, correctly reflecting what's live.
+if [ "${SERVING_NEW_HEAD}" = "true" ]; then
+  write_marker "${NEW_HEAD}"
+else
+  echo "→ Marker left at ${OLD_HEAD:0:7} — restart pending, new build not yet live"
+fi
 echo "✓ Deploy complete at $(date -Iseconds)"
