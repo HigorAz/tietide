@@ -141,7 +141,7 @@ export function DocumentationPanel({ workflowId }: DocumentationPanelProps) {
             {status === 'loading' && (
               <div className="flex items-center gap-2 text-sm text-text-secondary">
                 <Spinner size="sm" />
-                <span>Generating documentation…</span>
+                <span>Generating documentation… this can take a minute or two.</span>
               </div>
             )}
 
