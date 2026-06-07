@@ -481,6 +481,32 @@ describe('WorkflowsPage', () => {
       expect(mockedStartDocs).not.toHaveBeenCalled();
     });
 
+    it('does not interrupt an in-flight regeneration when View docs is clicked (no stale refetch)', async () => {
+      const user = userEvent.setup();
+      const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({
+          id: 'a',
+          name: 'Alpha',
+          documentation: { generatedAt, version: 1 },
+        }),
+      ]);
+      // Regeneration stays in flight (POST is pending for the test window).
+      mockedStartDocs.mockReturnValueOnce(new Promise<never>(() => {}));
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /update docs for alpha/i }));
+      await waitFor(() => expect(mockedStartDocs).toHaveBeenCalledWith('a'));
+
+      // Expanding the panel mid-generation must show the live generating state,
+      // not fire a competing GET that blanks the spinner with the stale doc.
+      await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
+
+      expect(await screen.findByText(/generating documentation/i)).toBeInTheDocument();
+      expect(mockedGetDocs).not.toHaveBeenCalled();
+    });
+
     it('shows an inline error with retry when regeneration fails (no toast spam)', async () => {
       const user = userEvent.setup();
       mockedList.mockResolvedValueOnce([

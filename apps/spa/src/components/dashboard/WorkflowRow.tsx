@@ -360,7 +360,15 @@ export function WorkflowRow({
               <span>Generating documentation…</span>
             </div>
           ) : docsContent ? (
-            <MarkdownContent source={docsContent} />
+            <>
+              {isGeneratingDocs && (
+                <div className="mb-3 flex items-center gap-2 text-xs text-text-secondary">
+                  <Spinner size="sm" label={`Updating docs for ${name}`} />
+                  <span>Updating documentation…</span>
+                </div>
+              )}
+              <MarkdownContent source={docsContent} />
+            </>
           ) : null}
         </div>
       )}

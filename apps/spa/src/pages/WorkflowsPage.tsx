@@ -117,6 +117,10 @@ export function WorkflowsPage(): JSX.Element {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  // Per-row poll generation. A newer regenerate/view supersedes any in-flight
+  // poll loop for that workflow so stale results never clobber fresher state
+  // (mirrors the activePoll token in documentationStore).
+  const docsPollTokens = useRef<Record<string, number>>({});
 
   // Hydrate filter selections from URL on mount and when URL changes externally.
   useEffect(() => {
@@ -443,26 +447,34 @@ export function WorkflowsPage(): JSX.Element {
     // Generation runs in the background (it can exceed edge proxy timeouts on a
     // CPU-only model), so we kick it off and poll until a doc fresher than the
     // current one appears. Readiness is detected via generatedAt advancing.
+    const token = (docsPollTokens.current[id] ?? 0) + 1;
+    docsPollTokens.current[id] = token;
+    const isCurrent = (): boolean => docsPollTokens.current[id] === token;
+
     const existing = workflows.find((w) => w.id === id)?.documentation?.generatedAt ?? null;
     const baselineIso = existing ? new Date(existing).toISOString() : null;
     updateRowDocs(id, { isGenerating: true, error: null });
     try {
       await startWorkflowDocsRegeneration(id);
+      if (!isCurrent()) return;
 
       let fresh: WorkflowDocumentationResponse | null = null;
       for (let attempt = 0; attempt < DOC_POLL_MAX_ATTEMPTS; attempt += 1) {
         if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, DOC_POLL_INTERVAL_MS));
+        if (!isCurrent()) return;
         let docResp: WorkflowDocumentationResponse | null = null;
         try {
           docResp = await getWorkflowDocs(id);
         } catch {
           continue;
         }
+        if (!isCurrent()) return;
         if (docResp && (baselineIso === null || docResp.generatedAt > baselineIso)) {
           fresh = docResp;
           break;
         }
       }
+      if (!isCurrent()) return;
       if (!fresh) {
         throw new Error('Documentation is taking longer than expected. Please try again.');
       }
@@ -478,6 +490,7 @@ export function WorkflowsPage(): JSX.Element {
         version: fresh.version,
       });
     } catch (err) {
+      if (!isCurrent()) return;
       updateRowDocs(id, {
         isGenerating: false,
         error: errorMessage(err, 'Could not generate documentation'),
@@ -487,6 +500,8 @@ export function WorkflowsPage(): JSX.Element {
   };
 
   const viewDocs = async (id: string): Promise<void> => {
+    // Never interrupt an in-flight regeneration with a stale one-shot fetch.
+    if (docsByWorkflow[id]?.isGenerating) return;
     updateRowDocs(id, { isGenerating: true, error: null });
     try {
       const response = await getWorkflowDocs(id);
@@ -529,7 +544,9 @@ export function WorkflowsPage(): JSX.Element {
       return;
     }
     updateRowDocs(id, { isExpanded: true });
-    if (!state.content) {
+    // While a regeneration is in flight, just reveal the live generating state —
+    // don't fire a competing fetch that would replace it with the stale doc.
+    if (!state.content && !state.isGenerating) {
       void viewDocs(id);
     }
   };

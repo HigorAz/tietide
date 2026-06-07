@@ -166,6 +166,22 @@ describe('WorkflowRow', () => {
     });
   });
 
+  describe('docs regeneration affordance', () => {
+    it('keeps existing docs visible with an "Updating" indicator while regenerating', () => {
+      render(
+        <WorkflowRow
+          {...defaultProps()}
+          isExpanded
+          isGeneratingDocs
+          docsContent={'# Existing docs\n\nbody text'}
+        />,
+      );
+
+      expect(screen.getByText(/existing docs/i)).toBeInTheDocument();
+      expect(screen.getByText(/updating documentation/i)).toBeInTheDocument();
+    });
+  });
+
   describe('existing behavior preserved', () => {
     it('clicking the chevron/row body still opens the workflow', async () => {
       const user = userEvent.setup();
