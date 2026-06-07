@@ -481,6 +481,32 @@ describe('WorkflowsPage', () => {
       expect(mockedStartDocs).not.toHaveBeenCalled();
     });
 
+    it('does not interrupt an in-flight regeneration when View docs is clicked (no stale refetch)', async () => {
+      const user = userEvent.setup();
+      const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({
+          id: 'a',
+          name: 'Alpha',
+          documentation: { generatedAt, version: 1 },
+        }),
+      ]);
+      // Regeneration stays in flight (POST is pending for the test window).
+      mockedStartDocs.mockReturnValueOnce(new Promise<never>(() => {}));
+
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /update docs for alpha/i }));
+      await waitFor(() => expect(mockedStartDocs).toHaveBeenCalledWith('a'));
+
+      // Expanding the panel mid-generation must show the live generating state,
+      // not fire a competing GET that blanks the spinner with the stale doc.
+      await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
+
+      expect(await screen.findByText(/generating documentation/i)).toBeInTheDocument();
+      expect(mockedGetDocs).not.toHaveBeenCalled();
+    });
+
     it('shows an inline error with retry when regeneration fails (no toast spam)', async () => {
       const user = userEvent.setup();
       mockedList.mockResolvedValueOnce([
@@ -562,6 +588,70 @@ describe('WorkflowsPage', () => {
 
       await waitFor(() => {
         expect(mockedList).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['t-1'] }));
+      });
+    });
+
+    it('assigns a tag to a workflow via the row picker (PATCH with tagIds)', async () => {
+      mockedList.mockResolvedValue([makeWorkflow({ id: 'wf-1', name: 'Alpha', tags: [] })]);
+      mockedListFolders.mockResolvedValue([]);
+      mockedListTags.mockResolvedValue([
+        {
+          id: 't-1',
+          name: 'urgent',
+          color: '#ef4444',
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+      ]);
+      mockedUpdate.mockResolvedValue(
+        makeWorkflow({
+          id: 'wf-1',
+          name: 'Alpha',
+          tags: [{ id: 't-1', name: 'urgent', color: '#ef4444' }],
+        }),
+      );
+
+      const user = userEvent.setup();
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /edit tags for alpha/i }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: /urgent/i }));
+
+      await waitFor(() => expect(mockedUpdate).toHaveBeenCalledWith('wf-1', { tagIds: ['t-1'] }));
+    });
+
+    it('bulk-adds a tag to all selected workflows (union, never clobbering existing)', async () => {
+      mockedList.mockResolvedValue([
+        makeWorkflow({ id: 'a', name: 'Alpha', tags: [] }),
+        makeWorkflow({
+          id: 'b',
+          name: 'Beta',
+          tags: [{ id: 't-2', name: 'finance', color: null }],
+        }),
+      ]);
+      mockedListFolders.mockResolvedValue([]);
+      mockedListTags.mockResolvedValue([
+        {
+          id: 't-1',
+          name: 'urgent',
+          color: '#ef4444',
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+        { id: 't-2', name: 'finance', color: null, createdAt: new Date('2026-05-08T00:00:00Z') },
+      ]);
+      mockedUpdate.mockImplementation(async (id: string) => makeWorkflow({ id }));
+
+      const user = userEvent.setup();
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('checkbox', { name: /select all workflows/i }));
+      await user.click(await screen.findByRole('button', { name: /^add tags$/i }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: /urgent/i }));
+      await user.click(await screen.findByRole('button', { name: /apply tags/i }));
+
+      await waitFor(() => {
+        // Alpha had none → gets t-1; Beta keeps t-2 and gains t-1.
+        expect(mockedUpdate).toHaveBeenCalledWith('a', { tagIds: ['t-1'] });
+        expect(mockedUpdate).toHaveBeenCalledWith('b', { tagIds: ['t-2', 't-1'] });
       });
     });
 

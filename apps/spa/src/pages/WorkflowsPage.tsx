@@ -88,6 +88,7 @@ export function WorkflowsPage(): JSX.Element {
     toggleActive,
     rename,
     moveToFolder,
+    setTags,
     setDocumentationMeta,
     selectedFolderId,
     selectedTagIds,
@@ -117,6 +118,10 @@ export function WorkflowsPage(): JSX.Element {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const selectAllRef = useRef<HTMLInputElement>(null);
+  // Per-row poll generation. A newer regenerate/view supersedes any in-flight
+  // poll loop for that workflow so stale results never clobber fresher state
+  // (mirrors the activePoll token in documentationStore).
+  const docsPollTokens = useRef<Record<string, number>>({});
 
   // Hydrate filter selections from URL on mount and when URL changes externally.
   useEffect(() => {
@@ -376,6 +381,34 @@ export function WorkflowsPage(): JSX.Element {
     [runBulk, moveToFolder],
   );
 
+  const handleSetTags = useCallback(
+    async (id: string, tagIds: string[]): Promise<void> => {
+      try {
+        await setTags(id, tagIds);
+      } catch (err) {
+        toast({ tone: 'error', message: errorMessage(err, 'Could not update tags') });
+      }
+    },
+    [setTags, toast],
+  );
+
+  const handleBulkAddTags = useCallback(
+    async (tagIds: string[]): Promise<void> => {
+      if (tagIds.length === 0) return;
+      await runBulk(
+        (n) => `Tagged ${n} workflow${n === 1 ? '' : 's'}`,
+        'Failed to tag',
+        (wf) => {
+          // Union with existing tags so a bulk add never clobbers per-workflow tags.
+          const existing = wf.tags.map((t) => t.id);
+          const merged = [...existing, ...tagIds.filter((t) => !existing.includes(t))];
+          return setTags(wf.id, merged);
+        },
+      );
+    },
+    [runBulk, setTags],
+  );
+
   const handleBulkDeleteConfirm = useCallback(async (): Promise<void> => {
     await runBulk(
       (n) => `Deleted ${n} workflow${n === 1 ? '' : 's'}`,
@@ -443,26 +476,34 @@ export function WorkflowsPage(): JSX.Element {
     // Generation runs in the background (it can exceed edge proxy timeouts on a
     // CPU-only model), so we kick it off and poll until a doc fresher than the
     // current one appears. Readiness is detected via generatedAt advancing.
+    const token = (docsPollTokens.current[id] ?? 0) + 1;
+    docsPollTokens.current[id] = token;
+    const isCurrent = (): boolean => docsPollTokens.current[id] === token;
+
     const existing = workflows.find((w) => w.id === id)?.documentation?.generatedAt ?? null;
     const baselineIso = existing ? new Date(existing).toISOString() : null;
     updateRowDocs(id, { isGenerating: true, error: null });
     try {
       await startWorkflowDocsRegeneration(id);
+      if (!isCurrent()) return;
 
       let fresh: WorkflowDocumentationResponse | null = null;
       for (let attempt = 0; attempt < DOC_POLL_MAX_ATTEMPTS; attempt += 1) {
         if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, DOC_POLL_INTERVAL_MS));
+        if (!isCurrent()) return;
         let docResp: WorkflowDocumentationResponse | null = null;
         try {
           docResp = await getWorkflowDocs(id);
         } catch {
           continue;
         }
+        if (!isCurrent()) return;
         if (docResp && (baselineIso === null || docResp.generatedAt > baselineIso)) {
           fresh = docResp;
           break;
         }
       }
+      if (!isCurrent()) return;
       if (!fresh) {
         throw new Error('Documentation is taking longer than expected. Please try again.');
       }
@@ -478,6 +519,7 @@ export function WorkflowsPage(): JSX.Element {
         version: fresh.version,
       });
     } catch (err) {
+      if (!isCurrent()) return;
       updateRowDocs(id, {
         isGenerating: false,
         error: errorMessage(err, 'Could not generate documentation'),
@@ -487,6 +529,8 @@ export function WorkflowsPage(): JSX.Element {
   };
 
   const viewDocs = async (id: string): Promise<void> => {
+    // Never interrupt an in-flight regeneration with a stale one-shot fetch.
+    if (docsByWorkflow[id]?.isGenerating) return;
     updateRowDocs(id, { isGenerating: true, error: null });
     try {
       const response = await getWorkflowDocs(id);
@@ -529,7 +573,9 @@ export function WorkflowsPage(): JSX.Element {
       return;
     }
     updateRowDocs(id, { isExpanded: true });
-    if (!state.content) {
+    // While a regeneration is in flight, just reveal the live generating state —
+    // don't fire a competing fetch that would replace it with the stale doc.
+    if (!state.content && !state.isGenerating) {
       void viewDocs(id);
     }
   };
@@ -657,9 +703,12 @@ export function WorkflowsPage(): JSX.Element {
                     count={selectedIds.size}
                     busy={bulkBusy}
                     folders={folders}
+                    tags={tags}
                     onActivate={handleBulkActivate}
                     onDeactivate={handleBulkDeactivate}
                     onMove={handleBulkMove}
+                    onAddTags={handleBulkAddTags}
+                    onManageTags={() => setShowTagManager(true)}
                     onDelete={() => setBulkDeleteOpen(true)}
                     onClear={clearSelection}
                   />
@@ -702,6 +751,9 @@ export function WorkflowsPage(): JSX.Element {
                           onToggleDocsExpanded={handleToggleDocsExpanded}
                           onToggleSelect={toggleSelect}
                           onRename={handleRename}
+                          availableTags={tags}
+                          onSetTags={handleSetTags}
+                          onManageTags={() => setShowTagManager(true)}
                           isToggling={togglingIds.has(wf.id)}
                           isDeleting={deletingIds.has(wf.id)}
                         />

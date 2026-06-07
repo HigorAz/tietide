@@ -71,6 +71,9 @@ def get_ollama_client() -> OllamaClient:
         # queued second request must wait out the first plus its own (now richer,
         # longer) generation without tripping a false 503.
         timeout=300.0,
+        # Pin the model in memory so the first request after an idle gap isn't a
+        # slow cold load (the dominant source of perceived slowness on CPU).
+        keep_alive=settings.ollama_keep_alive,
     )
 
 

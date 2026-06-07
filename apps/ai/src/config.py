@@ -4,6 +4,10 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
+    # Keep the model resident between requests so docs generation doesn't pay a
+    # ~4.7GB CPU cold-load each time (default Ollama evicts after ~5min idle).
+    # "-1" keeps it loaded indefinitely; a duration like "30m" also works.
+    ollama_keep_alive: str = "30m"
     chroma_host: str = "localhost"
     chroma_port: int = 8001
     chroma_collection: str = "tietide_docs"
