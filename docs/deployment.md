@@ -383,8 +383,9 @@ Document the result. The drill is described in [`infra/backups/README.md`](../in
 ## 8. Smoke test the deployment
 
 ```bash
-# Liveness — should always be 200
-curl -fsS https://tietide.example.com/v1/health/live
+# Liveness — should always be 200. Also reports the deployed commit:
+#   { "status": "ok", "commit": "<git-sha>", "timestamp": "..." }
+curl -fsS https://tietide.example.com/v1/health/live | jq
 
 # Readiness — 200 if all deps connected, 503 if DB or Valkey down
 curl -fsS https://tietide.example.com/v1/health | jq
@@ -396,6 +397,15 @@ curl -fsS -X POST https://tietide.example.com/v1/auth/register \
 ```
 
 If `/v1/health` reports `degraded`, the database and queue are up but the AI service is unreachable — workflows will run, AI doc-generation will not. See the [runbook](runbook.md).
+
+### `commit` field — confirming which build is live
+
+`/v1/health/live` exposes the git SHA the running deploy reports itself on, read from a
+marker file. Point the optional **`DEPLOYED_SHA_FILE`** env var at a path your deploy
+process writes the freshly-deployed SHA to after each successful deploy/restart (defaults to
+`~/tietide-scripts/deployed-sha`). When no marker exists, `commit` is `"unknown"`. The
+`Promote main to Production` GitHub Action polls this field to confirm production actually
+updated to the promoted commit before the run goes green.
 
 ---
 
