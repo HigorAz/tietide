@@ -79,6 +79,13 @@ export class WorkflowDocumentationController {
       throw new NotFoundException('Documentation not found');
     }
 
+    // Force revalidation on every request. Without this, browsers heuristically
+    // cache the response (~10% of its age via Last-Modified), so polling after a
+    // regenerate keeps reading the STALE doc from cache and never sees the new
+    // one — the SPA then times out. `no-cache` keeps the ETag/304 fast-path while
+    // guaranteeing the client always checks for a fresher doc.
+    res.setHeader('Cache-Control', 'private, no-cache');
+
     // HTTP-date is second-resolution; truncate updatedAt to seconds before
     // computing ETag and comparing with If-Modified-Since.
     const lastModifiedMs = Math.floor(existing.generatedAt.getTime() / 1000) * 1000;
