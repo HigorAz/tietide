@@ -11,7 +11,11 @@ vi.mock('./client', () => ({
 }));
 
 import { api } from './client';
-import { getWorkflowDocs, regenerateWorkflowDocs, type WorkflowDocumentationResponse } from './ai';
+import {
+  getWorkflowDocs,
+  startWorkflowDocsRegeneration,
+  type WorkflowDocumentationResponse,
+} from './ai';
 
 const mockedGet = vi.mocked(api.get);
 const mockedPost = vi.mocked(api.post);
@@ -84,20 +88,21 @@ describe('ai API client', () => {
     });
   });
 
-  describe('regenerateWorkflowDocs', () => {
-    it('should POST /workflows/:id/documentation/regenerate and return the body', async () => {
-      mockedPost.mockResolvedValueOnce({ data: sampleResponse });
+  describe('startWorkflowDocsRegeneration', () => {
+    it('should POST /workflows/:id/documentation/regenerate and return the accepted body', async () => {
+      const accepted = { workflowId: 'wf-1', status: 'pending' as const };
+      mockedPost.mockResolvedValueOnce({ data: accepted });
 
-      const result = await regenerateWorkflowDocs('wf-1');
+      const result = await startWorkflowDocsRegeneration('wf-1');
 
       expect(mockedPost).toHaveBeenCalledWith('/workflows/wf-1/documentation/regenerate');
-      expect(result).toEqual(sampleResponse);
+      expect(result).toEqual(accepted);
     });
 
     it('should propagate errors from the underlying client', async () => {
       mockedPost.mockRejectedValueOnce(new Error('boom'));
 
-      await expect(regenerateWorkflowDocs('wf-1')).rejects.toThrow('boom');
+      await expect(startWorkflowDocsRegeneration('wf-1')).rejects.toThrow('boom');
     });
   });
 });

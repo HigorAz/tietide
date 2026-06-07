@@ -1,6 +1,6 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService, AiServiceUnavailableError } from '../ai/ai.service';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
@@ -136,19 +136,26 @@ describe('WorkflowDocumentationService', () => {
     });
   });
 
-  describe('regenerate', () => {
-    it('should always call the AI service even when a row exists at the same version', async () => {
+  describe('startRegeneration', () => {
+    // Let the detached background promise (ai.generateDocs → upsert → finally) settle.
+    const flush = async (): Promise<void> => {
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+    };
+
+    it('should return pending immediately and run generation in the background', async () => {
       prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
-      prisma.workflowDocumentation.findUnique.mockResolvedValue(cachedRow);
       ai.generateDocs.mockResolvedValue(aiResult);
       prisma.workflowDocumentation.upsert.mockResolvedValue({
         ...cachedRow,
         documentation: aiResult.documentation,
-        updatedAt: new Date('2026-04-26T01:00:00Z'),
       });
 
-      const result = await service.regenerate(userId, workflowId);
+      const result = await service.startRegeneration(userId, workflowId);
 
+      expect(result).toEqual({ workflowId, status: 'pending' });
+
+      await flush();
       expect(ai.generateDocs).toHaveBeenCalledTimes(1);
       expect(ai.generateDocs).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -158,64 +165,54 @@ describe('WorkflowDocumentationService', () => {
           facts: expect.objectContaining({ nodes: expect.any(Array) }),
         }),
       );
-      expect(prisma.workflowDocumentation.upsert).toHaveBeenCalledWith({
-        where: { workflowId },
-        create: {
-          workflowId,
-          version: 3,
-          documentation: aiResult.documentation,
-          sections: generatedSections,
-          model: 'llama3.1:8b',
-        },
-        update: {
-          version: 3,
-          documentation: aiResult.documentation,
-          sections: generatedSections,
-          model: 'llama3.1:8b',
-        },
-      });
-      expect(result.documentation).toBe(aiResult.documentation);
-      expect(result).not.toHaveProperty('cached');
-    });
-
-    it('should upsert and return a fresh result when no row exists', async () => {
-      prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
-      prisma.workflowDocumentation.findUnique.mockResolvedValue(null);
-      ai.generateDocs.mockResolvedValue(aiResult);
-      prisma.workflowDocumentation.upsert.mockResolvedValue({
-        ...cachedRow,
-        documentation: aiResult.documentation,
-      });
-
-      const result = await service.regenerate(userId, workflowId);
-
       expect(prisma.workflowDocumentation.upsert).toHaveBeenCalledTimes(1);
-      expect(result.documentation).toBe(aiResult.documentation);
-      expect(result).not.toHaveProperty('cached');
     });
 
-    it('should throw NotFoundException when the workflow does not exist', async () => {
+    it('should not start a second generation while one is in flight for the workflow', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
+      let resolveGen: (value: unknown) => void = () => {};
+      ai.generateDocs.mockReturnValue(
+        new Promise((resolve) => {
+          resolveGen = resolve;
+        }),
+      );
+      prisma.workflowDocumentation.upsert.mockResolvedValue(cachedRow);
+
+      await service.startRegeneration(userId, workflowId);
+      await service.startRegeneration(userId, workflowId);
+
+      expect(ai.generateDocs).toHaveBeenCalledTimes(1);
+
+      resolveGen(aiResult);
+      await flush();
+    });
+
+    it('should throw NotFoundException (and not generate) when the workflow does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.regenerate(userId, workflowId)).rejects.toThrow(NotFoundException);
+      await expect(service.startRegeneration(userId, workflowId)).rejects.toThrow(
+        NotFoundException,
+      );
       expect(ai.generateDocs).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when the caller does not own the workflow', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ ...persistedWorkflow, userId: otherUserId });
 
-      await expect(service.regenerate(userId, workflowId)).rejects.toThrow(ForbiddenException);
+      await expect(service.startRegeneration(userId, workflowId)).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(ai.generateDocs).not.toHaveBeenCalled();
     });
 
-    it('should translate AiServiceUnavailableError into 503 ServiceUnavailableException', async () => {
+    it('should swallow background AI failures (returns pending, no upsert)', async () => {
       prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
-      prisma.workflowDocumentation.findUnique.mockResolvedValue(null);
       ai.generateDocs.mockRejectedValue(new AiServiceUnavailableError('down'));
 
-      await expect(service.regenerate(userId, workflowId)).rejects.toThrow(
-        ServiceUnavailableException,
-      );
+      const result = await service.startRegeneration(userId, workflowId);
+      expect(result.status).toBe('pending');
+
+      await flush();
       expect(prisma.workflowDocumentation.upsert).not.toHaveBeenCalled();
     });
   });

@@ -23,7 +23,12 @@ import { TagFilter } from '@/components/workflows/TagFilter';
 import { TagManagerDialog } from '@/components/workflows/TagManagerDialog';
 import { DraggableWorkflowRow } from '@/components/workflows/DraggableWorkflowRow';
 import { useToastStore } from '@/stores/toastStore';
-import { getWorkflowDocs, regenerateWorkflowDocs } from '@/api/ai';
+import {
+  getWorkflowDocs,
+  startWorkflowDocsRegeneration,
+  type WorkflowDocumentationResponse,
+} from '@/api/ai';
+import { DOC_POLL_INTERVAL_MS, DOC_POLL_MAX_ATTEMPTS } from '@/stores/documentationStore';
 import { cn } from '@/utils/cn';
 
 interface RowDocsState {
@@ -435,18 +440,42 @@ export function WorkflowsPage(): JSX.Element {
   };
 
   const regenerateDocs = async (id: string): Promise<void> => {
+    // Generation runs in the background (it can exceed edge proxy timeouts on a
+    // CPU-only model), so we kick it off and poll until a doc fresher than the
+    // current one appears. Readiness is detected via generatedAt advancing.
+    const existing = workflows.find((w) => w.id === id)?.documentation?.generatedAt ?? null;
+    const baselineIso = existing ? new Date(existing).toISOString() : null;
     updateRowDocs(id, { isGenerating: true, error: null });
     try {
-      const response = await regenerateWorkflowDocs(id);
+      await startWorkflowDocsRegeneration(id);
+
+      let fresh: WorkflowDocumentationResponse | null = null;
+      for (let attempt = 0; attempt < DOC_POLL_MAX_ATTEMPTS; attempt += 1) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, DOC_POLL_INTERVAL_MS));
+        let docResp: WorkflowDocumentationResponse | null = null;
+        try {
+          docResp = await getWorkflowDocs(id);
+        } catch {
+          continue;
+        }
+        if (docResp && (baselineIso === null || docResp.generatedAt > baselineIso)) {
+          fresh = docResp;
+          break;
+        }
+      }
+      if (!fresh) {
+        throw new Error('Documentation is taking longer than expected. Please try again.');
+      }
+
       updateRowDocs(id, {
         isGenerating: false,
-        content: response.documentation,
+        content: fresh.documentation,
         error: null,
         isExpanded: true,
       });
       setDocumentationMeta(id, {
-        generatedAt: new Date(response.generatedAt),
-        version: response.version,
+        generatedAt: new Date(fresh.generatedAt),
+        version: fresh.version,
       });
     } catch (err) {
       updateRowDocs(id, {

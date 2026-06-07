@@ -31,7 +31,7 @@ export function InspectorDocumentationPanel(): JSX.Element {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-xs text-text-secondary">
         <Spinner size="sm" />
-        <span>Generating documentation…</span>
+        <span>Generating documentation… this can take a minute or two.</span>
       </div>
     );
   }

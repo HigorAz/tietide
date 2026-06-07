@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiForbiddenResponse,
@@ -19,7 +20,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiResponse,
-  ApiServiceUnavailableResponse,
   ApiTags,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
@@ -35,7 +35,10 @@ import {
 } from '../common/throttler/throttler.config';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
-import { WorkflowDocumentationResponseDto } from './dto/workflow-documentation-response.dto';
+import {
+  DocumentationRegenerationAcceptedDto,
+  WorkflowDocumentationResponseDto,
+} from './dto/workflow-documentation-response.dto';
 
 const AI_DOCS_THROTTLE = {
   [DEFAULT_THROTTLER_NAME]: {
@@ -101,24 +104,24 @@ export class WorkflowDocumentationController {
 
   @Post('documentation/regenerate')
   @Throttle(AI_DOCS_THROTTLE)
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'Regenerate AI documentation for a workflow',
+    summary: 'Start regenerating AI documentation for a workflow',
     description:
-      'Always calls the FastAPI AI service to produce structured documentation via Ollama + RAG, ' +
-      'upserts the persisted row, and returns the freshly generated body.',
+      'Kicks off documentation generation (FastAPI AI service via Ollama + RAG) in the background ' +
+      'and returns 202 immediately. Generation can take minutes on a CPU-only model, longer than ' +
+      'edge proxy timeouts, so the client polls GET /documentation until the row is updated.',
   })
-  @ApiOkResponse({ type: WorkflowDocumentationResponseDto })
+  @ApiAcceptedResponse({ type: DocumentationRegenerationAcceptedDto })
   @ApiBadRequestResponse({ description: 'Invalid workflow id' })
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
-  @ApiServiceUnavailableResponse({ description: 'AI service temporarily unavailable' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async regenerate(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-  ): Promise<WorkflowDocumentationResponseDto> {
-    return this.docs.regenerate(user.id, id);
+  ): Promise<DocumentationRegenerationAcceptedDto> {
+    return this.docs.startRegeneration(user.id, id);
   }
 
   private matchesEtag(ifNoneMatch: string, etag: string): boolean {

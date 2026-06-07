@@ -45,10 +45,20 @@ export async function getWorkflowDocs(
   }
 }
 
-export async function regenerateWorkflowDocs(
+export interface DocumentationRegenerationAccepted {
+  workflowId: string;
+  status: 'pending';
+}
+
+/**
+ * Start documentation generation. Returns 202 immediately — generation runs in
+ * the background (it can take minutes on a CPU-only model, past edge proxy
+ * timeouts), so callers poll {@link getWorkflowDocs} for the finished result.
+ */
+export async function startWorkflowDocsRegeneration(
   workflowId: string,
-): Promise<WorkflowDocumentationResponse> {
-  const { data } = await api.post<WorkflowDocumentationResponse>(
+): Promise<DocumentationRegenerationAccepted> {
+  const { data } = await api.post<DocumentationRegenerationAccepted>(
     `/workflows/${workflowId}/documentation/regenerate`,
   );
   return data;
