@@ -8,7 +8,9 @@ import {
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import type { OrgRole } from '@tietide/shared';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { ExecutionsController } from './executions.controller';
 import { ExecutionsService } from './executions.service';
 
@@ -20,7 +22,9 @@ describe('ExecutionsController (integration)', () => {
     triggerNodeTest: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
+  let orgRole: OrgRole;
 
+  const orgId = 'org-uuid-aaaa';
   const workflowId = '550e8400-e29b-41d4-a716-446655440000';
   const executionId = '11111111-1111-4111-8111-111111111111';
   const accepted = {
@@ -74,6 +78,7 @@ describe('ExecutionsController (integration)', () => {
       triggerNodeTest: jest.fn(),
     };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
+    orgRole = 'SUPERADMIN';
 
     const mod: TestingModule = await Test.createTestingModule({
       controllers: [ExecutionsController],
@@ -87,6 +92,14 @@ describe('ExecutionsController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: orgId, role: orgRole };
           return true;
         },
       })
@@ -118,6 +131,7 @@ describe('ExecutionsController (integration)', () => {
 
       expect(res.body).toEqual(accepted);
       expect(executionsService.triggerManual).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         expect.objectContaining({}),
@@ -156,6 +170,16 @@ describe('ExecutionsController (integration)', () => {
         .expect(403);
     });
 
+    it('should return 403 when the caller is a VIEWER (role-gated, never reaches the service)', async () => {
+      orgRole = 'VIEWER';
+
+      await request(app.getHttpServer())
+        .post(`/workflows/${workflowId}/execute`)
+        .send({})
+        .expect(403);
+      expect(executionsService.triggerManual).not.toHaveBeenCalled();
+    });
+
     it('should forward the Idempotency-Key header to the service', async () => {
       executionsService.triggerManual.mockResolvedValue(accepted);
 
@@ -166,6 +190,7 @@ describe('ExecutionsController (integration)', () => {
         .expect(202);
 
       expect(executionsService.triggerManual).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         expect.objectContaining({ idempotencyKey: 'key-abc' }),
@@ -181,6 +206,7 @@ describe('ExecutionsController (integration)', () => {
         .expect(202);
 
       expect(executionsService.triggerManual).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         expect.objectContaining({ triggerData: { hello: 'world' } }),
@@ -197,6 +223,7 @@ describe('ExecutionsController (integration)', () => {
         .expect(202);
 
       expect(executionsService.triggerManual).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         expect.objectContaining({ requestId: 'req-corr-1' }),
@@ -222,6 +249,7 @@ describe('ExecutionsController (integration)', () => {
 
       expect(res.body).toEqual(testAccepted);
       expect(executionsService.triggerTest).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         expect.objectContaining({ definition: validDefinition }),
@@ -277,6 +305,16 @@ describe('ExecutionsController (integration)', () => {
         .expect(403);
     });
 
+    it('should return 403 when the caller is a VIEWER (role-gated, never reaches the service)', async () => {
+      orgRole = 'VIEWER';
+
+      await request(app.getHttpServer())
+        .post(`/workflows/${workflowId}/test`)
+        .send({ definition: validDefinition })
+        .expect(403);
+      expect(executionsService.triggerTest).not.toHaveBeenCalled();
+    });
+
     it('should forward triggerData from the request body to the service', async () => {
       executionsService.triggerTest.mockResolvedValue(testAccepted);
 
@@ -286,6 +324,7 @@ describe('ExecutionsController (integration)', () => {
         .expect(202);
 
       expect(executionsService.triggerTest).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         expect.objectContaining({ triggerData: { hello: 'world' } }),
@@ -302,6 +341,7 @@ describe('ExecutionsController (integration)', () => {
         .expect(202);
 
       expect(executionsService.triggerTest).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         expect.objectContaining({ requestId: 'req-test-2' }),
@@ -329,6 +369,7 @@ describe('ExecutionsController (integration)', () => {
 
       expect(res.body).toEqual(nodeTestAccepted);
       expect(executionsService.triggerNodeTest).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         'n1',
@@ -377,6 +418,16 @@ describe('ExecutionsController (integration)', () => {
         .expect(403);
     });
 
+    it('should return 403 when the caller is a VIEWER (role-gated, never reaches the service)', async () => {
+      orgRole = 'VIEWER';
+
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(403);
+      expect(executionsService.triggerNodeTest).not.toHaveBeenCalled();
+    });
+
     it('should forward triggerData and the node id to the service', async () => {
       executionsService.triggerNodeTest.mockResolvedValue(nodeTestAccepted);
 
@@ -386,6 +437,7 @@ describe('ExecutionsController (integration)', () => {
         .expect(202);
 
       expect(executionsService.triggerNodeTest).toHaveBeenCalledWith(
+        orgId,
         'owner-uuid',
         workflowId,
         'n1',

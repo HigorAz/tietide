@@ -79,23 +79,28 @@ describe('SubworkflowAction', () => {
       );
     });
 
-    it('should reject when the target workflow does not belong to the caller (IDOR guard)', async () => {
+    it('should reject when the target workflow is not in the caller org (IDOR guard)', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: PARENT_EXEC,
-        workflow: { userId: 'user-a' },
+        workflow: { organizationId: 'org-a' },
       });
-      // Cross-user lookup returns null because the where clause requires same userId.
+      // Cross-org lookup returns null because the where clause requires same organizationId.
       prisma.workflow.findFirst.mockResolvedValue(null);
 
       await expect(action.execute(baseInput, makeContext())).rejects.toThrow(
         SubworkflowTargetNotFoundError,
       );
+      // The target lookup is scoped to the caller's organization, never just by id.
+      expect(prisma.workflow.findFirst).toHaveBeenCalledWith({
+        where: { id: TARGET_WF, organizationId: 'org-a' },
+        select: { id: true },
+      });
       expect(engine.execute).not.toHaveBeenCalled();
     });
 
     it('should create a child WorkflowExecution with parentExecutionId, triggerType, and inputMapping', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
@@ -118,7 +123,7 @@ describe('SubworkflowAction', () => {
 
     it('should invoke EngineService.execute with depth+1 for the child execution', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
@@ -139,7 +144,7 @@ describe('SubworkflowAction', () => {
 
     it('should forward the child return-node output as the subworkflow output', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
@@ -156,7 +161,7 @@ describe('SubworkflowAction', () => {
 
     it('should fall back to the latest SUCCESS step when the child has no return node', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
@@ -171,7 +176,7 @@ describe('SubworkflowAction', () => {
 
     it('should wrap a non-object return value as { value }', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
@@ -186,7 +191,7 @@ describe('SubworkflowAction', () => {
 
     it('should throw SubworkflowFailedError when the child execution did not succeed', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'FAILED', error: 'inner blew up' });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.create.mockResolvedValue({ id: 'child-1' });
@@ -198,7 +203,7 @@ describe('SubworkflowAction', () => {
 
     it('should create the child with a deterministic idempotency key scoped to the parent node', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.findFirst.mockResolvedValue(null);
@@ -218,7 +223,7 @@ describe('SubworkflowAction', () => {
 
     it('should forward the parent requestId to the child engine.execute', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       prisma.workflowExecution.findFirst.mockResolvedValue(null);
@@ -235,7 +240,7 @@ describe('SubworkflowAction', () => {
     it('should reuse an already-SUCCESS child from a prior attempt without re-running it', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValueOnce({
         id: PARENT_EXEC,
-        workflow: { userId: 'user-a' },
+        workflow: { organizationId: 'org-a' },
       });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       // A previous attempt of this same parent execution already ran the child.
@@ -261,7 +266,7 @@ describe('SubworkflowAction', () => {
 
     it('should reuse the existing child row on a P2002 create race instead of failing', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { userId: 'user-a' } })
+        .mockResolvedValueOnce({ id: PARENT_EXEC, workflow: { organizationId: 'org-a' } })
         .mockResolvedValueOnce({ status: 'SUCCESS', error: null });
       prisma.workflow.findFirst.mockResolvedValue({ id: TARGET_WF });
       // First existence check sees nothing; the create then loses the unique race;

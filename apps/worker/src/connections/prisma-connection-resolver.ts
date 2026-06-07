@@ -7,7 +7,7 @@ import { OAuthRefreshClient } from './refresh/oauth-refresh.client';
 import { ConnectionNotFoundError, type ConnectionResolver } from './connection-resolver';
 
 interface ExecutionCache {
-  userId: string;
+  organizationId: string;
   connections: Map<string, DecryptedConnection>;
 }
 
@@ -44,7 +44,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     }
 
     const row = (await this.prisma.connection.findFirst({
-      where: { id: connectionId, userId: entry.userId },
+      where: { id: connectionId, organizationId: entry.organizationId },
     })) as ConnectionRow | null;
 
     if (!row) {
@@ -55,7 +55,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     entry.connections.set(connectionId, decrypted as DecryptedConnection);
 
     this.log.log(
-      { executionId, userId: entry.userId, connectionId, provider: row.provider },
+      { executionId, organizationId: entry.organizationId, connectionId, provider: row.provider },
       'connection.read',
     );
 
@@ -66,7 +66,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     const entry = await this.loadExecution(executionId);
 
     await this.prisma.connection.updateMany({
-      where: { id: connectionId, userId: entry.userId },
+      where: { id: connectionId, organizationId: entry.organizationId },
       data: {
         status: 'EXPIRED',
         refreshFailureCount: { increment: 1 },
@@ -76,7 +76,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     entry.connections.delete(connectionId);
 
     this.log.warn(
-      { executionId, userId: entry.userId, connectionId },
+      { executionId, organizationId: entry.organizationId, connectionId },
       'connection.marked_for_refresh',
     );
   }
@@ -89,7 +89,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     const entry = await this.loadExecution(executionId);
 
     const row = (await this.prisma.connection.findFirst({
-      where: { id: connectionId, userId: entry.userId },
+      where: { id: connectionId, organizationId: entry.organizationId },
     })) as ConnectionRow | null;
     if (!row) {
       this.log.warn({ executionId, connectionId }, 'connection.refresh.not_found');
@@ -175,7 +175,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     entry.connections.set(connectionId, refreshed as DecryptedConnection);
 
     this.log.log(
-      { executionId, userId: entry.userId, connectionId, provider: row.provider },
+      { executionId, organizationId: entry.organizationId, connectionId, provider: row.provider },
       'connection.refreshed',
     );
 
@@ -217,7 +217,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
 
     const execution = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
-      include: { workflow: { select: { userId: true } } },
+      include: { workflow: { select: { organizationId: true } } },
     });
 
     if (!execution) {
@@ -225,7 +225,7 @@ export class PrismaConnectionResolver implements ConnectionResolver {
     }
 
     const entry: ExecutionCache = {
-      userId: execution.workflow.userId,
+      organizationId: execution.workflow.organizationId,
       connections: new Map(),
     };
     this.cache.set(executionId, entry);

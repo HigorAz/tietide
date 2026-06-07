@@ -9,6 +9,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { ExecutionDetailController } from './execution-detail.controller';
 import { ExecutionsService } from './executions.service';
 
@@ -17,6 +18,7 @@ describe('ExecutionDetailController (integration)', () => {
   let executionsService: { findOne: jest.Mock; listSteps: jest.Mock };
   let authedUser: { id: string; email: string; role: string } | null;
 
+  const orgId = 'org-uuid-aaaa';
   const executionId = '11111111-1111-4111-8111-111111111111';
   const workflowId = '550e8400-e29b-41d4-a716-446655440000';
 
@@ -67,6 +69,15 @@ describe('ExecutionDetailController (integration)', () => {
           return true;
         },
       })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          // Read endpoints are open to any member, including VIEWER.
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: orgId, role: 'VIEWER' };
+          return true;
+        },
+      })
       .compile();
 
     app = mod.createNestApplication();
@@ -91,7 +102,7 @@ describe('ExecutionDetailController (integration)', () => {
       const res = await request(app.getHttpServer()).get(`/executions/${executionId}`).expect(200);
 
       expect(res.body).toEqual(detail);
-      expect(executionsService.findOne).toHaveBeenCalledWith('owner-uuid', executionId);
+      expect(executionsService.findOne).toHaveBeenCalledWith(orgId, executionId);
     });
 
     it('should return 401 when no authenticated user', async () => {
@@ -128,7 +139,7 @@ describe('ExecutionDetailController (integration)', () => {
         .expect(200);
 
       expect(res.body).toEqual([sampleStep]);
-      expect(executionsService.listSteps).toHaveBeenCalledWith('owner-uuid', executionId);
+      expect(executionsService.listSteps).toHaveBeenCalledWith(orgId, executionId);
     });
 
     it('should return 401 when no authenticated user', async () => {

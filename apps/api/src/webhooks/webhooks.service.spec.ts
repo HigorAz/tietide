@@ -24,6 +24,7 @@ describe('WebhooksService', () => {
   const path = 'inbox-abc';
   const hmacSecret = 'super-secret-hmac-key';
   const userId = 'owner-uuid';
+  const organizationId = 'org-uuid-web';
   const workflowId = '550e8400-e29b-41d4-a716-446655440000';
   const executionId = '11111111-1111-4111-8111-111111111111';
   const fixedNowMs = 1714000000000;
@@ -39,7 +40,7 @@ describe('WebhooksService', () => {
       path,
       hmacSecret,
       isActive: true,
-      workflow: { id: workflowId, userId },
+      workflow: { id: workflowId, userId, organizationId },
     };
   }
 
@@ -108,6 +109,7 @@ describe('WebhooksService', () => {
           workflowId,
           triggerType: 'webhook',
           userId,
+          organizationId,
           triggerData: { hello: 'world' },
         }),
         expect.objectContaining({ jobId: executionId, attempts: expect.any(Number) }),

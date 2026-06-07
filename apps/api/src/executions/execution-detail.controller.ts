@@ -8,9 +8,11 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import { OrgRolesGuard } from '../common/guards/org-roles.guard';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { ExecutionsService } from './executions.service';
 import { ExecutionDetailResponseDto } from './dto/execution-detail-response.dto';
 import { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
@@ -18,7 +20,7 @@ import { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
 @ApiTags('executions')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
 @Controller('executions')
 export class ExecutionDetailController {
   constructor(private readonly executions: ExecutionsService) {}
@@ -29,10 +31,10 @@ export class ExecutionDetailController {
   @ApiNotFoundResponse({ description: 'Execution not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this execution' })
   async findOne(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) executionId: string,
   ): Promise<ExecutionDetailResponseDto> {
-    return this.executions.findOne(user.id, executionId);
+    return this.executions.findOne(org.id, executionId);
   }
 
   @Get(':id/steps')
@@ -41,9 +43,9 @@ export class ExecutionDetailController {
   @ApiNotFoundResponse({ description: 'Execution not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this execution' })
   async listSteps(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) executionId: string,
   ): Promise<ExecutionStepResponseDto[]> {
-    return this.executions.listSteps(user.id, executionId);
+    return this.executions.listSteps(org.id, executionId);
   }
 }

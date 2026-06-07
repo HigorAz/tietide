@@ -6,7 +6,7 @@ import type { EnvVarResolver } from './env-var-resolver';
 
 interface EnvRow {
   scope: 'GLOBAL' | 'USER';
-  userId: string | null;
+  organizationId: string | null;
   key: string;
   valueEnc: string;
   valueNonce: string;
@@ -30,20 +30,20 @@ export class PrismaEnvVarResolver implements EnvVarResolver {
 
     const execution = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
-      include: { workflow: { select: { userId: true } } },
+      include: { workflow: { select: { organizationId: true } } },
     });
 
     if (!execution) {
       throw new Error(`Execution ${executionId} not found`);
     }
 
-    const userId = execution.workflow.userId;
+    const organizationId = execution.workflow.organizationId;
 
     const rows = (await this.prisma.environmentVariable.findMany({
       where: {
         OR: [
-          { scope: 'GLOBAL', userId: null },
-          { scope: 'USER', userId },
+          { scope: 'GLOBAL', organizationId: null },
+          { scope: 'USER', organizationId },
         ],
       },
     })) as EnvRow[];
@@ -63,7 +63,7 @@ export class PrismaEnvVarResolver implements EnvVarResolver {
 
     this.cache.set(executionId, map);
 
-    this.log.log({ executionId, userId, keyCount: map.size }, 'env-vars.loaded');
+    this.log.log({ executionId, organizationId, keyCount: map.size }, 'env-vars.loaded');
 
     return map;
   }

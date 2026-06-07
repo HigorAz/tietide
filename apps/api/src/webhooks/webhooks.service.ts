@@ -36,7 +36,7 @@ export class WebhooksService {
   async trigger(input: WebhookTriggerInput): Promise<WebhookTriggerResult> {
     const webhook = await this.prisma.webhook.findUnique({
       where: { path: input.path },
-      include: { workflow: { select: { id: true, userId: true } } },
+      include: { workflow: { select: { id: true, userId: true, organizationId: true } } },
     });
 
     if (!webhook || !webhook.isActive) {
@@ -104,6 +104,7 @@ export class WebhooksService {
       triggerType: 'webhook',
       triggerData,
       userId: webhook.workflow.userId,
+      organizationId: webhook.workflow.organizationId,
       requestId: input.requestId,
     };
 

@@ -54,7 +54,7 @@ describe('PrismaConnectionResolver', () => {
   });
 
   const seedConnection = (
-    userId: string,
+    organizationId: string,
     id: string,
     provider: string,
     config: Record<string, unknown>,
@@ -64,7 +64,7 @@ describe('PrismaConnectionResolver', () => {
     const refresh = refreshTokenPlain ? crypto.encrypt(refreshTokenPlain) : null;
     return {
       id,
-      userId,
+      organizationId,
       type: 'OAUTH2',
       provider,
       name: `conn-${id}`,
@@ -77,14 +77,14 @@ describe('PrismaConnectionResolver', () => {
   };
 
   describe('getConnection', () => {
-    it('returns decrypted config for owned connection', async () => {
+    it('returns decrypted config for connection owned by the execution org', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       const cfg = validGoogleConfig();
       prisma.connection.findFirst.mockResolvedValue(
-        seedConnection('user-A', 'conn-1', 'google', cfg),
+        seedConnection('org-A', 'conn-1', 'google', cfg),
       );
 
       const conn = await resolver.getConnection('exec-1', 'conn-1');
@@ -93,17 +93,17 @@ describe('PrismaConnectionResolver', () => {
       expect(conn.provider).toBe('google');
       expect(conn.config).toEqual(cfg);
       expect(prisma.connection.findFirst).toHaveBeenCalledWith({
-        where: { id: 'conn-1', userId: 'user-A' },
+        where: { id: 'conn-1', organizationId: 'org-A' },
       });
     });
 
     it('exposes the decrypted refresh token when present', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.connection.findFirst.mockResolvedValue(
-        seedConnection('user-A', 'conn-1', 'google', validGoogleConfig(), 'refresh-xyz'),
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig(), 'refresh-xyz'),
       );
 
       const conn = await resolver.getConnection('exec-1', 'conn-1');
@@ -114,10 +114,10 @@ describe('PrismaConnectionResolver', () => {
     it('omits refreshToken field when no refresh token is stored', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.connection.findFirst.mockResolvedValue(
-        seedConnection('user-A', 'conn-1', 'openai', { apiKey: 'sk-x' }),
+        seedConnection('org-A', 'conn-1', 'openai', { apiKey: 'sk-x' }),
       );
 
       const conn = await resolver.getConnection('exec-1', 'conn-1');
@@ -125,10 +125,10 @@ describe('PrismaConnectionResolver', () => {
       expect(conn.refreshToken).toBeUndefined();
     });
 
-    it('throws ConnectionNotFoundError when the connection is not owned by the executing user', async () => {
+    it('throws ConnectionNotFoundError when the connection is not owned by the executing org', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.connection.findFirst.mockResolvedValue(null);
 
@@ -147,10 +147,10 @@ describe('PrismaConnectionResolver', () => {
     it('caches per (executionId, connectionId) — second call does not re-hit Prisma', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.connection.findFirst.mockResolvedValue(
-        seedConnection('user-A', 'conn-1', 'google', validGoogleConfig()),
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig()),
       );
 
       await resolver.getConnection('exec-1', 'conn-1');
@@ -163,14 +163,14 @@ describe('PrismaConnectionResolver', () => {
 
     it('keeps caches isolated between different executions', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: 'exec-1', workflow: { userId: 'user-A' } })
-        .mockResolvedValueOnce({ id: 'exec-2', workflow: { userId: 'user-B' } });
+        .mockResolvedValueOnce({ id: 'exec-1', workflow: { organizationId: 'org-A' } })
+        .mockResolvedValueOnce({ id: 'exec-2', workflow: { organizationId: 'org-B' } });
       prisma.connection.findFirst
         .mockResolvedValueOnce(
-          seedConnection('user-A', 'conn-1', 'google', validGoogleConfig({ accessToken: 'A' })),
+          seedConnection('org-A', 'conn-1', 'google', validGoogleConfig({ accessToken: 'A' })),
         )
         .mockResolvedValueOnce(
-          seedConnection('user-B', 'conn-1', 'google', validGoogleConfig({ accessToken: 'B' })),
+          seedConnection('org-B', 'conn-1', 'google', validGoogleConfig({ accessToken: 'B' })),
         );
 
       const a = await resolver.getConnection('exec-1', 'conn-1');
@@ -183,11 +183,11 @@ describe('PrismaConnectionResolver', () => {
     it('validates against PROVIDER_CONFIG_SCHEMAS for known providers and rejects malformed configs', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       // 'google' schema requires accessToken/refreshToken/scope/tokenType — config missing these
       prisma.connection.findFirst.mockResolvedValue(
-        seedConnection('user-A', 'conn-1', 'google', { accessToken: 'incomplete' }),
+        seedConnection('org-A', 'conn-1', 'google', { accessToken: 'incomplete' }),
       );
 
       await expect(resolver.getConnection('exec-1', 'conn-1')).rejects.toThrow();
@@ -196,10 +196,10 @@ describe('PrismaConnectionResolver', () => {
     it('passes config through unchanged for unknown providers (no schema)', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.connection.findFirst.mockResolvedValue(
-        seedConnection('user-A', 'conn-1', 'custom-provider', { foo: 'bar', n: 1 }),
+        seedConnection('org-A', 'conn-1', 'custom-provider', { foo: 'bar', n: 1 }),
       );
 
       const conn = await resolver.getConnection('exec-1', 'conn-1');
@@ -209,16 +209,16 @@ describe('PrismaConnectionResolver', () => {
   });
 
   describe('markForRefresh', () => {
-    it('sets status=EXPIRED and increments refreshFailureCount with ownership filter', async () => {
+    it('sets status=EXPIRED and increments refreshFailureCount with org ownership filter', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
 
       await resolver.markForRefresh('exec-1', 'conn-1');
 
       expect(prisma.connection.updateMany).toHaveBeenCalledWith({
-        where: { id: 'conn-1', userId: 'user-A' },
+        where: { id: 'conn-1', organizationId: 'org-A' },
         data: {
           status: 'EXPIRED',
           refreshFailureCount: { increment: 1 },
@@ -229,14 +229,14 @@ describe('PrismaConnectionResolver', () => {
     it('drops the connection from cache so the next getConnection re-decrypts fresh state', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.connection.findFirst
         .mockResolvedValueOnce(
-          seedConnection('user-A', 'conn-1', 'google', validGoogleConfig({ accessToken: 'v1' })),
+          seedConnection('org-A', 'conn-1', 'google', validGoogleConfig({ accessToken: 'v1' })),
         )
         .mockResolvedValueOnce(
-          seedConnection('user-A', 'conn-1', 'google', validGoogleConfig({ accessToken: 'v2' })),
+          seedConnection('org-A', 'conn-1', 'google', validGoogleConfig({ accessToken: 'v2' })),
         );
 
       const first = await resolver.getConnection('exec-1', 'conn-1');
@@ -248,7 +248,7 @@ describe('PrismaConnectionResolver', () => {
       expect(prisma.connection.findFirst).toHaveBeenCalledTimes(2);
     });
 
-    it('throws when the execution does not exist (no cross-user write path)', async () => {
+    it('throws when the execution does not exist (no cross-org write path)', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue(null);
 
       await expect(resolver.markForRefresh('exec-missing', 'conn-1')).rejects.toThrow(/execution/i);
@@ -260,10 +260,10 @@ describe('PrismaConnectionResolver', () => {
     it('drops the cache for that execution so subsequent getConnection re-hits Prisma', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.connection.findFirst.mockResolvedValue(
-        seedConnection('user-A', 'conn-1', 'google', validGoogleConfig()),
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig()),
       );
 
       await resolver.getConnection('exec-1', 'conn-1');

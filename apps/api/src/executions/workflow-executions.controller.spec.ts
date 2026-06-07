@@ -9,6 +9,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { WorkflowExecutionsController } from './workflow-executions.controller';
 import { ExecutionsService } from './executions.service';
 
@@ -17,6 +18,7 @@ describe('WorkflowExecutionsController (integration)', () => {
   let executionsService: { list: jest.Mock };
   let authedUser: { id: string; email: string; role: string } | null;
 
+  const orgId = 'org-uuid-aaaa';
   const workflowId = '550e8400-e29b-41d4-a716-446655440000';
 
   const sampleItem = {
@@ -48,6 +50,15 @@ describe('WorkflowExecutionsController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          // Read endpoint is open to any member, including VIEWER.
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: orgId, role: 'VIEWER' };
           return true;
         },
       })
@@ -87,11 +98,7 @@ describe('WorkflowExecutionsController (integration)', () => {
         page: 1,
         pageSize: 20,
       });
-      expect(executionsService.list).toHaveBeenCalledWith(
-        'owner-uuid',
-        workflowId,
-        expect.any(Object),
-      );
+      expect(executionsService.list).toHaveBeenCalledWith(orgId, workflowId, expect.any(Object));
     });
 
     it('should return 401 when no authenticated user', async () => {
@@ -127,7 +134,7 @@ describe('WorkflowExecutionsController (integration)', () => {
         .expect(200);
 
       expect(executionsService.list).toHaveBeenCalledWith(
-        'owner-uuid',
+        orgId,
         workflowId,
         expect.objectContaining({ status: 'FAILED' }),
       );
@@ -170,7 +177,7 @@ describe('WorkflowExecutionsController (integration)', () => {
         .expect(200);
 
       expect(executionsService.list).toHaveBeenCalledWith(
-        'owner-uuid',
+        orgId,
         workflowId,
         expect.objectContaining({ page: 2, pageSize: 50 }),
       );
