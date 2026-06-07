@@ -31,7 +31,7 @@ export class PollProcessor extends WorkerHost {
   }
 
   async process(job: Job<PollFirePayload>): Promise<void> {
-    const { workflowId, userId, nodeId, type } = job.data;
+    const { workflowId, organizationId, nodeId, type } = job.data;
 
     const trigger = this.registry.get(type);
     if (!trigger) {
@@ -41,7 +41,7 @@ export class PollProcessor extends WorkerHost {
 
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { id: true, userId: true, isActive: true, definition: true },
+      select: { id: true, organizationId: true, isActive: true, definition: true },
     });
     if (!workflow || !workflow.isActive) {
       this.log.log(
@@ -65,7 +65,7 @@ export class PollProcessor extends WorkerHost {
       this.log.warn({ jobId: job.id, nodeId }, 'Trigger node missing connectionId');
       return;
     }
-    const connection = await this.loader.load(userId, connectionIdRaw);
+    const connection = await this.loader.load(organizationId, connectionIdRaw);
     if (!connection) return;
 
     const cursorRow = await this.prisma.triggerCursor.findUnique({
@@ -132,7 +132,7 @@ export class PollProcessor extends WorkerHost {
           workflowId,
           triggerType,
           triggerData: item,
-          userId,
+          organizationId,
         },
         {
           jobId: created.id,

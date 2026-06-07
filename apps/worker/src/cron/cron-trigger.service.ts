@@ -9,12 +9,12 @@ import { isValidCron } from './cron-validator';
 export interface AddRepeatableJobArgs {
   workflowId: string;
   expression: string;
-  userId: string;
+  organizationId: string;
 }
 
 export interface CronFirePayload {
   workflowId: string;
-  userId: string;
+  organizationId: string;
   expression: string;
 }
 
@@ -45,7 +45,7 @@ export class CronTriggerService implements OnModuleInit {
     const schedulerId = this.schedulerId(args.workflowId);
     const payload: CronFirePayload = {
       workflowId: args.workflowId,
-      userId: args.userId,
+      organizationId: args.organizationId,
       expression: args.expression,
     };
 
@@ -70,7 +70,7 @@ export class CronTriggerService implements OnModuleInit {
   async reconcile(): Promise<void> {
     const workflows = await this.prisma.workflow.findMany({
       where: { isActive: true },
-      select: { id: true, userId: true, definition: true },
+      select: { id: true, organizationId: true, definition: true },
     });
 
     const desired = new Map<string, AddRepeatableJobArgs>();
@@ -89,7 +89,7 @@ export class CronTriggerService implements OnModuleInit {
       desired.set(this.schedulerId(wf.id), {
         workflowId: wf.id,
         expression: cron.expression,
-        userId: wf.userId,
+        organizationId: wf.organizationId,
       });
     }
 

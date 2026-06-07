@@ -24,14 +24,14 @@ export class PollConnectionLoader {
   ) {}
 
   async load<TConfig = Record<string, unknown>>(
-    userId: string,
+    organizationId: string,
     connectionId: string,
   ): Promise<DecryptedConnection<TConfig> | null> {
     const row = (await this.prisma.connection.findFirst({
-      where: { id: connectionId, userId },
+      where: { id: connectionId, organizationId },
     })) as ConnectionRow | null;
     if (!row) {
-      this.log.warn({ userId, connectionId }, 'connection.not_found_for_poll');
+      this.log.warn({ organizationId, connectionId }, 'connection.not_found_for_poll');
       return null;
     }
 

@@ -9,7 +9,8 @@ import { POLL_JOB_NAME, POLL_QUEUE_NAME, POLL_SCHEDULER_PREFIX } from './poll.co
 export interface PollFirePayload {
   workflowId: string;
   nodeId: string;
-  userId: string;
+  // The owning workspace — the poll processor scopes the connection lookup to it.
+  organizationId: string;
   type: string;
 }
 
@@ -19,7 +20,7 @@ interface JobSchedulerSummary {
 
 interface PollSchedulerArgs {
   workflowId: string;
-  userId: string;
+  organizationId: string;
   nodeId: string;
   type: string;
   intervalSeconds: number;
@@ -42,7 +43,7 @@ export class PollSchedulerService implements OnModuleInit {
   async reconcile(): Promise<void> {
     const workflows = await this.prisma.workflow.findMany({
       where: { isActive: true },
-      select: { id: true, userId: true, definition: true },
+      select: { id: true, organizationId: true, definition: true },
     });
 
     const desired = new Map<string, PollSchedulerArgs>();
@@ -58,7 +59,7 @@ export class PollSchedulerService implements OnModuleInit {
         const schedulerId = this.schedulerId(wf.id, node.id);
         desired.set(schedulerId, {
           workflowId: wf.id,
-          userId: wf.userId,
+          organizationId: wf.organizationId,
           nodeId: node.id,
           type: node.type,
           intervalSeconds,
@@ -69,7 +70,7 @@ export class PollSchedulerService implements OnModuleInit {
     for (const [schedulerId, args] of desired) {
       const payload: PollFirePayload = {
         workflowId: args.workflowId,
-        userId: args.userId,
+        organizationId: args.organizationId,
         nodeId: args.nodeId,
         type: args.type,
       };

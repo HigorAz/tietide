@@ -111,7 +111,7 @@ export class OAuthRefreshOneProcessor extends WorkerHost {
       data: {
         refreshFailureCount: { increment: 1 },
       },
-      select: { refreshFailureCount: true, userId: true },
+      select: { refreshFailureCount: true, organizationId: true },
     });
 
     const newStatus = updated.refreshFailureCount >= MAX_REFRESH_FAILURES ? 'EXPIRED' : 'ERROR';
@@ -129,7 +129,7 @@ export class OAuthRefreshOneProcessor extends WorkerHost {
       payload: {
         connectionId: payload.connectionId,
         provider: payload.provider,
-        userId: updated.userId,
+        organizationId: updated.organizationId,
       },
       failureCount: updated.refreshFailureCount,
     });
