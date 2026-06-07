@@ -34,7 +34,7 @@ vi.mock('@/api/workflows', () => ({
 
 vi.mock('@/api/ai', () => ({
   getWorkflowDocs: vi.fn().mockResolvedValue(null),
-  regenerateWorkflowDocs: vi.fn(),
+  startWorkflowDocsRegeneration: vi.fn().mockResolvedValue({ workflowId: 'wf', status: 'pending' }),
 }));
 
 vi.mock('@/api/executions', () => ({

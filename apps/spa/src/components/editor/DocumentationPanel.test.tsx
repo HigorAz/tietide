@@ -7,14 +7,14 @@ import { initialToastState, useToastStore } from '@/stores/toastStore';
 
 vi.mock('@/api/ai', () => ({
   getWorkflowDocs: vi.fn(),
-  regenerateWorkflowDocs: vi.fn(),
+  startWorkflowDocsRegeneration: vi.fn(),
 }));
 
-import { getWorkflowDocs, regenerateWorkflowDocs } from '@/api/ai';
+import { getWorkflowDocs, startWorkflowDocsRegeneration } from '@/api/ai';
 import { DocumentationPanel } from './DocumentationPanel';
 
 const mockedGet = vi.mocked(getWorkflowDocs);
-const mockedRegenerate = vi.mocked(regenerateWorkflowDocs);
+const mockedStart = vi.mocked(startWorkflowDocsRegeneration);
 
 const sample: WorkflowDocumentationResponse = {
   workflowId: 'wf-1',
@@ -36,8 +36,10 @@ const sample: WorkflowDocumentationResponse = {
 describe('DocumentationPanel', () => {
   beforeEach(() => {
     mockedGet.mockReset();
-    mockedRegenerate.mockReset();
+    mockedStart.mockReset();
     mockedGet.mockResolvedValue(null); // default: no existing docs
+    // POST returns 202 immediately; the doc arrives via polling getWorkflowDocs.
+    mockedStart.mockResolvedValue({ workflowId: 'wf-1', status: 'pending' });
     useDocumentationStore.setState({ status: 'idle', docs: null, error: null });
     useToastStore.setState({ ...initialToastState });
   });
@@ -52,7 +54,7 @@ describe('DocumentationPanel', () => {
       render(<DocumentationPanel workflowId="wf-1" />);
       // Fetch is deferred until handleRegenerate explicitly opens the dialog.
       expect(mockedGet).not.toHaveBeenCalled();
-      expect(mockedRegenerate).not.toHaveBeenCalled();
+      expect(mockedStart).not.toHaveBeenCalled();
       expect(useToastStore.getState().toasts).toHaveLength(0);
     });
 
@@ -68,24 +70,20 @@ describe('DocumentationPanel', () => {
   });
 
   describe('regenerate action', () => {
-    it('should call regenerateWorkflowDocs (not GET) when the button is clicked', async () => {
-      mockedRegenerate.mockResolvedValueOnce(sample);
+    it('should POST to start regeneration when the button is clicked', async () => {
+      mockedGet.mockResolvedValue(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
       const button = await screen.findByRole('button', { name: /generate documentation/i });
       await user.click(button);
 
-      await waitFor(() => expect(mockedRegenerate).toHaveBeenCalledWith('wf-1'));
+      await waitFor(() => expect(mockedStart).toHaveBeenCalledWith('wf-1'));
     });
 
     it('should show a loading indicator and disable the button while regenerating', async () => {
-      let resolveFn: (v: WorkflowDocumentationResponse) => void = () => {};
-      mockedRegenerate.mockReturnValue(
-        new Promise<WorkflowDocumentationResponse>((resolve) => {
-          resolveFn = resolve;
-        }),
-      );
+      // POST stays pending → the panel sits in the loading state.
+      mockedStart.mockReturnValue(new Promise(() => {}));
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -94,13 +92,12 @@ describe('DocumentationPanel', () => {
 
       expect(await screen.findByText(/generating documentation/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /generating/i })).toBeDisabled();
-      resolveFn(sample);
     });
   });
 
   describe('ready state', () => {
     it('should render rendered markdown documentation when regeneration succeeds', async () => {
-      mockedRegenerate.mockResolvedValueOnce(sample);
+      mockedGet.mockResolvedValue(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -129,7 +126,7 @@ describe('DocumentationPanel', () => {
           decisions: 'None',
         },
       };
-      mockedRegenerate.mockResolvedValueOnce(legacy);
+      mockedGet.mockResolvedValue(legacy);
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -145,7 +142,7 @@ describe('DocumentationPanel', () => {
     });
 
     it('should expose a copy-to-clipboard button that copies the raw markdown', async () => {
-      mockedRegenerate.mockResolvedValueOnce(sample);
+      mockedGet.mockResolvedValue(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -165,7 +162,7 @@ describe('DocumentationPanel', () => {
     });
 
     it('should not render any "served from cache" indicator after opening the dialog', async () => {
-      mockedRegenerate.mockResolvedValueOnce(sample);
+      mockedGet.mockResolvedValue(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -181,7 +178,7 @@ describe('DocumentationPanel', () => {
 
   describe('error state', () => {
     it('should show fallback message when AI service is down', async () => {
-      mockedRegenerate.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
+      mockedStart.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -195,7 +192,7 @@ describe('DocumentationPanel', () => {
 
   describe('toast feedback', () => {
     it('should fire a success toast when regenerate transitions to ready', async () => {
-      mockedRegenerate.mockResolvedValueOnce(sample);
+      mockedGet.mockResolvedValue(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -211,7 +208,7 @@ describe('DocumentationPanel', () => {
     });
 
     it('should fire an error toast when regenerate transitions to error', async () => {
-      mockedRegenerate.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
+      mockedStart.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -226,7 +223,7 @@ describe('DocumentationPanel', () => {
     });
 
     it('should keep the inline retry block alongside the error toast', async () => {
-      mockedRegenerate.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
+      mockedStart.mockRejectedValueOnce(new Error('AI service temporarily unavailable'));
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -247,7 +244,7 @@ describe('DocumentationPanel', () => {
     });
 
     it('should fire a success toast only after an explicit regenerate click', async () => {
-      mockedRegenerate.mockResolvedValueOnce(sample);
+      mockedGet.mockResolvedValue(sample);
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();
@@ -264,7 +261,7 @@ describe('DocumentationPanel', () => {
 
   describe('spinner', () => {
     it('should render the shared Spinner inside the trigger button while loading', async () => {
-      mockedRegenerate.mockReturnValue(new Promise(() => {}));
+      mockedStart.mockReturnValue(new Promise(() => {}));
 
       render(<DocumentationPanel workflowId="wf-1" />);
       const user = userEvent.setup();

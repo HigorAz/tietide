@@ -33,6 +33,17 @@ export class DocumentationSectionsDto {
   actions?: string;
 }
 
+export class DocumentationRegenerationAcceptedDto {
+  @ApiProperty({ format: 'uuid' })
+  workflowId!: string;
+
+  @ApiProperty({
+    enum: ['pending'],
+    description: 'Generation was accepted and runs in the background; poll GET /documentation.',
+  })
+  status!: 'pending';
+}
+
 export class WorkflowDocumentationResponseDto {
   @ApiProperty({ format: 'uuid' })
   workflowId!: string;

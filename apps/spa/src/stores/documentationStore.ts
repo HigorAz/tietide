@@ -2,11 +2,22 @@ import { create } from 'zustand';
 import { AxiosError } from 'axios';
 import {
   getWorkflowDocs,
-  regenerateWorkflowDocs,
+  startWorkflowDocsRegeneration,
   type WorkflowDocumentationResponse,
 } from '@/api/ai';
 
 export type DocumentationStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+// Generation runs in the background and is polled. ~3.5 min of polling comfortably
+// covers the ~120s a CPU-only model takes, with headroom, before we give up.
+export const DOC_POLL_INTERVAL_MS = 3000;
+export const DOC_POLL_MAX_ATTEMPTS = 70;
+
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Monotonic token so a reset() or a newer regenerate() cancels any in-flight poll
+// loop (Zustand has no per-call lifecycle to hang a timer ref on).
+let activePoll = 0;
 
 export interface DocumentationState {
   status: DocumentationStatus;
@@ -38,7 +49,7 @@ const toMessage = (err: unknown, fallback: string): string => {
   return fallback;
 };
 
-export const useDocumentationStore = create<DocumentationStore>((set) => ({
+export const useDocumentationStore = create<DocumentationStore>((set, get) => ({
   ...initialState,
 
   fetch: async (workflowId) => {
@@ -56,18 +67,54 @@ export const useDocumentationStore = create<DocumentationStore>((set) => ({
   },
 
   regenerate: async (workflowId) => {
+    // Readiness is detected by the doc's generatedAt advancing past this baseline
+    // (or any doc appearing when there was none).
+    const baseline = get().docs?.generatedAt ?? null;
     set({ status: 'loading', error: null });
+    const token = ++activePoll;
+
     try {
-      const docs = await regenerateWorkflowDocs(workflowId);
-      set({ status: 'ready', docs, error: null });
+      await startWorkflowDocsRegeneration(workflowId);
     } catch (err) {
+      if (token !== activePoll) return;
       set({
         status: 'error',
         docs: null,
-        error: toMessage(err, 'Failed to generate documentation'),
+        error: toMessage(err, 'Failed to start documentation generation'),
       });
+      return;
     }
+
+    // Poll until a fresh doc appears. The first check is immediate; subsequent
+    // checks wait DOC_POLL_INTERVAL_MS. Transient GET failures are tolerated.
+    for (let attempt = 0; attempt < DOC_POLL_MAX_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) await wait(DOC_POLL_INTERVAL_MS);
+      if (token !== activePoll) return;
+
+      let doc: WorkflowDocumentationResponse | null = null;
+      try {
+        doc = await getWorkflowDocs(workflowId);
+      } catch {
+        continue;
+      }
+      if (token !== activePoll) return;
+
+      if (doc && (baseline === null || doc.generatedAt > baseline)) {
+        set({ status: 'ready', docs: doc, error: null });
+        return;
+      }
+    }
+
+    if (token !== activePoll) return;
+    set({
+      status: 'error',
+      error: 'Documentation is taking longer than expected. Please try again.',
+    });
   },
 
-  reset: () => set({ ...initialState }),
+  // Bump the token so any in-flight poll loop sees it's been superseded and stops.
+  reset: () => {
+    activePoll += 1;
+    set({ ...initialState });
+  },
 }));
