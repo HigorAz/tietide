@@ -56,6 +56,16 @@ services:
     restart: unless-stopped
     # RAM-heavy (~8 GB for llama3.1:8b). If the VPS is constrained, remove this
     # service and point OLLAMA_BASE_URL at a remote GPU host in .env instead.
+    # On a host WITH an NVIDIA GPU + the NVIDIA Container Toolkit, uncomment the
+    # block below to offload inference to the GPU (CPU-only hosts must leave it
+    # commented — a hard nvidia reservation fails `up` when no GPU is present):
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
