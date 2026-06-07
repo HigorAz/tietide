@@ -8,18 +8,31 @@ vi.mock('@/api/auth', () => ({
   getMe: vi.fn(),
 }));
 
+vi.mock('@/api/organizations', () => ({
+  listOrganizations: vi.fn(),
+}));
+
 import {
   login as apiLogin,
   register as apiRegister,
   verifyEmail as apiVerifyEmail,
   getMe as apiGetMe,
 } from '@/api/auth';
-import { useAuthStore, TOKEN_STORAGE_KEY } from './authStore';
+import { listOrganizations as apiListOrganizations } from '@/api/organizations';
+import { useAuthStore, TOKEN_STORAGE_KEY, ACTIVE_ORG_STORAGE_KEY } from './authStore';
 
 const mockedLogin = vi.mocked(apiLogin);
 const mockedRegister = vi.mocked(apiRegister);
 const mockedVerifyEmail = vi.mocked(apiVerifyEmail);
 const mockedGetMe = vi.mocked(apiGetMe);
+const mockedListOrganizations = vi.mocked(apiListOrganizations);
+
+const org = (id: string, role: 'SUPERADMIN' | 'ADMIN' | 'MEMBER' | 'VIEWER' = 'MEMBER') => ({
+  id,
+  name: `Org ${id}`,
+  slug: `org-${id}`,
+  role,
+});
 
 const sampleUser: PublicUser = {
   id: 'user-1',
@@ -29,7 +42,13 @@ const sampleUser: PublicUser = {
 };
 
 const resetStore = (): void => {
-  useAuthStore.setState({ user: null, token: null, hydrated: false });
+  useAuthStore.setState({
+    user: null,
+    token: null,
+    organizations: [],
+    activeOrganization: null,
+    hydrated: false,
+  });
   localStorage.clear();
 };
 
@@ -40,6 +59,8 @@ describe('authStore', () => {
     mockedRegister.mockReset();
     mockedVerifyEmail.mockReset();
     mockedGetMe.mockReset();
+    mockedListOrganizations.mockReset();
+    mockedListOrganizations.mockResolvedValue([]);
   });
 
   describe('login', () => {
@@ -170,6 +191,93 @@ describe('authStore', () => {
       expect(state.user).toBeNull();
       expect(state.hydrated).toBe(true);
       expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+    });
+
+    it('loads the membership list and activates the persisted org on hydrate', async () => {
+      localStorage.setItem(TOKEN_STORAGE_KEY, 'jwt-123');
+      localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'b');
+      mockedGetMe.mockResolvedValueOnce(sampleUser);
+      mockedListOrganizations.mockResolvedValueOnce([org('a'), org('b')]);
+
+      await useAuthStore.getState().hydrate();
+
+      const state = useAuthStore.getState();
+      expect(state.organizations).toHaveLength(2);
+      expect(state.activeOrganization?.id).toBe('b');
+    });
+  });
+
+  describe('loadOrganizations', () => {
+    it('activates the persisted org when the user is still a member', async () => {
+      localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'b');
+      mockedListOrganizations.mockResolvedValueOnce([org('a'), org('b')]);
+
+      await useAuthStore.getState().loadOrganizations();
+
+      expect(useAuthStore.getState().activeOrganization?.id).toBe('b');
+      expect(localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)).toBe('b');
+    });
+
+    it('falls back to the first membership when there is no persisted org', async () => {
+      mockedListOrganizations.mockResolvedValueOnce([org('a'), org('b')]);
+
+      await useAuthStore.getState().loadOrganizations();
+
+      expect(useAuthStore.getState().activeOrganization?.id).toBe('a');
+      expect(localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)).toBe('a');
+    });
+
+    it('leaves org state untouched on a fetch failure (non-fatal)', async () => {
+      useAuthStore.setState({ organizations: [org('a')], activeOrganization: org('a') });
+      mockedListOrganizations.mockRejectedValueOnce(new Error('network'));
+
+      await useAuthStore.getState().loadOrganizations();
+
+      expect(useAuthStore.getState().organizations).toHaveLength(1);
+      expect(useAuthStore.getState().activeOrganization?.id).toBe('a');
+    });
+  });
+
+  describe('switchOrganization', () => {
+    it('switches the active workspace and persists it', () => {
+      useAuthStore.setState({ organizations: [org('a'), org('b')], activeOrganization: org('a') });
+
+      useAuthStore.getState().switchOrganization('b');
+
+      expect(useAuthStore.getState().activeOrganization?.id).toBe('b');
+      expect(localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)).toBe('b');
+    });
+
+    it('is a no-op for an unknown org id', () => {
+      useAuthStore.setState({ organizations: [org('a')], activeOrganization: org('a') });
+
+      useAuthStore.getState().switchOrganization('zzz');
+
+      expect(useAuthStore.getState().activeOrganization?.id).toBe('a');
+    });
+  });
+
+  describe('handleLostOrgAccess', () => {
+    it('drops the active org and falls back to the next membership', () => {
+      useAuthStore.setState({ organizations: [org('a'), org('b')], activeOrganization: org('a') });
+      localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'a');
+
+      useAuthStore.getState().handleLostOrgAccess();
+
+      const state = useAuthStore.getState();
+      expect(state.organizations.map((o) => o.id)).toEqual(['b']);
+      expect(state.activeOrganization?.id).toBe('b');
+      expect(localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)).toBe('b');
+    });
+
+    it('clears the active org when no memberships remain', () => {
+      useAuthStore.setState({ organizations: [org('a')], activeOrganization: org('a') });
+      localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'a');
+
+      useAuthStore.getState().handleLostOrgAccess();
+
+      expect(useAuthStore.getState().activeOrganization).toBeNull();
+      expect(localStorage.getItem(ACTIVE_ORG_STORAGE_KEY)).toBeNull();
     });
   });
 });
