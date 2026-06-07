@@ -2,9 +2,13 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { getQueueToken } from '@nestjs/bullmq';
+import { readFileSync } from 'node:fs';
 import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
+
+jest.mock('node:fs', () => ({ readFileSync: jest.fn() }));
+const readFileSyncMock = readFileSync as jest.Mock;
 
 describe('HealthService', () => {
   let service: HealthService;
@@ -22,6 +26,7 @@ describe('HealthService', () => {
       get: jest.fn((key: string, defaultValue?: unknown) => {
         if (key === 'AI_SERVICE_URL') return 'http://ai-service:8000';
         if (key === 'HEALTH_CHECK_TIMEOUT_MS') return '2000';
+        if (key === 'DEPLOYED_SHA_FILE') return '/var/run/deployed-sha';
         return defaultValue;
       }),
     };
@@ -135,11 +140,35 @@ describe('HealthService', () => {
     });
   });
 
+  describe('getDeployedCommit', () => {
+    it('should return the trimmed contents of the marker file', () => {
+      readFileSyncMock.mockReturnValue('abc123def456\n');
+
+      expect(service.getDeployedCommit()).toBe('abc123def456');
+      expect(readFileSyncMock).toHaveBeenCalledWith('/var/run/deployed-sha', 'utf8');
+    });
+
+    it('should return "unknown" when the marker file is missing', () => {
+      readFileSyncMock.mockImplementation(() => {
+        throw Object.assign(new Error('ENOENT'), { code: 'ENOENT' });
+      });
+
+      expect(service.getDeployedCommit()).toBe('unknown');
+    });
+
+    it('should return "unknown" when the marker file is empty', () => {
+      readFileSyncMock.mockReturnValue('   \n');
+
+      expect(service.getDeployedCommit()).toBe('unknown');
+    });
+  });
+
   describe('check (aggregate)', () => {
     it('should return ok when all dependencies are connected', async () => {
       prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
       redisClient.ping.mockResolvedValue('PONG');
       fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response);
+      readFileSyncMock.mockReturnValue('deadbeef\n');
 
       const result = await service.check();
 
@@ -147,6 +176,7 @@ describe('HealthService', () => {
       expect(result.checks.database.status).toBe('connected');
       expect(result.checks.redis.status).toBe('connected');
       expect(result.checks.ai.status).toBe('connected');
+      expect(result.commit).toBe('deadbeef');
       expect(result.timestamp).toBeDefined();
     });
 

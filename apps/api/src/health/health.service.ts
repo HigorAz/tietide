@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 
@@ -20,6 +23,8 @@ export interface HealthReport {
     redis: DependencyCheck;
     ai: DependencyCheck;
   };
+  /** Git SHA the running production deploy reports itself on, or 'unknown'. */
+  commit: string;
   timestamp: string;
 }
 
@@ -28,6 +33,7 @@ export class HealthService {
   private readonly logger = new Logger(HealthService.name);
   private readonly aiServiceUrl: string;
   private readonly timeoutMs: number;
+  private readonly deployedShaFile: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -38,6 +44,25 @@ export class HealthService {
       this.config.get<string>('AI_SERVICE_URL', 'http://localhost:8000') ?? 'http://localhost:8000'
     ).replace(/\/+$/, '');
     this.timeoutMs = Number(this.config.get<string>('HEALTH_CHECK_TIMEOUT_MS', '2000'));
+    // The WSL deploy script writes the freshly-deployed git SHA here after every
+    // deploy; the promote-to-production workflow polls /v1/health/live for it.
+    const defaultShaFile = join(homedir(), 'tietide-scripts', 'deployed-sha');
+    this.deployedShaFile =
+      this.config.get<string>('DEPLOYED_SHA_FILE', defaultShaFile) ?? defaultShaFile;
+  }
+
+  /**
+   * Git SHA the running deploy reports itself on, read fresh from the marker file
+   * the deploy script writes. Returns 'unknown' when the marker is absent or empty
+   * (local dev, Docker, or before the first deploy). Never throws — the liveness
+   * probe depends on it.
+   */
+  getDeployedCommit(): string {
+    try {
+      return readFileSync(this.deployedShaFile, 'utf8').trim() || 'unknown';
+    } catch {
+      return 'unknown';
+    }
   }
 
   async checkDatabase(): Promise<DependencyCheck> {
@@ -105,6 +130,7 @@ export class HealthService {
     return {
       status,
       checks: { database, redis, ai },
+      commit: this.getDeployedCommit(),
       timestamp: new Date().toISOString(),
     };
   }
