@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Folder } from '@tietide/shared';
+import type { Folder, Tag } from '@tietide/shared';
 import { BulkActionsToolbar } from './BulkActionsToolbar';
 
 const folders: Folder[] = [
@@ -9,13 +9,21 @@ const folders: Folder[] = [
   { id: 'folder-b', name: 'Archive', parentFolderId: null, createdAt: new Date() },
 ];
 
+const tags: Tag[] = [
+  { id: 't-1', name: 'urgent', color: '#ef4444', createdAt: new Date() },
+  { id: 't-2', name: 'finance', color: null, createdAt: new Date() },
+];
+
 const defaultProps = () => ({
   count: 2,
   busy: false,
   folders,
+  tags,
   onActivate: vi.fn().mockResolvedValue(undefined),
   onDeactivate: vi.fn().mockResolvedValue(undefined),
   onMove: vi.fn().mockResolvedValue(undefined),
+  onAddTags: vi.fn().mockResolvedValue(undefined),
+  onManageTags: vi.fn(),
   onDelete: vi.fn(),
   onClear: vi.fn(),
 });
@@ -89,6 +97,18 @@ describe('BulkActionsToolbar', () => {
     await user.click(screen.getByRole('menuitem', { name: /no folder \(root\)/i }));
 
     expect(props.onMove).toHaveBeenCalledWith(null);
+  });
+
+  it('Add tags dropdown applies the drafted tag selection via onAddTags', async () => {
+    const user = userEvent.setup();
+    const props = defaultProps();
+    render(<BulkActionsToolbar {...props} />);
+
+    await user.click(screen.getByRole('button', { name: /^add tags$/i }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /urgent/i }));
+    await user.click(screen.getByRole('button', { name: /apply tags/i }));
+
+    expect(props.onAddTags).toHaveBeenCalledWith(['t-1']);
   });
 
   it('disables action buttons when busy=true', () => {

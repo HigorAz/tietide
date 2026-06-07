@@ -39,6 +39,28 @@ class TestOllamaClient:
             assert body["options"]["temperature"] == 0.3
             assert body["options"]["num_predict"] == 1024
 
+        async def test_sends_keep_alive_to_keep_model_resident(self):
+            # Without keep_alive Ollama evicts the model after ~5min idle and
+            # cold-loads 4.7GB on CPU on the next request. We pin it resident.
+            captured: dict = {}
+
+            def handler(request: httpx.Request) -> httpx.Response:
+                captured["body"] = json.loads(request.content)
+                return httpx.Response(200, json={"response": "{}", "done": True})
+
+            transport = httpx.MockTransport(handler)
+            client = OllamaClient(
+                base_url="http://ollama:11434",
+                model="llama3.1:8b",
+                timeout=10.0,
+                keep_alive="30m",
+                transport=transport,
+            )
+
+            await client.generate("p", temperature=0.3, max_tokens=1024)
+
+            assert captured["body"].get("keep_alive") == "30m"
+
         async def test_requests_json_format(self):
             captured: dict = {}
 

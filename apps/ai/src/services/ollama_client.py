@@ -33,11 +33,16 @@ class OllamaClient:
         base_url: str,
         model: str,
         timeout: float = 60.0,
+        keep_alive: str | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout = timeout
+        # How long Ollama keeps the model resident after a request. Without it the
+        # model is evicted after the default ~5min idle and cold-loaded (4.7GB on
+        # CPU) on the next call. e.g. "30m" or "-1" to keep loaded indefinitely.
+        self.keep_alive = keep_alive
         self._transport = transport
 
     async def generate(
@@ -60,6 +65,8 @@ class OllamaClient:
                 "num_predict": max_tokens,
             },
         }
+        if self.keep_alive is not None:
+            payload["keep_alive"] = self.keep_alive
         url = f"{self.base_url}/api/generate"
 
         try:

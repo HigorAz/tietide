@@ -28,6 +28,7 @@ const defaultProps = () => ({
   docsContent: null,
   docsError: null,
   selected: false,
+  availableTags: [],
   onOpen: vi.fn(),
   onToggleActive: vi.fn(),
   onDelete: vi.fn(),
@@ -35,6 +36,8 @@ const defaultProps = () => ({
   onToggleDocsExpanded: vi.fn(),
   onToggleSelect: vi.fn(),
   onRename: vi.fn().mockResolvedValue(undefined),
+  onSetTags: vi.fn().mockResolvedValue(undefined),
+  onManageTags: vi.fn(),
 });
 
 describe('WorkflowRow', () => {
@@ -163,6 +166,56 @@ describe('WorkflowRow', () => {
       await user.click(screen.getByRole('checkbox', { name: /select Example/i }));
 
       expect(props.onOpen).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('docs regeneration affordance', () => {
+    it('keeps existing docs visible with an "Updating" indicator while regenerating', () => {
+      render(
+        <WorkflowRow
+          {...defaultProps()}
+          isExpanded
+          isGeneratingDocs
+          docsContent={'# Existing docs\n\nbody text'}
+        />,
+      );
+
+      expect(screen.getByText(/existing docs/i)).toBeInTheDocument();
+      expect(screen.getByText(/updating documentation/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('tags', () => {
+    it('renders the assigned tag chips', () => {
+      render(
+        <WorkflowRow
+          {...defaultProps()}
+          workflow={makeWorkflow({ tags: [{ id: 't1', name: 'urgent', color: '#ef4444' }] })}
+        />,
+      );
+
+      expect(screen.getByText('urgent')).toBeInTheDocument();
+    });
+
+    it('toggling a tag in the picker calls onSetTags with the updated ids', async () => {
+      const user = userEvent.setup();
+      const props = defaultProps();
+      const availableTags = [
+        { id: 't1', name: 'urgent', color: null, createdAt: new Date('2026-05-01T00:00:00Z') },
+        { id: 't2', name: 'finance', color: null, createdAt: new Date('2026-05-01T00:00:00Z') },
+      ];
+      render(
+        <WorkflowRow
+          {...props}
+          availableTags={availableTags}
+          workflow={makeWorkflow({ id: 'wf-1', tags: [{ id: 't1', name: 'urgent', color: null }] })}
+        />,
+      );
+
+      await user.click(screen.getByRole('button', { name: /edit tags for example/i }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: /finance/i }));
+
+      expect(props.onSetTags).toHaveBeenCalledWith('wf-1', ['t1', 't2']);
     });
   });
 
