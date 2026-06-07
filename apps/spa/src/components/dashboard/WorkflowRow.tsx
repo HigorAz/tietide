@@ -18,11 +18,14 @@ import {
   Trash2,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import type { Tag } from '@tietide/shared';
 import type { WorkflowListItem } from '@/api/workflows';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { formatRelativeTime } from './relativeTime';
 import { MarkdownContent } from './MarkdownContent';
+import { TagChips } from '@/components/workflows/TagChips';
+import { TagPickerPopover } from '@/components/workflows/TagPickerPopover';
 
 export interface WorkflowRowProps {
   workflow: WorkflowListItem;
@@ -38,6 +41,9 @@ export interface WorkflowRowProps {
   onToggleDocsExpanded: (id: string) => void;
   onToggleSelect: (id: string) => void;
   onRename: (id: string, name: string) => Promise<void>;
+  availableTags: Tag[];
+  onSetTags: (id: string, tagIds: string[]) => void;
+  onManageTags?: () => void;
   isToggling?: boolean;
   isDeleting?: boolean;
 }
@@ -61,10 +67,13 @@ export function WorkflowRow({
   onToggleDocsExpanded,
   onToggleSelect,
   onRename,
+  availableTags,
+  onSetTags,
+  onManageTags,
   isToggling,
   isDeleting,
 }: WorkflowRowProps): JSX.Element {
-  const { id, name, isActive, updatedAt, executionCount, documentation } = workflow;
+  const { id, name, isActive, updatedAt, executionCount, documentation, tags } = workflow;
   const hasDocs = documentation !== null || docsContent !== null;
 
   const [editing, setEditing] = useState(false);
@@ -230,6 +239,7 @@ export function WorkflowRow({
           >
             {isActive ? 'Active' : 'Inactive'}
           </span>
+          <TagChips tags={tags} />
           <span
             aria-label={`${executionCount} executions`}
             className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-secondary"
@@ -293,6 +303,14 @@ export function WorkflowRow({
             )}
             <span>{docsLabel}</span>
           </button>
+
+          <TagPickerPopover
+            tags={availableTags}
+            selectedIds={tags.map((t) => t.id)}
+            onChange={(next) => onSetTags(id, next)}
+            onManage={onManageTags}
+            triggerAriaLabel={`Edit tags for ${name}`}
+          />
 
           {hasDocs && (
             <button

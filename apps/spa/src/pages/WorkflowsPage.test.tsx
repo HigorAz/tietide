@@ -591,6 +591,70 @@ describe('WorkflowsPage', () => {
       });
     });
 
+    it('assigns a tag to a workflow via the row picker (PATCH with tagIds)', async () => {
+      mockedList.mockResolvedValue([makeWorkflow({ id: 'wf-1', name: 'Alpha', tags: [] })]);
+      mockedListFolders.mockResolvedValue([]);
+      mockedListTags.mockResolvedValue([
+        {
+          id: 't-1',
+          name: 'urgent',
+          color: '#ef4444',
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+      ]);
+      mockedUpdate.mockResolvedValue(
+        makeWorkflow({
+          id: 'wf-1',
+          name: 'Alpha',
+          tags: [{ id: 't-1', name: 'urgent', color: '#ef4444' }],
+        }),
+      );
+
+      const user = userEvent.setup();
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('button', { name: /edit tags for alpha/i }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: /urgent/i }));
+
+      await waitFor(() => expect(mockedUpdate).toHaveBeenCalledWith('wf-1', { tagIds: ['t-1'] }));
+    });
+
+    it('bulk-adds a tag to all selected workflows (union, never clobbering existing)', async () => {
+      mockedList.mockResolvedValue([
+        makeWorkflow({ id: 'a', name: 'Alpha', tags: [] }),
+        makeWorkflow({
+          id: 'b',
+          name: 'Beta',
+          tags: [{ id: 't-2', name: 'finance', color: null }],
+        }),
+      ]);
+      mockedListFolders.mockResolvedValue([]);
+      mockedListTags.mockResolvedValue([
+        {
+          id: 't-1',
+          name: 'urgent',
+          color: '#ef4444',
+          createdAt: new Date('2026-05-08T00:00:00Z'),
+        },
+        { id: 't-2', name: 'finance', color: null, createdAt: new Date('2026-05-08T00:00:00Z') },
+      ]);
+      mockedUpdate.mockImplementation(async (id: string) => makeWorkflow({ id }));
+
+      const user = userEvent.setup();
+      renderWorkflows();
+
+      await user.click(await screen.findByRole('checkbox', { name: /select all workflows/i }));
+      await user.click(await screen.findByRole('button', { name: /^add tags$/i }));
+      await user.click(await screen.findByRole('menuitemcheckbox', { name: /urgent/i }));
+      await user.click(await screen.findByRole('button', { name: /apply tags/i }));
+
+      await waitFor(() => {
+        // Alpha had none → gets t-1; Beta keeps t-2 and gains t-1.
+        expect(mockedUpdate).toHaveBeenCalledWith('a', { tagIds: ['t-1'] });
+        expect(mockedUpdate).toHaveBeenCalledWith('b', { tagIds: ['t-2', 't-1'] });
+      });
+    });
+
     it('opens the cascade-aware delete dialog with the impact counts', async () => {
       mockedList.mockResolvedValue([
         makeWorkflow({ id: 'wf-1', folderId: 'f-1' }),

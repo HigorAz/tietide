@@ -88,6 +88,7 @@ export function WorkflowsPage(): JSX.Element {
     toggleActive,
     rename,
     moveToFolder,
+    setTags,
     setDocumentationMeta,
     selectedFolderId,
     selectedTagIds,
@@ -378,6 +379,34 @@ export function WorkflowsPage(): JSX.Element {
       );
     },
     [runBulk, moveToFolder],
+  );
+
+  const handleSetTags = useCallback(
+    async (id: string, tagIds: string[]): Promise<void> => {
+      try {
+        await setTags(id, tagIds);
+      } catch (err) {
+        toast({ tone: 'error', message: errorMessage(err, 'Could not update tags') });
+      }
+    },
+    [setTags, toast],
+  );
+
+  const handleBulkAddTags = useCallback(
+    async (tagIds: string[]): Promise<void> => {
+      if (tagIds.length === 0) return;
+      await runBulk(
+        (n) => `Tagged ${n} workflow${n === 1 ? '' : 's'}`,
+        'Failed to tag',
+        (wf) => {
+          // Union with existing tags so a bulk add never clobbers per-workflow tags.
+          const existing = wf.tags.map((t) => t.id);
+          const merged = [...existing, ...tagIds.filter((t) => !existing.includes(t))];
+          return setTags(wf.id, merged);
+        },
+      );
+    },
+    [runBulk, setTags],
   );
 
   const handleBulkDeleteConfirm = useCallback(async (): Promise<void> => {
@@ -674,9 +703,12 @@ export function WorkflowsPage(): JSX.Element {
                     count={selectedIds.size}
                     busy={bulkBusy}
                     folders={folders}
+                    tags={tags}
                     onActivate={handleBulkActivate}
                     onDeactivate={handleBulkDeactivate}
                     onMove={handleBulkMove}
+                    onAddTags={handleBulkAddTags}
+                    onManageTags={() => setShowTagManager(true)}
                     onDelete={() => setBulkDeleteOpen(true)}
                     onClear={clearSelection}
                   />
@@ -719,6 +751,9 @@ export function WorkflowsPage(): JSX.Element {
                           onToggleDocsExpanded={handleToggleDocsExpanded}
                           onToggleSelect={toggleSelect}
                           onRename={handleRename}
+                          availableTags={tags}
+                          onSetTags={handleSetTags}
+                          onManageTags={() => setShowTagManager(true)}
                           isToggling={togglingIds.has(wf.id)}
                           isDeleting={deletingIds.has(wf.id)}
                         />
