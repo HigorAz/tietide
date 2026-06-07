@@ -216,8 +216,9 @@ describe('OAuth Google flow (fixture token server)', () => {
     // exercise only the public callback in this test (the controller-level start test
     // is covered in oauth.controller.spec.ts).
 
+    const organizationId = '00000000-0000-4000-8000-0000000000aa';
     const oauthService = app.get(OAuthService);
-    const startResult = await oauthService.start(userId, {
+    const startResult = await oauthService.start(organizationId, userId, {
       provider: 'google',
       label: 'My Gmail',
       scopes: 'openid,email',

@@ -18,7 +18,11 @@ export class LibraryService {
     return DEMO_WORKFLOWS.map(toTemplateResponse);
   }
 
-  async instantiate(userId: string, slug: string): Promise<WorkflowResponseDto> {
+  async instantiate(
+    organizationId: string,
+    userId: string,
+    slug: string,
+  ): Promise<WorkflowResponseDto> {
     const fixture = DEMO_WORKFLOWS.find((f) => f.slug === slug);
     if (!fixture) {
       throw new NotFoundException(`Template '${slug}' not found`);
@@ -30,6 +34,7 @@ export class LibraryService {
     // toggle on /workflows after reviewing.
     const created = await this.prisma.workflow.create({
       data: {
+        organizationId,
         userId,
         name: fixture.name,
         description: fixture.description,
@@ -64,6 +69,7 @@ export class LibraryService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'library.instantiate',
       resource: 'workflow',
       resourceId: created.id,

@@ -24,8 +24,9 @@ describe('ConnectionsService', () => {
   let healthRegistry: { get: jest.Mock };
   let mockChecker: { provider: string; check: jest.Mock };
 
+  const orgId = 'org-uuid-1';
+  const otherOrgId = 'org-uuid-2';
   const userId = 'user-uuid-1';
-  const otherUserId = 'user-uuid-2';
   const connectionId = 'conn-uuid-1';
 
   const baseRow = {
@@ -70,13 +71,13 @@ describe('ConnectionsService', () => {
   });
 
   describe('list', () => {
-    it('should query Prisma scoped to the caller userId, keyset-ordered, with metadata-only select', async () => {
+    it('should query Prisma scoped to the active organizationId, keyset-ordered, metadata-only', async () => {
       prisma.connection.findMany.mockResolvedValue([]);
 
-      await service.list(userId);
+      await service.list(orgId);
 
       expect(prisma.connection.findMany).toHaveBeenCalledWith({
-        where: { userId },
+        where: { organizationId: orgId },
         select: {
           id: true,
           type: true,
@@ -96,7 +97,7 @@ describe('ConnectionsService', () => {
     it('should return rows in a paginated envelope without any encrypted/nonce fields', async () => {
       prisma.connection.findMany.mockResolvedValue([baseRow]);
 
-      const result = await service.list(userId);
+      const result = await service.list(orgId);
 
       expect(result).toEqual({ items: [baseRow], nextCursor: null });
       for (const row of result.items as unknown as Record<string, unknown>[]) {
@@ -114,7 +115,7 @@ describe('ConnectionsService', () => {
         'utf8',
       ).toString('base64url');
 
-      await service.list(userId, { cursor });
+      await service.list(orgId, { cursor });
 
       const call = prisma.connection.findMany.mock.calls[0][0] as { where: { AND?: unknown[] } };
       expect(call.where.AND).toBeDefined();
@@ -122,13 +123,13 @@ describe('ConnectionsService', () => {
   });
 
   describe('findOne', () => {
-    it('should return a metadata-only DTO when the row exists for the user', async () => {
+    it('should return a metadata-only DTO when the row exists in the org', async () => {
       prisma.connection.findFirst.mockResolvedValue(baseRow);
 
-      const result = await service.findOne(userId, connectionId);
+      const result = await service.findOne(orgId, connectionId);
 
       expect(prisma.connection.findFirst).toHaveBeenCalledWith({
-        where: { id: connectionId, userId },
+        where: { id: connectionId, organizationId: orgId },
         select: {
           id: true,
           type: true,
@@ -146,22 +147,22 @@ describe('ConnectionsService', () => {
       expect(result).not.toHaveProperty('configNonce');
     });
 
-    it('should throw NotFoundException when the id belongs to another user (IDOR)', async () => {
+    it('should throw NotFoundException when the id belongs to another org (IDOR)', async () => {
       prisma.connection.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne(otherUserId, connectionId)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(otherOrgId, connectionId)).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('update', () => {
-    it('should verify ownership via findFirst before updating', async () => {
+    it('should verify org ownership via findFirst before updating', async () => {
       prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      await service.update(userId, connectionId, { name: 'Renamed' });
+      await service.update(orgId, userId, connectionId, { name: 'Renamed' });
 
       expect(prisma.connection.findFirst).toHaveBeenCalledWith({
-        where: { id: connectionId, userId },
+        where: { id: connectionId, organizationId: orgId },
         select: { id: true },
       });
     });
@@ -170,7 +171,7 @@ describe('ConnectionsService', () => {
       prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      await service.update(userId, connectionId, {
+      await service.update(orgId, userId, connectionId, {
         name: 'Renamed',
         status: ConnectionStatus.REVOKED,
       });
@@ -183,25 +184,26 @@ describe('ConnectionsService', () => {
       );
     });
 
-    it('should throw NotFoundException when the connection belongs to another user', async () => {
+    it('should throw NotFoundException when the connection belongs to another org', async () => {
       prisma.connection.findFirst.mockResolvedValue(null);
 
-      await expect(service.update(otherUserId, connectionId, { name: 'X' })).rejects.toThrow(
+      await expect(service.update(otherOrgId, userId, connectionId, { name: 'X' })).rejects.toThrow(
         NotFoundException,
       );
 
       expect(prisma.connection.update).not.toHaveBeenCalled();
     });
 
-    it('should record an audit log entry with action "connection.update" listing changed fields', async () => {
+    it('should record an audit log entry (org-scoped) with action "connection.update"', async () => {
       prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      await service.update(userId, connectionId, { status: ConnectionStatus.EXPIRED });
+      await service.update(orgId, userId, connectionId, { status: ConnectionStatus.EXPIRED });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'connection.update',
           resource: 'connection',
           resourceId: connectionId,
@@ -214,7 +216,7 @@ describe('ConnectionsService', () => {
       prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      const result = await service.update(userId, connectionId, { name: 'Renamed' });
+      const result = await service.update(orgId, userId, connectionId, { name: 'Renamed' });
 
       expect(result).toEqual(baseRow);
       expect(result).not.toHaveProperty('configEncrypted');
@@ -223,30 +225,33 @@ describe('ConnectionsService', () => {
   });
 
   describe('remove', () => {
-    it('should delete with a composite (id, userId) filter', async () => {
+    it('should delete with a composite (id, organizationId) filter', async () => {
       prisma.connection.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(userId, connectionId);
+      await service.remove(orgId, userId, connectionId);
 
       expect(prisma.connection.deleteMany).toHaveBeenCalledWith({
-        where: { id: connectionId, userId },
+        where: { id: connectionId, organizationId: orgId },
       });
     });
 
-    it('should throw NotFoundException when no row matched (wrong user or missing id)', async () => {
+    it('should throw NotFoundException when no row matched (wrong org or missing id)', async () => {
       prisma.connection.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.remove(otherUserId, connectionId)).rejects.toThrow(NotFoundException);
+      await expect(service.remove(otherOrgId, userId, connectionId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should record an audit log entry with action "connection.delete" on success', async () => {
       prisma.connection.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(userId, connectionId);
+      await service.remove(orgId, userId, connectionId);
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'connection.delete',
           resource: 'connection',
           resourceId: connectionId,
@@ -260,7 +265,7 @@ describe('ConnectionsService', () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'CFG_C', nonce: 'CFG_N' });
       prisma.connection.create.mockResolvedValue(baseRow);
 
-      await service.create(userId, {
+      await service.create(orgId, userId, {
         type: ConnectionType.API_KEY,
         provider: 'openai',
         name: 'My OpenAI',
@@ -271,6 +276,7 @@ describe('ConnectionsService', () => {
       expect(prisma.connection.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
+            organizationId: orgId,
             userId,
             type: ConnectionType.API_KEY,
             provider: 'openai',
@@ -290,7 +296,7 @@ describe('ConnectionsService', () => {
         .mockReturnValueOnce({ ciphertext: 'RT_C', nonce: 'RT_N' });
       prisma.connection.create.mockResolvedValue(baseRow);
 
-      await service.create(userId, {
+      await service.create(orgId, userId, {
         type: ConnectionType.OAUTH2,
         provider: 'google',
         name: 'My Google',
@@ -315,7 +321,7 @@ describe('ConnectionsService', () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
       prisma.connection.create.mockResolvedValue(baseRow);
 
-      await service.create(userId, {
+      await service.create(orgId, userId, {
         type: ConnectionType.API_KEY,
         provider: 'openai',
         name: 'My OpenAI',
@@ -325,6 +331,7 @@ describe('ConnectionsService', () => {
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'connection.create',
           resource: 'connection',
           resourceId: connectionId,
@@ -346,22 +353,24 @@ describe('ConnectionsService', () => {
       refreshTokenNonce: null,
     };
 
-    it('should look up the connection scoped to the caller userId (IDOR)', async () => {
+    it('should look up the connection scoped to the active organizationId (IDOR)', async () => {
       prisma.connection.findFirst.mockResolvedValue(fullRow);
       crypto.decrypt.mockReturnValue(JSON.stringify({ apiKey: 'sk-abc' }));
       mockChecker.check.mockResolvedValue({ ok: true, latencyMs: 50 });
 
-      await service.test(userId, connectionId);
+      await service.test(orgId, userId, connectionId);
 
       expect(prisma.connection.findFirst).toHaveBeenCalledWith({
-        where: { id: connectionId, userId },
+        where: { id: connectionId, organizationId: orgId },
       });
     });
 
-    it('should throw NotFoundException when the connection belongs to another user', async () => {
+    it('should throw NotFoundException when the connection belongs to another org', async () => {
       prisma.connection.findFirst.mockResolvedValue(null);
 
-      await expect(service.test(otherUserId, connectionId)).rejects.toThrow(NotFoundException);
+      await expect(service.test(otherOrgId, userId, connectionId)).rejects.toThrow(
+        NotFoundException,
+      );
       expect(mockChecker.check).not.toHaveBeenCalled();
     });
 
@@ -370,7 +379,7 @@ describe('ConnectionsService', () => {
       crypto.decrypt.mockReturnValue(JSON.stringify({ apiKey: 'sk-abc' }));
       mockChecker.check.mockResolvedValue({ ok: true, latencyMs: 100 });
 
-      await service.test(userId, connectionId);
+      await service.test(orgId, userId, connectionId);
 
       expect(healthRegistry.get).toHaveBeenCalledWith('openai');
       expect(crypto.decrypt).toHaveBeenCalledWith('CFG_C', 'CFG_N');
@@ -383,7 +392,7 @@ describe('ConnectionsService', () => {
       mockChecker.check.mockResolvedValue({ ok: true, latencyMs: 50 });
       prisma.connection.update.mockResolvedValue(fullRow);
 
-      await service.test(userId, connectionId);
+      await service.test(orgId, userId, connectionId);
 
       expect(prisma.connection.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -398,7 +407,7 @@ describe('ConnectionsService', () => {
       crypto.decrypt.mockReturnValue(JSON.stringify({ apiKey: 'sk-bad' }));
       mockChecker.check.mockResolvedValue({ ok: false, message: 'unauthorized', latencyMs: 50 });
 
-      await service.test(userId, connectionId);
+      await service.test(orgId, userId, connectionId);
 
       expect(prisma.connection.update).not.toHaveBeenCalled();
     });
@@ -408,7 +417,7 @@ describe('ConnectionsService', () => {
       crypto.decrypt.mockReturnValue(JSON.stringify({ apiKey: 'sk-bad' }));
       mockChecker.check.mockResolvedValue({ ok: false, message: 'unauthorized', latencyMs: 50 });
 
-      await service.test(userId, connectionId);
+      await service.test(orgId, userId, connectionId);
 
       const updateCalls = prisma.connection.update.mock.calls;
       for (const call of updateCalls) {
@@ -422,7 +431,7 @@ describe('ConnectionsService', () => {
       mockChecker.check.mockResolvedValue({ ok: true, latencyMs: 50 });
       audit.log.mockClear();
 
-      await service.test(userId, connectionId);
+      await service.test(orgId, userId, connectionId);
 
       expect(audit.log).not.toHaveBeenCalled();
     });
@@ -432,7 +441,7 @@ describe('ConnectionsService', () => {
       crypto.decrypt.mockReturnValue(JSON.stringify({ apiKey: 'sk-abc' }));
       mockChecker.check.mockResolvedValue({ ok: false, message: 'rate limited', latencyMs: 30 });
 
-      const result = await service.test(userId, connectionId);
+      const result = await service.test(orgId, userId, connectionId);
 
       expect(result).toEqual({ ok: false, message: 'rate limited', latencyMs: 30 });
     });

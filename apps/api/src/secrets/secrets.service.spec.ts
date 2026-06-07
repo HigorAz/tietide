@@ -20,8 +20,9 @@ describe('SecretsService', () => {
   let crypto: { encrypt: jest.Mock; decrypt: jest.Mock };
   let audit: { log: jest.Mock };
 
+  const orgId = 'org-uuid-1';
+  const otherOrgId = 'org-uuid-2';
   const userId = 'user-uuid-1';
-  const otherUserId = 'user-uuid-2';
   const secretId = 'secret-uuid-1';
 
   beforeEach(async () => {
@@ -63,20 +64,21 @@ describe('SecretsService', () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
       prisma.secret.create.mockResolvedValue(persisted);
 
-      await service.create(userId, dto);
+      await service.create(orgId, userId, dto);
 
       expect(crypto.encrypt).toHaveBeenCalledWith(dto.value);
     });
 
-    it('should persist userId, name, ciphertext as value, and nonce', async () => {
+    it('should persist organizationId, userId, name, ciphertext as value, and nonce', async () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
       prisma.secret.create.mockResolvedValue(persisted);
 
-      await service.create(userId, dto);
+      await service.create(orgId, userId, dto);
 
       expect(prisma.secret.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: {
+            organizationId: orgId,
             userId,
             name: dto.name,
             value: 'CIPHER',
@@ -86,16 +88,17 @@ describe('SecretsService', () => {
       );
     });
 
-    it('should return only { id, name, createdAt, updatedAt } — no value or nonce', async () => {
+    it('should return only { id, name, createdAt, updatedAt } — no value/nonce/org/user', async () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
       prisma.secret.create.mockResolvedValue(persisted);
 
-      const result = await service.create(userId, dto);
+      const result = await service.create(orgId, userId, dto);
 
       expect(result).toEqual(persisted);
       expect(result).not.toHaveProperty('value');
       expect(result).not.toHaveProperty('nonce');
       expect(result).not.toHaveProperty('userId');
+      expect(result).not.toHaveProperty('organizationId');
     });
 
     it('should throw ConflictException when Prisma raises P2002 (name collision)', async () => {
@@ -103,18 +106,19 @@ describe('SecretsService', () => {
       const p2002 = Object.assign(new Error('unique'), { code: 'P2002' });
       prisma.secret.create.mockRejectedValue(p2002);
 
-      await expect(service.create(userId, dto)).rejects.toThrow(ConflictException);
+      await expect(service.create(orgId, userId, dto)).rejects.toThrow(ConflictException);
     });
 
-    it('should record an audit log entry with action "secret.create" and never include the value', async () => {
+    it('should record an audit log entry (org-scoped) with action "secret.create" and no value', async () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
       prisma.secret.create.mockResolvedValue(persisted);
 
-      await service.create(userId, dto);
+      await service.create(orgId, userId, dto);
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'secret.create',
           resource: 'secret',
           resourceId: secretId,
@@ -127,13 +131,13 @@ describe('SecretsService', () => {
   });
 
   describe('list', () => {
-    it('should query Prisma scoped to the caller userId with a keyset order and peek', async () => {
+    it('should query Prisma scoped to the active organizationId with keyset order and peek', async () => {
       prisma.secret.findMany.mockResolvedValue([]);
 
-      await service.list(userId);
+      await service.list(orgId);
 
       expect(prisma.secret.findMany).toHaveBeenCalledWith({
-        where: { userId },
+        where: { organizationId: orgId },
         select: { id: true, name: true, createdAt: true, updatedAt: true },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: 51,
@@ -149,7 +153,7 @@ describe('SecretsService', () => {
       };
       prisma.secret.findMany.mockResolvedValue([row]);
 
-      const result = await service.list(userId);
+      const result = await service.list(orgId);
 
       expect(result).toEqual({ items: [row], nextCursor: null });
       result.items.forEach((r) => {
@@ -165,7 +169,7 @@ describe('SecretsService', () => {
         'utf8',
       ).toString('base64url');
 
-      await service.list(userId, { cursor });
+      await service.list(orgId, { cursor });
 
       const call = prisma.secret.findMany.mock.calls[0][0] as { where: { AND?: unknown[] } };
       expect(call.where.AND).toBeDefined();
@@ -181,14 +185,14 @@ describe('SecretsService', () => {
       updatedAt: new Date('2026-04-16T01:00:00Z'),
     };
 
-    it('should verify ownership via findFirst({ where: { id, userId } }) before updating', async () => {
+    it('should verify ownership via findFirst({ where: { id, organizationId } }) before updating', async () => {
       prisma.secret.findFirst.mockResolvedValue(existing);
       prisma.secret.update.mockResolvedValue(persisted);
 
-      await service.update(userId, secretId, { name: 'NEW_NAME' });
+      await service.update(orgId, userId, secretId, { name: 'NEW_NAME' });
 
       expect(prisma.secret.findFirst).toHaveBeenCalledWith({
-        where: { id: secretId, userId },
+        where: { id: secretId, organizationId: orgId },
         select: { id: true },
       });
     });
@@ -198,7 +202,7 @@ describe('SecretsService', () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'NEW_CIPHER', nonce: 'NEW_NONCE' });
       prisma.secret.update.mockResolvedValue(persisted);
 
-      await service.update(userId, secretId, { value: 'new-plaintext' });
+      await service.update(orgId, userId, secretId, { value: 'new-plaintext' });
 
       expect(crypto.encrypt).toHaveBeenCalledWith('new-plaintext');
       expect(prisma.secret.update).toHaveBeenCalledWith(
@@ -213,7 +217,7 @@ describe('SecretsService', () => {
       prisma.secret.findFirst.mockResolvedValue(existing);
       prisma.secret.update.mockResolvedValue(persisted);
 
-      await service.update(userId, secretId, { name: 'RENAMED' });
+      await service.update(orgId, userId, secretId, { name: 'RENAMED' });
 
       expect(crypto.encrypt).not.toHaveBeenCalled();
       const call = prisma.secret.update.mock.calls[0][0];
@@ -222,10 +226,10 @@ describe('SecretsService', () => {
       expect(call.data).toEqual({ name: 'RENAMED' });
     });
 
-    it('should throw NotFoundException when the secret belongs to another user', async () => {
+    it('should throw NotFoundException when the secret belongs to another organization', async () => {
       prisma.secret.findFirst.mockResolvedValue(null);
 
-      await expect(service.update(otherUserId, secretId, { name: 'X' })).rejects.toThrow(
+      await expect(service.update(otherOrgId, userId, secretId, { name: 'X' })).rejects.toThrow(
         NotFoundException,
       );
 
@@ -237,7 +241,7 @@ describe('SecretsService', () => {
       const p2002 = Object.assign(new Error('unique'), { code: 'P2002' });
       prisma.secret.update.mockRejectedValue(p2002);
 
-      await expect(service.update(userId, secretId, { name: 'DUP' })).rejects.toThrow(
+      await expect(service.update(orgId, userId, secretId, { name: 'DUP' })).rejects.toThrow(
         ConflictException,
       );
     });
@@ -246,7 +250,7 @@ describe('SecretsService', () => {
       prisma.secret.findFirst.mockResolvedValue(existing);
       prisma.secret.update.mockResolvedValue(persisted);
 
-      const result = await service.update(userId, secretId, { name: 'NEW_NAME' });
+      const result = await service.update(orgId, userId, secretId, { name: 'NEW_NAME' });
 
       expect(result).toEqual(persisted);
       expect(result).not.toHaveProperty('value');
@@ -258,11 +262,12 @@ describe('SecretsService', () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
       prisma.secret.update.mockResolvedValue(persisted);
 
-      await service.update(userId, secretId, { value: 'super-secret' });
+      await service.update(orgId, userId, secretId, { value: 'super-secret' });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'secret.update',
           resource: 'secret',
           resourceId: secretId,
@@ -274,30 +279,31 @@ describe('SecretsService', () => {
   });
 
   describe('remove', () => {
-    it('should delete with a composite (id, userId) filter', async () => {
+    it('should delete with a composite (id, organizationId) filter', async () => {
       prisma.secret.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(userId, secretId);
+      await service.remove(orgId, userId, secretId);
 
       expect(prisma.secret.deleteMany).toHaveBeenCalledWith({
-        where: { id: secretId, userId },
+        where: { id: secretId, organizationId: orgId },
       });
     });
 
-    it('should throw NotFoundException when no row matched (wrong user or missing id)', async () => {
+    it('should throw NotFoundException when no row matched (wrong org or missing id)', async () => {
       prisma.secret.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.remove(otherUserId, secretId)).rejects.toThrow(NotFoundException);
+      await expect(service.remove(otherOrgId, userId, secretId)).rejects.toThrow(NotFoundException);
     });
 
     it('should record an audit log entry with action "secret.delete" on success', async () => {
       prisma.secret.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(userId, secretId);
+      await service.remove(orgId, userId, secretId);
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'secret.delete',
           resource: 'secret',
           resourceId: secretId,

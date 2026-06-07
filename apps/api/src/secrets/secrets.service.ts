@@ -26,12 +26,17 @@ export class SecretsService {
     private readonly audit: AuditLogService,
   ) {}
 
-  async create(userId: string, dto: CreateSecretDto): Promise<SecretResponseDto> {
+  async create(
+    organizationId: string,
+    userId: string,
+    dto: CreateSecretDto,
+  ): Promise<SecretResponseDto> {
     const { ciphertext, nonce } = this.crypto.encrypt(dto.value);
     let row: SecretResponseDto;
     try {
       row = await this.prisma.secret.create({
         data: {
+          organizationId,
           userId,
           name: dto.name,
           value: ciphertext,
@@ -48,6 +53,7 @@ export class SecretsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'secret.create',
       resource: 'secret',
       resourceId: row.id,
@@ -57,14 +63,14 @@ export class SecretsService {
     return row;
   }
 
-  async list(userId: string, page: PageRequest = {}): Promise<Page<SecretResponseDto>> {
+  async list(organizationId: string, page: PageRequest = {}): Promise<Page<SecretResponseDto>> {
     const limit = resolveLimit(page.limit);
-    let where: Prisma.SecretWhereInput = { userId };
+    let where: Prisma.SecretWhereInput = { organizationId };
     if (page.cursor) {
       const cursor = decodeKeysetCursor(page.cursor);
       where = {
         AND: [
-          { userId },
+          { organizationId },
           keysetWhere('createdAt', 'desc', new Date(cursor.v as string), cursor.id),
         ],
       } as Prisma.SecretWhereInput;
@@ -85,9 +91,14 @@ export class SecretsService {
     );
   }
 
-  async update(userId: string, id: string, dto: UpdateSecretDto): Promise<SecretResponseDto> {
+  async update(
+    organizationId: string,
+    userId: string,
+    id: string,
+    dto: UpdateSecretDto,
+  ): Promise<SecretResponseDto> {
     const existing = await this.prisma.secret.findFirst({
-      where: { id, userId },
+      where: { id, organizationId },
       select: { id: true },
     });
     if (!existing) {
@@ -120,6 +131,7 @@ export class SecretsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'secret.update',
       resource: 'secret',
       resourceId: id,
@@ -129,9 +141,9 @@ export class SecretsService {
     return row;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
+  async remove(organizationId: string, userId: string, id: string): Promise<void> {
     const { count } = await this.prisma.secret.deleteMany({
-      where: { id, userId },
+      where: { id, organizationId },
     });
     if (count === 0) {
       throw new NotFoundException('Secret not found');
@@ -139,6 +151,7 @@ export class SecretsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'secret.delete',
       resource: 'secret',
       resourceId: id,

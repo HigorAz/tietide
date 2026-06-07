@@ -24,12 +24,12 @@ export class TagsService {
     private readonly audit: AuditLogService,
   ) {}
 
-  async create(userId: string, dto: CreateTagDto): Promise<TagResponseDto> {
+  async create(organizationId: string, userId: string, dto: CreateTagDto): Promise<TagResponseDto> {
     const color = dto.color === undefined ? null : dto.color;
     let row: TagResponseDto;
     try {
       row = await this.prisma.tag.create({
-        data: { userId, name: dto.name, color },
+        data: { organizationId, userId, name: dto.name, color },
         select: SAFE_SELECT,
       });
     } catch (err) {
@@ -41,6 +41,7 @@ export class TagsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'tag.create',
       resource: 'tag',
       resourceId: row.id,
@@ -50,13 +51,13 @@ export class TagsService {
     return row;
   }
 
-  async list(userId: string, page: PageRequest = {}): Promise<Page<TagResponseDto>> {
+  async list(organizationId: string, page: PageRequest = {}): Promise<Page<TagResponseDto>> {
     const limit = resolveLimit(page.limit);
-    let where: Prisma.TagWhereInput = { userId };
+    let where: Prisma.TagWhereInput = { organizationId };
     if (page.cursor) {
       const cursor = decodeKeysetCursor(page.cursor);
       where = {
-        AND: [{ userId }, keysetWhere('name', 'asc', String(cursor.v), cursor.id)],
+        AND: [{ organizationId }, keysetWhere('name', 'asc', String(cursor.v), cursor.id)],
       } as Prisma.TagWhereInput;
     }
 
@@ -75,9 +76,14 @@ export class TagsService {
     );
   }
 
-  async update(userId: string, id: string, dto: UpdateTagDto): Promise<TagResponseDto> {
+  async update(
+    organizationId: string,
+    userId: string,
+    id: string,
+    dto: UpdateTagDto,
+  ): Promise<TagResponseDto> {
     const existing = await this.prisma.tag.findFirst({
-      where: { id, userId },
+      where: { id, organizationId },
       select: { id: true },
     });
     if (!existing) {
@@ -104,6 +110,7 @@ export class TagsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'tag.update',
       resource: 'tag',
       resourceId: id,
@@ -113,14 +120,15 @@ export class TagsService {
     return row;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
-    const { count } = await this.prisma.tag.deleteMany({ where: { id, userId } });
+  async remove(organizationId: string, userId: string, id: string): Promise<void> {
+    const { count } = await this.prisma.tag.deleteMany({ where: { id, organizationId } });
     if (count === 0) {
       throw new NotFoundException('Tag not found');
     }
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'tag.delete',
       resource: 'tag',
       resourceId: id,

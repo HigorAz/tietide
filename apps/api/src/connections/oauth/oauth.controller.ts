@@ -20,8 +20,11 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../../common/guards/org-context.guard';
 import type { AuthenticatedUser } from '../../auth/strategies/jwt.strategy';
+import type { OrgContext } from '../../common/org-context/org-context.types';
 import { StartOAuthDto } from './dto/start-oauth.dto';
 import { OAuthCallbackDto } from './dto/oauth-callback.dto';
 import { StartOAuthResponseDto } from './dto/start-oauth-response.dto';
@@ -35,17 +38,18 @@ export class OAuthController {
   constructor(private readonly oauth: OAuthService) {}
 
   @Get('start')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, OrgContextGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Begin an OAuth2 authorization flow for a provider' })
   @ApiOkResponse({ type: StartOAuthResponseDto })
   @ApiBadRequestResponse({ description: 'Unknown provider or disallowed scope' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
   async start(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Query() dto: StartOAuthDto,
   ): Promise<StartOAuthResponseDto> {
-    const { redirectUrl, state } = await this.oauth.start(user.id, {
+    const { redirectUrl, state } = await this.oauth.start(org.id, user.id, {
       provider: dto.provider,
       scopes: dto.scopes,
       label: dto.label,

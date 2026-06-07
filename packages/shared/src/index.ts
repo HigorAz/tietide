@@ -18,6 +18,13 @@ export type {
 } from './types/execution-events.types.js';
 export type { NodeTypeDefinition } from './types/node.types.js';
 export type { Connection } from './types/connections.types.js';
+export type {
+  Organization,
+  OrganizationSummary,
+  OrganizationMember,
+  OrgMemberView,
+  OrganizationInviteView,
+} from './types/organization.types.js';
 
 // Constants
 export { Role } from './types/user.types.js';
@@ -31,6 +38,7 @@ export {
   NODE_GROUP_LABELS,
 } from './types/node.types.js';
 export { ConnectionType, ConnectionStatus, ConnectionProvider } from './types/connections.types.js';
+export { OrgRole, ORG_ROLE_RANK } from './types/organization.types.js';
 export {
   PILL_SAMPLE_KEY,
   RESERVED_CONFIG_KEYS,

@@ -14,6 +14,7 @@ describe('LibraryService', () => {
   };
   let audit: { log: jest.Mock };
 
+  const orgId = 'org-uuid-1';
   const userId = 'user-uuid-1';
 
   beforeEach(async () => {
@@ -105,12 +106,13 @@ describe('LibraryService', () => {
     });
 
     it('should create a Workflow row owned by the requesting user (AC: instantiate creates Workflow owned by caller)', async () => {
-      await service.instantiate(userId, 'cron-fetch-process');
+      await service.instantiate(orgId, userId, 'cron-fetch-process');
 
       expect(prisma.workflow.create).toHaveBeenCalledTimes(1);
       const call = prisma.workflow.create.mock.calls[0][0] as { data: Record<string, unknown> };
       expect(call.data).toEqual(
         expect.objectContaining({
+          organizationId: orgId,
           userId,
           name: 'Demo: Cron → Fetch → Archive',
           description:
@@ -123,14 +125,14 @@ describe('LibraryService', () => {
 
     it('should always default isActive to false even when the fixture is active (security)', async () => {
       // The webhook fixture has activate=true. Library instantiation must not auto-activate.
-      await service.instantiate(userId, 'webhook-conditional-notification');
+      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
 
       const call = prisma.workflow.create.mock.calls[0][0] as { data: { isActive: boolean } };
       expect(call.data.isActive).toBe(false);
     });
 
     it('should provision a Webhook row when the fixture has webhook config', async () => {
-      await service.instantiate(userId, 'webhook-conditional-notification');
+      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
 
       expect(prisma.webhook.create).toHaveBeenCalledTimes(1);
       const call = prisma.webhook.create.mock.calls[0][0] as { data: Record<string, unknown> };
@@ -149,24 +151,25 @@ describe('LibraryService', () => {
     });
 
     it('should NOT create a Webhook row when the fixture has no webhook config', async () => {
-      await service.instantiate(userId, 'cron-fetch-process');
+      await service.instantiate(orgId, userId, 'cron-fetch-process');
 
       expect(prisma.webhook.create).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException for an unknown slug (AC: 404 for unknown slug)', async () => {
-      await expect(service.instantiate(userId, 'no-such-template')).rejects.toThrow(
+      await expect(service.instantiate(orgId, userId, 'no-such-template')).rejects.toThrow(
         NotFoundException,
       );
       expect(prisma.workflow.create).not.toHaveBeenCalled();
     });
 
     it('should record an audit log entry with action "library.instantiate" and the slug', async () => {
-      await service.instantiate(userId, 'cron-fetch-process');
+      await service.instantiate(orgId, userId, 'cron-fetch-process');
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'library.instantiate',
           resource: 'workflow',
           resourceId: persistedWorkflow.id,
@@ -180,8 +183,8 @@ describe('LibraryService', () => {
         .mockResolvedValueOnce({ ...persistedWorkflow, id: 'first' })
         .mockResolvedValueOnce({ ...persistedWorkflow, id: 'second' });
 
-      const a = await service.instantiate(userId, 'cron-fetch-process');
-      const b = await service.instantiate(userId, 'cron-fetch-process');
+      const a = await service.instantiate(orgId, userId, 'cron-fetch-process');
+      const b = await service.instantiate(orgId, userId, 'cron-fetch-process');
 
       expect(prisma.workflow.create).toHaveBeenCalledTimes(2);
       expect(a.id).toBe('first');
@@ -189,8 +192,8 @@ describe('LibraryService', () => {
     });
 
     it('should give each webhook instantiation a unique path so concurrent instantiations never collide', async () => {
-      await service.instantiate(userId, 'webhook-conditional-notification');
-      await service.instantiate(userId, 'webhook-conditional-notification');
+      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
+      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
 
       expect(prisma.webhook.create).toHaveBeenCalledTimes(2);
       const paths = prisma.webhook.create.mock.calls.map(
@@ -200,7 +203,7 @@ describe('LibraryService', () => {
     });
 
     it('should return the created workflow shape (no userId leak)', async () => {
-      const result = await service.instantiate(userId, 'cron-fetch-process');
+      const result = await service.instantiate(orgId, userId, 'cron-fetch-process');
 
       expect(result).toEqual(
         expect.objectContaining({

@@ -24,20 +24,25 @@ export class FoldersService {
     private readonly audit: AuditLogService,
   ) {}
 
-  async create(userId: string, dto: CreateFolderDto): Promise<FolderResponseDto> {
+  async create(
+    organizationId: string,
+    userId: string,
+    dto: CreateFolderDto,
+  ): Promise<FolderResponseDto> {
     const parentFolderId = dto.parentFolderId ?? null;
 
     if (parentFolderId !== null) {
-      await this.assertFolderOwnedByUser(userId, parentFolderId);
+      await this.assertFolderInOrg(organizationId, parentFolderId);
     }
 
     const row = await this.prisma.folder.create({
-      data: { userId, name: dto.name, parentFolderId },
+      data: { organizationId, userId, name: dto.name, parentFolderId },
       select: SAFE_SELECT,
     });
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'folder.create',
       resource: 'folder',
       resourceId: row.id,
@@ -47,16 +52,16 @@ export class FoldersService {
     return row;
   }
 
-  async list(userId: string, page: PageRequest = {}): Promise<Page<FolderResponseDto>> {
+  async list(organizationId: string, page: PageRequest = {}): Promise<Page<FolderResponseDto>> {
     const limit = resolveLimit(page.limit);
     // Keyset on (name asc, id asc). The tree is reconstructed client-side from
     // parentFolderId, so a global name order still presents each parent's
     // children in name order while giving a strict, cursorable total order.
-    let where: Prisma.FolderWhereInput = { userId };
+    let where: Prisma.FolderWhereInput = { organizationId };
     if (page.cursor) {
       const cursor = decodeKeysetCursor(page.cursor);
       where = {
-        AND: [{ userId }, keysetWhere('name', 'asc', String(cursor.v), cursor.id)],
+        AND: [{ organizationId }, keysetWhere('name', 'asc', String(cursor.v), cursor.id)],
       } as Prisma.FolderWhereInput;
     }
 
@@ -75,9 +80,14 @@ export class FoldersService {
     );
   }
 
-  async update(userId: string, id: string, dto: UpdateFolderDto): Promise<FolderResponseDto> {
+  async update(
+    organizationId: string,
+    userId: string,
+    id: string,
+    dto: UpdateFolderDto,
+  ): Promise<FolderResponseDto> {
     const existing = await this.prisma.folder.findFirst({
-      where: { id, userId },
+      where: { id, organizationId },
       select: { id: true, parentFolderId: true },
     });
     if (!existing) {
@@ -88,8 +98,8 @@ export class FoldersService {
       if (dto.parentFolderId === id) {
         throw new BadRequestException('Cannot move a folder into itself');
       }
-      await this.assertFolderOwnedByUser(userId, dto.parentFolderId);
-      if (await this.wouldCreateCycle(userId, id, dto.parentFolderId)) {
+      await this.assertFolderInOrg(organizationId, dto.parentFolderId);
+      if (await this.wouldCreateCycle(organizationId, id, dto.parentFolderId)) {
         throw new BadRequestException('Cannot move a folder into its own descendant');
       }
     }
@@ -106,6 +116,7 @@ export class FoldersService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'folder.update',
       resource: 'folder',
       resourceId: id,
@@ -115,20 +126,20 @@ export class FoldersService {
     return row;
   }
 
-  async remove(userId: string, id: string): Promise<DeleteFolderResultDto> {
+  async remove(organizationId: string, userId: string, id: string): Promise<DeleteFolderResultDto> {
     const existing = await this.prisma.folder.findFirst({
-      where: { id, userId },
+      where: { id, organizationId },
       select: { id: true },
     });
     if (!existing) {
       throw new NotFoundException('Folder not found');
     }
 
-    const descendants = await this.collectDescendantIds(userId, id);
+    const descendants = await this.collectDescendantIds(organizationId, id);
     const allIds = [id, ...descendants];
 
     const deletedWorkflows = await this.prisma.workflow.count({
-      where: { userId, folderId: { in: allIds } },
+      where: { organizationId, folderId: { in: allIds } },
     });
 
     // Postgres FK cascades remove descendant folders + their workflows.
@@ -141,6 +152,7 @@ export class FoldersService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'folder.delete',
       resource: 'folder',
       resourceId: id,
@@ -150,9 +162,9 @@ export class FoldersService {
     return result;
   }
 
-  private async assertFolderOwnedByUser(userId: string, folderId: string): Promise<void> {
+  private async assertFolderInOrg(organizationId: string, folderId: string): Promise<void> {
     const owned = await this.prisma.folder.findFirst({
-      where: { id: folderId, userId },
+      where: { id: folderId, organizationId },
       select: { id: true },
     });
     if (!owned) {
@@ -161,7 +173,7 @@ export class FoldersService {
   }
 
   private async wouldCreateCycle(
-    userId: string,
+    organizationId: string,
     folderId: string,
     newParentId: string,
   ): Promise<boolean> {
@@ -172,7 +184,7 @@ export class FoldersService {
       if (visited.has(cursor)) return false;
       visited.add(cursor);
       const parent: { parentFolderId: string | null } | null = await this.prisma.folder.findFirst({
-        where: { id: cursor, userId },
+        where: { id: cursor, organizationId },
         select: { parentFolderId: true },
       });
       cursor = parent?.parentFolderId ?? null;
@@ -180,13 +192,13 @@ export class FoldersService {
     return false;
   }
 
-  private async collectDescendantIds(userId: string, rootId: string): Promise<string[]> {
+  private async collectDescendantIds(organizationId: string, rootId: string): Promise<string[]> {
     const result: string[] = [];
     const queue: string[] = [rootId];
     while (queue.length > 0) {
       const current = queue.shift() as string;
       const children: { id: string }[] = await this.prisma.folder.findMany({
-        where: { userId, parentFolderId: current },
+        where: { organizationId, parentFolderId: current },
         select: { id: true },
       });
       for (const child of children) {

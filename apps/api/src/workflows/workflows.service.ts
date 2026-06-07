@@ -99,12 +99,17 @@ export class WorkflowsService {
     private readonly activation: ActivationService,
   ) {}
 
-  async create(userId: string, dto: CreateWorkflowDto): Promise<WorkflowResponseDto> {
+  async create(
+    organizationId: string,
+    userId: string,
+    dto: CreateWorkflowDto,
+  ): Promise<WorkflowResponseDto> {
     assertExecutableDefinition(dto.definition);
 
     const row = await this.prisma.$transaction(async (tx) => {
       const created = await tx.workflow.create({
         data: {
+          organizationId,
           userId,
           name: dto.name,
           description: dto.description ?? null,
@@ -128,6 +133,7 @@ export class WorkflowsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'workflow.create',
       resource: 'workflow',
       resourceId: row.id,
@@ -137,8 +143,11 @@ export class WorkflowsService {
     return this.toResponse(row);
   }
 
-  async list(userId: string, filter: WorkflowListFilter = {}): Promise<Page<WorkflowListItemDto>> {
-    const baseWhere: Prisma.WorkflowWhereInput = { userId };
+  async list(
+    organizationId: string,
+    filter: WorkflowListFilter = {},
+  ): Promise<Page<WorkflowListItemDto>> {
+    const baseWhere: Prisma.WorkflowWhereInput = { organizationId };
     if (filter.folderId !== undefined) {
       baseWhere.folderId = filter.folderId;
     }
@@ -182,24 +191,29 @@ export class WorkflowsService {
     );
   }
 
-  async findOne(userId: string, id: string): Promise<WorkflowResponseDto> {
+  async findOne(organizationId: string, id: string): Promise<WorkflowResponseDto> {
     const row = await this.prisma.workflow.findUnique({
       where: { id },
-      select: { ...SAFE_SELECT, userId: true },
+      select: { ...SAFE_SELECT, organizationId: true },
     });
 
     if (!row) {
       throw new NotFoundException('Workflow not found');
     }
-    if (row.userId !== userId) {
+    if (row.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
-    const { userId: _ownerId, ...rest } = row;
+    const { organizationId: _ownerOrg, ...rest } = row;
     return this.toResponse(rest);
   }
 
-  async update(userId: string, id: string, dto: UpdateWorkflowDto): Promise<WorkflowResponseDto> {
+  async update(
+    organizationId: string,
+    userId: string,
+    id: string,
+    dto: UpdateWorkflowDto,
+  ): Promise<WorkflowResponseDto> {
     const hasAnyField =
       dto.name !== undefined ||
       dto.description !== undefined ||
@@ -220,21 +234,21 @@ export class WorkflowsService {
 
     const existing = await this.prisma.workflow.findUnique({
       where: { id },
-      select: { userId: true, isActive: true, definition: true },
+      select: { organizationId: true, isActive: true, definition: true },
     });
     if (!existing) {
       throw new NotFoundException('Workflow not found');
     }
-    if (existing.userId !== userId) {
+    if (existing.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
     if (dto.folderId !== undefined && dto.folderId !== null) {
-      await this.assertFolderOwnedByUser(userId, dto.folderId);
+      await this.assertFolderInOrg(organizationId, dto.folderId);
     }
 
     if (dto.tagIds !== undefined && dto.tagIds.length > 0) {
-      await this.assertTagsOwnedByUser(userId, dto.tagIds);
+      await this.assertTagsInOrg(organizationId, dto.tagIds);
     }
 
     const willActivate = dto.isActive === true && existing.isActive === false;
@@ -334,6 +348,7 @@ export class WorkflowsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'workflow.update',
       resource: 'workflow',
       resourceId: id,
@@ -343,15 +358,15 @@ export class WorkflowsService {
     return this.toResponse(row);
   }
 
-  async remove(userId: string, id: string): Promise<void> {
+  async remove(organizationId: string, userId: string, id: string): Promise<void> {
     const existing = await this.prisma.workflow.findUnique({
       where: { id },
-      select: { userId: true, isActive: true, definition: true },
+      select: { organizationId: true, isActive: true, definition: true },
     });
     if (!existing) {
       throw new NotFoundException('Workflow not found');
     }
-    if (existing.userId !== userId) {
+    if (existing.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
@@ -363,19 +378,20 @@ export class WorkflowsService {
       });
     }
 
-    await this.prisma.workflow.deleteMany({ where: { id, userId } });
+    await this.prisma.workflow.deleteMany({ where: { id, organizationId } });
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'workflow.delete',
       resource: 'workflow',
       resourceId: id,
     });
   }
 
-  private async assertFolderOwnedByUser(userId: string, folderId: string): Promise<void> {
+  private async assertFolderInOrg(organizationId: string, folderId: string): Promise<void> {
     const owned = await this.prisma.folder.findFirst({
-      where: { id: folderId, userId },
+      where: { id: folderId, organizationId },
       select: { id: true },
     });
     if (!owned) {
@@ -383,9 +399,9 @@ export class WorkflowsService {
     }
   }
 
-  private async assertTagsOwnedByUser(userId: string, tagIds: string[]): Promise<void> {
+  private async assertTagsInOrg(organizationId: string, tagIds: string[]): Promise<void> {
     const owned = await this.prisma.tag.findMany({
-      where: { id: { in: tagIds }, userId },
+      where: { id: { in: tagIds }, organizationId },
       select: { id: true },
     });
     if (owned.length !== tagIds.length) {

@@ -22,7 +22,8 @@ const SAFE_SELECT = {
 
 interface ScopeContext {
   scope: EnvVarScope;
-  ownerUserId: string | null;
+  // The owning workspace for USER-scope vars; null for GLOBAL platform vars.
+  organizationId: string | null;
   actorUserId: string;
 }
 
@@ -41,7 +42,7 @@ interface RemoveInput extends ScopeContext {
 
 interface ListInput {
   scope: EnvVarScope;
-  ownerUserId: string | null;
+  organizationId: string | null;
   limit?: number;
   cursor?: string;
 }
@@ -55,7 +56,7 @@ export class EnvVarsService {
   ) {}
 
   async create(input: CreateInput): Promise<EnvVarResponseDto> {
-    const { scope, ownerUserId, actorUserId, dto } = input;
+    const { scope, organizationId, actorUserId, dto } = input;
     const { ciphertext, nonce } = this.crypto.encrypt(dto.value);
 
     let row: EnvVarResponseDto;
@@ -63,7 +64,10 @@ export class EnvVarsService {
       row = (await this.prisma.environmentVariable.create({
         data: {
           scope,
-          userId: ownerUserId,
+          // GLOBAL vars belong to no workspace/user; USER vars are workspace-shared
+          // and record their creator.
+          organizationId,
+          userId: scope === 'USER' ? actorUserId : null,
           key: dto.key,
           valueEnc: ciphertext,
           valueNonce: nonce,
@@ -79,6 +83,7 @@ export class EnvVarsService {
 
     await this.audit.log({
       userId: actorUserId,
+      organizationId: organizationId ?? undefined,
       action: 'env-var.create',
       resource: 'env-var',
       resourceId: row.id,
@@ -90,7 +95,7 @@ export class EnvVarsService {
 
   async list(input: ListInput): Promise<Page<EnvVarResponseDto>> {
     const limit = resolveLimit(input.limit);
-    const baseWhere = { scope: input.scope, userId: input.ownerUserId };
+    const baseWhere = { scope: input.scope, organizationId: input.organizationId };
     let where: Prisma.EnvironmentVariableWhereInput = baseWhere;
     if (input.cursor) {
       const cursor = decodeKeysetCursor(input.cursor);
@@ -115,10 +120,10 @@ export class EnvVarsService {
   }
 
   async update(input: UpdateInput): Promise<EnvVarResponseDto> {
-    const { scope, ownerUserId, actorUserId, id, dto } = input;
+    const { scope, organizationId, actorUserId, id, dto } = input;
 
     const existing = await this.prisma.environmentVariable.findFirst({
-      where: { id, scope, userId: ownerUserId },
+      where: { id, scope, organizationId },
       select: { id: true },
     });
     if (!existing) {
@@ -151,6 +156,7 @@ export class EnvVarsService {
 
     await this.audit.log({
       userId: actorUserId,
+      organizationId: organizationId ?? undefined,
       action: 'env-var.update',
       resource: 'env-var',
       resourceId: id,
@@ -161,10 +167,10 @@ export class EnvVarsService {
   }
 
   async remove(input: RemoveInput): Promise<void> {
-    const { scope, ownerUserId, actorUserId, id } = input;
+    const { scope, organizationId, actorUserId, id } = input;
 
     const { count } = await this.prisma.environmentVariable.deleteMany({
-      where: { id, scope, userId: ownerUserId },
+      where: { id, scope, organizationId },
     });
     if (count === 0) {
       throw new NotFoundException('Env var not found');
@@ -172,6 +178,7 @@ export class EnvVarsService {
 
     await this.audit.log({
       userId: actorUserId,
+      organizationId: organizationId ?? undefined,
       action: 'env-var.delete',
       resource: 'env-var',
       resourceId: id,

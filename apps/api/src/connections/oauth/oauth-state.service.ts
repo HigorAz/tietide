@@ -6,6 +6,8 @@ const OAUTH_STATE_TTL = '10m';
 
 export interface OAuthStatePayload {
   userId: string;
+  // The workspace the flow was started in; the resulting connection is created here.
+  organizationId: string;
   provider: string;
   scopes: string[];
   label: string;
@@ -34,6 +36,7 @@ export class OAuthStateService {
     }
 
     const userId = decoded.userId;
+    const organizationId = decoded.organizationId;
     const provider = decoded.provider;
     const scopes = decoded.scopes;
     const label = decoded.label;
@@ -41,6 +44,7 @@ export class OAuthStateService {
 
     if (
       typeof userId !== 'string' ||
+      typeof organizationId !== 'string' ||
       typeof provider !== 'string' ||
       !Array.isArray(scopes) ||
       !scopes.every((s): s is string => typeof s === 'string') ||
@@ -50,6 +54,6 @@ export class OAuthStateService {
       throw new UnauthorizedException('Invalid OAuth state payload');
     }
 
-    return { userId, provider, scopes, label, nonce };
+    return { userId, organizationId, provider, scopes, label, nonce };
   }
 }

@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { ConnectionStatus, ConnectionType } from '@tietide/shared';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { ConnectionsController } from './connections.controller';
 import { ConnectionsService } from './connections.service';
 
@@ -43,6 +44,14 @@ describe('ConnectionsController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
           return true;
         },
       })
@@ -97,7 +106,7 @@ describe('ConnectionsController (integration)', () => {
         expect(row).not.toHaveProperty('refreshTokenEncrypted');
         expect(row).not.toHaveProperty('refreshTokenNonce');
       }
-      expect(connectionsService.list).toHaveBeenCalledWith('owner-uuid', {});
+      expect(connectionsService.list).toHaveBeenCalledWith('org-uuid', {});
     });
   });
 
@@ -110,7 +119,7 @@ describe('ConnectionsController (integration)', () => {
       expect(res.body).toEqual(persisted);
       expect(res.body).not.toHaveProperty('configEncrypted');
       expect(res.body).not.toHaveProperty('refreshTokenEncrypted');
-      expect(connectionsService.findOne).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(connectionsService.findOne).toHaveBeenCalledWith('org-uuid', uuid);
     });
 
     it('should return 404 when the connection belongs to another user', async () => {
@@ -137,7 +146,7 @@ describe('ConnectionsController (integration)', () => {
 
       expect(res.body).toEqual(persisted);
       expect(res.body).not.toHaveProperty('configEncrypted');
-      expect(connectionsService.update).toHaveBeenCalledWith('owner-uuid', uuid, {
+      expect(connectionsService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
         name: 'Renamed',
         status: ConnectionStatus.REVOKED,
       });
@@ -221,7 +230,7 @@ describe('ConnectionsController (integration)', () => {
       expect(res.body).not.toHaveProperty('configNonce');
       expect(res.body).not.toHaveProperty('refreshTokenEncrypted');
       expect(res.body).not.toHaveProperty('refreshTokenNonce');
-      expect(connectionsService.create).toHaveBeenCalledWith('owner-uuid', {
+      expect(connectionsService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', {
         type: ConnectionType.API_KEY,
         provider: 'openai',
         name: 'My OpenAI',
@@ -251,6 +260,7 @@ describe('ConnectionsController (integration)', () => {
       await request(app.getHttpServer()).post('/connections').send(discordBotBody).expect(201);
 
       expect(connectionsService.create).toHaveBeenCalledWith(
+        'org-uuid',
         'owner-uuid',
         expect.objectContaining({ type: ConnectionType.CUSTOM, provider: 'discord-bot' }),
       );
@@ -319,6 +329,7 @@ describe('ConnectionsController (integration)', () => {
         .expect(201);
 
       expect(connectionsService.create).toHaveBeenCalledWith(
+        'org-uuid',
         'owner-uuid',
         expect.objectContaining({
           config: { apiKey: 'sk-abc', organization: 'org-1' },
@@ -362,7 +373,7 @@ describe('ConnectionsController (integration)', () => {
       const res = await request(app.getHttpServer()).post(`/connections/${uuid}/test`).expect(200);
 
       expect(res.body).toEqual({ ok: true, latencyMs: 142 });
-      expect(connectionsService.test).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(connectionsService.test).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid);
     });
 
     it('should return 200 with { ok: false, message, latencyMs } on failed health check', async () => {
@@ -396,7 +407,7 @@ describe('ConnectionsController (integration)', () => {
 
       await request(app.getHttpServer()).delete(`/connections/${uuid}`).expect(204);
 
-      expect(connectionsService.remove).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(connectionsService.remove).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid);
     });
 
     it('should return 404 when the connection belongs to another user (ownership filter)', async () => {
