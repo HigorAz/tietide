@@ -33,6 +33,16 @@ services:
       - '11434:11434'
     volumes:
       - ollama_data:/root/.ollama
+    # Offload inference to an NVIDIA GPU when one is present (needs the NVIDIA
+    # Container Toolkit on the host). Falls back to CPU automatically if absent.
+    # Cuts llama3.1:8b docs generation from minutes (CPU) to seconds (GPU).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     # The ollama image ships neither curl nor wget, so a curl-based check is
     # permanently "unhealthy" — which blocks dependents (the ai service) from
     # starting. `ollama list` hits the local server via the bundled CLI.
