@@ -9,6 +9,7 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import type { ForgotPasswordDto } from './dto/forgot-password.dto';
 import type { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto';
 import type { LoginDto } from './dto/login.dto';
@@ -59,6 +60,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly mailer: MailerService,
+    private readonly organizations: OrganizationsService,
   ) {}
 
   async register(dto: RegisterDto): Promise<RegisterResponseDto> {
@@ -89,6 +91,9 @@ export class AuthService {
         data: { email: dto.email, name: dto.name, password: passwordHash },
         select: { id: true },
       });
+      // Provision a personal workspace so the new user has an org to land in once
+      // verified — without it, every org-scoped request would 403 (no org context).
+      await this.organizations.create(user.id, { name: `${dto.name}'s Workspace` });
       await this.issueVerificationToken(user.id, dto.email);
     } catch (err) {
       // Lost a concurrent create race for the same email — treat it exactly like
