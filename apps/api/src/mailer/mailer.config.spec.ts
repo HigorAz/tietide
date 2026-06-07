@@ -1,6 +1,7 @@
 import {
   DEFAULT_APP_URL,
   DEFAULT_MAIL_FROM,
+  buildInviteUrl,
   buildPasswordResetUrl,
   buildVerificationUrl,
   resolveMailConfig,
@@ -85,6 +86,20 @@ describe('mailer.config', () => {
     it('does not double a trailing slash on the base url', () => {
       expect(buildPasswordResetUrl('https://app.tietide.com/', 'tok')).toBe(
         'https://app.tietide.com/reset-password?token=tok',
+      );
+    });
+  });
+
+  describe('buildInviteUrl', () => {
+    it('builds an /organizations/accept-invite URL with the token query-encoded', () => {
+      expect(buildInviteUrl('https://app.tietide.com', 'abc+/=')).toBe(
+        'https://app.tietide.com/organizations/accept-invite?token=abc%2B%2F%3D',
+      );
+    });
+
+    it('does not double a trailing slash on the base url', () => {
+      expect(buildInviteUrl('https://app.tietide.com/', 'tok')).toBe(
+        'https://app.tietide.com/organizations/accept-invite?token=tok',
       );
     });
   });
