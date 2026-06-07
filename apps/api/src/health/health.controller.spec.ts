@@ -6,10 +6,10 @@ import { HealthService } from './health.service';
 
 describe('HealthController', () => {
   let controller: HealthController;
-  let healthService: { check: jest.Mock };
+  let healthService: { check: jest.Mock; getDeployedCommit: jest.Mock };
 
   beforeEach(async () => {
-    healthService = { check: jest.fn() };
+    healthService = { check: jest.fn(), getDeployedCommit: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [HealthController],
@@ -69,9 +69,19 @@ describe('HealthController', () => {
   });
 
   it('liveness should always return ok regardless of dependencies', () => {
+    healthService.getDeployedCommit.mockReturnValue('unknown');
+
     const result = controller.live();
 
     expect(result.status).toBe('ok');
     expect(result.timestamp).toBeDefined();
+  });
+
+  it('liveness should report the deployed commit', () => {
+    healthService.getDeployedCommit.mockReturnValue('abc123def456');
+
+    const result = controller.live();
+
+    expect(result.commit).toBe('abc123def456');
   });
 });

@@ -20,9 +20,13 @@ export class HealthController {
   }
 
   @Get('live')
-  @ApiOperation({ summary: 'Liveness probe (process is up)' })
+  @ApiOperation({ summary: 'Liveness probe (process is up) + deployed commit' })
   @ApiResponse({ status: 200, description: 'Process is alive' })
-  live(): { status: 'ok'; timestamp: string } {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+  live(): { status: 'ok'; commit: string; timestamp: string } {
+    return {
+      status: 'ok',
+      commit: this.health.getDeployedCommit(),
+      timestamp: new Date().toISOString(),
+    };
   }
 }
