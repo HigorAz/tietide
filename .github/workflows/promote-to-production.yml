@@ -1,9 +1,15 @@
 name: Promote main to Production
 
 # Manual one-click promotion. Click "Run workflow" on the Actions tab to fast-forward
-# the Production branch to whatever's currently on main. The WSL deploy timer
-# (see docs/guides/continuous-deployment.md) picks up the change within ~5 minutes
-# and runs git pull + conditional pnpm install / prisma migrate / shared rebuild.
+# the Production branch to whatever's currently on main, then WAIT until the WSL prod
+# box is confirmed serving the promoted commit.
+#
+# How the wait works: WSL has no inbound path (it's public only via the Cloudflare
+# tunnel at tietide.com). The deploy timer there (see docs/guides/continuous-deployment.md)
+# polls Production every ~5 min and runs git pull + conditional rebuild/restart, then
+# writes the now-serving SHA to a marker file the API exposes on /v1/health/live. This
+# workflow polls that endpoint until it reports the promoted SHA, so the run only goes
+# green once prod has actually updated — and fails loudly if it never does.
 #
 # Designed as a safety gate: nothing happens automatically on push to main. You
 # explicitly trigger this when main is ready to go live.
@@ -19,6 +25,8 @@ jobs:
   promote:
     name: Fast-forward Production from main
     runs-on: ubuntu-latest
+    # Backstop in case the deploy-wait poll loop's own timeout ever fails to fire.
+    timeout-minutes: 25
     permissions:
       contents: write
 
@@ -36,6 +44,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Fast-forward to origin/main
+        id: ff
         run: |
           git fetch origin main
 
@@ -44,6 +53,8 @@ jobs:
 
           if [ "$OLD" = "$MAIN" ]; then
             echo "✓ Production is already at $MAIN — nothing to promote."
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            echo "sha=$MAIN" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -59,6 +70,45 @@ jobs:
           NEW=$(git rev-parse HEAD)
           echo ""
           echo "✓ Promoted Production: $OLD → $NEW"
+          echo "promoted=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for WSL production deploy
+        # Skip when there was nothing new to promote — no deploy to wait for.
+        if: ${{ steps.ff.outputs.promoted == 'true' }}
+        env:
+          EXPECTED_SHA: ${{ steps.ff.outputs.sha }}
+          HEALTH_URL: https://tietide.com/v1/health/live
+          # Worst case ~5 min poll latency + rebuild + restart. 20 min is generous.
+          TIMEOUT_SECONDS: '1200'
+          POLL_INTERVAL: '20'
+        run: |
+          echo "Waiting for $HEALTH_URL to report commit $EXPECTED_SHA"
+          echo "(WSL polls Production every ~5 min, then rebuilds + restarts.)"
+          deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
+          last="(none)"
+          while :; do
+            # A failed/empty curl during the brief restart window is expected — just retry.
+            body=$(curl -fsS -m 10 "$HEALTH_URL" 2>/dev/null || echo '{}')
+            current=$(printf '%s' "$body" | jq -r '.commit // empty')
+            [ -n "$current" ] && last="$current"
+
+            if [ "$current" = "$EXPECTED_SHA" ]; then
+              echo "✓ Production is live on $EXPECTED_SHA"
+              exit 0
+            fi
+
+            now=$(date +%s)
+            if [ "$now" -ge "$deadline" ]; then
+              echo "✗ Timed out after ${TIMEOUT_SECONDS}s waiting for prod to report $EXPECTED_SHA."
+              echo "  Last reported commit: $last"
+              echo "  Check the WSL deploy timer: journalctl -u tietide-deploy.service"
+              exit 1
+            fi
+
+            echo "  prod on '${current:-unreachable}' — retrying in ${POLL_INTERVAL}s ($((deadline - now))s left)"
+            sleep "$POLL_INTERVAL"
+          done
 
       - name: Summary
         if: ${{ always() }}
@@ -69,4 +119,11 @@ jobs:
           echo "- **Reason:** ${{ inputs.reason || '(not provided)' }}" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Production now at:** $(git rev-parse --short HEAD)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "The WSL deploy timer will pull this change within ~5 minutes." >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.ff.outputs.promoted }}" != "true" ]; then
+            echo "Nothing to promote — Production was already up to date." >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ job.status }}" = "success" ]; then
+            echo "✅ WSL production confirmed live on this commit." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "⚠️ Promoted, but WSL production was **not** confirmed live (deploy wait failed or timed out)." >> "$GITHUB_STEP_SUMMARY"
+            echo "Check the WSL deploy timer: \`journalctl -u tietide-deploy.service\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
