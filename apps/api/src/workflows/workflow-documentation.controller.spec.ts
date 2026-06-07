@@ -2,7 +2,6 @@ import type { ExecutionContext, INestApplication } from '@nestjs/common';
 import {
   ForbiddenException,
   NotFoundException,
-  ServiceUnavailableException,
   UnauthorizedException,
   ValidationPipe,
 } from '@nestjs/common';
@@ -19,7 +18,7 @@ describe('WorkflowDocumentationController (integration)', () => {
   let app: INestApplication;
   let docs: {
     findExisting: jest.Mock;
-    regenerate: jest.Mock;
+    startRegeneration: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
 
@@ -50,7 +49,7 @@ describe('WorkflowDocumentationController (integration)', () => {
   beforeEach(async () => {
     docs = {
       findExisting: jest.fn(),
-      regenerate: jest.fn(),
+      startRegeneration: jest.fn(),
     };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
 
@@ -180,20 +179,15 @@ describe('WorkflowDocumentationController (integration)', () => {
   });
 
   describe('POST /workflows/:id/documentation/regenerate', () => {
-    it('should return 200 with the freshly generated body and no cached field', async () => {
-      docs.regenerate.mockResolvedValue(result);
+    it('should return 202 with a pending body and kick off generation', async () => {
+      docs.startRegeneration.mockResolvedValue({ workflowId: uuid, status: 'pending' });
 
       const res = await request(app.getHttpServer())
         .post(`/workflows/${uuid}/documentation/regenerate`)
-        .expect(200);
+        .expect(202);
 
-      expect(docs.regenerate).toHaveBeenCalledWith('owner-uuid', uuid);
-      expect(res.body).toMatchObject({
-        workflowId: uuid,
-        version: 3,
-        documentation: '# Demo\nGenerated text',
-      });
-      expect(res.body).not.toHaveProperty('cached');
+      expect(docs.startRegeneration).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(res.body).toEqual({ workflowId: uuid, status: 'pending' });
     });
 
     it('should return 401 when the guard rejects', async () => {
@@ -202,18 +196,18 @@ describe('WorkflowDocumentationController (integration)', () => {
       await request(app.getHttpServer())
         .post(`/workflows/${uuid}/documentation/regenerate`)
         .expect(401);
-      expect(docs.regenerate).not.toHaveBeenCalled();
+      expect(docs.startRegeneration).not.toHaveBeenCalled();
     });
 
     it('should return 400 when id is not a UUID', async () => {
       await request(app.getHttpServer())
         .post('/workflows/not-a-uuid/documentation/regenerate')
         .expect(400);
-      expect(docs.regenerate).not.toHaveBeenCalled();
+      expect(docs.startRegeneration).not.toHaveBeenCalled();
     });
 
     it('should return 404 when service throws NotFoundException', async () => {
-      docs.regenerate.mockRejectedValue(new NotFoundException('Workflow not found'));
+      docs.startRegeneration.mockRejectedValue(new NotFoundException('Workflow not found'));
 
       await request(app.getHttpServer())
         .post(`/workflows/${uuid}/documentation/regenerate`)
@@ -221,20 +215,11 @@ describe('WorkflowDocumentationController (integration)', () => {
     });
 
     it('should return 403 when service throws ForbiddenException', async () => {
-      docs.regenerate.mockRejectedValue(new ForbiddenException('No access'));
+      docs.startRegeneration.mockRejectedValue(new ForbiddenException('No access'));
 
       await request(app.getHttpServer())
         .post(`/workflows/${uuid}/documentation/regenerate`)
         .expect(403);
-    });
-
-    it('should return 503 when AI service is unavailable', async () => {
-      docs.regenerate.mockRejectedValue(new ServiceUnavailableException('AI service unavailable'));
-
-      const res = await request(app.getHttpServer())
-        .post(`/workflows/${uuid}/documentation/regenerate`)
-        .expect(503);
-      expect(res.body.message ?? res.body.error).toBeDefined();
     });
   });
 

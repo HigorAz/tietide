@@ -20,6 +20,11 @@ export interface WorkflowDocumentationResult {
   generatedAt: Date;
 }
 
+export interface DocumentationRegenerationStarted {
+  workflowId: string;
+  status: 'pending';
+}
+
 interface AuthorizedWorkflow {
   id: string;
   userId: string;
@@ -31,6 +36,11 @@ interface AuthorizedWorkflow {
 @Injectable()
 export class WorkflowDocumentationService {
   private readonly logger = new Logger(WorkflowDocumentationService.name);
+  // Workflows whose documentation is generating right now. Generation runs in
+  // the background (it can take minutes on a CPU-only Ollama, longer than the
+  // Cloudflare edge timeout), so we guard against duplicate concurrent runs for
+  // the same workflow while a client polls GET /documentation for the result.
+  private readonly inFlight = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -56,9 +66,35 @@ export class WorkflowDocumentationService {
     };
   }
 
-  async regenerate(userId: string, workflowId: string): Promise<WorkflowDocumentationResult> {
+  /**
+   * Kick off documentation generation in the background and return immediately.
+   * Ownership/existence are validated synchronously (so the caller still gets a
+   * 404/403 right away); the slow AI call then runs detached and upserts the row
+   * on completion. Clients poll GET /documentation for the result — this avoids
+   * holding an HTTP request open past the Cloudflare 524 (~100s) edge timeout.
+   */
+  async startRegeneration(
+    userId: string,
+    workflowId: string,
+  ): Promise<DocumentationRegenerationStarted> {
     const workflow = await this.loadAuthorizedWorkflow(userId, workflowId);
-    return this.runAiAndUpsert(workflow);
+
+    if (!this.inFlight.has(workflowId)) {
+      this.inFlight.add(workflowId);
+      void this.runAiAndUpsert(workflow)
+        .catch((err: unknown) => {
+          this.logger.warn(
+            `Background documentation generation failed for ${workflowId}: ${
+              (err as Error).message
+            }`,
+          );
+        })
+        .finally(() => {
+          this.inFlight.delete(workflowId);
+        });
+    }
+
+    return { workflowId, status: 'pending' };
   }
 
   private async loadAuthorizedWorkflow(
