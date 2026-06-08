@@ -8,15 +8,18 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password      String
-  name          String
-  role          Role     @default(USER)
-  tokenVersion  Int      @default(0) @map("token_version")
-  emailVerified Boolean  @default(false) @map("email_verified")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(uuid())
+  email                 String   @unique
+  password              String
+  name                  String
+  role                  Role     @default(USER)
+  tokenVersion          Int      @default(0) @map("token_version")
+  emailVerified         Boolean  @default(false) @map("email_verified")
+  // The org the SPA opens by default and the fallback when the X-Org-Id header
+  // is absent. Nullable so a user mid-deletion of their last org is valid; SetNull.
+  defaultOrganizationId String?  @map("default_organization_id")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   workflows               Workflow[]
   secrets                 Secret[]
@@ -28,6 +31,9 @@ model User {
   tags                    Tag[]
   emailVerificationTokens EmailVerificationToken[]
   passwordResetTokens     PasswordResetToken[]
+  organizationMemberships OrganizationMember[]
+  createdOrganizations    Organization[]           @relation("OrgCreatedBy")
+  defaultOrganization     Organization?            @relation("UserDefaultOrg", fields: [defaultOrganizationId], references: [id], onDelete: SetNull)
 
   @@map("users")
 }
@@ -75,43 +81,121 @@ enum Role {
   ADMIN
 }
 
+// Organization (workspace) roles. SUPERADMIN is the all-powerful top tier and may
+// be held by MULTIPLE members (it is NOT a single owner pointer) — permission
+// derives from a member's role only. Rank: SUPERADMIN > ADMIN > MEMBER > VIEWER.
+enum OrgRole {
+  SUPERADMIN
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  // Audit-only record of who created the org — NOT a permission source. SetNull so
+  // deleting the creating user does not delete the org.
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy            User?                 @relation("OrgCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  defaultForUsers      User[]                @relation("UserDefaultOrg")
+  members              OrganizationMember[]
+  invites              OrganizationInvite[]
+  workflows            Workflow[]
+  secrets              Secret[]
+  connections          Connection[]
+  folders              Folder[]
+  tags                 Tag[]
+  environmentVariables EnvironmentVariable[]
+  auditLogs            AuditLog[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  role           OrgRole  @default(MEMBER)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+// Single-use, hashed organization invites. The raw token is emailed; only its
+// SHA-256 hash is stored — mirrors EmailVerificationToken (W2.1). Consuming one
+// (single-use, expiry-bounded) creates an OrganizationMember with `role`.
+model OrganizationInvite {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  email          String
+  role           OrgRole   @default(MEMBER)
+  tokenHash      String    @unique @map("token_hash")
+  invitedById    String?   @map("invited_by_id")
+  expiresAt      DateTime  @map("expires_at")
+  consumedAt     DateTime? @map("consumed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([expiresAt])
+  @@map("organization_invites")
+}
+
 enum EnvVarScope {
   GLOBAL
   USER
 }
 
 model EnvironmentVariable {
-  id         String      @id @default(uuid())
-  scope      EnvVarScope
-  userId     String?     @map("user_id")
-  key        String
-  valueEnc   String      @map("value_enc")
-  valueNonce String      @map("value_nonce")
-  createdAt  DateTime    @default(now()) @map("created_at")
-  updatedAt  DateTime    @updatedAt @map("updated_at")
+  id             String      @id @default(uuid())
+  scope          EnvVarScope
+  userId         String?     @map("user_id")
+  // Set for USER-scope rows (workspace-shared vars); NULL for GLOBAL platform vars.
+  organizationId String?     @map("organization_id")
+  key            String
+  valueEnc       String      @map("value_enc")
+  valueNonce     String      @map("value_nonce")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
-  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   // Uniqueness is enforced by two partial unique indexes (scope-specific) in the
   // migration. Postgres treats NULL as distinct in standard unique indexes, so a
-  // composite @@unique([scope, userId, key]) here would NOT prevent duplicate
-  // GLOBAL rows (where user_id is NULL).
+  // composite @@unique here would NOT prevent duplicate GLOBAL rows. USER-scope
+  // uniqueness is partitioned by organization_id (workspace-shared), not user_id.
   @@index([scope])
   @@map("environment_variables")
 }
 
 model Workflow {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  definition  Json
-  isActive    Boolean  @default(false) @map("is_active")
-  version     Int      @default(1)
-  userId      String   @map("user_id")
-  folderId    String?  @map("folder_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  definition     Json
+  isActive       Boolean  @default(false) @map("is_active")
+  version        Int      @default(1)
+  // Owning workspace. `userId` is retained as the creator/author.
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  folderId       String?  @map("folder_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user                  User                   @relation(fields: [userId], references: [id])
   folder                Folder?                @relation(fields: [folderId], references: [id], onDelete: Cascade)
   executions            WorkflowExecution[]
@@ -122,6 +206,7 @@ model Workflow {
   providerSubscriptions ProviderSubscription[]
   triggerCursors        TriggerCursor[]
 
+  @@index([organizationId, folderId])
   @@index([userId, folderId])
   // Worker cron/poll schedulers sweep all active workflows globally
   // (where { isActive: true }) — index it so that scan does not table-scan.
@@ -131,31 +216,37 @@ model Workflow {
 
 model Folder {
   id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
   userId         String   @map("user_id")
   name           String
   parentFolderId String?  @map("parent_folder_id")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent    Folder?    @relation("FolderTree", fields: [parentFolderId], references: [id], onDelete: Cascade)
-  children  Folder[]   @relation("FolderTree")
-  workflows Workflow[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent       Folder?      @relation("FolderTree", fields: [parentFolderId], references: [id], onDelete: Cascade)
+  children     Folder[]     @relation("FolderTree")
+  workflows    Workflow[]
 
+  @@index([organizationId, parentFolderId])
   @@index([userId, parentFolderId])
   @@map("folders")
 }
 
 model Tag {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  name      String
-  color     String?
-  createdAt DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  name           String
+  color          String?
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workflows WorkflowTag[]
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflows    WorkflowTag[]
 
-  @@unique([userId, name])
+  // Tag names are unique per workspace (not per user).
+  @@unique([organizationId, name])
   @@map("tags")
 }
 
@@ -259,22 +350,26 @@ model ExecutionStep {
 }
 
 model Secret {
-  id        String   @id @default(uuid())
-  name      String
-  value     String
-  nonce     String
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String   @id @default(uuid())
+  name           String
+  value          String
+  nonce          String
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id])
 
-  @@unique([userId, name])
+  // Secret names are unique per workspace (not per user).
+  @@unique([organizationId, name])
   @@map("secrets")
 }
 
 model Connection {
   id                    String           @id @default(uuid())
+  organizationId        String           @map("organization_id")
   userId                String           @map("user_id")
   type                  ConnectionType
   provider              String
@@ -290,8 +385,10 @@ model Connection {
   createdAt             DateTime         @default(now()) @map("created_at")
   updatedAt             DateTime         @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId, provider])
   @@index([userId, provider])
   // OAuth refresh-scan sweeps connections due for refresh
   // (where { status: ACTIVE, expiresAt: { lt: cutoff } }).
@@ -328,16 +425,21 @@ model Webhook {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String   @map("user_id")
-  action     String
-  resource   String
-  resourceId String?  @map("resource_id")
-  metadata   Json?
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid())
+  // Owning workspace. Nullable for pre-org / account-level events (e.g. auth) that
+  // are not scoped to a workspace.
+  organizationId String?  @map("organization_id")
+  userId         String   @map("user_id")
+  action         String
+  resource       String
+  resourceId     String?  @map("resource_id")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id])
 
+  @@index([organizationId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@map("audit_logs")
 }

@@ -26,8 +26,13 @@ import {
 } from '@nestjs/swagger';
 import { ConnectionType, PROVIDER_CONFIG_SCHEMAS, type ProviderConfigMap } from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
+import { OrgRoles } from '../common/decorators/org-roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import { OrgRolesGuard } from '../common/guards/org-roles.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
@@ -39,30 +44,32 @@ import { PageQueryDto } from '../common/pagination/page-query.dto';
 @ApiTags('connections')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
 @Controller('connections')
 export class ConnectionsController {
   constructor(private readonly connections: ConnectionsService) {}
 
   @Get()
   @ApiOperation({
-    summary: "List the authenticated user's connections (config masked, cursor-paginated)",
+    summary: "List the active workspace's connections (config masked, cursor-paginated)",
   })
   @ApiOkResponse({ type: PaginatedConnectionsDto })
   async list(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Query() page: PageQueryDto,
   ): Promise<PaginatedConnectionsDto> {
-    return this.connections.list(user.id, page);
+    return this.connections.list(org.id, page);
   }
 
   @Post()
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @ApiOperation({
     summary: 'Create an API-key connection (OAuth connections use /connections/oauth/start)',
   })
   @ApiCreatedResponse({ type: ConnectionResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid input or unsupported type/provider' })
   async create(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateConnectionDto,
   ): Promise<ConnectionResponseDto> {
@@ -82,7 +89,7 @@ export class ConnectionsController {
         .join('; ');
       throw new BadRequestException(`Invalid config for provider "${dto.provider}": ${issues}`);
     }
-    return this.connections.create(user.id, {
+    return this.connections.create(org.id, user.id, {
       type: dto.type,
       provider: dto.provider,
       name: dto.name,
@@ -95,18 +102,20 @@ export class ConnectionsController {
   @ApiOkResponse({ type: ConnectionResponseDto })
   @ApiNotFoundResponse({ description: 'Connection not found' })
   async findOne(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<ConnectionResponseDto> {
-    return this.connections.findOne(user.id, id);
+    return this.connections.findOne(org.id, id);
   }
 
   @Patch(':id')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @ApiOperation({ summary: 'Update a connection name and/or status' })
   @ApiOkResponse({ type: ConnectionResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid input' })
   @ApiNotFoundResponse({ description: 'Connection not found' })
   async update(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateConnectionDto,
@@ -114,10 +123,11 @@ export class ConnectionsController {
     if (dto.name === undefined && dto.status === undefined) {
       throw new BadRequestException('Provide at least one of: name, status');
     }
-    return this.connections.update(user.id, id, dto);
+    return this.connections.update(org.id, user.id, id, dto);
   }
 
   @Post(':id/test')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Run a provider-specific health check against the stored credentials',
@@ -125,21 +135,24 @@ export class ConnectionsController {
   @ApiOkResponse({ type: TestConnectionResponseDto })
   @ApiNotFoundResponse({ description: 'Connection not found' })
   async test(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<TestConnectionResponseDto> {
-    return this.connections.test(user.id, id);
+    return this.connections.test(org.id, user.id, id);
   }
 
   @Delete(':id')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Revoke (delete) a connection' })
   @ApiNoContentResponse({ description: 'Deleted' })
   @ApiNotFoundResponse({ description: 'Connection not found' })
   async remove(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<void> {
-    await this.connections.remove(user.id, id);
+    await this.connections.remove(org.id, user.id, id);
   }
 }

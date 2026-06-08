@@ -7,7 +7,7 @@ import { OAUTH_REFRESH_DLQ_JOB, OAUTH_REFRESH_DLQ_QUEUE } from './oauth-refresh.
 export interface OAuthRefreshFailedPayload {
   connectionId: string;
   provider: string;
-  userId?: string;
+  organizationId?: string;
 }
 
 export interface OAuthRefreshFailedSummary {

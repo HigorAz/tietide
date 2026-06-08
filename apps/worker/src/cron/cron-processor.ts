@@ -8,7 +8,7 @@ import { isUniqueViolation } from '../common/prisma-error';
 
 export interface CronFirePayload {
   workflowId: string;
-  userId: string;
+  organizationId: string;
   expression: string;
 }
 
@@ -17,7 +17,7 @@ interface ExecutionJobPayload {
   workflowId: string;
   triggerType: 'cron';
   triggerData: Record<string, unknown>;
-  userId: string;
+  organizationId: string;
 }
 
 const MAX_ATTEMPTS = 3;
@@ -39,7 +39,7 @@ export class CronProcessor extends WorkerHost {
 
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { id: true, userId: true, isActive: true },
+      select: { id: true, organizationId: true, isActive: true },
     });
 
     if (!workflow) {
@@ -100,7 +100,7 @@ export class CronProcessor extends WorkerHost {
       workflowId,
       triggerType: 'cron',
       triggerData,
-      userId: workflow.userId,
+      organizationId: workflow.organizationId,
     };
 
     await this.executionQueue.add(EXECUTION_JOB_NAME, payload, {

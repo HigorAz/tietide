@@ -56,7 +56,11 @@ export class OAuthService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async start(userId: string, input: OAuthStartInput): Promise<OAuthStartResult> {
+  async start(
+    organizationId: string,
+    userId: string,
+    input: OAuthStartInput,
+  ): Promise<OAuthStartResult> {
     const provider = this.registry.get(input.provider);
 
     const requestedScopes = this.parseScopes(input.scopes) ?? [...provider.defaultScopes];
@@ -86,6 +90,7 @@ export class OAuthService {
 
     const stateToken = await this.state.sign({
       userId,
+      organizationId,
       provider: provider.id,
       scopes: requestedScopes,
       label: input.label,
@@ -155,7 +160,7 @@ export class OAuthService {
     const schema = PROVIDER_CONFIG_SCHEMAS[provider.id as keyof ProviderConfigMap];
     schema.parse(exchanged.config);
 
-    const created = await this.connections.create(decoded.userId, {
+    const created = await this.connections.create(decoded.organizationId, decoded.userId, {
       type: ConnectionType.OAUTH2,
       provider: provider.id,
       name: decoded.label,

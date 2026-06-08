@@ -9,6 +9,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { SecretsController } from './secrets.controller';
 import { SecretsService } from './secrets.service';
 
@@ -43,6 +44,14 @@ describe('SecretsController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
           return true;
         },
       })
@@ -89,7 +98,7 @@ describe('SecretsController (integration)', () => {
         expect(row).not.toHaveProperty('value');
         expect(row).not.toHaveProperty('nonce');
       });
-      expect(secretsService.list).toHaveBeenCalledWith('owner-uuid', {});
+      expect(secretsService.list).toHaveBeenCalledWith('org-uuid', {});
     });
   });
 
@@ -104,7 +113,7 @@ describe('SecretsController (integration)', () => {
       expect(res.body).toEqual(persisted);
       expect(res.body).not.toHaveProperty('value');
       expect(res.body).not.toHaveProperty('nonce');
-      expect(secretsService.create).toHaveBeenCalledWith('owner-uuid', validBody);
+      expect(secretsService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', validBody);
     });
 
     it('should return 400 when value is missing', async () => {
@@ -147,7 +156,7 @@ describe('SecretsController (integration)', () => {
 
       await request(app.getHttpServer()).post('/secrets').send(validBody).expect(201);
 
-      expect(secretsService.create).toHaveBeenCalledWith('owner-uuid', validBody);
+      expect(secretsService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', validBody);
     });
   });
 
@@ -162,7 +171,7 @@ describe('SecretsController (integration)', () => {
 
       expect(res.body).toEqual(persisted);
       expect(res.body).not.toHaveProperty('value');
-      expect(secretsService.update).toHaveBeenCalledWith('owner-uuid', uuid, {
+      expect(secretsService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
         value: 'new-plaintext',
       });
     });
@@ -195,7 +204,7 @@ describe('SecretsController (integration)', () => {
 
       await request(app.getHttpServer()).delete(`/secrets/${uuid}`).expect(204);
 
-      expect(secretsService.remove).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(secretsService.remove).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid);
     });
 
     it('should return 404 when the id belongs to another user (ownership filter)', async () => {

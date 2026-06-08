@@ -45,7 +45,10 @@ export interface WorkflowExecutionJobPayload {
   workflowId: string;
   triggerType: string;
   triggerData?: Record<string, unknown>;
+  // The actor who triggered the run (creator/auditor) and the workspace the run
+  // belongs to. The worker scopes secrets/connections/env-vars by organizationId.
   userId: string;
+  organizationId: string;
   requestId?: string;
   isDryRun?: boolean;
   definitionOverride?: WorkflowDefinition;
@@ -65,18 +68,19 @@ export class ExecutionsService {
   ) {}
 
   async triggerManual(
+    organizationId: string,
     userId: string,
     workflowId: string,
     options: TriggerOptions,
   ): Promise<ExecutionResponseDto> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { id: true, userId: true },
+      select: { id: true, organizationId: true },
     });
     if (!workflow) {
       throw new NotFoundException('Workflow not found');
     }
-    if (workflow.userId !== userId) {
+    if (workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
@@ -137,6 +141,7 @@ export class ExecutionsService {
       triggerType: 'manual',
       triggerData: options.triggerData,
       userId,
+      organizationId,
       requestId: options.requestId,
     };
 
@@ -150,6 +155,7 @@ export class ExecutionsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'execution.trigger',
       resource: 'workflow',
       resourceId: workflowId,
@@ -160,18 +166,19 @@ export class ExecutionsService {
   }
 
   async triggerTest(
+    organizationId: string,
     userId: string,
     workflowId: string,
     options: TestTriggerOptions,
   ): Promise<ExecutionResponseDto> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { id: true, userId: true },
+      select: { id: true, organizationId: true },
     });
     if (!workflow) {
       throw new NotFoundException('Workflow not found');
     }
-    if (workflow.userId !== userId) {
+    if (workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
@@ -197,6 +204,7 @@ export class ExecutionsService {
       triggerType: 'test',
       triggerData: options.triggerData,
       userId,
+      organizationId,
       requestId: options.requestId,
       isDryRun: true,
       definitionOverride: options.definition,
@@ -212,6 +220,7 @@ export class ExecutionsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'execution.test',
       resource: 'workflow',
       resourceId: workflowId,
@@ -228,6 +237,7 @@ export class ExecutionsService {
    * same definition-override path as `triggerTest`, with `isDryRun: false`.
    */
   async triggerNodeTest(
+    organizationId: string,
     userId: string,
     workflowId: string,
     nodeId: string,
@@ -235,12 +245,12 @@ export class ExecutionsService {
   ): Promise<ExecutionResponseDto> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { id: true, userId: true },
+      select: { id: true, organizationId: true },
     });
     if (!workflow) {
       throw new NotFoundException('Workflow not found');
     }
-    if (workflow.userId !== userId) {
+    if (workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
     if (!options.definition.nodes.some((n) => n.id === nodeId)) {
@@ -271,6 +281,7 @@ export class ExecutionsService {
       triggerType: 'node-test',
       triggerData: options.triggerData,
       userId,
+      organizationId,
       requestId: options.requestId,
       isDryRun: false,
       definitionOverride: subgraph,
@@ -286,6 +297,7 @@ export class ExecutionsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'execution.node-test',
       resource: 'workflow',
       resourceId: workflowId,
@@ -296,18 +308,18 @@ export class ExecutionsService {
   }
 
   async list(
-    userId: string,
+    organizationId: string,
     workflowId: string,
     options: ListOptions,
   ): Promise<ExecutionListResponseDto> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { userId: true },
+      select: { organizationId: true },
     });
     if (!workflow) {
       throw new NotFoundException('Workflow not found');
     }
-    if (workflow.userId !== userId) {
+    if (workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
 
@@ -345,8 +357,11 @@ export class ExecutionsService {
     };
   }
 
-  async listAllForUser(userId: string, options: ListOptions): Promise<ExecutionListResponseDto> {
-    const baseWhere: Prisma.WorkflowExecutionWhereInput = { workflow: { userId } };
+  async listAllForOrg(
+    organizationId: string,
+    options: ListOptions,
+  ): Promise<ExecutionListResponseDto> {
+    const baseWhere: Prisma.WorkflowExecutionWhereInput = { workflow: { organizationId } };
     if (options.status) {
       baseWhere.status = options.status as Prisma.WorkflowExecutionWhereInput['status'];
     }
@@ -427,29 +442,32 @@ export class ExecutionsService {
     };
   }
 
-  async findOne(userId: string, executionId: string): Promise<ExecutionDetailResponseDto> {
+  async findOne(organizationId: string, executionId: string): Promise<ExecutionDetailResponseDto> {
     const row = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
-      include: { workflow: { select: { userId: true } } },
+      include: { workflow: { select: { organizationId: true } } },
     });
     if (!row) {
       throw new NotFoundException('Execution not found');
     }
-    if (row.workflow.userId !== userId) {
+    if (row.workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this execution');
     }
     return this.toDetailResponse(row);
   }
 
-  async listSteps(userId: string, executionId: string): Promise<ExecutionStepResponseDto[]> {
+  async listSteps(
+    organizationId: string,
+    executionId: string,
+  ): Promise<ExecutionStepResponseDto[]> {
     const row = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
-      include: { workflow: { select: { userId: true } } },
+      include: { workflow: { select: { organizationId: true } } },
     });
     if (!row) {
       throw new NotFoundException('Execution not found');
     }
-    if (row.workflow.userId !== userId) {
+    if (row.workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this execution');
     }
     const steps = await this.prisma.executionStep.findMany({

@@ -10,12 +10,23 @@ import {
   type LoginCredentials,
   type RegisterPayload,
 } from '@/api/auth';
+import {
+  listOrganizations as apiListOrganizations,
+  type OrganizationSummary,
+} from '@/api/organizations';
 
 export const TOKEN_STORAGE_KEY = 'tietide-token';
+// The workspace the SPA scopes requests to, echoed as the X-Org-Id header by the
+// API client. Persisted so a refresh keeps the same active workspace.
+export const ACTIVE_ORG_STORAGE_KEY = 'tietide-active-org';
 
 export interface AuthState {
   user: PublicUser | null;
   token: string | null;
+  // The workspaces the user belongs to, and the one currently active (drives the
+  // org switcher and the X-Org-Id header). Loaded alongside the user.
+  organizations: OrganizationSummary[];
+  activeOrganization: OrganizationSummary | null;
   // True once the initial hydrate() has settled (restored the user from a stored
   // token, or determined there is none / it was invalid). ProtectedRoute waits on
   // this so a refresh doesn't bounce a logged-in user to /login before getMe resolves.
@@ -35,6 +46,14 @@ export interface AuthActions {
   resetPassword: (token: string, password: string) => Promise<void>;
   logout: () => void;
   hydrate: () => Promise<void>;
+  // Refresh the membership list and reconcile the active workspace (the persisted
+  // one if still a member, else the first available, else none).
+  loadOrganizations: () => Promise<void>;
+  // Switch the active workspace and persist it (no-op for an unknown id).
+  switchOrganization: (orgId: string) => void;
+  // The active workspace is no longer accessible (a 403 from the org guard): drop
+  // it and fall back to the next available membership.
+  handleLostOrgAccess: () => void;
 }
 
 export type AuthStore = AuthState & AuthActions;
@@ -44,9 +63,22 @@ const readStoredToken = (): string | null => {
   return localStorage.getItem(TOKEN_STORAGE_KEY);
 };
 
+const readStoredActiveOrgId = (): string | null => {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+};
+
+const persistActiveOrg = (org: OrganizationSummary | null): void => {
+  if (typeof localStorage === 'undefined') return;
+  if (org) localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, org.id);
+  else localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
+};
+
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
   token: readStoredToken(),
+  organizations: [],
+  activeOrganization: null,
   hydrated: false,
 
   login: async (credentials) => {
@@ -55,6 +87,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ token: accessToken });
     const user = await apiGetMe();
     set({ user });
+    await get().loadOrganizations();
   },
 
   register: async (payload) => {
@@ -72,6 +105,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ token: accessToken });
     const user = await apiGetMe();
     set({ user });
+    await get().loadOrganizations();
   },
 
   forgotPassword: async (email) => {
@@ -88,11 +122,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     set({ token: accessToken });
     const user = await apiGetMe();
     set({ user });
+    await get().loadOrganizations();
   },
 
   logout: () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
-    set({ user: null, token: null });
+    localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
+    set({ user: null, token: null, organizations: [], activeOrganization: null });
   },
 
   hydrate: async () => {
@@ -106,12 +142,43 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
     try {
       const user = await apiGetMe();
-      set({ user, hydrated: true });
+      set({ user });
+      await get().loadOrganizations();
+      set({ hydrated: true });
     } catch {
       // The stored token is invalid/expired — drop it so the guard sends the user
       // to /login instead of leaving them in a half-authenticated state.
       localStorage.removeItem(TOKEN_STORAGE_KEY);
-      set({ user: null, token: null, hydrated: true });
+      localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
+      set({ user: null, token: null, organizations: [], activeOrganization: null, hydrated: true });
     }
+  },
+
+  loadOrganizations: async () => {
+    try {
+      const organizations = await apiListOrganizations();
+      const storedId = readStoredActiveOrgId();
+      const active = organizations.find((o) => o.id === storedId) ?? organizations[0] ?? null;
+      persistActiveOrg(active);
+      set({ organizations, activeOrganization: active });
+    } catch {
+      // Non-fatal — leave the existing org state untouched so a transient failure
+      // doesn't blank the switcher.
+    }
+  },
+
+  switchOrganization: (orgId) => {
+    const org = get().organizations.find((o) => o.id === orgId);
+    if (!org) return;
+    persistActiveOrg(org);
+    set({ activeOrganization: org });
+  },
+
+  handleLostOrgAccess: () => {
+    const lostId = get().activeOrganization?.id;
+    const remaining = get().organizations.filter((o) => o.id !== lostId);
+    const next = remaining[0] ?? null;
+    persistActiveOrg(next);
+    set({ organizations: remaining, activeOrganization: next });
   },
 }));

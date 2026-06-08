@@ -4,6 +4,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { UsageController } from './usage.controller';
 import { UsageService } from './usage.service';
 
@@ -37,6 +38,14 @@ describe('UsageController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
           return true;
         },
       })
@@ -74,7 +83,7 @@ describe('UsageController (integration)', () => {
 
       await request(app.getHttpServer()).get('/usage/summary').expect(200);
 
-      expect(usage.getSummary).toHaveBeenCalledWith('owner-uuid', expect.any(String));
+      expect(usage.getSummary).toHaveBeenCalledWith('org-uuid', expect.any(String));
     });
 
     it('does not allow a forged userId from the query to override the JWT user', async () => {
@@ -93,7 +102,7 @@ describe('UsageController (integration)', () => {
 
       await request(app.getHttpServer()).get('/usage/summary').query({ range: '30d' }).expect(200);
 
-      expect(usage.getSummary).toHaveBeenCalledWith('owner-uuid', '30d');
+      expect(usage.getSummary).toHaveBeenCalledWith('org-uuid', '30d');
     });
 
     it('defaults the range to "7d" when omitted', async () => {
@@ -101,7 +110,7 @@ describe('UsageController (integration)', () => {
 
       await request(app.getHttpServer()).get('/usage/summary').expect(200);
 
-      expect(usage.getSummary).toHaveBeenCalledWith('owner-uuid', '7d');
+      expect(usage.getSummary).toHaveBeenCalledWith('org-uuid', '7d');
     });
 
     it('rejects an invalid range with 400', async () => {

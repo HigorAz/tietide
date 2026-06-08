@@ -48,7 +48,7 @@ describe('PollSchedulerService', () => {
       prisma.workflow.findMany.mockResolvedValueOnce([
         {
           id: 'wf-1',
-          userId: 'u1',
+          organizationId: 'org-1',
           isActive: true,
           definition: {
             nodes: [
@@ -74,7 +74,7 @@ describe('PollSchedulerService', () => {
             workflowId: 'wf-1',
             nodeId: 'trigger-1',
             type: 'sheets-row-added',
-            userId: 'u1',
+            organizationId: 'org-1',
           }),
         }),
       );
@@ -84,7 +84,7 @@ describe('PollSchedulerService', () => {
       prisma.workflow.findMany.mockResolvedValueOnce([
         {
           id: 'wf-1',
-          userId: 'u1',
+          organizationId: 'org-1',
           isActive: true,
           definition: {
             nodes: [
@@ -127,7 +127,7 @@ describe('PollSchedulerService', () => {
       prisma.workflow.findMany.mockResolvedValueOnce([
         {
           id: 'wf-1',
-          userId: 'u1',
+          organizationId: 'org-1',
           isActive: true,
           definition: {
             nodes: [

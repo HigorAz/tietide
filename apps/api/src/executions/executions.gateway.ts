@@ -128,7 +128,7 @@ export class ExecutionsGateway implements OnGatewayConnection, OnGatewayDisconne
       return;
     }
 
-    const allowed = await this.assertOwnership(executionId, state.user.id);
+    const allowed = await this.assertMembership(executionId, state.user.id);
     if (!allowed) {
       socket.emit('error', { message: 'Forbidden' });
       return;
@@ -194,12 +194,22 @@ export class ExecutionsGateway implements OnGatewayConnection, OnGatewayDisconne
     return candidate;
   }
 
-  private async assertOwnership(executionId: string, userId: string): Promise<boolean> {
+  // Defence-in-depth: the WS handshake only proves identity (JWT). Before joining
+  // an execution's event channel we additionally require that the caller is a
+  // member of the organization that owns the execution's workflow — mirroring the
+  // HTTP OrgContextGuard, since the socket carries no validated X-Org-Id.
+  private async assertMembership(executionId: string, userId: string): Promise<boolean> {
     const row = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
-      select: { workflow: { select: { userId: true } } },
+      select: { workflow: { select: { organizationId: true } } },
     });
-    return !!row && row.workflow.userId === userId;
+    if (!row) return false;
+
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { organizationId: row.workflow.organizationId, userId },
+      select: { id: true },
+    });
+    return !!membership;
   }
 }
 

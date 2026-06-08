@@ -44,4 +44,16 @@ describe('MailerService (log transport)', () => {
     expect(meta.to).toBe('user@example.com');
     expect(meta.body).toContain('https://app.tietide.com/reset-password?token=reset-tok-123');
   });
+
+  it('logs the org-invite email containing the /organizations/accept-invite link and org name', async () => {
+    await mailer.sendOrganizationInviteEmail('user@example.com', 'inv-tok-123', 'Acme Workspace');
+
+    expect(logger.log).toHaveBeenCalledTimes(1);
+    const [meta] = logger.log.mock.calls[0];
+    expect(meta.to).toBe('user@example.com');
+    expect(meta.body).toContain(
+      'https://app.tietide.com/organizations/accept-invite?token=inv-tok-123',
+    );
+    expect(meta.body).toContain('Acme Workspace');
+  });
 });

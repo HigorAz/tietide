@@ -24,6 +24,7 @@ import { LibraryModule } from './library/library.module';
 import { FoldersModule } from './folders/folders.module';
 import { TagsModule } from './tags/tags.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { MetricsModule } from './metrics/metrics.module';
     FoldersModule,
     TagsModule,
     MetricsModule,
+    OrganizationsModule,
   ],
 })
 export class AppModule {}

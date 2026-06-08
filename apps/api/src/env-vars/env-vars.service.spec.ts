@@ -20,8 +20,9 @@ describe('EnvVarsService', () => {
   let crypto: { encrypt: jest.Mock; decrypt: jest.Mock };
   let audit: { log: jest.Mock };
 
+  const orgId = 'org-1';
+  const otherOrgId = 'org-2';
   const userId = 'user-1';
-  const otherUserId = 'user-2';
   const adminId = 'admin-1';
   const envVarId = 'env-1';
 
@@ -65,21 +66,22 @@ describe('EnvVarsService', () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
       prisma.environmentVariable.create.mockResolvedValue(persisted);
 
-      await service.create({ scope: 'USER', ownerUserId: userId, actorUserId: userId, dto });
+      await service.create({ scope: 'USER', organizationId: orgId, actorUserId: userId, dto });
 
       expect(crypto.encrypt).toHaveBeenCalledWith(dto.value);
     });
 
-    it('should persist scope=USER, userId=ownerUserId, key, valueEnc, valueNonce', async () => {
+    it('should persist scope=USER, organizationId, creator userId, key, valueEnc, valueNonce', async () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
       prisma.environmentVariable.create.mockResolvedValue(persisted);
 
-      await service.create({ scope: 'USER', ownerUserId: userId, actorUserId: userId, dto });
+      await service.create({ scope: 'USER', organizationId: orgId, actorUserId: userId, dto });
 
       expect(prisma.environmentVariable.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: {
             scope: 'USER',
+            organizationId: orgId,
             userId,
             key: dto.key,
             valueEnc: 'CIPHER',
@@ -95,7 +97,7 @@ describe('EnvVarsService', () => {
 
       const result = await service.create({
         scope: 'USER',
-        ownerUserId: userId,
+        organizationId: orgId,
         actorUserId: userId,
         dto,
       });
@@ -104,6 +106,7 @@ describe('EnvVarsService', () => {
       expect(result).not.toHaveProperty('valueEnc');
       expect(result).not.toHaveProperty('valueNonce');
       expect(result).not.toHaveProperty('userId');
+      expect(result).not.toHaveProperty('organizationId');
     });
 
     it('should throw ConflictException on Prisma P2002 (duplicate key in scope)', async () => {
@@ -112,19 +115,20 @@ describe('EnvVarsService', () => {
       prisma.environmentVariable.create.mockRejectedValue(p2002);
 
       await expect(
-        service.create({ scope: 'USER', ownerUserId: userId, actorUserId: userId, dto }),
+        service.create({ scope: 'USER', organizationId: orgId, actorUserId: userId, dto }),
       ).rejects.toThrow(ConflictException);
     });
 
-    it('should write an audit log entry with action env-var.create and key+scope metadata', async () => {
+    it('should write an audit log entry (org-scoped) with action env-var.create', async () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
       prisma.environmentVariable.create.mockResolvedValue(persisted);
 
-      await service.create({ scope: 'USER', ownerUserId: userId, actorUserId: userId, dto });
+      await service.create({ scope: 'USER', organizationId: orgId, actorUserId: userId, dto });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'env-var.create',
           resource: 'env-var',
           resourceId: envVarId,
@@ -144,15 +148,20 @@ describe('EnvVarsService', () => {
       updatedAt: new Date(),
     };
 
-    it('should persist with userId=null and scope=GLOBAL', async () => {
+    it('should persist with organizationId=null, userId=null and scope=GLOBAL', async () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
       prisma.environmentVariable.create.mockResolvedValue(persisted);
 
-      await service.create({ scope: 'GLOBAL', ownerUserId: null, actorUserId: adminId, dto });
+      await service.create({ scope: 'GLOBAL', organizationId: null, actorUserId: adminId, dto });
 
       expect(prisma.environmentVariable.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ scope: 'GLOBAL', userId: null, key: dto.key }),
+          data: expect.objectContaining({
+            scope: 'GLOBAL',
+            organizationId: null,
+            userId: null,
+            key: dto.key,
+          }),
         }),
       );
     });
@@ -161,7 +170,7 @@ describe('EnvVarsService', () => {
       crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
       prisma.environmentVariable.create.mockResolvedValue(persisted);
 
-      await service.create({ scope: 'GLOBAL', ownerUserId: null, actorUserId: adminId, dto });
+      await service.create({ scope: 'GLOBAL', organizationId: null, actorUserId: adminId, dto });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -174,26 +183,26 @@ describe('EnvVarsService', () => {
   });
 
   describe('list', () => {
-    it('should query USER scope filtered by ownerUserId, keyset-ordered with a peek', async () => {
+    it('should query USER scope filtered by organizationId, keyset-ordered with a peek', async () => {
       prisma.environmentVariable.findMany.mockResolvedValue([]);
 
-      await service.list({ scope: 'USER', ownerUserId: userId });
+      await service.list({ scope: 'USER', organizationId: orgId });
 
       expect(prisma.environmentVariable.findMany).toHaveBeenCalledWith({
-        where: { scope: 'USER', userId },
+        where: { scope: 'USER', organizationId: orgId },
         select: { id: true, key: true, scope: true, createdAt: true, updatedAt: true },
         orderBy: [{ key: 'asc' }, { id: 'asc' }],
         take: 51,
       });
     });
 
-    it('should query GLOBAL scope with userId=null', async () => {
+    it('should query GLOBAL scope with organizationId=null', async () => {
       prisma.environmentVariable.findMany.mockResolvedValue([]);
 
-      await service.list({ scope: 'GLOBAL', ownerUserId: null });
+      await service.list({ scope: 'GLOBAL', organizationId: null });
 
       expect(prisma.environmentVariable.findMany).toHaveBeenCalledWith({
-        where: { scope: 'GLOBAL', userId: null },
+        where: { scope: 'GLOBAL', organizationId: null },
         select: { id: true, key: true, scope: true, createdAt: true, updatedAt: true },
         orderBy: [{ key: 'asc' }, { id: 'asc' }],
         take: 51,
@@ -210,7 +219,7 @@ describe('EnvVarsService', () => {
       };
       prisma.environmentVariable.findMany.mockResolvedValue([row]);
 
-      const result = await service.list({ scope: 'USER', ownerUserId: userId });
+      const result = await service.list({ scope: 'USER', organizationId: orgId });
 
       expect(result).toEqual({ items: [row], nextCursor: null });
       result.items.forEach((r) => {
@@ -225,7 +234,7 @@ describe('EnvVarsService', () => {
         'base64url',
       );
 
-      await service.list({ scope: 'USER', ownerUserId: userId, cursor });
+      await service.list({ scope: 'USER', organizationId: orgId, cursor });
 
       const call = prisma.environmentVariable.findMany.mock.calls[0][0] as {
         where: { AND?: unknown[] };
@@ -244,20 +253,20 @@ describe('EnvVarsService', () => {
       updatedAt: new Date(),
     };
 
-    it('should verify ownership scoped by id + scope + userId before updating', async () => {
+    it('should verify ownership scoped by id + scope + organizationId before updating', async () => {
       prisma.environmentVariable.findFirst.mockResolvedValue(existing);
       prisma.environmentVariable.update.mockResolvedValue(persisted);
 
       await service.update({
         scope: 'USER',
-        ownerUserId: userId,
+        organizationId: orgId,
         actorUserId: userId,
         id: envVarId,
         dto: { key: 'NEW_KEY' },
       });
 
       expect(prisma.environmentVariable.findFirst).toHaveBeenCalledWith({
-        where: { id: envVarId, scope: 'USER', userId },
+        where: { id: envVarId, scope: 'USER', organizationId: orgId },
         select: { id: true },
       });
     });
@@ -269,7 +278,7 @@ describe('EnvVarsService', () => {
 
       await service.update({
         scope: 'USER',
-        ownerUserId: userId,
+        organizationId: orgId,
         actorUserId: userId,
         id: envVarId,
         dto: { value: 'new-value' },
@@ -290,7 +299,7 @@ describe('EnvVarsService', () => {
 
       await service.update({
         scope: 'USER',
-        ownerUserId: userId,
+        organizationId: orgId,
         actorUserId: userId,
         id: envVarId,
         dto: { key: 'RENAMED' },
@@ -301,14 +310,14 @@ describe('EnvVarsService', () => {
       expect(call.data).toEqual({ key: 'RENAMED' });
     });
 
-    it('should throw NotFoundException when row belongs to another user (IDOR)', async () => {
+    it('should throw NotFoundException when row belongs to another organization (IDOR)', async () => {
       prisma.environmentVariable.findFirst.mockResolvedValue(null);
 
       await expect(
         service.update({
           scope: 'USER',
-          ownerUserId: otherUserId,
-          actorUserId: otherUserId,
+          organizationId: otherOrgId,
+          actorUserId: userId,
           id: envVarId,
           dto: { key: 'X' },
         }),
@@ -324,7 +333,7 @@ describe('EnvVarsService', () => {
       await expect(
         service.update({
           scope: 'USER',
-          ownerUserId: userId,
+          organizationId: orgId,
           actorUserId: userId,
           id: envVarId,
           dto: { key: 'DUP' },
@@ -332,14 +341,14 @@ describe('EnvVarsService', () => {
       ).rejects.toThrow(ConflictException);
     });
 
-    it('should write an audit log entry with env-var.update action', async () => {
+    it('should write an audit log entry (org-scoped) with env-var.update action', async () => {
       prisma.environmentVariable.findFirst.mockResolvedValue(existing);
       crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
       prisma.environmentVariable.update.mockResolvedValue(persisted);
 
       await service.update({
         scope: 'USER',
-        ownerUserId: userId,
+        organizationId: orgId,
         actorUserId: userId,
         id: envVarId,
         dto: { value: 'plaintext' },
@@ -348,6 +357,7 @@ describe('EnvVarsService', () => {
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'env-var.update',
           resource: 'env-var',
           resourceId: envVarId,
@@ -358,33 +368,33 @@ describe('EnvVarsService', () => {
   });
 
   describe('remove', () => {
-    it('should delete with composite (id, scope, userId) filter', async () => {
+    it('should delete with composite (id, scope, organizationId) filter', async () => {
       prisma.environmentVariable.deleteMany.mockResolvedValue({ count: 1 });
 
       await service.remove({
         scope: 'USER',
-        ownerUserId: userId,
+        organizationId: orgId,
         actorUserId: userId,
         id: envVarId,
       });
 
       expect(prisma.environmentVariable.deleteMany).toHaveBeenCalledWith({
-        where: { id: envVarId, scope: 'USER', userId },
+        where: { id: envVarId, scope: 'USER', organizationId: orgId },
       });
     });
 
-    it('should delete a GLOBAL var with userId=null filter', async () => {
+    it('should delete a GLOBAL var with organizationId=null filter', async () => {
       prisma.environmentVariable.deleteMany.mockResolvedValue({ count: 1 });
 
       await service.remove({
         scope: 'GLOBAL',
-        ownerUserId: null,
+        organizationId: null,
         actorUserId: adminId,
         id: envVarId,
       });
 
       expect(prisma.environmentVariable.deleteMany).toHaveBeenCalledWith({
-        where: { id: envVarId, scope: 'GLOBAL', userId: null },
+        where: { id: envVarId, scope: 'GLOBAL', organizationId: null },
       });
     });
 
@@ -394,8 +404,8 @@ describe('EnvVarsService', () => {
       await expect(
         service.remove({
           scope: 'USER',
-          ownerUserId: otherUserId,
-          actorUserId: otherUserId,
+          organizationId: otherOrgId,
+          actorUserId: userId,
           id: envVarId,
         }),
       ).rejects.toThrow(NotFoundException);
@@ -406,7 +416,7 @@ describe('EnvVarsService', () => {
 
       await service.remove({
         scope: 'USER',
-        ownerUserId: userId,
+        organizationId: orgId,
         actorUserId: userId,
         id: envVarId,
       });
@@ -414,6 +424,7 @@ describe('EnvVarsService', () => {
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId: orgId,
           action: 'env-var.delete',
           resource: 'env-var',
           resourceId: envVarId,

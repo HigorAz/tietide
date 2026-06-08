@@ -11,6 +11,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { WorkflowsController } from './workflows.controller';
 import { WorkflowsService } from './workflows.service';
 
@@ -77,6 +78,14 @@ describe('WorkflowsController (integration)', () => {
           return true;
         },
       })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
+          return true;
+        },
+      })
       .compile();
 
     app = module.createNestApplication();
@@ -104,7 +113,7 @@ describe('WorkflowsController (integration)', () => {
       const res = await request(app.getHttpServer()).post('/workflows').send(validBody).expect(201);
 
       expect(res.body).toEqual(persisted);
-      expect(workflowsService.create).toHaveBeenCalledWith('owner-uuid', validBody);
+      expect(workflowsService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', validBody);
     });
 
     it('should return 401 when the guard rejects', async () => {
@@ -132,7 +141,7 @@ describe('WorkflowsController (integration)', () => {
         .send({ name: 'X', definition: { nodes: [], edges: [] } })
         .expect(201);
 
-      expect(workflowsService.create).toHaveBeenCalledWith('owner-uuid', {
+      expect(workflowsService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', {
         name: 'X',
         definition: { nodes: [], edges: [] },
       });
@@ -160,7 +169,7 @@ describe('WorkflowsController (integration)', () => {
 
       await request(app.getHttpServer()).post('/workflows').send(validBody).expect(201);
 
-      expect(workflowsService.create).toHaveBeenCalledWith('owner-uuid', validBody);
+      expect(workflowsService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', validBody);
     });
 
     describe('topology validation (issue #163)', () => {
@@ -223,13 +232,13 @@ describe('WorkflowsController (integration)', () => {
       const res = await request(app.getHttpServer()).get('/workflows').expect(200);
 
       expect(res.body).toEqual({ items: [persisted], nextCursor: null });
-      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', {});
+      expect(workflowsService.list).toHaveBeenCalledWith('org-uuid', {});
     });
 
     it('passes limit and cursor through to the service filter', async () => {
       workflowsService.list.mockResolvedValue({ items: [], nextCursor: null });
       await request(app.getHttpServer()).get('/workflows?limit=10&cursor=abc').expect(200);
-      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', {
+      expect(workflowsService.list).toHaveBeenCalledWith('org-uuid', {
         limit: 10,
         cursor: 'abc',
       });
@@ -238,14 +247,14 @@ describe('WorkflowsController (integration)', () => {
     it('passes folderId="null" sentinel as filter.folderId=null', async () => {
       workflowsService.list.mockResolvedValue([]);
       await request(app.getHttpServer()).get('/workflows?folderId=null').expect(200);
-      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', { folderId: null });
+      expect(workflowsService.list).toHaveBeenCalledWith('org-uuid', { folderId: null });
     });
 
     it('passes folderId=<uuid> as filter.folderId=<uuid>', async () => {
       const uuid = '550e8400-e29b-41d4-a716-446655440099';
       workflowsService.list.mockResolvedValue([]);
       await request(app.getHttpServer()).get(`/workflows?folderId=${uuid}`).expect(200);
-      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', { folderId: uuid });
+      expect(workflowsService.list).toHaveBeenCalledWith('org-uuid', { folderId: uuid });
     });
 
     it('returns 400 on invalid folderId', async () => {
@@ -257,7 +266,7 @@ describe('WorkflowsController (integration)', () => {
       const b = '550e8400-e29b-41d4-a716-446655440012';
       workflowsService.list.mockResolvedValue([]);
       await request(app.getHttpServer()).get(`/workflows?tagIds=${a},${b}`).expect(200);
-      expect(workflowsService.list).toHaveBeenCalledWith('owner-uuid', { tagIds: [a, b] });
+      expect(workflowsService.list).toHaveBeenCalledWith('org-uuid', { tagIds: [a, b] });
     });
 
     it('returns 400 when tagIds contains non-UUID', async () => {
@@ -327,7 +336,9 @@ describe('WorkflowsController (integration)', () => {
         .expect(200);
 
       expect(res.body.version).toBe(2);
-      expect(workflowsService.update).toHaveBeenCalledWith('owner-uuid', uuid, { name: 'Renamed' });
+      expect(workflowsService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
+        name: 'Renamed',
+      });
     });
 
     it('should accept an empty definition on update (workflow reverts to draft)', async () => {
@@ -342,7 +353,7 @@ describe('WorkflowsController (integration)', () => {
         .send({ definition: { nodes: [], edges: [] } })
         .expect(200);
 
-      expect(workflowsService.update).toHaveBeenCalledWith('owner-uuid', uuid, {
+      expect(workflowsService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
         definition: { nodes: [], edges: [] },
       });
     });
@@ -380,7 +391,9 @@ describe('WorkflowsController (integration)', () => {
         .send({ definition })
         .expect(200);
 
-      expect(workflowsService.update).toHaveBeenCalledWith('owner-uuid', uuid, { definition });
+      expect(workflowsService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
+        definition,
+      });
     });
 
     it('should return 400 when id is not a UUID', async () => {
@@ -463,7 +476,7 @@ describe('WorkflowsController (integration)', () => {
     it('should return 204 on success', async () => {
       workflowsService.remove.mockResolvedValue(undefined);
       await request(app.getHttpServer()).delete(`/workflows/${uuid}`).expect(204);
-      expect(workflowsService.remove).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(workflowsService.remove).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid);
     });
 
     it('should return 404 when service throws NotFoundException', async () => {

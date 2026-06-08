@@ -6,6 +6,7 @@ import { DemoService } from './demo.service';
 import { DEMO_WORKFLOWS } from './demo-workflows.fixtures';
 
 describe('DemoService', () => {
+  const orgId = 'ffffffff-0000-1111-2222-333333333333';
   const userId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 
   let service: DemoService;
@@ -66,7 +67,7 @@ describe('DemoService', () => {
         Promise.resolve({ id: `hk-${data.path}`, path: data.path }),
       );
 
-      const result = await service.seedForUser(userId);
+      const result = await service.seedForOrg(orgId, userId);
 
       expect(prisma.workflow.create).toHaveBeenCalledTimes(DEMO_WORKFLOWS.length);
       expect(result.workflows).toHaveLength(DEMO_WORKFLOWS.length);
@@ -83,7 +84,7 @@ describe('DemoService', () => {
       prisma.webhook.findFirst.mockResolvedValue(null);
       prisma.webhook.create.mockResolvedValue({ id: 'hk-1', path: 'demo' });
 
-      await service.seedForUser(userId);
+      await service.seedForOrg(orgId, userId);
 
       for (const call of prisma.workflow.create.mock.calls) {
         expect(call[0].data.userId).toBe(userId);
@@ -105,7 +106,7 @@ describe('DemoService', () => {
       prisma.webhook.findFirst.mockResolvedValue(null);
       prisma.webhook.create.mockResolvedValue({ id: 'hk-1', path: 'demo' });
 
-      await service.seedForUser(userId);
+      await service.seedForOrg(orgId, userId);
 
       const activeFixtures = DEMO_WORKFLOWS.filter((w) => w.activate);
       const activeCalls = prisma.workflow.create.mock.calls.filter(
@@ -124,7 +125,7 @@ describe('DemoService', () => {
         Promise.resolve({ id: `hk-${data.path}`, path: data.path }),
       );
 
-      const result = await service.seedForUser(userId);
+      const result = await service.seedForOrg(orgId, userId);
 
       const expectedWebhookCount = DEMO_WORKFLOWS.filter((w) => w.webhook).length;
       expect(prisma.webhook.create).toHaveBeenCalledTimes(expectedWebhookCount);
@@ -148,7 +149,7 @@ describe('DemoService', () => {
         Promise.resolve({ id: `hk-${data.path}`, path: data.path }),
       );
 
-      await service.seedForUser(userId);
+      await service.seedForOrg(orgId, userId);
 
       for (const call of prisma.webhook.create.mock.calls) {
         const path = call[0].data.path as string;
@@ -171,11 +172,11 @@ describe('DemoService', () => {
         Promise.resolve({ id: `hk-${data.path}`, path: data.path }),
       );
 
-      await service.seedForUser(userA);
+      await service.seedForOrg(orgId, userA);
       const pathsA = prisma.webhook.create.mock.calls.map((c) => c[0].data.path as string);
 
       prisma.webhook.create.mockClear();
-      await service.seedForUser(userB);
+      await service.seedForOrg(orgId, userB);
       const pathsB = prisma.webhook.create.mock.calls.map((c) => c[0].data.path as string);
 
       expect(pathsA.length).toBeGreaterThan(0);
@@ -195,7 +196,7 @@ describe('DemoService', () => {
         Promise.resolve({ id: `hk-${data.path}`, path: data.path }),
       );
 
-      await service.seedForUser(userId);
+      await service.seedForOrg(orgId, userId);
 
       const secrets = prisma.webhook.create.mock.calls.map((c) => c[0].data.hmacSecret as string);
       for (const secret of secrets) {
@@ -211,7 +212,7 @@ describe('DemoService', () => {
       );
       prisma.webhook.findFirst.mockResolvedValue({ id: 'hk-existing', path: 'demo-existing' });
 
-      const result = await service.seedForUser(userId);
+      const result = await service.seedForOrg(orgId, userId);
 
       expect(prisma.workflow.create).not.toHaveBeenCalled();
       expect(prisma.webhook.create).not.toHaveBeenCalled();
@@ -231,7 +232,7 @@ describe('DemoService', () => {
         Promise.resolve({ id: `hk-${data.path}`, path: data.path }),
       );
 
-      await service.seedForUser(userId);
+      await service.seedForOrg(orgId, userId);
 
       expect(audit.log).toHaveBeenCalled();
       const workflowAuditEntries = audit.log.mock.calls.filter(
@@ -247,12 +248,12 @@ describe('DemoService', () => {
       prisma.workflow.findFirst.mockResolvedValue(baseWorkflow({ id: 'pre-existing' }));
       prisma.webhook.findFirst.mockResolvedValue({ id: 'hk-existing', path: 'demo' });
 
-      await service.seedForUser(userId);
+      await service.seedForOrg(orgId, userId);
 
       expect(audit.log).not.toHaveBeenCalled();
     });
 
-    it('should query existing workflows scoped by userId AND name', async () => {
+    it('should query existing workflows scoped by organizationId AND name', async () => {
       prisma.workflow.findFirst.mockResolvedValue(null);
       prisma.workflow.create.mockImplementation(({ data }: { data: { name: string } }) =>
         Promise.resolve(baseWorkflow({ id: `wf-${data.name}`, name: data.name })),
@@ -260,10 +261,10 @@ describe('DemoService', () => {
       prisma.webhook.findFirst.mockResolvedValue(null);
       prisma.webhook.create.mockResolvedValue({ id: 'hk-1', path: 'demo' });
 
-      await service.seedForUser(userId);
+      await service.seedForOrg(orgId, userId);
 
       for (const call of prisma.workflow.findFirst.mock.calls) {
-        expect(call[0].where.userId).toBe(userId);
+        expect(call[0].where.organizationId).toBe(orgId);
         expect(typeof call[0].where.name).toBe('string');
       }
     });

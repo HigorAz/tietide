@@ -4,13 +4,16 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { AllExecutionsController } from './all-executions.controller';
 import { ExecutionsService } from './executions.service';
 
 describe('AllExecutionsController (integration)', () => {
   let app: INestApplication;
-  let executionsService: { listAllForUser: jest.Mock };
+  let executionsService: { listAllForOrg: jest.Mock };
   let authedUser: { id: string; email: string; role: string } | null;
+
+  const orgId = 'org-uuid-aaaa';
 
   const sampleItem = {
     id: '11111111-1111-4111-8111-111111111111',
@@ -26,7 +29,7 @@ describe('AllExecutionsController (integration)', () => {
   };
 
   beforeEach(async () => {
-    executionsService = { listAllForUser: jest.fn() };
+    executionsService = { listAllForOrg: jest.fn() };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
 
     const mod: TestingModule = await Test.createTestingModule({
@@ -41,6 +44,15 @@ describe('AllExecutionsController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          // Read endpoints are open to any member, including VIEWER.
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: orgId, role: 'VIEWER' };
           return true;
         },
       })
@@ -63,7 +75,7 @@ describe('AllExecutionsController (integration)', () => {
 
   describe('GET /executions', () => {
     it('should return 200 with paginated list scoped to the caller', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [sampleItem],
         total: 1,
         page: 1,
@@ -80,21 +92,18 @@ describe('AllExecutionsController (integration)', () => {
         pageSize: 20,
         nextCursor: null,
       });
-      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
-        'owner-uuid',
-        expect.any(Object),
-      );
+      expect(executionsService.listAllForOrg).toHaveBeenCalledWith(orgId, expect.any(Object));
     });
 
     it('should return 401 when no authenticated user', async () => {
       authedUser = null;
 
       await request(app.getHttpServer()).get('/executions').expect(401);
-      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+      expect(executionsService.listAllForOrg).not.toHaveBeenCalled();
     });
 
     it('should forward status filter to the service', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [],
         total: 0,
         page: 1,
@@ -103,8 +112,8 @@ describe('AllExecutionsController (integration)', () => {
 
       await request(app.getHttpServer()).get('/executions').query({ status: 'FAILED' }).expect(200);
 
-      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
-        'owner-uuid',
+      expect(executionsService.listAllForOrg).toHaveBeenCalledWith(
+        orgId,
         expect.objectContaining({ status: 'FAILED' }),
       );
     });
@@ -114,7 +123,7 @@ describe('AllExecutionsController (integration)', () => {
     });
 
     it('should forward from/to ISO date filters and parse as Date', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [],
         total: 0,
         page: 1,
@@ -126,7 +135,7 @@ describe('AllExecutionsController (integration)', () => {
         .query({ from: '2026-04-01T00:00:00Z', to: '2026-04-30T23:59:59Z' })
         .expect(200);
 
-      const args = executionsService.listAllForUser.mock.calls[0][1] as { from?: Date; to?: Date };
+      const args = executionsService.listAllForOrg.mock.calls[0][1] as { from?: Date; to?: Date };
       expect(args.from).toBeInstanceOf(Date);
       expect(args.to).toBeInstanceOf(Date);
       expect(args.from?.toISOString()).toBe('2026-04-01T00:00:00.000Z');
@@ -140,7 +149,7 @@ describe('AllExecutionsController (integration)', () => {
     });
 
     it('should forward page and pageSize as integers', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [],
         total: 0,
         page: 2,
@@ -152,8 +161,8 @@ describe('AllExecutionsController (integration)', () => {
         .query({ page: '2', pageSize: '50' })
         .expect(200);
 
-      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
-        'owner-uuid',
+      expect(executionsService.listAllForOrg).toHaveBeenCalledWith(
+        orgId,
         expect.objectContaining({ page: 2, pageSize: 50 }),
       );
     });
@@ -167,7 +176,7 @@ describe('AllExecutionsController (integration)', () => {
     });
 
     it('should forward workflowId filter to the service', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [],
         total: 0,
         page: 1,
@@ -177,8 +186,8 @@ describe('AllExecutionsController (integration)', () => {
       const wfId = '550e8400-e29b-41d4-a716-446655440000';
       await request(app.getHttpServer()).get('/executions').query({ workflowId: wfId }).expect(200);
 
-      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
-        'owner-uuid',
+      expect(executionsService.listAllForOrg).toHaveBeenCalledWith(
+        orgId,
         expect.objectContaining({ workflowId: wfId }),
       );
     });
@@ -188,11 +197,11 @@ describe('AllExecutionsController (integration)', () => {
         .get('/executions')
         .query({ workflowId: 'not-a-uuid' })
         .expect(400);
-      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+      expect(executionsService.listAllForOrg).not.toHaveBeenCalled();
     });
 
     it('should accept `limit` as an alias for pageSize and forward it as pageSize', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [],
         total: 0,
         page: 1,
@@ -201,14 +210,14 @@ describe('AllExecutionsController (integration)', () => {
 
       await request(app.getHttpServer()).get('/executions').query({ limit: '5' }).expect(200);
 
-      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
-        'owner-uuid',
+      expect(executionsService.listAllForOrg).toHaveBeenCalledWith(
+        orgId,
         expect.objectContaining({ pageSize: 5 }),
       );
     });
 
     it('should prefer pageSize when both pageSize and limit are provided', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [],
         total: 0,
         page: 1,
@@ -220,19 +229,19 @@ describe('AllExecutionsController (integration)', () => {
         .query({ pageSize: '30', limit: '5' })
         .expect(200);
 
-      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
-        'owner-uuid',
+      expect(executionsService.listAllForOrg).toHaveBeenCalledWith(
+        orgId,
         expect.objectContaining({ pageSize: 30 }),
       );
     });
 
     it('should reject limit over 100 with 400', async () => {
       await request(app.getHttpServer()).get('/executions').query({ limit: '500' }).expect(400);
-      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+      expect(executionsService.listAllForOrg).not.toHaveBeenCalled();
     });
 
     it('should forward cursor to the service', async () => {
-      executionsService.listAllForUser.mockResolvedValue({
+      executionsService.listAllForOrg.mockResolvedValue({
         items: [],
         total: 0,
         page: 1,
@@ -243,8 +252,8 @@ describe('AllExecutionsController (integration)', () => {
       const cursor = 'eyJjcmVhdGVkQXQiOiIyMDI2LTA0LTIwVDEwOjAwOjAwLjAwMFoiLCJpZCI6ImFiYyJ9';
       await request(app.getHttpServer()).get('/executions').query({ cursor }).expect(200);
 
-      expect(executionsService.listAllForUser).toHaveBeenCalledWith(
-        'owner-uuid',
+      expect(executionsService.listAllForOrg).toHaveBeenCalledWith(
+        orgId,
         expect.objectContaining({ cursor }),
       );
     });
@@ -254,7 +263,7 @@ describe('AllExecutionsController (integration)', () => {
         .get('/executions')
         .query({ cursor: 'invalid cursor!' })
         .expect(400);
-      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+      expect(executionsService.listAllForOrg).not.toHaveBeenCalled();
     });
 
     it('should reject a cursor over 256 characters', async () => {
@@ -262,7 +271,7 @@ describe('AllExecutionsController (integration)', () => {
         .get('/executions')
         .query({ cursor: 'a'.repeat(257) })
         .expect(400);
-      expect(executionsService.listAllForUser).not.toHaveBeenCalled();
+      expect(executionsService.listAllForOrg).not.toHaveBeenCalled();
     });
   });
 });

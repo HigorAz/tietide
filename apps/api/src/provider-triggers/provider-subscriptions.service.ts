@@ -13,17 +13,17 @@ export class ProviderSubscriptionsService {
   ) {}
 
   /**
-   * List the provider-webhook subscriptions for a workflow the caller owns,
-   * each with its public callback URL. Ownership is enforced via userId — IDs
-   * are never trusted from the request body. Returns [] when the workflow has
-   * no active push-trigger subscriptions yet (e.g. it has not been activated).
+   * List the provider-webhook subscriptions for a workflow in the active
+   * workspace, each with its public callback URL. Ownership is enforced via
+   * organizationId — IDs are never trusted from the request body. Returns []
+   * when the workflow has no active push-trigger subscriptions yet.
    */
   async listForWorkflow(
-    userId: string,
+    organizationId: string,
     workflowId: string,
   ): Promise<ProviderSubscriptionResponseDto[]> {
     const workflow = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, userId },
+      where: { id: workflowId, organizationId },
       select: { id: true },
     });
     if (!workflow) {

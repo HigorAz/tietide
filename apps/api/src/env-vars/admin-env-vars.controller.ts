@@ -56,7 +56,7 @@ export class AdminEnvVarsController {
   async list(@Query() page: PageQueryDto): Promise<PaginatedEnvVarsDto> {
     return this.envVars.list({
       scope: 'GLOBAL',
-      ownerUserId: null,
+      organizationId: null,
       limit: page.limit,
       cursor: page.cursor,
     });
@@ -74,7 +74,7 @@ export class AdminEnvVarsController {
   ): Promise<EnvVarResponseDto> {
     return this.envVars.create({
       scope: 'GLOBAL',
-      ownerUserId: null,
+      organizationId: null,
       actorUserId: admin.id,
       dto,
     });
@@ -96,7 +96,7 @@ export class AdminEnvVarsController {
     }
     return this.envVars.update({
       scope: 'GLOBAL',
-      ownerUserId: null,
+      organizationId: null,
       actorUserId: admin.id,
       id,
       dto,
@@ -114,7 +114,7 @@ export class AdminEnvVarsController {
   ): Promise<void> {
     await this.envVars.remove({
       scope: 'GLOBAL',
-      ownerUserId: null,
+      organizationId: null,
       actorUserId: admin.id,
       id,
     });

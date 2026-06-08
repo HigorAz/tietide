@@ -9,6 +9,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { FoldersController } from './folders.controller';
 import { FoldersService } from './folders.service';
 
@@ -48,6 +49,14 @@ describe('FoldersController (integration)', () => {
           return true;
         },
       })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
+          return true;
+        },
+      })
       .compile();
 
     app = module.createNestApplication();
@@ -81,7 +90,7 @@ describe('FoldersController (integration)', () => {
       foldersService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
       const res = await request(app.getHttpServer()).get('/folders').expect(200);
       expect(res.body).toEqual({ items: [persisted], nextCursor: null });
-      expect(foldersService.list).toHaveBeenCalledWith('owner-uuid', {});
+      expect(foldersService.list).toHaveBeenCalledWith('org-uuid', {});
     });
   });
 
@@ -93,7 +102,9 @@ describe('FoldersController (integration)', () => {
         .send({ name: 'Personal' })
         .expect(201);
       expect(res.body).toEqual(persisted);
-      expect(foldersService.create).toHaveBeenCalledWith('owner-uuid', { name: 'Personal' });
+      expect(foldersService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', {
+        name: 'Personal',
+      });
     });
 
     it('accepts a UUID parentFolderId', async () => {
@@ -102,7 +113,7 @@ describe('FoldersController (integration)', () => {
         .post('/folders')
         .send({ name: 'Sub', parentFolderId: parentUuid })
         .expect(201);
-      expect(foldersService.create).toHaveBeenCalledWith('owner-uuid', {
+      expect(foldersService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', {
         name: 'Sub',
         parentFolderId: parentUuid,
       });
@@ -137,7 +148,9 @@ describe('FoldersController (integration)', () => {
         .patch(`/folders/${uuid}`)
         .send({ name: 'Renamed' })
         .expect(200);
-      expect(foldersService.update).toHaveBeenCalledWith('owner-uuid', uuid, { name: 'Renamed' });
+      expect(foldersService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
+        name: 'Renamed',
+      });
     });
 
     it('moves a folder to root via parentFolderId=null', async () => {
@@ -146,7 +159,7 @@ describe('FoldersController (integration)', () => {
         .patch(`/folders/${uuid}`)
         .send({ parentFolderId: null })
         .expect(200);
-      expect(foldersService.update).toHaveBeenCalledWith('owner-uuid', uuid, {
+      expect(foldersService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
         parentFolderId: null,
       });
     });
@@ -172,7 +185,7 @@ describe('FoldersController (integration)', () => {
       foldersService.remove.mockResolvedValue({ deletedFolders: 2, deletedWorkflows: 5 });
       const res = await request(app.getHttpServer()).delete(`/folders/${uuid}`).expect(200);
       expect(res.body).toEqual({ deletedFolders: 2, deletedWorkflows: 5 });
-      expect(foldersService.remove).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(foldersService.remove).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid);
     });
 
     it('returns 404 when folder belongs to another user', async () => {

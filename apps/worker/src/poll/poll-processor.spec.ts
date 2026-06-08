@@ -25,7 +25,7 @@ describe('PollProcessor', () => {
   let trigger: { defaultIntervalSeconds: number; poll: jest.Mock; type: string };
   let loader: { load: jest.Mock };
 
-  const userId = 'user-1';
+  const organizationId = 'org-1';
   const workflowId = 'wf-1';
   const nodeId = 'trigger-1';
   const triggerType = 'sheets-row-added';
@@ -33,7 +33,7 @@ describe('PollProcessor', () => {
   function makeJob(): Job<PollFirePayload> {
     return {
       id: 'job-1',
-      data: { workflowId, userId, nodeId, type: triggerType },
+      data: { workflowId, organizationId, nodeId, type: triggerType },
     } as unknown as Job<PollFirePayload>;
   }
 
@@ -50,7 +50,7 @@ describe('PollProcessor', () => {
       workflow: {
         findUnique: jest.fn(async () => ({
           id: workflowId,
-          userId,
+          organizationId,
           isActive: true,
           definition: {
             nodes: [
@@ -108,7 +108,7 @@ describe('PollProcessor', () => {
 
     await processor.process(makeJob());
 
-    expect(loader.load).toHaveBeenCalledWith(userId, 'conn-1');
+    expect(loader.load).toHaveBeenCalledWith(organizationId, 'conn-1');
     expect(trigger.poll).toHaveBeenCalledWith(
       expect.objectContaining({
         workflowId,
@@ -191,7 +191,7 @@ describe('PollProcessor', () => {
   it('skips when workflow is inactive', async () => {
     prisma.workflow.findUnique.mockResolvedValueOnce({
       id: workflowId,
-      userId,
+      organizationId,
       isActive: false,
       definition: { nodes: [], edges: [] },
     });
@@ -203,7 +203,7 @@ describe('PollProcessor', () => {
 
   it('skips when the trigger type is not registered', async () => {
     const unknownJob = {
-      data: { workflowId, userId, nodeId, type: 'unknown-poll' },
+      data: { workflowId, organizationId, nodeId, type: 'unknown-poll' },
     } as Job<PollFirePayload>;
 
     await processor.process(unknownJob);

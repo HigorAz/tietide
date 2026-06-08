@@ -10,6 +10,9 @@ import type {
 
 export interface AuditLogEntry {
   userId: string;
+  // Owning workspace for the audited action. Omitted for account-level events
+  // (e.g. auth) that are not scoped to an organization.
+  organizationId?: string;
   action: string;
   resource: string;
   resourceId?: string;
@@ -112,6 +115,7 @@ export class AuditLogService {
       .create({
         data: {
           userId: entry.userId,
+          organizationId: entry.organizationId,
           action: entry.action,
           resource: entry.resource,
           resourceId: entry.resourceId,

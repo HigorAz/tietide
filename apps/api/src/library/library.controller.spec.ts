@@ -4,6 +4,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { LibraryController } from './library.controller';
 import { LibraryService } from './library.service';
 
@@ -76,6 +77,14 @@ describe('LibraryController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
           return true;
         },
       })
@@ -153,7 +162,11 @@ describe('LibraryController (integration)', () => {
         .send({ userId: 'forged-id' })
         .expect(201);
 
-      expect(libraryService.instantiate).toHaveBeenCalledWith('owner-uuid', 'cron-fetch-process');
+      expect(libraryService.instantiate).toHaveBeenCalledWith(
+        'org-uuid',
+        'owner-uuid',
+        'cron-fetch-process',
+      );
     });
 
     it('should return 404 when the service raises NotFoundException (AC: unknown slug)', async () => {

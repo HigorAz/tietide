@@ -27,8 +27,13 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
+import { OrgRoles } from '../common/decorators/org-roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import { OrgRolesGuard } from '../common/guards/org-roles.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { WorkflowsService } from './workflows.service';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
 import { UpdateWorkflowDto } from './dto/update-workflow.dto';
@@ -38,13 +43,13 @@ import { PaginatedWorkflowsDto } from './dto/workflow-list-response.dto';
 @ApiTags('workflows')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
 @Controller('workflows')
 export class WorkflowsController {
   constructor(private readonly workflows: WorkflowsService) {}
 
   @Get()
-  @ApiOperation({ summary: "List the authenticated user's workflows (cursor-paginated)" })
+  @ApiOperation({ summary: "List the active workspace's workflows (cursor-paginated)" })
   @ApiOkResponse({ type: PaginatedWorkflowsDto })
   @ApiQuery({
     name: 'folderId',
@@ -67,7 +72,7 @@ export class WorkflowsController {
     description: "Opaque cursor from a previous page's nextCursor.",
   })
   async list(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Query('folderId') folderId?: string,
     @Query('tagIds') tagIds?: string,
     @Query('limit') limit?: string,
@@ -107,19 +112,21 @@ export class WorkflowsController {
       }
       filter.tagIds = ids;
     }
-    return this.workflows.list(user.id, filter);
+    return this.workflows.list(org.id, filter);
   }
 
   @Post()
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new workflow' })
   @ApiCreatedResponse({ type: WorkflowResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid input' })
   async create(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateWorkflowDto,
   ): Promise<WorkflowResponseDto> {
-    return this.workflows.create(user.id, dto);
+    return this.workflows.create(org.id, user.id, dto);
   }
 
   @Get(':id')
@@ -128,36 +135,40 @@ export class WorkflowsController {
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async findOne(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<WorkflowResponseDto> {
-    return this.workflows.findOne(user.id, id);
+    return this.workflows.findOne(org.id, id);
   }
 
   @Patch(':id')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @ApiOperation({ summary: 'Update a workflow (auto-increments version)' })
   @ApiOkResponse({ type: WorkflowResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid input' })
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async update(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateWorkflowDto,
   ): Promise<WorkflowResponseDto> {
-    return this.workflows.update(user.id, id, dto);
+    return this.workflows.update(org.id, user.id, id, dto);
   }
 
   @Delete(':id')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a workflow' })
   @ApiNoContentResponse({ description: 'Deleted' })
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async remove(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<void> {
-    await this.workflows.remove(user.id, id);
+    await this.workflows.remove(org.id, user.id, id);
   }
 }

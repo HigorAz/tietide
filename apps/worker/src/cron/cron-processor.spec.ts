@@ -20,7 +20,7 @@ const buildJob = (
 ): Job<CronFirePayload> => {
   const data: CronFirePayload = {
     workflowId: 'wf-1',
-    userId: 'user-1',
+    organizationId: 'org-1',
     expression: '*/5 * * * *',
     ...overrides,
   };
@@ -71,7 +71,7 @@ describe('CronProcessor', () => {
     it('should look up the workflow before queueing an execution', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'user-1',
+        organizationId: 'org-1',
         isActive: true,
       });
 
@@ -79,14 +79,14 @@ describe('CronProcessor', () => {
 
       expect(prisma.workflow.findUnique).toHaveBeenCalledWith({
         where: { id: 'wf-1' },
-        select: { id: true, userId: true, isActive: true },
+        select: { id: true, organizationId: true, isActive: true },
       });
     });
 
     it('should create a WorkflowExecution row with a deterministic idempotency key', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'user-1',
+        organizationId: 'org-1',
         isActive: true,
       });
 
@@ -107,7 +107,7 @@ describe('CronProcessor', () => {
     it('keys idempotency on the scheduled time, stable across processing-time (processedOn) drift', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'user-1',
+        organizationId: 'org-1',
         isActive: true,
       });
 
@@ -122,14 +122,14 @@ describe('CronProcessor', () => {
       expect(k1).toBe(`cron:wf-1:${new Date(1700000000000).toISOString()}`);
     });
 
-    it('should enqueue an execution job to the workflow-execution queue with the userId from DB', async () => {
+    it('should enqueue an execution job to the workflow-execution queue with the organizationId from DB', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'owner-7',
+        organizationId: 'org-7',
         isActive: true,
       });
 
-      await processor.process(buildJob({ userId: 'spoofed-user' }));
+      await processor.process(buildJob({ organizationId: 'spoofed-org' }));
 
       expect(executionQueue.add).toHaveBeenCalledTimes(1);
       const [jobName, payload, opts] = executionQueue.add.mock.calls[0];
@@ -138,7 +138,7 @@ describe('CronProcessor', () => {
         expect.objectContaining({
           workflowId: 'wf-1',
           triggerType: 'cron',
-          userId: 'owner-7',
+          organizationId: 'org-7',
         }),
       );
       expect(opts).toEqual(expect.objectContaining({ jobId: expect.any(String) }));
@@ -147,7 +147,7 @@ describe('CronProcessor', () => {
     it('should skip when the workflow is no longer active (lock against stale repeatables)', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'user-1',
+        organizationId: 'org-1',
         isActive: false,
       });
 
@@ -169,7 +169,7 @@ describe('CronProcessor', () => {
     it('should not duplicate when the same scheduled tick fires twice (idempotency lock)', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'user-1',
+        organizationId: 'org-1',
         isActive: true,
       });
       prisma.workflowExecution.findFirst.mockResolvedValue({ id: 'exec-existing' });
@@ -183,7 +183,7 @@ describe('CronProcessor', () => {
     it('should treat a concurrent insert that loses the unique-constraint race (P2002) as a duplicate', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'user-1',
+        organizationId: 'org-1',
         isActive: true,
       });
       // The pre-create findFirst sees nothing, but a concurrent tick commits the
@@ -202,7 +202,7 @@ describe('CronProcessor', () => {
     it('should rethrow a non-unique create error so the tick fails and retries', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         id: 'wf-1',
-        userId: 'user-1',
+        organizationId: 'org-1',
         isActive: true,
       });
       prisma.workflowExecution.findFirst.mockResolvedValue(null);

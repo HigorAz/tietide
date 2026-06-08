@@ -34,6 +34,7 @@ describe('ProviderWebhooksService', () => {
   const subscriptionId = 'sub-uuid';
   const workflowId = 'wf-uuid';
   const userId = 'user-uuid';
+  const organizationId = 'org-uuid-pw';
   const executionId = 'exec-uuid';
   const signingSecret = 'whsec_test';
 
@@ -50,6 +51,7 @@ describe('ProviderWebhooksService', () => {
       workflow: {
         id: workflowId,
         userId,
+        organizationId,
         isActive: active,
         definition: {
           nodes: [{ id: 'trigger-node', type: 'stripe-event-received', config: {} }],
@@ -125,6 +127,7 @@ describe('ProviderWebhooksService', () => {
           executionId,
           workflowId,
           userId,
+          organizationId,
           triggerType: 'provider:stripe',
         }),
         expect.objectContaining({ jobId: executionId }),

@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { visibleNavItems } from './navItems';
 import { SidebarItem } from './SidebarItem';
 import { SidebarFooter } from './SidebarFooter';
+import { OrgSwitcher } from './OrgSwitcher';
 import logoIcon from '@/assets/brand/logo-icon.png';
 
 export const SIDEBAR_STORAGE_KEY = 'tietide-sidebar-collapsed';
@@ -79,6 +80,8 @@ export function Sidebar(): JSX.Element {
           )}
         </button>
       </div>
+
+      <OrgSwitcher collapsed={collapsed} />
 
       <nav aria-label="Main navigation" className="flex-1 overflow-y-auto py-2">
         {items.map((item) => (

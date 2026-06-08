@@ -78,7 +78,7 @@ describe('AdminEnvVarsController (GLOBAL scope) integration', () => {
       await request(app.getHttpServer()).get('/admin/env-vars').expect(200);
       expect(envVarsService.list).toHaveBeenCalledWith({
         scope: 'GLOBAL',
-        ownerUserId: null,
+        organizationId: null,
         limit: undefined,
         cursor: undefined,
       });
@@ -113,7 +113,7 @@ describe('AdminEnvVarsController (GLOBAL scope) integration', () => {
       expect(res.body).toEqual(persisted);
       expect(envVarsService.create).toHaveBeenCalledWith({
         scope: 'GLOBAL',
-        ownerUserId: null,
+        organizationId: null,
         actorUserId: 'admin-uuid',
         dto: validBody,
       });
@@ -150,7 +150,7 @@ describe('AdminEnvVarsController (GLOBAL scope) integration', () => {
 
       expect(envVarsService.update).toHaveBeenCalledWith({
         scope: 'GLOBAL',
-        ownerUserId: null,
+        organizationId: null,
         actorUserId: 'admin-uuid',
         id: uuid,
         dto: { value: 'rotated' },
@@ -173,7 +173,7 @@ describe('AdminEnvVarsController (GLOBAL scope) integration', () => {
 
       expect(envVarsService.remove).toHaveBeenCalledWith({
         scope: 'GLOBAL',
-        ownerUserId: null,
+        organizationId: null,
         actorUserId: 'admin-uuid',
         id: uuid,
       });
