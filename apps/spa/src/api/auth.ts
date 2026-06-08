@@ -63,3 +63,42 @@ export async function resetPassword(token: string, password: string): Promise<Lo
   const { data } = await api.post<LoginResponse>('/auth/reset-password', { token, password });
   return data;
 }
+
+export interface MessageResponse {
+  message: string;
+}
+
+// Updates the display name and returns the refreshed public profile.
+export async function updateProfile(name: string): Promise<PublicUser> {
+  const { data } = await api.patch<PublicUser>('/auth/profile', { name });
+  return data;
+}
+
+// Changes the password (current password required). Revokes every other session
+// and returns a fresh token so the calling device stays signed in.
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<LoginResponse> {
+  const { data } = await api.patch<LoginResponse>('/auth/password', {
+    currentPassword,
+    newPassword,
+  });
+  return data;
+}
+
+// Requests a fresh verification email. Always resolves with a neutral message.
+export async function resendVerification(email: string): Promise<MessageResponse> {
+  const { data } = await api.post<MessageResponse>('/auth/resend-verification', { email });
+  return data;
+}
+
+// Revokes every outstanding session for the current user (bumps tokenVersion).
+export async function logout(): Promise<void> {
+  await api.post('/auth/logout');
+}
+
+// Permanently deletes (anonymizes) the current account. Requires the password.
+export async function deleteAccount(password: string): Promise<void> {
+  await api.delete('/auth/account', { data: { password } });
+}

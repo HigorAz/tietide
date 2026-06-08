@@ -10,7 +10,14 @@ const TEST_USER_ID = 'user-test';
 
 const setUser = (id: string = TEST_USER_ID): void => {
   useAuthStore.setState({
-    user: { id, email: 'tester@tietide.dev', name: 'Tester', role: Role.USER },
+    user: {
+      id,
+      email: 'tester@tietide.dev',
+      name: 'Tester',
+      role: Role.USER,
+      emailVerified: true,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    },
     token: 'jwt-test',
   });
 };

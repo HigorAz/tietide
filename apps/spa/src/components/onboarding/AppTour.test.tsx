@@ -58,7 +58,14 @@ const renderAt = (initial = '/dashboard'): ReturnType<typeof render> =>
 
 const mockUser = (id: string): void => {
   useAuthStore.setState({
-    user: { id, email: 't@t', name: 'T', role: 'USER' },
+    user: {
+      id,
+      email: 't@t',
+      name: 'T',
+      role: 'USER',
+      emailVerified: true,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    },
     token: 'jwt-test',
   });
 };

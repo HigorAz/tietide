@@ -14,7 +14,7 @@ import { ConnectionsPage } from '@/pages/ConnectionsPage';
 import { OrganizationsPage } from '@/pages/OrganizationsPage';
 import { OrgMembersPage } from '@/pages/OrgMembersPage';
 import { InviteAcceptPage } from '@/pages/InviteAcceptPage';
-import { PlaceholderPage } from '@/pages/PlaceholderPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { SettingsEnvVarsPage } from '@/pages/settings/EnvVarsPage';
 import { AdminEnvVarsPage } from '@/pages/admin/EnvVarsPage';
 import { AuditLogPage } from '@/pages/admin/AuditLogPage';
@@ -48,7 +48,7 @@ const router = createBrowserRouter([
           { path: '/organizations', element: <OrganizationsPage /> },
           { path: '/organizations/members', element: <OrgMembersPage /> },
           { path: '/organizations/accept-invite', element: <InviteAcceptPage /> },
-          { path: '/settings', element: <PlaceholderPage title="Account settings" /> },
+          { path: '/settings', element: <SettingsPage /> },
           { path: '/settings/env-vars', element: <SettingsEnvVarsPage /> },
           {
             path: '/admin/env-vars',
