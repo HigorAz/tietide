@@ -56,4 +56,13 @@ describe('MailerService (log transport)', () => {
     );
     expect(meta.body).toContain('Acme Workspace');
   });
+
+  it('logs the account-deleted confirmation email', async () => {
+    await mailer.sendAccountDeletedEmail('user@example.com');
+
+    expect(logger.log).toHaveBeenCalledTimes(1);
+    const [meta] = logger.log.mock.calls[0];
+    expect(meta.to).toBe('user@example.com');
+    expect(meta.subject).toBe('Your TieTide account has been deleted');
+  });
 });

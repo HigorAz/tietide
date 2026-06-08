@@ -13,6 +13,14 @@ import {
   resolveMailConfig,
   type MailConfig,
 } from './mailer.config';
+import { toMailParts } from './templates/layout';
+import {
+  buildAccountDeletedEmail,
+  buildAlreadyRegisteredEmail,
+  buildInviteEmail,
+  buildPasswordResetEmail,
+  buildVerificationEmail,
+} from './templates/emails';
 
 /**
  * Sends transactional auth emails. The transport is chosen once at construction:
@@ -34,52 +42,27 @@ export class MailerService {
 
   async sendVerificationEmail(to: string, rawToken: string): Promise<void> {
     const url = buildVerificationUrl(this.config.appUrl, rawToken);
-    await this.safeSend({
-      to,
-      subject: 'Verify your TieTide email',
-      text:
-        `Welcome to TieTide!\n\n` +
-        `Confirm your email address to activate your account:\n${url}\n\n` +
-        `This link expires in 24 hours. If you didn't create an account, you can ignore this email.`,
-    });
+    await this.safeSend({ to, ...toMailParts(buildVerificationEmail(url)) });
   }
 
   async sendPasswordResetEmail(to: string, rawToken: string): Promise<void> {
     const url = buildPasswordResetUrl(this.config.appUrl, rawToken);
-    await this.safeSend({
-      to,
-      subject: 'Reset your TieTide password',
-      text:
-        `We received a request to reset your TieTide password.\n\n` +
-        `Choose a new password here:\n${url}\n\n` +
-        `This link expires in 1 hour and can be used once. ` +
-        `If you didn't request this, you can safely ignore this email — your password won't change.`,
-    });
+    await this.safeSend({ to, ...toMailParts(buildPasswordResetEmail(url)) });
   }
 
   async sendOrganizationInviteEmail(to: string, rawToken: string, orgName: string): Promise<void> {
     const url = buildInviteUrl(this.config.appUrl, rawToken);
-    await this.safeSend({
-      to,
-      subject: `You've been invited to ${orgName} on TieTide`,
-      text:
-        `You've been invited to join the "${orgName}" workspace on TieTide.\n\n` +
-        `Accept the invitation here:\n${url}\n\n` +
-        `This invite expires in 7 days and can be used once. ` +
-        `If you weren't expecting this, you can safely ignore this email.`,
-    });
+    await this.safeSend({ to, ...toMailParts(buildInviteEmail(url, orgName)) });
   }
 
   async sendAlreadyRegisteredEmail(to: string): Promise<void> {
-    await this.safeSend({
-      to,
-      subject: 'You already have a TieTide account',
-      text:
-        `Someone tried to create a TieTide account with this email, but one already exists.\n\n` +
-        `If this was you, just sign in at ${this.config.appUrl}/login` +
-        ` (use "forgot password" if you don't remember it).\n\n` +
-        `If it wasn't you, you can safely ignore this email — no account was created or changed.`,
-    });
+    const loginUrl = `${this.config.appUrl}/login`;
+    await this.safeSend({ to, ...toMailParts(buildAlreadyRegisteredEmail(loginUrl)) });
+  }
+
+  /** Best-effort confirmation that a self-service account deletion completed. */
+  async sendAccountDeletedEmail(to: string): Promise<void> {
+    await this.safeSend({ to, ...toMailParts(buildAccountDeletedEmail()) });
   }
 
   private async safeSend(message: MailMessage): Promise<void> {
