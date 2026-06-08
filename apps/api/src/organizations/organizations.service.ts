@@ -10,6 +10,7 @@ import { ORG_ROLE_RANK, type OrgRole } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { EntitlementsService } from '../billing/entitlements.service';
+import { SeatSyncService } from '../billing/seat-sync.service';
 import { OrganizationAccessService } from './organization-access.service';
 import type { CreateOrganizationDto } from './dto/create-organization.dto';
 import type { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -28,6 +29,7 @@ export class OrganizationsService {
     private readonly audit: AuditLogService,
     private readonly access: OrganizationAccessService,
     private readonly entitlements: EntitlementsService,
+    private readonly seatSync: SeatSyncService,
   ) {}
 
   async create(userId: string, dto: CreateOrganizationDto): Promise<OrganizationSummaryDto> {
@@ -194,6 +196,8 @@ export class OrganizationsService {
     await this.prisma.organizationMember.delete({
       where: { organizationId_userId: { organizationId: orgId, userId: targetUserId } },
     });
+    // A seat freed up → reconcile the Stripe seat quantity (async, no-op for FREE).
+    await this.seatSync.enqueue(orgId);
     await this.audit.log({
       userId: actingUserId,
       organizationId: orgId,

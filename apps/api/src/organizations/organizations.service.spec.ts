@@ -4,6 +4,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { EntitlementsService } from '../billing/entitlements.service';
+import { SeatSyncService } from '../billing/seat-sync.service';
 import { PaymentRequiredException } from '../billing/payment-required.exception';
 import { OrganizationAccessService } from './organization-access.service';
 import { OrganizationsService } from './organizations.service';
@@ -84,6 +85,7 @@ describe('OrganizationsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogService, useValue: audit },
         { provide: EntitlementsService, useValue: entitlements },
+        { provide: SeatSyncService, useValue: { enqueue: jest.fn() } },
       ],
     }).compile();
 

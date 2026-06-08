@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { MailerService } from '../mailer/mailer.service';
 import { EntitlementsService } from '../billing/entitlements.service';
+import { SeatSyncService } from '../billing/seat-sync.service';
 import { OrganizationAccessService } from './organization-access.service';
 import type { CreateInviteDto } from './dto/create-invite.dto';
 import type { AcceptInviteDto } from './dto/accept-invite.dto';
@@ -31,6 +32,7 @@ export class OrganizationInvitesService {
     private readonly mailer: MailerService,
     private readonly access: OrganizationAccessService,
     private readonly entitlements: EntitlementsService,
+    private readonly seatSync: SeatSyncService,
   ) {}
 
   async create(
@@ -147,6 +149,12 @@ export class OrganizationInvitesService {
     } catch (err) {
       // Already a member — accepting is idempotent; keep their existing role.
       if (!this.access.isUniqueViolation(err)) throw err;
+    }
+
+    // A new member consumed a seat → reconcile the Stripe seat quantity (async,
+    // no-op for FREE/unsubscribed). Skip when they were already a member.
+    if (!alreadyMember) {
+      await this.seatSync.enqueue(invite.organizationId);
     }
 
     await this.access.adoptAsDefaultIfNone(userId, invite.organizationId);

@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { MailerService } from '../mailer/mailer.service';
 import { EntitlementsService } from '../billing/entitlements.service';
+import { SeatSyncService } from '../billing/seat-sync.service';
 import { OrganizationAccessService } from './organization-access.service';
 import { OrganizationInvitesService } from './organization-invites.service';
 
@@ -60,6 +61,7 @@ describe('OrganizationInvitesService', () => {
         { provide: AuditLogService, useValue: audit },
         { provide: MailerService, useValue: mailer },
         { provide: EntitlementsService, useValue: entitlements },
+        { provide: SeatSyncService, useValue: { enqueue: jest.fn() } },
       ],
     }).compile();
 
