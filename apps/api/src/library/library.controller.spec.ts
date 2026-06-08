@@ -17,39 +17,39 @@ describe('LibraryController (integration)', () => {
 
   const templates = [
     {
-      slug: 'webhook-conditional-notification',
-      name: 'Demo: Webhook → Enrich → IF → Notify',
-      description: 'Webhook fixture',
-      category: 'Webhook',
-      nodeTypes: ['webhook-trigger', 'http-request', 'conditional'],
+      slug: 'lead-capture-to-crm',
+      name: 'Lead capture → CRM → hot-lead alert',
+      description: 'Sales template',
+      category: 'Sales',
+      nodeTypes: ['webhook-trigger', 'code', 'hubspot-create-contact', 'conditional'],
     },
     {
-      slug: 'cron-fetch-process',
-      name: 'Demo: Cron → Fetch → Archive',
-      description: 'Cron fixture',
-      category: 'Schedule',
-      nodeTypes: ['cron-trigger', 'http-request'],
+      slug: 'daily-hn-ai-digest',
+      name: 'Daily Hacker News AI digest',
+      description: 'Marketing template',
+      category: 'Marketing',
+      nodeTypes: ['cron-trigger', 'http-request', 'code', 'iterator'],
     },
     {
-      slug: 'manual-ai-docs-showcase',
-      name: 'Demo: Manual → Multi-step (AI Docs Showcase)',
-      description: 'AI fixture',
-      category: 'AI',
-      nodeTypes: ['manual-trigger', 'http-request', 'conditional'],
+      slug: 'github-issue-ai-triage',
+      name: 'GitHub issue AI triage',
+      description: 'Engineering template',
+      category: 'Engineering',
+      nodeTypes: ['github-issue-opened', 'claude-messages', 'code', 'conditional'],
     },
     {
-      slug: 'manual-failure-dlq',
-      name: 'Demo: Manual → Failure (DLQ Showcase)',
-      description: 'DLQ fixture',
-      category: 'Reliability',
-      nodeTypes: ['manual-trigger', 'http-request'],
+      slug: 'weather-ops-alert',
+      name: 'Weather ops alert',
+      description: 'Operations template',
+      category: 'Operations & Finance',
+      nodeTypes: ['cron-trigger', 'http-request', 'code', 'telegram-send-message'],
     },
   ];
 
   const instantiated = {
     id: '11111111-1111-1111-1111-111111111111',
-    name: 'Demo: Cron → Fetch → Archive',
-    description: 'Cron fixture',
+    name: 'Lead capture → CRM → hot-lead alert',
+    description: 'Sales template',
     definition: { nodes: [], edges: [] },
     isActive: false,
     version: 1,
@@ -142,7 +142,7 @@ describe('LibraryController (integration)', () => {
       libraryService.instantiate.mockResolvedValue(instantiated);
 
       const res = await request(app.getHttpServer())
-        .post('/library/templates/cron-fetch-process/instantiate')
+        .post('/library/templates/lead-capture-to-crm/instantiate')
         .expect(201);
 
       expect(res.body).toEqual(
@@ -158,14 +158,14 @@ describe('LibraryController (integration)', () => {
       libraryService.instantiate.mockResolvedValue(instantiated);
 
       await request(app.getHttpServer())
-        .post('/library/templates/cron-fetch-process/instantiate')
+        .post('/library/templates/lead-capture-to-crm/instantiate')
         .send({ userId: 'forged-id' })
         .expect(201);
 
       expect(libraryService.instantiate).toHaveBeenCalledWith(
         'org-uuid',
         'owner-uuid',
-        'cron-fetch-process',
+        'lead-capture-to-crm',
       );
     });
 
@@ -181,7 +181,7 @@ describe('LibraryController (integration)', () => {
       authedUser = null;
 
       await request(app.getHttpServer())
-        .post('/library/templates/cron-fetch-process/instantiate')
+        .post('/library/templates/lead-capture-to-crm/instantiate')
         .expect(401);
 
       expect(libraryService.instantiate).not.toHaveBeenCalled();

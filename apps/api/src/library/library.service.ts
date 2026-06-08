@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
-import { DEMO_WORKFLOWS, type DemoWorkflowFixture } from '../demo/demo-workflows.fixtures';
+import { LIBRARY_TEMPLATES, type LibraryTemplate } from './templates';
 import type { WorkflowResponseDto } from '../workflows/dto/workflow-response.dto';
 import type { TemplateResponseDto } from './dto/template-response.dto';
 
@@ -15,7 +15,7 @@ export class LibraryService {
   ) {}
 
   list(): TemplateResponseDto[] {
-    return DEMO_WORKFLOWS.map(toTemplateResponse);
+    return LIBRARY_TEMPLATES.map(toTemplateResponse);
   }
 
   async instantiate(
@@ -23,15 +23,14 @@ export class LibraryService {
     userId: string,
     slug: string,
   ): Promise<WorkflowResponseDto> {
-    const fixture = DEMO_WORKFLOWS.find((f) => f.slug === slug);
+    const fixture = LIBRARY_TEMPLATES.find((f) => f.slug === slug);
     if (!fixture) {
       throw new NotFoundException(`Template '${slug}' not found`);
     }
 
-    // Library instantiation always creates an inactive workflow regardless of
-    // fixture.activate. This prevents a single click from exposing a publicly
-    // callable webhook URL on a forked workflow — the user opts in via the
-    // toggle on /workflows after reviewing.
+    // Library instantiation always creates an inactive workflow. This prevents a
+    // single click from exposing a publicly callable webhook URL on a forked
+    // workflow — the user opts in via the toggle on /workflows after reviewing.
     const created = await this.prisma.workflow.create({
       data: {
         organizationId,
@@ -93,7 +92,7 @@ export class LibraryService {
   }
 }
 
-function toTemplateResponse(fixture: DemoWorkflowFixture): TemplateResponseDto {
+function toTemplateResponse(fixture: LibraryTemplate): TemplateResponseDto {
   const nodeTypes = Array.from(new Set(fixture.definition.nodes.map((n) => n.type)));
   return {
     slug: fixture.slug,
