@@ -13,6 +13,21 @@ vi.mock('@/api/organizations', () => ({
   deleteOrganization: vi.fn(),
 }));
 
+vi.mock('@/api/billing', () => ({
+  getBilling: vi.fn().mockResolvedValue({
+    plan: 'FREE',
+    status: 'ACTIVE',
+    seats: { used: 1, included: 2, max: 2 },
+    runs: { used: 0, included: 1000, hardCap: 1000 },
+    workflows: { used: 0, max: 10 },
+    currentPeriodEnd: null,
+    cancelAtPeriodEnd: false,
+    configured: false,
+  }),
+  startCheckout: vi.fn(),
+  openBillingPortal: vi.fn(),
+}));
+
 import * as orgsApi from '@/api/organizations';
 import type { OrganizationSummary } from '@/api/organizations';
 import { useAuthStore, ACTIVE_ORG_STORAGE_KEY } from '@/stores/authStore';
@@ -66,6 +81,8 @@ describe('WorkspacesSettings', () => {
       expect(screen.getByRole('region', { name: /workspace settings/i })).toBeInTheDocument(),
     );
     expect(screen.getByRole('button', { name: /delete workspace/i })).toBeInTheDocument();
+    // The SUPERADMIN-only billing card is present too.
+    expect(screen.getByRole('region', { name: /plan & billing/i })).toBeInTheDocument();
   });
 
   it('hides the workspace settings card for a non-SUPERADMIN', () => {

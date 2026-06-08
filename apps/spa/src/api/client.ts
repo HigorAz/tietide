@@ -31,6 +31,15 @@ api.interceptors.request.use(attachRequestHeaders);
 // hitting a mutation is left for the page to handle.
 const ORG_ACCESS_LOST = /member of this organization|organization context/i;
 
+// 402 plan-limit messages, keyed by the `reason` the API attaches. Shows a
+// targeted upgrade prompt; call sites may also catch 402 for an inline CTA.
+const PLAN_LIMIT_MESSAGES: Record<string, string> = {
+  seats: 'You’ve reached your plan’s seat limit. Upgrade to add more members.',
+  workspaces: 'You’ve reached the free workspace limit. Upgrade an existing workspace to add more.',
+  runs: 'This workspace has used its included runs. Upgrade to keep running workflows.',
+  workflows: 'You’ve reached your plan’s workflow limit. Upgrade to add more.',
+};
+
 // On a 401 for an authenticated session, soft-logout: clearing the auth store makes
 // ProtectedRoute reactively redirect to /login WITHOUT a full-page reload (the old
 // `window.location.href` threw away all SPA state), and surface a session-expired
@@ -58,6 +67,14 @@ export function onResponseRejected(error: AxiosError): Promise<never> {
         message: 'You no longer have access to that workspace.',
       });
     }
+  }
+
+  if (status === 402 && useAuthStore.getState().token) {
+    const reason = (error.response?.data as { reason?: string } | undefined)?.reason ?? '';
+    useToastStore.getState().show({
+      tone: 'error',
+      message: PLAN_LIMIT_MESSAGES[reason] ?? 'Upgrade your plan to continue.',
+    });
   }
 
   return Promise.reject(error);

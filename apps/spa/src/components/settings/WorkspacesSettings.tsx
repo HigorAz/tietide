@@ -3,6 +3,7 @@ import { MembersManager } from '@/components/organizations/MembersManager';
 import { SettingsCard } from './SettingsCard';
 import { WorkspaceList } from './WorkspaceList';
 import { WorkspaceAdminSection } from './WorkspaceAdminSection';
+import { BillingSection } from './BillingSection';
 
 /**
  * Workspace management surface on the Account Settings page. Lists the user's
@@ -24,6 +25,12 @@ export function WorkspacesSettings(): JSX.Element {
       {active && (
         <SettingsCard title="Members" description={active.name}>
           <MembersManager activeOrg={active} />
+        </SettingsCard>
+      )}
+
+      {active && active.role === 'SUPERADMIN' && (
+        <SettingsCard title="Plan & billing" description="Your workspace plan, usage and payment.">
+          <BillingSection key={active.id} />
         </SettingsCard>
       )}
 
