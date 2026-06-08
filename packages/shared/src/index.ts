@@ -128,10 +128,14 @@ export {
   registerFormSchema,
   forgotPasswordFormSchema,
   resetPasswordFormSchema,
+  updateProfileFormSchema,
+  changePasswordFormSchema,
   type LoginFormValues,
   type RegisterFormValues,
   type ForgotPasswordFormValues,
   type ResetPasswordFormValues,
+  type UpdateProfileFormValues,
+  type ChangePasswordFormValues,
 } from './schemas/auth.schema.js';
 export {
   googleOAuth2ConfigSchema,
