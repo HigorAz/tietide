@@ -62,8 +62,8 @@ export function renderEmailHtml(content: EmailContent): string {
     .join('');
 
   const button = content.cta
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;">
-            <tr><td style="border-radius:8px;background:${BRAND.accentTeal};">
+    ? `<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0" style="margin:8px auto 24px;">
+            <tr><td align="center" style="border-radius:8px;background:${BRAND.accentTeal};">
               <a href="${escapeHtml(content.cta.url)}" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:${BRAND.deepBlue};text-decoration:none;border-radius:8px;">${escapeHtml(content.cta.label)}</a>
             </td></tr>
           </table>`

@@ -60,6 +60,11 @@ describe('email layout', () => {
       expect(html).toContain(BRAND.accentTeal);
     });
 
+    it('centers the CTA button', () => {
+      expect(html).toContain('align="center"');
+      expect(html).toContain('margin:8px auto 24px;');
+    });
+
     it('renders a copy-paste fallback link when a CTA is present', () => {
       expect(html).toContain('copy and paste');
     });
