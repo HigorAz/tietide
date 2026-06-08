@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
 import type { Logger as SdkLogger } from '@tietide/sdk';
 import type { WorkflowDefinition, WorkflowNode } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkerEntitlementsService } from '../billing/worker-entitlements.service';
 import { PollTriggerRegistry } from './poll-trigger.registry';
 import { PollConnectionLoader } from './poll-connection-loader';
 import { POLL_QUEUE_NAME } from './poll.constants';
@@ -26,6 +27,7 @@ export class PollProcessor extends WorkerHost {
     private readonly registry: PollTriggerRegistry,
     private readonly loader: PollConnectionLoader,
     @InjectQueue(EXECUTION_QUEUE_NAME) private readonly executionQueue: Queue,
+    private readonly entitlements: WorkerEntitlementsService,
   ) {
     super();
   }
@@ -47,6 +49,17 @@ export class PollProcessor extends WorkerHost {
       this.log.log(
         { jobId: job.id, workflowId },
         'Workflow inactive or missing; skipping poll tick',
+      );
+      return;
+    }
+
+    // Run-quota gate: a FREE workspace over its included runs pauses polling
+    // BEFORE hitting the provider API. The cursor is left untouched, so items are
+    // re-polled once the plan is upgraded or the period resets. Paid plans pass.
+    if (!(await this.entitlements.canRun(organizationId))) {
+      this.log.log(
+        { jobId: job.id, workflowId },
+        'Poll tick skipped: workspace run quota exhausted',
       );
       return;
     }

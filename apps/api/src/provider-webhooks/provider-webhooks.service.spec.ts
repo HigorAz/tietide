@@ -4,6 +4,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import { ProviderTriggerRegistry } from '../provider-triggers/provider-trigger.registry';
 import { ProviderWebhooksService } from './provider-webhooks.service';
@@ -81,6 +82,7 @@ describe('ProviderWebhooksService', () => {
         { provide: CryptoService, useValue: crypto },
         { provide: ProviderTriggerRegistry, useValue: registry },
         { provide: getQueueToken(EXECUTION_QUEUE_NAME), useValue: queue },
+        { provide: EntitlementsService, useValue: { assertCanRun: jest.fn() } },
       ],
     }).compile();
 

@@ -3,6 +3,9 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { SeatSyncService } from '../billing/seat-sync.service';
+import { PaymentRequiredException } from '../billing/payment-required.exception';
 import { OrganizationAccessService } from './organization-access.service';
 import { OrganizationsService } from './organizations.service';
 
@@ -29,6 +32,7 @@ interface PrismaMock {
     updateMany: jest.Mock;
     deleteMany: jest.Mock;
   };
+  subscription: { create: jest.Mock };
   user: { update: jest.Mock; updateMany: jest.Mock };
 }
 
@@ -36,6 +40,7 @@ describe('OrganizationsService', () => {
   let service: OrganizationsService;
   let prisma: PrismaMock;
   let audit: { log: jest.Mock };
+  let entitlements: { assertCanCreateWorkspace: jest.Mock };
 
   const orgId = 'org-uuid-1';
   const actingUserId = 'user-acting';
@@ -67,9 +72,11 @@ describe('OrganizationsService', () => {
         updateMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      subscription: { create: jest.fn() },
       user: { update: jest.fn(), updateMany: jest.fn() },
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    entitlements = { assertCanCreateWorkspace: jest.fn().mockResolvedValue(undefined) };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,6 +84,8 @@ describe('OrganizationsService', () => {
         OrganizationAccessService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogService, useValue: audit },
+        { provide: EntitlementsService, useValue: entitlements },
+        { provide: SeatSyncService, useValue: { enqueue: jest.fn() } },
       ],
     }).compile();
 
@@ -139,6 +148,17 @@ describe('OrganizationsService', () => {
 
       expect(prisma.organization.create).toHaveBeenCalledTimes(2);
       expect(result.slug).toBe('acme-second');
+    });
+
+    it('rejects creation when the free-workspace cap is reached (no org written)', async () => {
+      entitlements.assertCanCreateWorkspace.mockRejectedValueOnce(
+        new PaymentRequiredException('workspaces', 'limit reached'),
+      );
+
+      await expect(service.create(actingUserId, { name: 'Acme' })).rejects.toBeInstanceOf(
+        PaymentRequiredException,
+      );
+      expect(prisma.organization.create).not.toHaveBeenCalled();
     });
   });
 

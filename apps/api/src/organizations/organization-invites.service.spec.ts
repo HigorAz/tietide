@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { MailerService } from '../mailer/mailer.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { SeatSyncService } from '../billing/seat-sync.service';
 import { OrganizationAccessService } from './organization-access.service';
 import { OrganizationInvitesService } from './organization-invites.service';
 
@@ -26,6 +28,7 @@ describe('OrganizationInvitesService', () => {
   let prisma: PrismaMock;
   let mailer: { sendOrganizationInviteEmail: jest.Mock };
   let audit: { log: jest.Mock };
+  let entitlements: { assertCanAddSeat: jest.Mock };
 
   const orgId = 'org-uuid-1';
   const actingUserId = 'user-acting';
@@ -48,6 +51,7 @@ describe('OrganizationInvitesService', () => {
     };
     mailer = { sendOrganizationInviteEmail: jest.fn().mockResolvedValue(undefined) };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    entitlements = { assertCanAddSeat: jest.fn().mockResolvedValue(undefined) };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -56,6 +60,8 @@ describe('OrganizationInvitesService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogService, useValue: audit },
         { provide: MailerService, useValue: mailer },
+        { provide: EntitlementsService, useValue: entitlements },
+        { provide: SeatSyncService, useValue: { enqueue: jest.fn() } },
       ],
     }).compile();
 
@@ -117,6 +123,18 @@ describe('OrganizationInvitesService', () => {
       await expect(
         service.create(orgId, actingUserId, { email: 'x@x.com', role: 'MEMBER' }),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects (without writing an invite) when the seat cap is reached', async () => {
+      prisma.organizationMember.findFirst.mockResolvedValue(member('ADMIN'));
+      prisma.organization.findFirst.mockResolvedValue({ id: orgId, name: 'Acme' });
+      entitlements.assertCanAddSeat.mockRejectedValueOnce(new Error('no seats'));
+
+      await expect(
+        service.create(orgId, actingUserId, { email: 'x@x.com', role: 'MEMBER' }),
+      ).rejects.toThrow('no seats');
+      expect(entitlements.assertCanAddSeat).toHaveBeenCalledWith(orgId, true);
+      expect(prisma.organizationInvite.create).not.toHaveBeenCalled();
     });
   });
 
@@ -203,6 +221,25 @@ describe('OrganizationInvitesService', () => {
         }),
       );
       expect(result).toEqual({ id: orgId, name: 'Acme', slug: 'acme-1', role: 'MEMBER' });
+    });
+
+    it('rejects (without consuming) when the workspace is at its seat cap', async () => {
+      prisma.organizationInvite.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        organizationId: orgId,
+        email: 'new@x.com',
+        role: 'MEMBER',
+      });
+      // Not already a member, so the seat cap applies and blocks the join.
+      prisma.organizationMember.findFirst.mockResolvedValue(null);
+      entitlements.assertCanAddSeat.mockRejectedValueOnce(new Error('no seats'));
+
+      await expect(service.accept(targetUserId, 'new@x.com', { token: rawToken })).rejects.toThrow(
+        'no seats',
+      );
+      expect(entitlements.assertCanAddSeat).toHaveBeenCalledWith(orgId, false);
+      // Must NOT consume the single-use token — they can join once a seat frees up.
+      expect(prisma.organizationInvite.updateMany).not.toHaveBeenCalled();
     });
 
     it('rejects with a generic error when the token is unknown', async () => {

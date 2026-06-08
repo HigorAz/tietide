@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
 import type { ValidationResponse } from '@tietide/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import type { WorkflowExecutionJobPayload } from '../executions/executions.service';
 import { ProviderTriggerRegistry } from '../provider-triggers/provider-trigger.registry';
@@ -70,6 +71,7 @@ export class ProviderWebhooksService {
     private readonly crypto: CryptoService,
     private readonly registry: ProviderTriggerRegistry,
     @InjectQueue(EXECUTION_QUEUE_NAME) private readonly queue: Queue,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async trigger(input: ProviderWebhookTriggerInput): Promise<ProviderWebhookTriggerResult> {
@@ -194,6 +196,11 @@ export class ProviderWebhooksService {
       );
       return { executionId: existing.id, status: existing.status };
     }
+
+    // Run-quota gate (after the replay short-circuit): a FREE workspace over its
+    // included runs returns 402 and does not enqueue; the provider redelivers and
+    // the trigger resumes on upgrade/period reset. Paid (metered) plans never block.
+    await this.entitlements.assertCanRun(subscription.workflow.organizationId);
 
     let created: { id: string };
     try {

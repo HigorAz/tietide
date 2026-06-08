@@ -1,6 +1,7 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from '../prisma/prisma.module';
+import { WorkerBillingModule } from '../billing/billing.module';
 import { CryptoModule } from '../crypto/crypto.module';
 import { OAuthRefreshModule } from '../connections/refresh/oauth-refresh.module';
 import {
@@ -65,6 +66,7 @@ import { PollConnectionLoader } from './poll-connection-loader';
     PrismaModule,
     CryptoModule,
     OAuthRefreshModule,
+    WorkerBillingModule,
     BullModule.registerQueue({ name: POLL_QUEUE_NAME }, { name: 'workflow-execution' }),
   ],
   providers: [

@@ -27,6 +27,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let issues: unknown = undefined;
+    let reason: string | undefined = undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -41,6 +42,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         // errors to specific form fields. See CLAUDE.md §11.
         if (Array.isArray(obj.issues)) {
           issues = obj.issues;
+        }
+        // Plan-limit (402) errors carry a `reason` so the client can show a
+        // targeted upgrade prompt (seats / workspaces / runs / workflows).
+        if (typeof obj.reason === 'string') {
+          reason = obj.reason;
         }
       }
     } else {
@@ -63,6 +69,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
     if (issues !== undefined) {
       body.issues = issues;
+    }
+    if (reason !== undefined) {
+      body.reason = reason;
     }
     if (requestId !== undefined) {
       body.requestId = requestId;
