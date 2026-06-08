@@ -25,18 +25,23 @@ export interface MailParts {
 }
 
 // Brand tokens mirror docs/claude/design-system.md. Emails use a light card with the
-// deep-blue header bar and teal accent (transactional mail is light for readability).
+// deep-blue header bar and teal accent — transactional mail is light for readability,
+// so body text is the deep-blue brand colour (the light-theme inverse of the app's
+// dark-theme --text-primary #F6F8FA).
 export const BRAND = {
   name: 'TieTide',
-  accentTeal: '#00D4B3',
-  deepBlue: '#0A2540',
-  textPrimary: '#0A2540',
-  textMuted: '#6B7C93',
-  canvas: '#F4F6F8',
+  accentTeal: '#00D4B3', // --accent-teal (exact)
+  deepBlue: '#0A2540', // --bg-deep-blue (exact) — header bar + body/heading text
+  mutedText: '#6B7C93', // --text-secondary — footer / help / fallback-link text
+  canvas: '#F4F6F8', // light page background behind the card
   card: '#FFFFFF',
   border: '#E3E8EF',
   fontFamily: "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif",
   homeUrl: 'https://tietide.com',
+  // Stable public asset (apps/spa/public/email-logo.png) — the src/assets copy gets a
+  // hashed bundle URL that email clients can't resolve. The text wordmark stays as a
+  // fallback for when images are blocked.
+  logoUrl: 'https://tietide.com/email-logo.png',
 } as const;
 
 export function escapeHtml(value: string): string {
@@ -52,7 +57,7 @@ export function renderEmailHtml(content: EmailContent): string {
   const paragraphs = content.paragraphs
     .map(
       (p) =>
-        `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.textPrimary};">${escapeHtml(p)}</p>`,
+        `<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:${BRAND.deepBlue};">${escapeHtml(p)}</p>`,
     )
     .join('');
 
@@ -65,12 +70,12 @@ export function renderEmailHtml(content: EmailContent): string {
     : '';
 
   const fallbackLink = content.cta
-    ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:${BRAND.textMuted};">Or copy and paste this link into your browser:</p>
+    ? `<p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:${BRAND.mutedText};">Or copy and paste this link into your browser:</p>
           <p style="margin:0 0 24px;font-size:13px;line-height:1.6;word-break:break-all;"><a href="${escapeHtml(content.cta.url)}" style="color:${BRAND.accentTeal};">${escapeHtml(content.cta.url)}</a></p>`
     : '';
 
   const footerNote = content.footerNote
-    ? `<p style="margin:0;font-size:13px;line-height:1.6;color:${BRAND.textMuted};">${escapeHtml(content.footerNote)}</p>`
+    ? `<p style="margin:0;font-size:13px;line-height:1.6;color:${BRAND.mutedText};">${escapeHtml(content.footerNote)}</p>`
     : '';
 
   return `<!doctype html>
@@ -87,17 +92,20 @@ export function renderEmailHtml(content: EmailContent): string {
   <tr><td align="center" style="padding:32px 16px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;font-family:${BRAND.fontFamily};">
       <tr><td style="padding:20px 32px;background:${BRAND.deepBlue};border-radius:12px 12px 0 0;">
-        <span style="font-size:22px;font-weight:700;letter-spacing:-0.5px;color:#FFFFFF;">Tie<span style="color:${BRAND.accentTeal};">Tide</span></span>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          <td style="padding-right:12px;vertical-align:middle;"><img src="${BRAND.logoUrl}" width="36" height="36" alt="TieTide" style="display:block;width:36px;height:36px;border:0;outline:none;"></td>
+          <td style="vertical-align:middle;"><span style="font-size:22px;font-weight:700;letter-spacing:-0.5px;color:#FFFFFF;">Tie<span style="color:${BRAND.accentTeal};">Tide</span></span></td>
+        </tr></table>
       </td></tr>
       <tr><td style="padding:32px;background:${BRAND.card};border:1px solid ${BRAND.border};border-top:none;border-radius:0 0 12px 12px;">
-        <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:${BRAND.textPrimary};">${escapeHtml(content.heading)}</h1>
+        <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:${BRAND.deepBlue};">${escapeHtml(content.heading)}</h1>
         ${paragraphs}
         ${button}
         ${fallbackLink}
         ${footerNote}
       </td></tr>
       <tr><td style="padding:24px 32px;text-align:center;">
-        <p style="margin:0;font-size:12px;line-height:1.6;color:${BRAND.textMuted};">${BRAND.name} — Integration &amp; Automation Platform<br><a href="${BRAND.homeUrl}" style="color:${BRAND.textMuted};">tietide.com</a></p>
+        <p style="margin:0;font-size:12px;line-height:1.6;color:${BRAND.mutedText};">${BRAND.name} — Integration &amp; Automation Platform<br><a href="${BRAND.homeUrl}" style="color:${BRAND.mutedText};">tietide.com</a></p>
       </td></tr>
     </table>
   </td></tr>

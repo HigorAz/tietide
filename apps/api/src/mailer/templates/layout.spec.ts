@@ -43,6 +43,11 @@ describe('email layout', () => {
       expect(html).toContain(`Tie<span style="color:${BRAND.accentTeal};">Tide</span>`);
     });
 
+    it('renders the logo image with alt-text fallback in the header', () => {
+      expect(html).toContain(`<img src="${BRAND.logoUrl}"`);
+      expect(html).toContain('alt="TieTide"');
+    });
+
     it('renders the heading and every paragraph', () => {
       expect(html).toContain('Welcome to TieTide!');
       expect(html).toContain('Confirm your email address to activate your account.');
