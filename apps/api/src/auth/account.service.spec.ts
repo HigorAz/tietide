@@ -6,6 +6,7 @@ import { AccountService } from './account.service';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { MailerService } from '../mailer/mailer.service';
 
 jest.mock('bcrypt');
 
@@ -23,6 +24,7 @@ describe('AccountService', () => {
   };
   let auth: { signSession: jest.Mock; issueVerificationToken: jest.Mock };
   let audit: { log: jest.Mock };
+  let mailer: { sendAccountDeletedEmail: jest.Mock };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
   beforeEach(async () => {
@@ -35,6 +37,7 @@ describe('AccountService', () => {
     };
     auth = { signSession: jest.fn(), issueVerificationToken: jest.fn(async () => undefined) };
     audit = { log: jest.fn(async () => undefined) };
+    mailer = { sendAccountDeletedEmail: jest.fn(async () => undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,6 +45,7 @@ describe('AccountService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuthService, useValue: auth },
         { provide: AuditLogService, useValue: audit },
+        { provide: MailerService, useValue: mailer },
       ],
     }).compile();
 
@@ -175,7 +179,7 @@ describe('AccountService', () => {
   });
 
   describe('deleteAccount', () => {
-    const stored = { id: 'u1', password: 'pw_hash', deletedAt: null };
+    const stored = { id: 'u1', email: 'a@b.com', password: 'pw_hash', deletedAt: null };
 
     it('rejects a wrong password and never anonymizes', async () => {
       prisma.user.findUnique.mockResolvedValue(stored);
@@ -184,6 +188,7 @@ describe('AccountService', () => {
       await expect(service.deleteAccount('u1', 'wrong')).rejects.toThrow(UnauthorizedException);
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(mailer.sendAccountDeletedEmail).not.toHaveBeenCalled();
     });
 
     it('hard-deletes a sole-member workspace and anonymizes the user', async () => {
@@ -211,6 +216,8 @@ describe('AccountService', () => {
       );
       // Account-level audit entry — never references a (possibly deleted) workspace.
       expect(audit.log.mock.calls[0][0]).not.toHaveProperty('organizationId');
+      // Confirmation goes to the original address, captured before anonymization.
+      expect(mailer.sendAccountDeletedEmail).toHaveBeenCalledWith('a@b.com');
     });
 
     it('drops membership (keeps the workspace) for a shared workspace where others remain', async () => {
@@ -244,6 +251,7 @@ describe('AccountService', () => {
       await expect(service.deleteAccount('u1', 'rightpass')).rejects.toThrow(BadRequestException);
       expect(prisma.organizationMember.delete).not.toHaveBeenCalled();
       expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(mailer.sendAccountDeletedEmail).not.toHaveBeenCalled();
     });
   });
 });
