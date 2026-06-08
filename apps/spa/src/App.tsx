@@ -11,8 +11,6 @@ import { WorkflowsPage } from '@/pages/WorkflowsPage';
 import { GlobalHistoryPage } from '@/pages/GlobalHistoryPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { ConnectionsPage } from '@/pages/ConnectionsPage';
-import { OrganizationsPage } from '@/pages/OrganizationsPage';
-import { OrgMembersPage } from '@/pages/OrgMembersPage';
 import { InviteAcceptPage } from '@/pages/InviteAcceptPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { SettingsEnvVarsPage } from '@/pages/settings/EnvVarsPage';
@@ -45,8 +43,9 @@ const router = createBrowserRouter([
           { path: '/history', element: <GlobalHistoryPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/connections', element: <ConnectionsPage /> },
-          { path: '/organizations', element: <OrganizationsPage /> },
-          { path: '/organizations/members', element: <OrgMembersPage /> },
+          // Workspaces moved into Account Settings; keep old URLs working.
+          { path: '/organizations', element: <Navigate to="/settings" replace /> },
+          { path: '/organizations/members', element: <Navigate to="/settings" replace /> },
           { path: '/organizations/accept-invite', element: <InviteAcceptPage /> },
           { path: '/settings', element: <SettingsPage /> },
           { path: '/settings/env-vars', element: <SettingsEnvVarsPage /> },

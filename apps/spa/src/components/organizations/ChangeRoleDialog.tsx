@@ -4,6 +4,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from '@/components/dashboard/Modal';
 import { cn } from '@/utils/cn';
 import type { OrgMember } from '@/api/organizations';
+import { RoleSelect } from './RoleSelect';
 
 export interface ChangeRoleDialogProps {
   member: OrgMember;
@@ -11,11 +12,6 @@ export interface ChangeRoleDialogProps {
   onClose: () => void;
   onSubmit: (role: OrgRole) => Promise<void> | void;
 }
-
-const fieldClass = cn(
-  'w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-text-primary',
-  'focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 
 export function ChangeRoleDialog({
   member,
@@ -48,24 +44,15 @@ export function ChangeRoleDialog({
         {member.email}).
       </p>
 
-      <label
-        htmlFor="change-role-select"
-        className="mb-1 block text-xs font-medium text-text-secondary"
-      >
+      <span id="change-role-label" className="mb-1 block text-xs font-medium text-text-secondary">
         Role
-      </label>
-      <select
-        id="change-role-select"
+      </span>
+      <RoleSelect
         value={role}
-        onChange={(e) => setRole(e.target.value as OrgRole)}
-        className={fieldClass}
-      >
-        {assignableRoles.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
+        onChange={setRole}
+        assignableRoles={assignableRoles}
+        labelledBy="change-role-label"
+      />
 
       {error && <p className="mt-2 text-sm text-error">{error}</p>}
 
