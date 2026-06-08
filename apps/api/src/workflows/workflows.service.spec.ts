@@ -37,7 +37,6 @@ describe('WorkflowsService', () => {
   const orgId = 'org-uuid-1';
   const otherOrgId = 'org-uuid-2';
   const userId = 'user-uuid-1';
-  const otherUserId = 'user-uuid-2';
   const workflowId = 'workflow-uuid-1';
 
   const validDefinition = {
