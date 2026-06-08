@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Plug, Building2, KeyRound, ChevronRight } from 'lucide-react';
+import { Plug, KeyRound, ChevronRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { SettingsCard } from './SettingsCard';
 
@@ -10,20 +10,15 @@ interface Shortcut {
   icon: LucideIcon;
 }
 
-// Links to the existing workspace-scoped management surfaces. Secrets have no
-// standalone page (they are managed inside the editor), so they are omitted.
+// Links to the workspace-scoped management surfaces that have their own pages.
+// Workspaces themselves are managed below on this page; Secrets have no standalone
+// page (they live inside the editor), so both are omitted here.
 const shortcuts: Shortcut[] = [
   {
     to: '/connections',
     label: 'Connections',
     description: 'OAuth and API-key integrations',
     icon: Plug,
-  },
-  {
-    to: '/organizations',
-    label: 'Workspaces',
-    description: 'Members, invites and workspace settings',
-    icon: Building2,
   },
   {
     to: '/settings/env-vars',
@@ -35,7 +30,7 @@ const shortcuts: Shortcut[] = [
 
 export function WorkspaceShortcutsSection(): JSX.Element {
   return (
-    <SettingsCard title="Workspace" description="Jump to your workspace-scoped settings.">
+    <SettingsCard title="Shortcuts" description="Jump to your workspace-scoped settings.">
       <ul className="divide-y divide-white/5 overflow-hidden rounded-md border border-white/5">
         {shortcuts.map(({ to, label, description, icon: Icon }) => (
           <li key={to}>
