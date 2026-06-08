@@ -18,6 +18,10 @@ model User {
   // The org the SPA opens by default and the fallback when the X-Org-Id header
   // is absent. Nullable so a user mid-deletion of their last org is valid; SetNull.
   defaultOrganizationId String?  @map("default_organization_id")
+  // Set when the account is self-deleted. The row is anonymized rather than removed
+  // so authored workflows/secrets/audit logs (Restrict FKs) keep their integrity;
+  // the auth path (login + JWT strategy) rejects any user with deletedAt set.
+  deletedAt             DateTime? @map("deleted_at")
   createdAt             DateTime @default(now()) @map("created_at")
   updatedAt             DateTime @updatedAt @map("updated_at")
 

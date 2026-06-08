@@ -13,6 +13,9 @@ export class UserResponseDto {
   @ApiProperty({ enum: ['USER', 'ADMIN'] })
   role!: string;
 
+  @ApiProperty({ description: 'Whether the email address has been verified' })
+  emailVerified!: boolean;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 }

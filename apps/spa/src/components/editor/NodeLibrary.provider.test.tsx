@@ -26,7 +26,14 @@ vi.mock('@tietide/shared', async (orig) => {
 beforeEach(() => {
   localStorage.clear();
   useAuthStore.setState({
-    user: { id: 'user-test', email: 'tester@tietide.dev', name: 'Tester', role: Role.USER },
+    user: {
+      id: 'user-test',
+      email: 'tester@tietide.dev',
+      name: 'Tester',
+      role: Role.USER,
+      emailVerified: true,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    },
     token: 'jwt-test',
   });
 });

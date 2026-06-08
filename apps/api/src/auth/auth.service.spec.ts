@@ -190,6 +190,17 @@ describe('AuthService', () => {
 
       await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
     });
+
+    it('throws UnauthorizedException for a soft-deleted (anonymized) account even with valid credentials', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...storedUser,
+        deletedAt: new Date('2026-06-08T00:00:00Z'),
+      });
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+      expect(jwt.sign).not.toHaveBeenCalled();
+    });
   });
 
   describe('verifyEmail', () => {
@@ -338,18 +349,27 @@ describe('AuthService', () => {
       email: 'alice@example.com',
       name: 'Alice',
       role: 'USER' as const,
+      emailVerified: true,
       createdAt: new Date('2026-04-15T00:00:00Z'),
     };
 
-    it('looks up the user by id and selects only safe fields', async () => {
+    it('looks up the user by id and selects only safe fields (incl. emailVerified)', async () => {
       prisma.user.findUnique.mockResolvedValue(profile);
 
-      await service.getProfile(userId);
+      const result = await service.getProfile(userId);
 
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: userId },
-        select: { id: true, email: true, name: true, role: true, createdAt: true },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          emailVerified: true,
+          createdAt: true,
+        },
       });
+      expect(result).toEqual(profile);
     });
 
     it('throws UnauthorizedException when the user no longer exists', async () => {
