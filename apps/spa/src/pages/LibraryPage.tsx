@@ -12,10 +12,49 @@ import { cn } from '@/utils/cn';
 const errorMessage = (err: unknown, fallback: string): string =>
   err instanceof Error && err.message ? err.message : fallback;
 
+// Fixed display order for the department sections; mirrors the API's
+// LIBRARY_DEPARTMENT_ORDER. Any category not listed here is appended after,
+// alphabetically, so the page never silently drops a template.
+const DEPARTMENT_ORDER: readonly string[] = [
+  'Sales',
+  'Marketing',
+  'Customer Success',
+  'Engineering',
+  'Product',
+  'Operations & Finance',
+];
+
+interface DepartmentGroup {
+  category: string;
+  items: WorkflowTemplate[];
+}
+
+function groupByDepartment(templates: WorkflowTemplate[]): DepartmentGroup[] {
+  const byCategory = new Map<string, WorkflowTemplate[]>();
+  for (const template of templates) {
+    const list = byCategory.get(template.category) ?? [];
+    list.push(template);
+    byCategory.set(template.category, list);
+  }
+
+  const groups: DepartmentGroup[] = [];
+  for (const category of DEPARTMENT_ORDER) {
+    const items = byCategory.get(category);
+    if (items && items.length > 0) {
+      groups.push({ category, items });
+      byCategory.delete(category);
+    }
+  }
+  // Unknown categories (defensive) keep their templates visible, sorted by name.
+  for (const category of Array.from(byCategory.keys()).sort()) {
+    groups.push({ category, items: byCategory.get(category)! });
+  }
+  return groups;
+}
+
 export function LibraryPage(): JSX.Element {
   const navigate = useNavigate();
-  const { templates, status, error, search, category, fetch, setSearch, setCategory, instantiate } =
-    useLibraryStore();
+  const { templates, status, error, search, fetch, setSearch, instantiate } = useLibraryStore();
   const toast = useToastStore((s) => s.show);
 
   const [busySlugs, setBusySlugs] = useState<Set<string>>(() => new Set());
@@ -24,20 +63,15 @@ export function LibraryPage(): JSX.Element {
     void fetch();
   }, [fetch]);
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of templates) set.add(t.category);
-    return Array.from(set).sort();
-  }, [templates]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return templates.filter((t) => {
-      if (category && t.category !== category) return false;
-      if (!q) return true;
-      return t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
-    });
-  }, [templates, search, category]);
+    if (!q) return templates;
+    return templates.filter(
+      (t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
+    );
+  }, [templates, search]);
+
+  const groups = useMemo(() => groupByDepartment(filtered), [filtered]);
 
   const handleImported = (created: Workflow): void => {
     navigate(`/workflows/${created.id}`, { state: { from: '/library' } });
@@ -66,7 +100,7 @@ export function LibraryPage(): JSX.Element {
           <div>
             <h1 className="text-lg font-semibold">Library</h1>
             <p className="text-xs text-text-secondary">
-              Pre-built workflow templates — pick one and start customizing.
+              Real-world workflow templates by department — pick one and start customizing.
             </p>
           </div>
           <ImportWorkflowButton variant="primary" onImported={handleImported} />
@@ -74,7 +108,7 @@ export function LibraryPage(): JSX.Element {
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-6 py-8">
-        <div className="mb-6 flex flex-col gap-3">
+        <div className="mb-6">
           <label className="relative flex items-center">
             <Search
               aria-hidden="true"
@@ -93,25 +127,6 @@ export function LibraryPage(): JSX.Element {
               )}
             />
           </label>
-          {categories.length > 0 && (
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by category">
-              <CategoryChip
-                label="All"
-                selected={category === null}
-                onClick={() => setCategory(null)}
-                ariaLabel="Show all categories"
-              />
-              {categories.map((c) => (
-                <CategoryChip
-                  key={c}
-                  label={c}
-                  selected={category === c}
-                  onClick={() => setCategory(c)}
-                  ariaLabel={`Filter by ${c}`}
-                />
-              ))}
-            </div>
-          )}
         </div>
 
         {status === 'loading' && templates.length === 0 && (
@@ -142,50 +157,32 @@ export function LibraryPage(): JSX.Element {
           <p className="text-sm text-text-secondary">No templates match your filters.</p>
         )}
 
-        {filtered.length > 0 && (
-          <ul
-            aria-label="Workflow templates"
-            className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
-          >
-            {filtered.map((template) => (
-              <TemplateCard
-                key={template.slug}
-                template={template}
-                isBusy={busySlugs.has(template.slug)}
-                onUse={handleUseTemplate}
-              />
+        {groups.length > 0 && (
+          <div className="flex flex-col gap-10">
+            {groups.map((group) => (
+              <section key={group.category} aria-label={group.category}>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+                  {group.category}
+                </h2>
+                <ul
+                  aria-label={`${group.category} templates`}
+                  className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+                >
+                  {group.items.map((template) => (
+                    <TemplateCard
+                      key={template.slug}
+                      template={template}
+                      isBusy={busySlugs.has(template.slug)}
+                      onUse={handleUseTemplate}
+                    />
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         )}
       </main>
     </div>
-  );
-}
-
-interface CategoryChipProps {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-  ariaLabel: string;
-}
-
-function CategoryChip({ label, selected, onClick, ariaLabel }: CategoryChipProps): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      aria-label={ariaLabel}
-      className={cn(
-        'rounded-full border px-3 py-1 text-xs font-medium transition',
-        'focus:outline-none focus:ring-1 focus:ring-accent-teal',
-        selected
-          ? 'border-accent-teal bg-accent-teal/15 text-accent-teal'
-          : 'border-white/10 bg-elevated text-text-secondary hover:border-white/20 hover:text-text-primary',
-      )}
-    >
-      {label}
-    </button>
   );
 }
 
@@ -201,12 +198,7 @@ function TemplateCard({ template, isBusy, onUse }: TemplateCardProps): JSX.Eleme
       data-testid="template-card"
       className="flex flex-col gap-3 rounded-lg border border-white/5 bg-surface p-4 transition hover:border-white/10"
     >
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold text-text-primary">{template.name}</h2>
-        <span className="shrink-0 rounded-full border border-accent-teal/40 bg-accent-teal/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-teal">
-          {template.category}
-        </span>
-      </div>
+      <h3 className="text-sm font-semibold text-text-primary">{template.name}</h3>
       <p className="text-xs leading-relaxed text-text-secondary">{template.description}</p>
       <div className="flex flex-wrap items-center gap-2" aria-label="Node types">
         {template.nodeTypes.map((nodeType) => {

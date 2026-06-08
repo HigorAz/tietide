@@ -4,7 +4,14 @@ import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { LibraryService } from './library.service';
-import { DEMO_WORKFLOWS } from '../demo/demo-workflows.fixtures';
+import { LIBRARY_TEMPLATES } from './templates';
+
+// Representative templates: one webhook-backed (provisions a Webhook on
+// instantiate) and one schedule-backed (no webhook).
+const WEBHOOK_SLUG = 'lead-capture-to-crm';
+const NO_WEBHOOK_SLUG = 'daily-hn-ai-digest';
+const webhookTemplate = LIBRARY_TEMPLATES.find((t) => t.slug === WEBHOOK_SLUG)!;
+const noWebhookTemplate = LIBRARY_TEMPLATES.find((t) => t.slug === NO_WEBHOOK_SLUG)!;
 
 describe('LibraryService', () => {
   let service: LibraryService;
@@ -37,9 +44,9 @@ describe('LibraryService', () => {
   });
 
   describe('list', () => {
-    it('should return one entry per fixture', () => {
+    it('should return one entry per library template', () => {
       const result = service.list();
-      expect(result).toHaveLength(DEMO_WORKFLOWS.length);
+      expect(result).toHaveLength(LIBRARY_TEMPLATES.length);
     });
 
     it('should expose slug, name, description, category and nodeTypes for every template (AC: schema)', () => {
@@ -58,23 +65,21 @@ describe('LibraryService', () => {
       }
     });
 
-    it('should return at least 4 templates (AC: GET /v1/library/templates returns at least 4)', () => {
-      expect(service.list().length).toBeGreaterThanOrEqual(4);
+    it('should return at least 9 templates (AC: ≥9 templates)', () => {
+      expect(service.list().length).toBeGreaterThanOrEqual(9);
     });
 
-    it('should derive nodeTypes from the fixture definition (deduped) for the webhook fixture', () => {
+    it('should derive nodeTypes from the definition (deduped) for a template with repeated node types', () => {
       const result = service.list();
-      const webhookTemplate = result.find((t) => t.slug === 'webhook-conditional-notification');
-      expect(webhookTemplate).toBeDefined();
-      expect(webhookTemplate!.nodeTypes).toEqual(
-        expect.arrayContaining(['webhook-trigger', 'http-request', 'conditional']),
-      );
-      // Two http-request nodes in the fixture should appear once in the deduped list.
-      const httpCount = webhookTemplate!.nodeTypes.filter((t) => t === 'http-request').length;
+      // daily-hn-ai-digest has two http-request nodes; they dedupe to one entry.
+      const digest = result.find((t) => t.slug === NO_WEBHOOK_SLUG);
+      expect(digest).toBeDefined();
+      expect(digest!.nodeTypes).toEqual(expect.arrayContaining(['cron-trigger', 'http-request']));
+      const httpCount = digest!.nodeTypes.filter((t) => t === 'http-request').length;
       expect(httpCount).toBe(1);
     });
 
-    it('should not leak the underlying fixture definition or webhook config', () => {
+    it('should not leak the underlying definition or webhook config', () => {
       const result = service.list();
       for (const template of result) {
         expect(template).not.toHaveProperty('definition');
@@ -87,8 +92,8 @@ describe('LibraryService', () => {
   describe('instantiate', () => {
     const persistedWorkflow = {
       id: 'new-workflow-uuid',
-      name: 'Demo: Cron → Fetch → Archive',
-      description: 'cron description',
+      name: noWebhookTemplate.name,
+      description: noWebhookTemplate.description,
       definition: { nodes: [], edges: [] },
       isActive: false,
       version: 1,
@@ -106,7 +111,7 @@ describe('LibraryService', () => {
     });
 
     it('should create a Workflow row owned by the requesting user (AC: instantiate creates Workflow owned by caller)', async () => {
-      await service.instantiate(orgId, userId, 'cron-fetch-process');
+      await service.instantiate(orgId, userId, NO_WEBHOOK_SLUG);
 
       expect(prisma.workflow.create).toHaveBeenCalledTimes(1);
       const call = prisma.workflow.create.mock.calls[0][0] as { data: Record<string, unknown> };
@@ -114,25 +119,23 @@ describe('LibraryService', () => {
         expect.objectContaining({
           organizationId: orgId,
           userId,
-          name: 'Demo: Cron → Fetch → Archive',
-          description:
-            'Hourly cron pulls fresh data from a public endpoint and forwards the response to an archive sink.',
+          name: noWebhookTemplate.name,
+          description: noWebhookTemplate.description,
           isActive: false,
         }),
       );
       expect(call.data.definition).toBeDefined();
     });
 
-    it('should always default isActive to false even when the fixture is active (security)', async () => {
-      // The webhook fixture has activate=true. Library instantiation must not auto-activate.
-      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
+    it('should always default isActive to false (security)', async () => {
+      await service.instantiate(orgId, userId, WEBHOOK_SLUG);
 
       const call = prisma.workflow.create.mock.calls[0][0] as { data: { isActive: boolean } };
       expect(call.data.isActive).toBe(false);
     });
 
-    it('should provision a Webhook row when the fixture has webhook config', async () => {
-      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
+    it('should provision a Webhook row when the template declares webhook config', async () => {
+      await service.instantiate(orgId, userId, WEBHOOK_SLUG);
 
       expect(prisma.webhook.create).toHaveBeenCalledTimes(1);
       const call = prisma.webhook.create.mock.calls[0][0] as { data: Record<string, unknown> };
@@ -142,16 +145,16 @@ describe('LibraryService', () => {
           isActive: true,
         }),
       );
-      // Path should start with the fixture's pathSuffix and include a unique component.
       expect(typeof call.data.path).toBe('string');
-      expect(call.data.path as string).toMatch(/^webhook-demo-/);
-      // HMAC secret is a fresh random hex string of non-trivial length.
+      expect(call.data.path as string).toMatch(
+        new RegExp(`^${webhookTemplate.webhook!.pathSuffix}-`),
+      );
       expect(typeof call.data.hmacSecret).toBe('string');
       expect((call.data.hmacSecret as string).length).toBeGreaterThanOrEqual(32);
     });
 
-    it('should NOT create a Webhook row when the fixture has no webhook config', async () => {
-      await service.instantiate(orgId, userId, 'cron-fetch-process');
+    it('should NOT create a Webhook row when the template has no webhook config', async () => {
+      await service.instantiate(orgId, userId, NO_WEBHOOK_SLUG);
 
       expect(prisma.webhook.create).not.toHaveBeenCalled();
     });
@@ -164,7 +167,7 @@ describe('LibraryService', () => {
     });
 
     it('should record an audit log entry with action "library.instantiate" and the slug', async () => {
-      await service.instantiate(orgId, userId, 'cron-fetch-process');
+      await service.instantiate(orgId, userId, NO_WEBHOOK_SLUG);
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -173,7 +176,7 @@ describe('LibraryService', () => {
           action: 'library.instantiate',
           resource: 'workflow',
           resourceId: persistedWorkflow.id,
-          metadata: expect.objectContaining({ slug: 'cron-fetch-process' }),
+          metadata: expect.objectContaining({ slug: NO_WEBHOOK_SLUG }),
         }),
       );
     });
@@ -183,8 +186,8 @@ describe('LibraryService', () => {
         .mockResolvedValueOnce({ ...persistedWorkflow, id: 'first' })
         .mockResolvedValueOnce({ ...persistedWorkflow, id: 'second' });
 
-      const a = await service.instantiate(orgId, userId, 'cron-fetch-process');
-      const b = await service.instantiate(orgId, userId, 'cron-fetch-process');
+      const a = await service.instantiate(orgId, userId, NO_WEBHOOK_SLUG);
+      const b = await service.instantiate(orgId, userId, NO_WEBHOOK_SLUG);
 
       expect(prisma.workflow.create).toHaveBeenCalledTimes(2);
       expect(a.id).toBe('first');
@@ -192,8 +195,8 @@ describe('LibraryService', () => {
     });
 
     it('should give each webhook instantiation a unique path so concurrent instantiations never collide', async () => {
-      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
-      await service.instantiate(orgId, userId, 'webhook-conditional-notification');
+      await service.instantiate(orgId, userId, WEBHOOK_SLUG);
+      await service.instantiate(orgId, userId, WEBHOOK_SLUG);
 
       expect(prisma.webhook.create).toHaveBeenCalledTimes(2);
       const paths = prisma.webhook.create.mock.calls.map(
@@ -203,7 +206,7 @@ describe('LibraryService', () => {
     });
 
     it('should return the created workflow shape (no userId leak)', async () => {
-      const result = await service.instantiate(orgId, userId, 'cron-fetch-process');
+      const result = await service.instantiate(orgId, userId, NO_WEBHOOK_SLUG);
 
       expect(result).toEqual(
         expect.objectContaining({
