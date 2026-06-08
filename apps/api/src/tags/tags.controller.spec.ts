@@ -9,6 +9,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { TagsController } from './tags.controller';
 import { TagsService } from './tags.service';
 
@@ -48,6 +49,14 @@ describe('TagsController (integration)', () => {
           return true;
         },
       })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
+          return true;
+        },
+      })
       .compile();
 
     app = module.createNestApplication();
@@ -79,7 +88,7 @@ describe('TagsController (integration)', () => {
       tagsService.list.mockResolvedValue({ items: [persisted], nextCursor: null });
       const res = await request(app.getHttpServer()).get('/tags').expect(200);
       expect(res.body).toEqual({ items: [persisted], nextCursor: null });
-      expect(tagsService.list).toHaveBeenCalledWith('owner-uuid', {});
+      expect(tagsService.list).toHaveBeenCalledWith('org-uuid', {});
     });
   });
 
@@ -96,7 +105,7 @@ describe('TagsController (integration)', () => {
     it('accepts a tag without color', async () => {
       tagsService.create.mockResolvedValue({ ...persisted, color: null });
       await request(app.getHttpServer()).post('/tags').send({ name: 'draft' }).expect(201);
-      expect(tagsService.create).toHaveBeenCalledWith('owner-uuid', { name: 'draft' });
+      expect(tagsService.create).toHaveBeenCalledWith('org-uuid', 'owner-uuid', { name: 'draft' });
     });
 
     it('returns 400 on invalid color', async () => {
@@ -140,7 +149,7 @@ describe('TagsController (integration)', () => {
     it('returns 204 on success', async () => {
       tagsService.remove.mockResolvedValue(undefined);
       await request(app.getHttpServer()).delete(`/tags/${uuid}`).expect(204);
-      expect(tagsService.remove).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(tagsService.remove).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid);
     });
 
     it('returns 404 when not found', async () => {

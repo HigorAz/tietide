@@ -45,6 +45,7 @@ export function stableSubscriptionId(workflowId: string, nodeId: string): string
 
 export interface ActivationArgs {
   workflowId: string;
+  organizationId: string;
   userId: string;
   definition: Prisma.JsonValue | null | undefined;
   tx?: Prisma.TransactionClient;
@@ -92,10 +93,10 @@ export class ActivationService {
       }
 
       const connRow = await db.connection.findFirst({
-        where: { id: connectionIdRaw, userId: args.userId },
+        where: { id: connectionIdRaw, organizationId: args.organizationId },
       });
       if (!connRow) {
-        throw new NotFoundException(`Connection "${connectionIdRaw}" not found for user`);
+        throw new NotFoundException(`Connection "${connectionIdRaw}" not found in workspace`);
       }
 
       const decryptedConnection = this.toDecryptedConnection(connRow);
@@ -172,7 +173,7 @@ export class ActivationService {
           const connectionIdRaw = node.config['connectionId'];
           if (typeof connectionIdRaw === 'string' && connectionIdRaw.length > 0) {
             const connRow = await db.connection.findFirst({
-              where: { id: connectionIdRaw, userId: args.userId },
+              where: { id: connectionIdRaw, organizationId: args.organizationId },
             });
             if (connRow) {
               const decryptedConnection = this.toDecryptedConnection(connRow);
@@ -209,7 +210,7 @@ export class ActivationService {
       where: { id: subscriptionId },
       include: {
         workflow: {
-          select: { id: true, userId: true, isActive: true, definition: true },
+          select: { id: true, organizationId: true, isActive: true, definition: true },
         },
       },
     });
@@ -250,7 +251,7 @@ export class ActivationService {
       return;
     }
     const connRow = await this.prisma.connection.findFirst({
-      where: { id: connectionIdRaw, userId: sub.workflow.userId },
+      where: { id: connectionIdRaw, organizationId: sub.workflow.organizationId },
     });
     if (!connRow) {
       this.log.warn(

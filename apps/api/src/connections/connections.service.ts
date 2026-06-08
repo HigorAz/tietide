@@ -47,14 +47,14 @@ export class ConnectionsService {
     private readonly health: ProviderHealthRegistry,
   ) {}
 
-  async list(userId: string, page: PageRequest = {}): Promise<Page<ConnectionResponseDto>> {
+  async list(organizationId: string, page: PageRequest = {}): Promise<Page<ConnectionResponseDto>> {
     const limit = resolveLimit(page.limit);
-    let where: Prisma.ConnectionWhereInput = { userId };
+    let where: Prisma.ConnectionWhereInput = { organizationId };
     if (page.cursor) {
       const cursor = decodeKeysetCursor(page.cursor);
       where = {
         AND: [
-          { userId },
+          { organizationId },
           keysetWhere('createdAt', 'desc', new Date(cursor.v as string), cursor.id),
         ],
       } as Prisma.ConnectionWhereInput;
@@ -75,9 +75,9 @@ export class ConnectionsService {
     );
   }
 
-  async findOne(userId: string, id: string): Promise<ConnectionResponseDto> {
+  async findOne(organizationId: string, id: string): Promise<ConnectionResponseDto> {
     const row = await this.prisma.connection.findFirst({
-      where: { id, userId },
+      where: { id, organizationId },
       select: SAFE_SELECT,
     });
     if (!row) {
@@ -87,12 +87,13 @@ export class ConnectionsService {
   }
 
   async update(
+    organizationId: string,
     userId: string,
     id: string,
     dto: UpdateConnectionDto,
   ): Promise<ConnectionResponseDto> {
     const existing = await this.prisma.connection.findFirst({
-      where: { id, userId },
+      where: { id, organizationId },
       select: { id: true },
     });
     if (!existing) {
@@ -115,6 +116,7 @@ export class ConnectionsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'connection.update',
       resource: 'connection',
       resourceId: id,
@@ -124,9 +126,9 @@ export class ConnectionsService {
     return row;
   }
 
-  async remove(userId: string, id: string): Promise<void> {
+  async remove(organizationId: string, userId: string, id: string): Promise<void> {
     const { count } = await this.prisma.connection.deleteMany({
-      where: { id, userId },
+      where: { id, organizationId },
     });
     if (count === 0) {
       throw new NotFoundException('Connection not found');
@@ -134,18 +136,24 @@ export class ConnectionsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'connection.delete',
       resource: 'connection',
       resourceId: id,
     });
   }
 
-  async create(userId: string, input: CreateConnectionInput): Promise<ConnectionResponseDto> {
+  async create(
+    organizationId: string,
+    userId: string,
+    input: CreateConnectionInput,
+  ): Promise<ConnectionResponseDto> {
     const config = this.encryptConfig(input.config);
     const refreshToken = input.refreshToken ? this.crypto.encrypt(input.refreshToken) : null;
 
     const row = await this.prisma.connection.create({
       data: {
+        organizationId,
         userId,
         type: input.type,
         provider: input.provider,
@@ -161,6 +169,7 @@ export class ConnectionsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'connection.create',
       resource: 'connection',
       resourceId: row.id,
@@ -170,9 +179,13 @@ export class ConnectionsService {
     return row;
   }
 
-  async test(userId: string, connectionId: string): Promise<ProviderHealthResult> {
+  async test(
+    organizationId: string,
+    userId: string,
+    connectionId: string,
+  ): Promise<ProviderHealthResult> {
     const row = await this.prisma.connection.findFirst({
-      where: { id: connectionId, userId },
+      where: { id: connectionId, organizationId },
     });
     if (!row) {
       throw new NotFoundException('Connection not found');

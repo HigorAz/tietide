@@ -28,13 +28,13 @@ interface ExecutionRow {
 export class UsageService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSummary(userId: string, range: UsageRange): Promise<UsageSummaryResponseDto> {
+  async getSummary(organizationId: string, range: UsageRange): Promise<UsageSummaryResponseDto> {
     const rangeDays = RANGE_DAYS[range];
     const now = new Date();
     const since = new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000);
 
     const baseWhere: Prisma.WorkflowExecutionWhereInput = {
-      workflow: { userId },
+      workflow: { organizationId },
       createdAt: { gte: since },
       isDryRun: false,
     };
@@ -50,7 +50,7 @@ export class UsageService {
           createdAt: true,
         },
       }) as Promise<ExecutionRow[]>,
-      this.prisma.workflow.count({ where: { userId, isActive: true } }),
+      this.prisma.workflow.count({ where: { organizationId, isActive: true } }),
     ]);
 
     const totalRuns = executions.length;

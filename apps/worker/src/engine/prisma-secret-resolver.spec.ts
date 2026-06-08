@@ -34,31 +34,31 @@ describe('PrismaSecretResolver', () => {
     resolver = new PrismaSecretResolver(prisma as never, cryptoService as never);
   });
 
-  const seedSecret = (userId: string, name: string, plaintext: string) => {
+  const seedSecret = (organizationId: string, name: string, plaintext: string) => {
     const { ciphertext, nonce } = crypto.encrypt(plaintext);
-    return { id: `sec-${name}`, userId, name, value: ciphertext, nonce };
+    return { id: `sec-${name}`, organizationId, name, value: ciphertext, nonce };
   };
 
   describe('getSecret', () => {
-    it('should return the decrypted value when the secret exists for the execution owner', async () => {
+    it('should return the decrypted value when the secret exists for the execution org', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
-      prisma.secret.findFirst.mockResolvedValue(seedSecret('user-A', 'STRIPE_KEY', 'sk_live_xyz'));
+      prisma.secret.findFirst.mockResolvedValue(seedSecret('org-A', 'STRIPE_KEY', 'sk_live_xyz'));
 
       const value = await resolver.getSecret('exec-1', 'STRIPE_KEY');
 
       expect(value).toBe('sk_live_xyz');
       expect(prisma.secret.findFirst).toHaveBeenCalledWith({
-        where: { userId: 'user-A', name: 'STRIPE_KEY' },
+        where: { organizationId: 'org-A', name: 'STRIPE_KEY' },
       });
     });
 
-    it('should throw SecretNotFoundError when the secret does not exist for the execution owner', async () => {
+    it('should throw SecretNotFoundError when the secret does not exist for the execution org', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.secret.findFirst.mockResolvedValue(null);
 
@@ -75,15 +75,18 @@ describe('PrismaSecretResolver', () => {
       expect(prisma.secret.findFirst).not.toHaveBeenCalled();
     });
 
-    it('should not return secrets owned by a different user (cross-user isolation)', async () => {
+    it('should not return secrets owned by a different org (cross-org isolation)', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
-      // Prisma findFirst with where:{userId:'user-A',name:'X'} returns null because the secret
-      // belongs to user-B; we simulate that here.
-      prisma.secret.findFirst.mockImplementation(({ where }: { where: { userId: string } }) =>
-        Promise.resolve(where.userId === 'user-A' ? null : seedSecret('user-B', 'X', 'leaked')),
+      // Prisma findFirst with where:{organizationId:'org-A',name:'X'} returns null because the
+      // secret belongs to org-B; we simulate that here.
+      prisma.secret.findFirst.mockImplementation(
+        ({ where }: { where: { organizationId: string } }) =>
+          Promise.resolve(
+            where.organizationId === 'org-A' ? null : seedSecret('org-B', 'X', 'leaked'),
+          ),
       );
 
       await expect(resolver.getSecret('exec-1', 'X')).rejects.toBeInstanceOf(SecretNotFoundError);
@@ -92,9 +95,9 @@ describe('PrismaSecretResolver', () => {
     it('should hit Prisma only once per (executionId, name) within an execution (cache hit)', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
-      prisma.secret.findFirst.mockResolvedValue(seedSecret('user-A', 'API_KEY', 'value-1'));
+      prisma.secret.findFirst.mockResolvedValue(seedSecret('org-A', 'API_KEY', 'value-1'));
 
       await resolver.getSecret('exec-1', 'API_KEY');
       await resolver.getSecret('exec-1', 'API_KEY');
@@ -104,14 +107,14 @@ describe('PrismaSecretResolver', () => {
       expect(cryptoService.decrypt).toHaveBeenCalledTimes(1);
     });
 
-    it('should resolve userId once and reuse it for different secret names within an execution', async () => {
+    it('should resolve organizationId once and reuse it for different secret names within an execution', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
       prisma.secret.findFirst
-        .mockResolvedValueOnce(seedSecret('user-A', 'A', 'aaa'))
-        .mockResolvedValueOnce(seedSecret('user-A', 'B', 'bbb'));
+        .mockResolvedValueOnce(seedSecret('org-A', 'A', 'aaa'))
+        .mockResolvedValueOnce(seedSecret('org-A', 'B', 'bbb'));
 
       const a = await resolver.getSecret('exec-1', 'A');
       const b = await resolver.getSecret('exec-1', 'B');
@@ -124,11 +127,11 @@ describe('PrismaSecretResolver', () => {
 
     it('should keep caches isolated between different executions', async () => {
       prisma.workflowExecution.findUnique
-        .mockResolvedValueOnce({ id: 'exec-1', workflow: { userId: 'user-A' } })
-        .mockResolvedValueOnce({ id: 'exec-2', workflow: { userId: 'user-B' } });
+        .mockResolvedValueOnce({ id: 'exec-1', workflow: { organizationId: 'org-A' } })
+        .mockResolvedValueOnce({ id: 'exec-2', workflow: { organizationId: 'org-B' } });
       prisma.secret.findFirst
-        .mockResolvedValueOnce(seedSecret('user-A', 'KEY', 'value-A'))
-        .mockResolvedValueOnce(seedSecret('user-B', 'KEY', 'value-B'));
+        .mockResolvedValueOnce(seedSecret('org-A', 'KEY', 'value-A'))
+        .mockResolvedValueOnce(seedSecret('org-B', 'KEY', 'value-B'));
 
       const a = await resolver.getSecret('exec-1', 'KEY');
       const b = await resolver.getSecret('exec-2', 'KEY');
@@ -143,9 +146,9 @@ describe('PrismaSecretResolver', () => {
     it('should drop the cache for that execution so subsequent getSecret re-hits Prisma', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
-        workflow: { userId: 'user-A' },
+        workflow: { organizationId: 'org-A' },
       });
-      prisma.secret.findFirst.mockResolvedValue(seedSecret('user-A', 'X', 'val'));
+      prisma.secret.findFirst.mockResolvedValue(seedSecret('org-A', 'X', 'val'));
 
       await resolver.getSecret('exec-1', 'X');
       resolver.releaseExecution('exec-1');

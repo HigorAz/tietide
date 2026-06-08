@@ -76,7 +76,7 @@ describe('OAuthRefreshOneProcessor', () => {
     it('decrypts → refreshes → re-encrypts → updates connection with status=ACTIVE and counter reset', async () => {
       prisma.connection.findUnique.mockResolvedValue({
         id: 'c1',
-        userId: 'u1',
+        organizationId: 'org-1',
         provider: 'google',
         configEncrypted:
           'enc({"accessToken":"old","refreshToken":"rt","scope":"s","tokenType":"Bearer"})',
@@ -164,7 +164,7 @@ describe('OAuthRefreshOneProcessor', () => {
 
     it('after final failure with previous count 0 → status=ERROR (count=1) + DLQ publish', async () => {
       prisma.connection.update
-        .mockResolvedValueOnce({ refreshFailureCount: 1, userId: 'u1' })
+        .mockResolvedValueOnce({ refreshFailureCount: 1, organizationId: 'org-1' })
         .mockResolvedValueOnce({});
 
       const job = makeJob({ attemptsMade: 3, opts: { attempts: 3 } as never });
@@ -174,7 +174,7 @@ describe('OAuthRefreshOneProcessor', () => {
       expect(prisma.connection.update).toHaveBeenNthCalledWith(1, {
         where: { id: 'c1' },
         data: { refreshFailureCount: { increment: 1 } },
-        select: { refreshFailureCount: true, userId: true },
+        select: { refreshFailureCount: true, organizationId: true },
       });
       expect(prisma.connection.update).toHaveBeenNthCalledWith(2, {
         where: { id: 'c1' },
@@ -185,7 +185,7 @@ describe('OAuthRefreshOneProcessor', () => {
           payload: expect.objectContaining({
             connectionId: 'c1',
             provider: 'google',
-            userId: 'u1',
+            organizationId: 'org-1',
           }),
           failureCount: 1,
         }),
@@ -194,7 +194,7 @@ describe('OAuthRefreshOneProcessor', () => {
 
     it('after final failure with count reaching 3 → status=EXPIRED + DLQ publish', async () => {
       prisma.connection.update
-        .mockResolvedValueOnce({ refreshFailureCount: 3, userId: 'u1' })
+        .mockResolvedValueOnce({ refreshFailureCount: 3, organizationId: 'org-1' })
         .mockResolvedValueOnce({});
 
       const job = makeJob({ attemptsMade: 3, opts: { attempts: 3 } as never });

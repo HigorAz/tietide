@@ -9,6 +9,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
 import type { OAuthProvider } from './providers/oauth-provider.interface';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
+const ORG_ID = '00000000-0000-4000-8000-0000000000aa';
 
 function makeProvider(overrides: Partial<OAuthProvider> = {}): OAuthProvider {
   return {
@@ -59,6 +60,7 @@ function makeService(opts: {
       opts.stateVerify ??
       jest.fn().mockResolvedValue({
         userId: USER_ID,
+        organizationId: ORG_ID,
         provider: provider.id,
         scopes: ['openid', 'email'],
         label: 'My Label',
@@ -113,7 +115,7 @@ describe('OAuthService', () => {
 
       const buildSpy = jest.spyOn(provider, 'buildAuthorizeUrl');
 
-      const result = await service.start(USER_ID, {
+      const result = await service.start(ORG_ID, USER_ID, {
         provider: 'google',
         scopes: 'openid,email',
         label: 'My Gmail',
@@ -123,6 +125,7 @@ describe('OAuthService', () => {
       expect(result.state).toBe('signed.jwt.token');
       expect(state.sign).toHaveBeenCalledWith({
         userId: USER_ID,
+        organizationId: ORG_ID,
         provider: 'google',
         scopes: ['openid', 'email'],
         label: 'My Gmail',
@@ -141,7 +144,7 @@ describe('OAuthService', () => {
       const { service, provider } = makeService({});
       const spy = jest.spyOn(provider, 'buildAuthorizeUrl');
 
-      await service.start(USER_ID, { provider: 'google', label: 'X' });
+      await service.start(ORG_ID, USER_ID, { provider: 'google', label: 'X' });
 
       expect(spy).toHaveBeenCalledWith(expect.objectContaining({ scopes: ['openid', 'email'] }));
     });
@@ -149,16 +152,16 @@ describe('OAuthService', () => {
     it('throws BadRequest for an unknown provider', async () => {
       const { service } = makeService({});
 
-      await expect(service.start(USER_ID, { provider: 'dropbox', label: 'X' })).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.start(ORG_ID, USER_ID, { provider: 'dropbox', label: 'X' }),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequest when scopes contain values outside the provider allowlist', async () => {
       const { service } = makeService({});
 
       await expect(
-        service.start(USER_ID, {
+        service.start(ORG_ID, USER_ID, {
           provider: 'google',
           scopes: 'openid,https://mail.google.com/',
           label: 'X',
@@ -189,6 +192,7 @@ describe('OAuthService', () => {
         codeVerifier: 'verifier-xyz',
       });
       expect(connections.create).toHaveBeenCalledWith(
+        ORG_ID,
         USER_ID,
         expect.objectContaining({
           type: ConnectionType.OAUTH2,
@@ -212,6 +216,7 @@ describe('OAuthService', () => {
         codeVerifier: 'verifier-xyz',
       });
       expect(connections.create).toHaveBeenCalledWith(
+        ORG_ID,
         USER_ID,
         expect.objectContaining({ provider: 'google' }),
       );

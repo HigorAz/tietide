@@ -34,8 +34,9 @@ describe('WorkflowsService', () => {
     $transaction: jest.Mock;
   };
 
+  const orgId = 'org-uuid-1';
+  const otherOrgId = 'org-uuid-2';
   const userId = 'user-uuid-1';
-  const otherUserId = 'user-uuid-2';
   const workflowId = 'workflow-uuid-1';
 
   const validDefinition = {
@@ -138,11 +139,12 @@ describe('WorkflowsService', () => {
     it('should persist with userId from the caller and return the row', async () => {
       prisma.workflow.create.mockResolvedValue(persisted);
 
-      const result = await service.create(userId, dto);
+      const result = await service.create(orgId, userId, dto);
 
       expect(prisma.workflow.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: {
+            organizationId: orgId,
             userId,
             name: 'Demo',
             description: null,
@@ -156,7 +158,7 @@ describe('WorkflowsService', () => {
     it('should accept an optional description', async () => {
       prisma.workflow.create.mockResolvedValue(persisted);
 
-      await service.create(userId, { ...dto, description: 'Notes' });
+      await service.create(orgId, userId, { ...dto, description: 'Notes' });
 
       expect(prisma.workflow.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -168,7 +170,7 @@ describe('WorkflowsService', () => {
     it('should exclude userId from the selected/returned columns', async () => {
       prisma.workflow.create.mockResolvedValue(persisted);
 
-      await service.create(userId, dto);
+      await service.create(orgId, userId, dto);
 
       const call = prisma.workflow.create.mock.calls[0][0] as { select: Record<string, boolean> };
       expect(call.select).toBeDefined();
@@ -178,7 +180,7 @@ describe('WorkflowsService', () => {
     it('should record an audit log entry with action "workflow.create"', async () => {
       prisma.workflow.create.mockResolvedValue(persisted);
 
-      await service.create(userId, dto);
+      await service.create(orgId, userId, dto);
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -206,7 +208,7 @@ describe('WorkflowsService', () => {
         edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
-      await service.create(userId, { name: 'Demo', definition: definitionWithCode });
+      await service.create(orgId, userId, { name: 'Demo', definition: definitionWithCode });
 
       expect(prisma.workflow.create).toHaveBeenCalled();
     });
@@ -216,7 +218,7 @@ describe('WorkflowsService', () => {
         definition: { nodes: unknown[]; edges: unknown[] },
         messageNeedle: string,
       ) {
-        const promise = service.create(userId, {
+        const promise = service.create(orgId, userId, {
           name: 'Demo',
           definition: definition as unknown as typeof validDefinition,
         });
@@ -299,7 +301,7 @@ describe('WorkflowsService', () => {
 
       it('accepts a known node type with a normal nested config', async () => {
         prisma.workflow.create.mockResolvedValue(persisted);
-        await service.create(userId, {
+        await service.create(orgId, userId, {
           name: 'Demo',
           definition: {
             nodes: [
@@ -346,7 +348,7 @@ describe('WorkflowsService', () => {
         definition: { nodes: unknown[]; edges: unknown[] },
         expectedCode: string,
       ) {
-        const promise = service.create(userId, {
+        const promise = service.create(orgId, userId, {
           name: 'Demo',
           definition: definition as unknown as typeof validDefinition,
         });
@@ -406,7 +408,7 @@ describe('WorkflowsService', () => {
     it('should seed an initial WorkflowVersion v1 with the new definition', async () => {
       prisma.workflow.create.mockResolvedValue(persisted);
 
-      await service.create(userId, dto);
+      await service.create(orgId, userId, dto);
 
       expect(prisma.workflowVersion.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -421,7 +423,7 @@ describe('WorkflowsService', () => {
     it('should perform create + initial snapshot in a single $transaction', async () => {
       prisma.workflow.create.mockResolvedValue(persisted);
 
-      await service.create(userId, dto);
+      await service.create(orgId, userId, dto);
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
@@ -434,11 +436,11 @@ describe('WorkflowsService', () => {
     it('should query Prisma scoped to the caller userId only with a keyset order', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId);
+      await service.list(orgId);
 
       expect(prisma.workflow.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId },
+          where: { organizationId: orgId },
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         }),
       );
@@ -447,7 +449,7 @@ describe('WorkflowsService', () => {
     it('should fetch limit + 1 rows to detect a next page', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId, { limit: 10 });
+      await service.list(orgId, { limit: 10 });
 
       const call = prisma.workflow.findMany.mock.calls[0][0] as { take: number };
       expect(call.take).toBe(11);
@@ -456,7 +458,7 @@ describe('WorkflowsService', () => {
     it('should return items wrapped with a null nextCursor when not full', async () => {
       prisma.workflow.findMany.mockResolvedValue([persisted]);
 
-      const result = await service.list(userId);
+      const result = await service.list(orgId);
 
       expect(result).toEqual({ items: [persistedListItem], nextCursor: null });
     });
@@ -464,7 +466,7 @@ describe('WorkflowsService', () => {
     it('should NOT request or return the heavy definition field', async () => {
       prisma.workflow.findMany.mockResolvedValue([persisted]);
 
-      const result = await service.list(userId);
+      const result = await service.list(orgId);
 
       const call = prisma.workflow.findMany.mock.calls[0][0] as {
         select: Record<string, unknown>;
@@ -481,7 +483,7 @@ describe('WorkflowsService', () => {
       ];
       prisma.workflow.findMany.mockResolvedValue(rows);
 
-      const result = await service.list(userId, { limit: 2 });
+      const result = await service.list(orgId, { limit: 2 });
 
       expect(result.items).toHaveLength(2);
       expect(result.items.map((w) => w.id)).toEqual(['wf-a', 'wf-b']);
@@ -496,7 +498,7 @@ describe('WorkflowsService', () => {
         'utf8',
       ).toString('base64url');
 
-      await service.list(userId, { cursor });
+      await service.list(orgId, { cursor });
 
       const call = prisma.workflow.findMany.mock.calls[0][0] as {
         where: { AND?: unknown[] };
@@ -507,7 +509,7 @@ describe('WorkflowsService', () => {
     it('should request the execution count via Prisma _count', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId);
+      await service.list(orgId);
 
       const call = prisma.workflow.findMany.mock.calls[0][0] as {
         select: Record<string, unknown>;
@@ -518,7 +520,7 @@ describe('WorkflowsService', () => {
     it('should map _count.executions to executionCount', async () => {
       prisma.workflow.findMany.mockResolvedValue([{ ...persisted, _count: { executions: 7 } }]);
 
-      const { items } = await service.list(userId);
+      const { items } = await service.list(orgId);
 
       expect(items[0].executionCount).toBe(7);
       expect(items[0]).not.toHaveProperty('_count');
@@ -527,7 +529,7 @@ describe('WorkflowsService', () => {
     it('should exclude userId from the response select', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId);
+      await service.list(orgId);
 
       const call = prisma.workflow.findMany.mock.calls[0][0] as {
         select: Record<string, boolean>;
@@ -542,7 +544,7 @@ describe('WorkflowsService', () => {
         { ...persisted, documentation: { updatedAt: docUpdated, version: 3 } },
       ]);
 
-      const { items } = await service.list(userId);
+      const { items } = await service.list(orgId);
 
       expect(items[0].documentation).toEqual({ generatedAt: docUpdated, version: 3 });
     });
@@ -550,7 +552,7 @@ describe('WorkflowsService', () => {
     it('should expose documentation as null when none exists', async () => {
       prisma.workflow.findMany.mockResolvedValue([{ ...persisted, documentation: null }]);
 
-      const { items } = await service.list(userId);
+      const { items } = await service.list(orgId);
 
       expect(items[0].documentation).toBeNull();
     });
@@ -558,9 +560,9 @@ describe('WorkflowsService', () => {
 
   describe('findOne', () => {
     it('should return the workflow when the caller owns it', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: orgId });
 
-      const result = await service.findOne(userId, workflowId);
+      const result = await service.findOne(orgId, workflowId);
 
       expect(prisma.workflow.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: workflowId } }),
@@ -571,19 +573,19 @@ describe('WorkflowsService', () => {
     it('should throw NotFoundException when the row does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne(userId, workflowId)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(orgId, workflowId)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException when the row belongs to another user', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId: otherUserId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: otherOrgId });
 
-      await expect(service.findOne(userId, workflowId)).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne(orgId, workflowId)).rejects.toThrow(ForbiddenException);
     });
 
     it('should not leak userId in the returned payload', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: orgId });
 
-      const result = await service.findOne(userId, workflowId);
+      const result = await service.findOne(orgId, workflowId);
 
       expect(result).not.toHaveProperty('userId');
     });
@@ -592,11 +594,11 @@ describe('WorkflowsService', () => {
       const docUpdated = new Date('2026-05-02T08:30:00Z');
       prisma.workflow.findUnique.mockResolvedValue({
         ...persisted,
-        userId,
+        organizationId: orgId,
         documentation: { updatedAt: docUpdated, version: 2 },
       });
 
-      const result = await service.findOne(userId, workflowId);
+      const result = await service.findOne(orgId, workflowId);
 
       expect(result.documentation).toEqual({ generatedAt: docUpdated, version: 2 });
     });
@@ -604,11 +606,11 @@ describe('WorkflowsService', () => {
     it('should expose documentation as null when none exists', async () => {
       prisma.workflow.findUnique.mockResolvedValue({
         ...persisted,
-        userId,
+        organizationId: orgId,
         documentation: null,
       });
 
-      const result = await service.findOne(userId, workflowId);
+      const result = await service.findOne(orgId, workflowId);
 
       expect(result.documentation).toBeNull();
     });
@@ -616,12 +618,12 @@ describe('WorkflowsService', () => {
 
   describe('update', () => {
     beforeEach(() => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: orgId });
       prisma.workflow.update.mockResolvedValue({ ...persisted, version: 2 });
     });
 
     it('should apply partial fields without bumping version when definition is unchanged', async () => {
-      await service.update(userId, workflowId, { name: 'Renamed' });
+      await service.update(orgId, userId, workflowId, { name: 'Renamed' });
 
       const call = prisma.workflow.update.mock.calls[0][0] as { data: Record<string, unknown> };
       expect(call.data.name).toBe('Renamed');
@@ -643,7 +645,7 @@ describe('WorkflowsService', () => {
         edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
-      await service.update(userId, workflowId, { definition: newDef });
+      await service.update(orgId, userId, workflowId, { definition: newDef });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -653,7 +655,7 @@ describe('WorkflowsService', () => {
     });
 
     it('should NOT bump version when only isActive changes', async () => {
-      await service.update(userId, workflowId, { isActive: true });
+      await service.update(orgId, userId, workflowId, { isActive: true });
 
       const call = prisma.workflow.update.mock.calls[0][0] as { data: Record<string, unknown> };
       expect(call.data.isActive).toBe(true);
@@ -661,13 +663,13 @@ describe('WorkflowsService', () => {
     });
 
     it('should bump version by 1 ONLY when definition changes', async () => {
-      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, organizationId: orgId });
       prisma.workflow.findUnique.mockResolvedValueOnce({
         definition: validDefinition,
         version: 1,
       });
       const newDef = { ...validDefinition };
-      await service.update(userId, workflowId, { definition: newDef });
+      await service.update(orgId, userId, workflowId, { definition: newDef });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -679,7 +681,7 @@ describe('WorkflowsService', () => {
     it('should snapshot the NEW definition at the NEW version when definition changes', async () => {
       // WorkflowVersion(1) already exists from create; on update we snapshot the
       // new state at v+1 (every version has exactly one row).
-      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, organizationId: orgId });
       prisma.workflow.findUnique.mockResolvedValueOnce({
         definition: validDefinition,
         version: 1,
@@ -698,7 +700,10 @@ describe('WorkflowsService', () => {
         edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
-      await service.update(userId, workflowId, { definition: newDef, versionMessage: 'tweak' });
+      await service.update(orgId, userId, workflowId, {
+        definition: newDef,
+        versionMessage: 'tweak',
+      });
 
       expect(prisma.workflowVersion.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -712,27 +717,27 @@ describe('WorkflowsService', () => {
     });
 
     it('should NOT call workflowVersion.create when only name/isActive change', async () => {
-      await service.update(userId, workflowId, { name: 'Renamed' });
-      await service.update(userId, workflowId, { isActive: true });
-      await service.update(userId, workflowId, { description: 'noted' });
+      await service.update(orgId, userId, workflowId, { name: 'Renamed' });
+      await service.update(orgId, userId, workflowId, { isActive: true });
+      await service.update(orgId, userId, workflowId, { description: 'noted' });
 
       expect(prisma.workflowVersion.create).not.toHaveBeenCalled();
     });
 
     it('should wrap snapshot + update in a single $transaction when definition changes', async () => {
-      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValueOnce({ ...persisted, organizationId: orgId });
       prisma.workflow.findUnique.mockResolvedValueOnce({
         definition: validDefinition,
         version: 1,
       });
       const newDef = { ...validDefinition };
-      await service.update(userId, workflowId, { definition: newDef });
+      await service.update(orgId, userId, workflowId, { definition: newDef });
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
 
     it('should NOT use $transaction when definition is unchanged', async () => {
-      await service.update(userId, workflowId, { name: 'Renamed' });
+      await service.update(orgId, userId, workflowId, { name: 'Renamed' });
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });
@@ -741,7 +746,7 @@ describe('WorkflowsService', () => {
       prisma.workflow.findUnique.mockReset();
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.update(userId, workflowId, { name: 'X' })).rejects.toThrow(
+      await expect(service.update(orgId, userId, workflowId, { name: 'X' })).rejects.toThrow(
         NotFoundException,
       );
 
@@ -750,9 +755,9 @@ describe('WorkflowsService', () => {
 
     it('should throw ForbiddenException when the row belongs to another user', async () => {
       prisma.workflow.findUnique.mockReset();
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId: otherUserId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: otherOrgId });
 
-      await expect(service.update(userId, workflowId, { name: 'X' })).rejects.toThrow(
+      await expect(service.update(orgId, userId, workflowId, { name: 'X' })).rejects.toThrow(
         ForbiddenException,
       );
 
@@ -761,14 +766,16 @@ describe('WorkflowsService', () => {
 
     it('should throw BadRequestException with an empty body and not touch Prisma', async () => {
       prisma.workflow.findUnique.mockReset();
-      await expect(service.update(userId, workflowId, {})).rejects.toThrow(BadRequestException);
+      await expect(service.update(orgId, userId, workflowId, {})).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(prisma.workflow.findUnique).not.toHaveBeenCalled();
       expect(prisma.workflow.update).not.toHaveBeenCalled();
     });
 
     it('should accept description: null to clear it', async () => {
-      await service.update(userId, workflowId, { description: null });
+      await service.update(orgId, userId, workflowId, { description: null });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -778,14 +785,14 @@ describe('WorkflowsService', () => {
     });
 
     it('should return the updated row without userId', async () => {
-      const result = await service.update(userId, workflowId, { name: 'Renamed' });
+      const result = await service.update(orgId, userId, workflowId, { name: 'Renamed' });
 
       expect(result).not.toHaveProperty('userId');
       expect(result.version).toBe(2);
     });
 
     it('should record an audit log entry with action "workflow.update"', async () => {
-      await service.update(userId, workflowId, { name: 'Renamed' });
+      await service.update(orgId, userId, workflowId, { name: 'Renamed' });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -812,7 +819,7 @@ describe('WorkflowsService', () => {
         edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
       };
 
-      await service.update(userId, workflowId, { definition: definitionWithCode });
+      await service.update(orgId, userId, workflowId, { definition: definitionWithCode });
 
       expect(prisma.workflow.update).toHaveBeenCalled();
     });
@@ -838,7 +845,7 @@ describe('WorkflowsService', () => {
         definition: { nodes: unknown[]; edges: unknown[] },
         expectedCode: string,
       ) {
-        const promise = service.update(userId, workflowId, {
+        const promise = service.update(orgId, userId, workflowId, {
           definition: definition as unknown as typeof validDefinition,
         });
         await expect(promise).rejects.toThrow(UnprocessableEntityException);
@@ -901,40 +908,40 @@ describe('WorkflowsService', () => {
     it('passes folderId=null to where when filter.folderId === null', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId, { folderId: null });
+      await service.list(orgId, { folderId: null });
 
       expect(prisma.workflow.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userId, folderId: null } }),
+        expect.objectContaining({ where: { organizationId: orgId, folderId: null } }),
       );
     });
 
     it('passes folderId=<uuid> to where when filter.folderId is a uuid', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId, { folderId: folderUuid });
+      await service.list(orgId, { folderId: folderUuid });
 
       expect(prisma.workflow.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { userId, folderId: folderUuid } }),
+        expect.objectContaining({ where: { organizationId: orgId, folderId: folderUuid } }),
       );
     });
 
     it('omits folderId from where when filter.folderId is undefined', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId, {});
+      await service.list(orgId, {});
 
       const call = prisma.workflow.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
-      expect(call.where).toEqual({ userId });
+      expect(call.where).toEqual({ organizationId: orgId });
     });
 
     it('builds tags.some filter when tagIds provided', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId, { tagIds: [tagUuidA, tagUuidB] });
+      await service.list(orgId, { tagIds: [tagUuidA, tagUuidB] });
 
       expect(prisma.workflow.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId, tags: { some: { tagId: { in: [tagUuidA, tagUuidB] } } } },
+          where: { organizationId: orgId, tags: { some: { tagId: { in: [tagUuidA, tagUuidB] } } } },
         }),
       );
     });
@@ -942,21 +949,21 @@ describe('WorkflowsService', () => {
     it('skips tags filter when tagIds is empty', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId, { tagIds: [] });
+      await service.list(orgId, { tagIds: [] });
 
       const call = prisma.workflow.findMany.mock.calls[0][0] as { where: Record<string, unknown> };
-      expect(call.where).toEqual({ userId });
+      expect(call.where).toEqual({ organizationId: orgId });
     });
 
     it('combines folderId and tagIds filters', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 
-      await service.list(userId, { folderId: folderUuid, tagIds: [tagUuidA] });
+      await service.list(orgId, { folderId: folderUuid, tagIds: [tagUuidA] });
 
       expect(prisma.workflow.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            userId,
+            organizationId: orgId,
             folderId: folderUuid,
             tags: { some: { tagId: { in: [tagUuidA] } } },
           },
@@ -970,7 +977,7 @@ describe('WorkflowsService', () => {
 
       const {
         items: [row],
-      } = await service.list(userId);
+      } = await service.list(orgId);
 
       expect(row.tags).toEqual([{ id: tagUuidA, name: 'client-a', color: '#3366cc' }]);
     });
@@ -981,17 +988,17 @@ describe('WorkflowsService', () => {
     const tagUuidA = '550e8400-e29b-41d4-a716-446655440020';
 
     beforeEach(() => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: orgId });
       prisma.workflow.update.mockResolvedValue({ ...persisted, version: 1 });
     });
 
     it('connects folder when folderId is a uuid the user owns', async () => {
       prisma.folder.findFirst.mockResolvedValue({ id: folderUuid });
 
-      await service.update(userId, workflowId, { folderId: folderUuid });
+      await service.update(orgId, userId, workflowId, { folderId: folderUuid });
 
       expect(prisma.folder.findFirst).toHaveBeenCalledWith({
-        where: { id: folderUuid, userId },
+        where: { id: folderUuid, organizationId: orgId },
         select: { id: true },
       });
       expect(prisma.workflow.update).toHaveBeenCalledWith(
@@ -1004,14 +1011,14 @@ describe('WorkflowsService', () => {
     it('rejects folderId belonging to another user (NotFoundException)', async () => {
       prisma.folder.findFirst.mockResolvedValue(null);
 
-      await expect(service.update(userId, workflowId, { folderId: folderUuid })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.update(orgId, userId, workflowId, { folderId: folderUuid }),
+      ).rejects.toThrow(NotFoundException);
       expect(prisma.workflow.update).not.toHaveBeenCalled();
     });
 
     it('disconnects folder when folderId is null', async () => {
-      await service.update(userId, workflowId, { folderId: null });
+      await service.update(orgId, userId, workflowId, { folderId: null });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1023,7 +1030,7 @@ describe('WorkflowsService', () => {
     it('replaces tag set with deleteMany + create when tagIds provided', async () => {
       prisma.tag.findMany.mockResolvedValue([{ id: tagUuidA }]);
 
-      await service.update(userId, workflowId, { tagIds: [tagUuidA] });
+      await service.update(orgId, userId, workflowId, { tagIds: [tagUuidA] });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1040,14 +1047,14 @@ describe('WorkflowsService', () => {
     it('rejects when any tagId belongs to another user (NotFoundException)', async () => {
       prisma.tag.findMany.mockResolvedValue([]); // none owned
 
-      await expect(service.update(userId, workflowId, { tagIds: [tagUuidA] })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.update(orgId, userId, workflowId, { tagIds: [tagUuidA] }),
+      ).rejects.toThrow(NotFoundException);
       expect(prisma.workflow.update).not.toHaveBeenCalled();
     });
 
     it('clears tags when tagIds is an empty array', async () => {
-      await service.update(userId, workflowId, { tagIds: [] });
+      await service.update(orgId, userId, workflowId, { tagIds: [] });
 
       expect(prisma.workflow.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1063,21 +1070,21 @@ describe('WorkflowsService', () => {
 
   describe('remove', () => {
     it('should delete when the caller owns the row', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: orgId });
       prisma.workflow.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(userId, workflowId);
+      await service.remove(orgId, userId, workflowId);
 
       expect(prisma.workflow.deleteMany).toHaveBeenCalledWith({
-        where: { id: workflowId, userId },
+        where: { id: workflowId, organizationId: orgId },
       });
     });
 
     it('should record an audit log entry with action "workflow.delete"', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: orgId });
       prisma.workflow.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(userId, workflowId);
+      await service.remove(orgId, userId, workflowId);
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1092,15 +1099,15 @@ describe('WorkflowsService', () => {
     it('should throw NotFoundException when the row does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.remove(userId, workflowId)).rejects.toThrow(NotFoundException);
+      await expect(service.remove(orgId, userId, workflowId)).rejects.toThrow(NotFoundException);
 
       expect(prisma.workflow.deleteMany).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when the row belongs to another user', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, userId: otherUserId });
+      prisma.workflow.findUnique.mockResolvedValue({ ...persisted, organizationId: otherOrgId });
 
-      await expect(service.remove(userId, workflowId)).rejects.toThrow(ForbiddenException);
+      await expect(service.remove(orgId, userId, workflowId)).rejects.toThrow(ForbiddenException);
 
       expect(prisma.workflow.deleteMany).not.toHaveBeenCalled();
     });

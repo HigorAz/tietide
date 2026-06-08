@@ -8,6 +8,7 @@ import {
 import { Test, type TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../../common/guards/org-context.guard';
 import { OAuthController } from './oauth.controller';
 import { OAuthService, OAuthCallbackError } from './oauth.service';
 
@@ -51,6 +52,14 @@ describe('OAuthController (integration)', () => {
           return true;
         },
       })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
+          return true;
+        },
+      })
       .compile();
 
     app = module.createNestApplication();
@@ -85,7 +94,7 @@ describe('OAuthController (integration)', () => {
         .expect(200);
 
       expect(res.body).toEqual({ redirectUrl: 'http://google.example/auth', state: 'abc' });
-      expect(oauth.start).toHaveBeenCalledWith('owner-uuid', {
+      expect(oauth.start).toHaveBeenCalledWith('org-uuid', 'owner-uuid', {
         provider: 'google',
         label: 'My Gmail',
         scopes: 'openid,email',

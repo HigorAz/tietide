@@ -7,9 +7,10 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { UsageService } from './usage.service';
 import { UsageRange, UsageSummaryQueryDto } from './dto/usage-summary-query.dto';
 import { UsageSummaryResponseDto } from './dto/usage-summary-response.dto';
@@ -17,19 +18,19 @@ import { UsageSummaryResponseDto } from './dto/usage-summary-response.dto';
 @ApiTags('usage')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 @Controller('usage')
 export class UsageController {
   constructor(private readonly usage: UsageService) {}
 
   @Get('summary')
-  @ApiOperation({ summary: 'Per-user usage analytics over a rolling 7/30/90-day window' })
+  @ApiOperation({ summary: 'Active-workspace usage analytics over a rolling 7/30/90-day window' })
   @ApiOkResponse({ type: UsageSummaryResponseDto })
   @ApiBadRequestResponse({ description: 'Invalid query parameters' })
   async getSummary(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Query() query: UsageSummaryQueryDto,
   ): Promise<UsageSummaryResponseDto> {
-    return this.usage.getSummary(user.id, query.range ?? UsageRange.D7);
+    return this.usage.getSummary(org.id, query.range ?? UsageRange.D7);
   }
 }

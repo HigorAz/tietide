@@ -7,6 +7,7 @@ import {
   type MailTransport,
 } from './mail.transport';
 import {
+  buildInviteUrl,
   buildPasswordResetUrl,
   buildVerificationUrl,
   resolveMailConfig,
@@ -53,6 +54,19 @@ export class MailerService {
         `Choose a new password here:\n${url}\n\n` +
         `This link expires in 1 hour and can be used once. ` +
         `If you didn't request this, you can safely ignore this email — your password won't change.`,
+    });
+  }
+
+  async sendOrganizationInviteEmail(to: string, rawToken: string, orgName: string): Promise<void> {
+    const url = buildInviteUrl(this.config.appUrl, rawToken);
+    await this.safeSend({
+      to,
+      subject: `You've been invited to ${orgName} on TieTide`,
+      text:
+        `You've been invited to join the "${orgName}" workspace on TieTide.\n\n` +
+        `Accept the invitation here:\n${url}\n\n` +
+        `This invite expires in 7 days and can be used once. ` +
+        `If you weren't expecting this, you can safely ignore this email.`,
     });
   }
 

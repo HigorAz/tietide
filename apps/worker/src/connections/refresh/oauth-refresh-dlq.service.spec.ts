@@ -27,7 +27,7 @@ const makeSummary = (
   attemptsAllowed: 3,
   failedAt: new Date('2026-05-11T12:00:00.000Z'),
   error: 'invalid_grant: refresh token revoked',
-  payload: { connectionId: 'conn-1', provider: 'google', userId: 'user-1' },
+  payload: { connectionId: 'conn-1', provider: 'google', organizationId: 'org-1' },
   failureCount: 3,
   ...overrides,
 });

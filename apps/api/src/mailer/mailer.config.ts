@@ -53,3 +53,7 @@ export function buildVerificationUrl(appUrl: string, token: string): string {
 export function buildPasswordResetUrl(appUrl: string, token: string): string {
   return `${stripTrailingSlashes(appUrl)}/reset-password?token=${encodeURIComponent(token)}`;
 }
+
+export function buildInviteUrl(appUrl: string, token: string): string {
+  return `${stripTrailingSlashes(appUrl)}/organizations/accept-invite?token=${encodeURIComponent(token)}`;
+}

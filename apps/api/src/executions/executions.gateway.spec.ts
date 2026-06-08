@@ -18,9 +18,9 @@ const TEST_JWT_SECRET = 'test-secret-execution-gateway-spec';
 const GATEWAY_PATH = '/v1/ws/executions';
 
 const OWNER_ID = '00000000-0000-4000-8000-000000000001';
-const STRANGER_ID = '00000000-0000-4000-8000-000000000002';
 const EXECUTION_ID = '11111111-1111-4111-8111-111111111111';
 const FOREIGN_EXECUTION_ID = '22222222-2222-4222-8222-222222222222';
+const ORG_ID = '33333333-3333-4333-8333-333333333333';
 
 class InMemorySubscriber implements ExecutionEventsSubscriber {
   private readonly handlers = new Map<string, Set<ExecutionEventHandler>>();
@@ -117,14 +117,21 @@ describe('ExecutionsGateway (integration)', () => {
   let port: number;
   let jwtService: JwtService;
   let subscriber: InMemorySubscriber;
-  let prisma: { workflowExecution: { findUnique: jest.Mock } };
+  let prisma: {
+    workflowExecution: { findUnique: jest.Mock };
+    organizationMember: { findFirst: jest.Mock };
+  };
   let openClients: ClientSocket[];
 
   beforeEach(async () => {
     subscriber = new InMemorySubscriber();
     prisma = {
       workflowExecution: { findUnique: jest.fn() },
+      organizationMember: { findFirst: jest.fn() },
     };
+    // Default: the connecting user IS a member of the execution's org. Tests that
+    // exercise the non-member path override this with mockResolvedValue(null).
+    prisma.organizationMember.findFirst.mockResolvedValue({ id: 'member-1' });
 
     const mod: TestingModule = await Test.createTestingModule({
       imports: [
@@ -207,10 +214,12 @@ describe('ExecutionsGateway (integration)', () => {
   });
 
   describe('subscribe', () => {
-    it('should error and not subscribe when execution belongs to another user', async () => {
+    it('should error and not subscribe when the caller is not a member of the execution org', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
-        workflow: { userId: STRANGER_ID },
+        workflow: { organizationId: ORG_ID },
       });
+      // The execution belongs to an org the caller is not a member of.
+      prisma.organizationMember.findFirst.mockResolvedValue(null);
 
       const client = connect(signOwnerToken());
       await waitForEvent(client, 'connect');
@@ -238,7 +247,7 @@ describe('ExecutionsGateway (integration)', () => {
 
     it('should subscribe to an owned execution', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
-        workflow: { userId: OWNER_ID },
+        workflow: { organizationId: ORG_ID },
       });
 
       const client = connect(signOwnerToken());
@@ -252,13 +261,19 @@ describe('ExecutionsGateway (integration)', () => {
       expect(subscriber.handlerCount(EXECUTION_ID)).toBe(1);
       expect(prisma.workflowExecution.findUnique).toHaveBeenCalledWith({
         where: { id: EXECUTION_ID },
-        select: { workflow: { select: { userId: true } } },
+        select: { workflow: { select: { organizationId: true } } },
+      });
+      // Defence-in-depth: the WS subscribe verifies org membership, not just that
+      // the execution exists.
+      expect(prisma.organizationMember.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: ORG_ID, userId: OWNER_ID },
+        select: { id: true },
       });
     });
 
     it('should be idempotent when the same socket subscribes twice', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
-        workflow: { userId: OWNER_ID },
+        workflow: { organizationId: ORG_ID },
       });
 
       const client = connect(signOwnerToken());
@@ -276,7 +291,7 @@ describe('ExecutionsGateway (integration)', () => {
   describe('event forwarding', () => {
     it('should forward a published envelope to the subscribed socket as "event"', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
-        workflow: { userId: OWNER_ID },
+        workflow: { organizationId: ORG_ID },
       });
 
       const client = connect(signOwnerToken());
@@ -293,7 +308,7 @@ describe('ExecutionsGateway (integration)', () => {
 
     it('should fan out to multiple sockets subscribed to the same execution', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
-        workflow: { userId: OWNER_ID },
+        workflow: { organizationId: ORG_ID },
       });
 
       const a = connect(signOwnerToken());
@@ -322,7 +337,7 @@ describe('ExecutionsGateway (integration)', () => {
   describe('unsubscribe', () => {
     it('should leave the channel and stop receiving events', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
-        workflow: { userId: OWNER_ID },
+        workflow: { organizationId: ORG_ID },
       });
 
       const client = connect(signOwnerToken());
@@ -344,7 +359,7 @@ describe('ExecutionsGateway (integration)', () => {
   describe('handleDisconnect', () => {
     it('should clean up all subscriptions when a socket disconnects', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
-        workflow: { userId: OWNER_ID },
+        workflow: { organizationId: ORG_ID },
       });
 
       const client = connect(signOwnerToken());

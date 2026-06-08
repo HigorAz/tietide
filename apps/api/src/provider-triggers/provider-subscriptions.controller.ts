@@ -7,16 +7,17 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { ProviderSubscriptionsService } from './provider-subscriptions.service';
 import { ProviderSubscriptionResponseDto } from './dto/provider-subscription-response.dto';
 
 @ApiTags('provider-subscriptions')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 @Controller('workflows/:workflowId/provider-subscriptions')
 export class ProviderSubscriptionsController {
   constructor(private readonly service: ProviderSubscriptionsService) {}
@@ -29,9 +30,9 @@ export class ProviderSubscriptionsController {
   @ApiOkResponse({ type: ProviderSubscriptionResponseDto, isArray: true })
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   async list(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('workflowId', new ParseUUIDPipe({ version: '4' })) workflowId: string,
   ): Promise<ProviderSubscriptionResponseDto[]> {
-    return this.service.listForWorkflow(user.id, workflowId);
+    return this.service.listForWorkflow(org.id, workflowId);
   }
 }

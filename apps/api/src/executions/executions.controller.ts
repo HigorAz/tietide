@@ -26,13 +26,18 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { WorkflowDefinition } from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
+import { OrgRoles } from '../common/decorators/org-roles.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import { OrgRolesGuard } from '../common/guards/org-roles.guard';
 import {
   DEFAULT_THROTTLER_NAME,
   DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
   DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
 } from '../common/throttler/throttler.config';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { ExecutionsService } from './executions.service';
 import { TriggerExecutionDto } from './dto/trigger-execution.dto';
 import { TestExecutionDto } from './dto/test-execution.dto';
@@ -48,12 +53,13 @@ const EXECUTE_THROTTLE = {
 @ApiTags('executions')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
 @Controller('workflows/:id')
 export class ExecutionsController {
   constructor(private readonly executions: ExecutionsService) {}
 
   @Post('execute')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @Throttle(EXECUTE_THROTTLE)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Manually trigger a workflow execution' })
@@ -71,13 +77,14 @@ export class ExecutionsController {
     description: 'Repeated requests with the same key return the same execution.',
   })
   async trigger(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: TriggerExecutionDto,
     @Req() req: Request & { id?: string },
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<ExecutionResponseDto> {
-    return this.executions.triggerManual(user.id, id, {
+    return this.executions.triggerManual(org.id, user.id, id, {
       triggerData: dto.triggerData,
       idempotencyKey: idempotencyKey?.trim() || undefined,
       requestId: extractRequestId(req),
@@ -85,6 +92,7 @@ export class ExecutionsController {
   }
 
   @Post('test')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @Throttle(EXECUTE_THROTTLE)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -101,12 +109,13 @@ export class ExecutionsController {
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async runTest(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: TestExecutionDto,
     @Req() req: Request & { id?: string },
   ): Promise<ExecutionResponseDto> {
-    return this.executions.triggerTest(user.id, id, {
+    return this.executions.triggerTest(org.id, user.id, id, {
       definition: dto.definition as unknown as WorkflowDefinition,
       triggerData: dto.triggerData,
       requestId: extractRequestId(req),
@@ -114,6 +123,7 @@ export class ExecutionsController {
   }
 
   @Post('nodes/:nodeId/test')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @Throttle(EXECUTE_THROTTLE)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -132,13 +142,14 @@ export class ExecutionsController {
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async testNode(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Param('nodeId') nodeId: string,
     @Body() dto: TestExecutionDto,
     @Req() req: Request & { id?: string },
   ): Promise<ExecutionResponseDto> {
-    return this.executions.triggerNodeTest(user.id, id, nodeId, {
+    return this.executions.triggerNodeTest(org.id, user.id, id, nodeId, {
       definition: dto.definition as unknown as WorkflowDefinition,
       triggerData: dto.triggerData,
       requestId: extractRequestId(req),

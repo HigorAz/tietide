@@ -76,7 +76,15 @@ export class ProviderWebhooksService {
     const subscription = await this.prisma.providerSubscription.findUnique({
       where: { id: input.subscriptionId },
       include: {
-        workflow: { select: { id: true, userId: true, isActive: true, definition: true } },
+        workflow: {
+          select: {
+            id: true,
+            userId: true,
+            organizationId: true,
+            isActive: true,
+            definition: true,
+          },
+        },
       },
     });
 
@@ -218,6 +226,7 @@ export class ProviderWebhooksService {
       triggerType: executionTriggerType,
       triggerData,
       userId: subscription.workflow.userId,
+      organizationId: subscription.workflow.organizationId,
       requestId: input.requestId,
     };
 

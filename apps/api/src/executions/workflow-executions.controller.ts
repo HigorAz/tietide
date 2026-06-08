@@ -9,9 +9,11 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import { OrgRolesGuard } from '../common/guards/org-roles.guard';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { ExecutionsService } from './executions.service';
 import { ExecutionQueryDto } from './dto/execution-query.dto';
 import { ExecutionListResponseDto } from './dto/execution-detail-response.dto';
@@ -19,7 +21,7 @@ import { ExecutionListResponseDto } from './dto/execution-detail-response.dto';
 @ApiTags('executions')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard, OrgRolesGuard)
 @Controller('workflows/:id/executions')
 export class WorkflowExecutionsController {
   constructor(private readonly executions: ExecutionsService) {}
@@ -31,11 +33,11 @@ export class WorkflowExecutionsController {
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async list(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) workflowId: string,
     @Query() query: ExecutionQueryDto,
   ): Promise<ExecutionListResponseDto> {
-    return this.executions.list(user.id, workflowId, {
+    return this.executions.list(org.id, workflowId, {
       status: query.status,
       from: query.from,
       to: query.to,

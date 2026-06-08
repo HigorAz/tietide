@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 
 jest.mock('bcrypt');
 
@@ -22,6 +23,7 @@ describe('AuthService', () => {
     sendAlreadyRegisteredEmail: jest.Mock;
     sendPasswordResetEmail: jest.Mock;
   };
+  let organizations: { create: jest.Mock };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
   beforeEach(async () => {
@@ -36,6 +38,7 @@ describe('AuthService', () => {
       sendAlreadyRegisteredEmail: jest.fn(async () => undefined),
       sendPasswordResetEmail: jest.fn(async () => undefined),
     };
+    organizations = { create: jest.fn(async () => undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -43,6 +46,7 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwt },
         { provide: MailerService, useValue: mailer },
+        { provide: OrganizationsService, useValue: organizations },
       ],
     }).compile();
 
@@ -71,6 +75,11 @@ describe('AuthService', () => {
       );
       expect(prisma.emailVerificationToken.create).toHaveBeenCalledTimes(1);
       expect(mailer.sendVerificationEmail).toHaveBeenCalledWith(validDto.email, expect.any(String));
+      // A personal workspace is provisioned so the new user has an org context to
+      // land in once verified (closes the new-user no-org gap).
+      expect(organizations.create).toHaveBeenCalledWith('uuid-1', {
+        name: "Test User's Workspace",
+      });
       // No token in the response, no account fields — the response is neutral.
       expect(result).toEqual(NEUTRAL);
       expect(jwt.sign).not.toHaveBeenCalled();
@@ -86,6 +95,7 @@ describe('AuthService', () => {
       // The real owner gets a heads-up; no verification token is minted.
       expect(mailer.sendAlreadyRegisteredEmail).toHaveBeenCalledWith(validDto.email);
       expect(prisma.emailVerificationToken.create).not.toHaveBeenCalled();
+      expect(organizations.create).not.toHaveBeenCalled();
     });
 
     it('resends a verification link (still neutral) for a taken-but-unverified email', async () => {
@@ -97,6 +107,8 @@ describe('AuthService', () => {
       expect(prisma.user.create).not.toHaveBeenCalled();
       expect(prisma.emailVerificationToken.create).toHaveBeenCalledTimes(1);
       expect(mailer.sendVerificationEmail).toHaveBeenCalledWith(validDto.email, expect.any(String));
+      // No new user → no new workspace provisioned.
+      expect(organizations.create).not.toHaveBeenCalled();
     });
 
     it('stays neutral (does not surface) when create loses a P2002 race', async () => {

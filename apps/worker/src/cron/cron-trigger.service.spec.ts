@@ -18,7 +18,7 @@ interface PrismaMock {
 
 const cronWorkflow = (overrides: {
   id: string;
-  userId?: string;
+  organizationId?: string;
   isActive?: boolean;
   expression?: string;
   type?: string;
@@ -37,7 +37,7 @@ const cronWorkflow = (overrides: {
   };
   return {
     id: overrides.id,
-    userId: overrides.userId ?? 'user-1',
+    organizationId: overrides.organizationId ?? 'org-1',
     isActive: overrides.isActive ?? true,
     definition,
   };
@@ -72,7 +72,7 @@ describe('CronTriggerService', () => {
       await service.addRepeatableJob({
         workflowId: 'wf-1',
         expression: '*/5 * * * *',
-        userId: 'user-1',
+        organizationId: 'org-1',
       });
 
       expect(queue.upsertJobScheduler).toHaveBeenCalledTimes(1);
@@ -82,7 +82,7 @@ describe('CronTriggerService', () => {
       expect(template).toEqual(
         expect.objectContaining({
           name: expect.any(String),
-          data: expect.objectContaining({ workflowId: 'wf-1', userId: 'user-1' }),
+          data: expect.objectContaining({ workflowId: 'wf-1', organizationId: 'org-1' }),
         }),
       );
     });
@@ -92,7 +92,7 @@ describe('CronTriggerService', () => {
         service.addRepeatableJob({
           workflowId: 'wf-1',
           expression: 'not-a-cron',
-          userId: 'user-1',
+          organizationId: 'org-1',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -103,7 +103,7 @@ describe('CronTriggerService', () => {
       const args = {
         workflowId: 'wf-1',
         expression: '*/5 * * * *',
-        userId: 'user-1',
+        organizationId: 'org-1',
       };
 
       await service.addRepeatableJob(args);

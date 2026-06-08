@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { MailerModule } from '../mailer/mailer.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions['signOptions']>['expiresIn']>;
@@ -12,6 +13,7 @@ type ExpiresIn = NonNullable<NonNullable<JwtModuleOptions['signOptions']>['expir
 @Module({
   imports: [
     MailerModule,
+    OrganizationsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

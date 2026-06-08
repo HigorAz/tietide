@@ -11,6 +11,9 @@ import { WorkflowsPage } from '@/pages/WorkflowsPage';
 import { GlobalHistoryPage } from '@/pages/GlobalHistoryPage';
 import { LibraryPage } from '@/pages/LibraryPage';
 import { ConnectionsPage } from '@/pages/ConnectionsPage';
+import { OrganizationsPage } from '@/pages/OrganizationsPage';
+import { OrgMembersPage } from '@/pages/OrgMembersPage';
+import { InviteAcceptPage } from '@/pages/InviteAcceptPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { SettingsEnvVarsPage } from '@/pages/settings/EnvVarsPage';
 import { AdminEnvVarsPage } from '@/pages/admin/EnvVarsPage';
@@ -42,6 +45,9 @@ const router = createBrowserRouter([
           { path: '/history', element: <GlobalHistoryPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/connections', element: <ConnectionsPage /> },
+          { path: '/organizations', element: <OrganizationsPage /> },
+          { path: '/organizations/members', element: <OrgMembersPage /> },
+          { path: '/organizations/accept-invite', element: <InviteAcceptPage /> },
           { path: '/settings', element: <PlaceholderPage title="Account settings" /> },
           { path: '/settings/env-vars', element: <SettingsEnvVarsPage /> },
           {

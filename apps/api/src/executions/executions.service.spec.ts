@@ -34,7 +34,8 @@ describe('ExecutionsService', () => {
   let audit: { log: jest.Mock };
 
   const userId = 'user-uuid-1';
-  const otherUserId = 'user-uuid-2';
+  const organizationId = 'org-uuid-1';
+  const otherOrganizationId = 'org-uuid-2';
   const workflowId = '550e8400-e29b-41d4-a716-446655440000';
   const executionId = '11111111-1111-4111-8111-111111111111';
 
@@ -68,7 +69,7 @@ describe('ExecutionsService', () => {
 
   describe('triggerManual', () => {
     it('should create a PENDING execution and enqueue a BullMQ job for the owner', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -79,11 +80,11 @@ describe('ExecutionsService', () => {
         createdAt: new Date('2026-04-24T00:00:00Z'),
       });
 
-      const result = await service.triggerManual(userId, workflowId, {});
+      const result = await service.triggerManual(organizationId, userId, workflowId, {});
 
       expect(prisma.workflow.findUnique).toHaveBeenCalledWith({
         where: { id: workflowId },
-        select: { id: true, userId: true },
+        select: { id: true, organizationId: true },
       });
       expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -101,6 +102,7 @@ describe('ExecutionsService', () => {
           workflowId,
           triggerType: 'manual',
           userId,
+          organizationId,
         }),
         expect.any(Object),
       );
@@ -117,7 +119,7 @@ describe('ExecutionsService', () => {
     it('should throw NotFoundException when the workflow does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.triggerManual(userId, workflowId, {})).rejects.toThrow(
+      await expect(service.triggerManual(organizationId, userId, workflowId, {})).rejects.toThrow(
         NotFoundException,
       );
 
@@ -126,9 +128,12 @@ describe('ExecutionsService', () => {
     });
 
     it('should throw ForbiddenException when the workflow belongs to another user', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId: otherUserId });
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: workflowId,
+        organizationId: otherOrganizationId,
+      });
 
-      await expect(service.triggerManual(userId, workflowId, {})).rejects.toThrow(
+      await expect(service.triggerManual(organizationId, userId, workflowId, {})).rejects.toThrow(
         ForbiddenException,
       );
 
@@ -137,7 +142,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should pass triggerData to the queue payload when provided', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -148,7 +153,9 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerManual(userId, workflowId, { triggerData: { foo: 'bar' } });
+      await service.triggerManual(organizationId, userId, workflowId, {
+        triggerData: { foo: 'bar' },
+      });
 
       expect(queue.add).toHaveBeenCalledWith(
         'execute',
@@ -158,7 +165,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should return the existing execution when the same idempotencyKey is reused', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       const existing = {
         id: executionId,
         workflowId,
@@ -170,7 +177,7 @@ describe('ExecutionsService', () => {
       };
       prisma.workflowExecution.findFirst.mockResolvedValue(existing);
 
-      const result = await service.triggerManual(userId, workflowId, {
+      const result = await service.triggerManual(organizationId, userId, workflowId, {
         idempotencyKey: 'key-abc',
       });
 
@@ -183,7 +190,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should persist the idempotencyKey when provided and key is new', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.findFirst.mockResolvedValue(null);
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
@@ -195,7 +202,9 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerManual(userId, workflowId, { idempotencyKey: 'key-abc' });
+      await service.triggerManual(organizationId, userId, workflowId, {
+        idempotencyKey: 'key-abc',
+      });
 
       expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -206,7 +215,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should return the existing execution when a concurrent create races the unique constraint (P2002)', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       // Pre-create dedup check sees nothing (the racing request has not committed
       // yet), so we proceed to create — which then loses the race and the unique
       // constraint rejects with P2002. The post-catch re-fetch finds the winner.
@@ -224,7 +233,7 @@ describe('ExecutionsService', () => {
         Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
       );
 
-      const result = await service.triggerManual(userId, workflowId, {
+      const result = await service.triggerManual(organizationId, userId, workflowId, {
         idempotencyKey: 'key-race',
       });
 
@@ -237,20 +246,20 @@ describe('ExecutionsService', () => {
     });
 
     it('should rethrow a non-unique create error unchanged', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.findFirst.mockResolvedValue(null);
       prisma.workflowExecution.create.mockRejectedValue(
         Object.assign(new Error('connection reset'), { code: 'P1001' }),
       );
 
       await expect(
-        service.triggerManual(userId, workflowId, { idempotencyKey: 'key-x' }),
+        service.triggerManual(organizationId, userId, workflowId, { idempotencyKey: 'key-x' }),
       ).rejects.toThrow('connection reset');
       expect(queue.add).not.toHaveBeenCalled();
     });
 
     it('should use the executionId as the BullMQ jobId for at-most-once delivery', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -261,14 +270,14 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerManual(userId, workflowId, {});
+      await service.triggerManual(organizationId, userId, workflowId, {});
 
       const opts = queue.add.mock.calls[0][2] as { jobId?: string };
       expect(opts.jobId).toBe(executionId);
     });
 
     it('should propagate requestId into the BullMQ job payload for end-to-end correlation', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -279,7 +288,7 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerManual(userId, workflowId, { requestId: 'req-xyz' });
+      await service.triggerManual(organizationId, userId, workflowId, { requestId: 'req-xyz' });
 
       expect(queue.add).toHaveBeenCalledWith(
         'execute',
@@ -289,7 +298,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should not exhaust retries silently — opts include retry/backoff', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -300,7 +309,7 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerManual(userId, workflowId, {});
+      await service.triggerManual(organizationId, userId, workflowId, {});
 
       const opts = queue.add.mock.calls[0][2] as {
         attempts?: number;
@@ -312,7 +321,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should record an audit log entry with action "execution.trigger"', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -323,11 +332,12 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerManual(userId, workflowId, {});
+      await service.triggerManual(organizationId, userId, workflowId, {});
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId,
           action: 'execution.trigger',
           resource: 'workflow',
           resourceId: workflowId,
@@ -352,7 +362,7 @@ describe('ExecutionsService', () => {
     };
 
     it('should create a PENDING dry-run execution and enqueue a job with the override definition', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -364,11 +374,11 @@ describe('ExecutionsService', () => {
         createdAt: new Date('2026-05-07T00:00:00Z'),
       });
 
-      const result = await service.triggerTest(userId, workflowId, { definition });
+      const result = await service.triggerTest(organizationId, userId, workflowId, { definition });
 
       expect(prisma.workflow.findUnique).toHaveBeenCalledWith({
         where: { id: workflowId },
-        select: { id: true, userId: true },
+        select: { id: true, organizationId: true },
       });
       expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -388,6 +398,7 @@ describe('ExecutionsService', () => {
           workflowId,
           triggerType: 'test',
           userId,
+          organizationId,
           isDryRun: true,
           definitionOverride: definition,
         }),
@@ -407,27 +418,30 @@ describe('ExecutionsService', () => {
     it('should throw NotFoundException when the workflow does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.triggerTest(userId, workflowId, { definition })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.triggerTest(organizationId, userId, workflowId, { definition }),
+      ).rejects.toThrow(NotFoundException);
 
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when the workflow belongs to another user', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId: otherUserId });
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: workflowId,
+        organizationId: otherOrganizationId,
+      });
 
-      await expect(service.triggerTest(userId, workflowId, { definition })).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.triggerTest(organizationId, userId, workflowId, { definition }),
+      ).rejects.toThrow(ForbiddenException);
 
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });
 
     it('should never check or persist an idempotency key (test runs are exploratory)', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -439,7 +453,7 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerTest(userId, workflowId, { definition });
+      await service.triggerTest(organizationId, userId, workflowId, { definition });
 
       expect(prisma.workflowExecution.findFirst).not.toHaveBeenCalled();
       expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
@@ -450,7 +464,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should record an audit log entry with action "execution.test"', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -462,11 +476,12 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerTest(userId, workflowId, { definition });
+      await service.triggerTest(organizationId, userId, workflowId, { definition });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId,
           action: 'execution.test',
           resource: 'workflow',
           resourceId: workflowId,
@@ -476,7 +491,7 @@ describe('ExecutionsService', () => {
     });
 
     it('should propagate triggerData and requestId into the BullMQ job payload', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -488,7 +503,7 @@ describe('ExecutionsService', () => {
         createdAt: new Date(),
       });
 
-      await service.triggerTest(userId, workflowId, {
+      await service.triggerTest(organizationId, userId, workflowId, {
         definition,
         triggerData: { foo: 'bar' },
         requestId: 'req-test-1',
@@ -531,7 +546,7 @@ describe('ExecutionsService', () => {
     };
 
     const mockPending = () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({
         id: executionId,
         workflowId,
@@ -547,7 +562,9 @@ describe('ExecutionsService', () => {
     it('enqueues a non-dry-run execution with the single-node subgraph as the override', async () => {
       mockPending();
 
-      const result = await service.triggerNodeTest(userId, workflowId, 'n2', { definition });
+      const result = await service.triggerNodeTest(organizationId, userId, workflowId, 'n2', {
+        definition,
+      });
 
       expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -578,27 +595,32 @@ describe('ExecutionsService', () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.triggerNodeTest(userId, workflowId, 'n2', { definition }),
+        service.triggerNodeTest(organizationId, userId, workflowId, 'n2', { definition }),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });
 
     it('throws ForbiddenException when the workflow belongs to another user', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId: otherUserId });
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: workflowId,
+        organizationId: otherOrganizationId,
+      });
 
       await expect(
-        service.triggerNodeTest(userId, workflowId, 'n2', { definition }),
+        service.triggerNodeTest(organizationId, userId, workflowId, 'n2', { definition }),
       ).rejects.toThrow(ForbiddenException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundException when the node is not in the definition', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
 
       await expect(
-        service.triggerNodeTest(userId, workflowId, 'does-not-exist', { definition }),
+        service.triggerNodeTest(organizationId, userId, workflowId, 'does-not-exist', {
+          definition,
+        }),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
@@ -607,11 +629,12 @@ describe('ExecutionsService', () => {
     it('records an audit log entry with action "execution.node-test"', async () => {
       mockPending();
 
-      await service.triggerNodeTest(userId, workflowId, 'n2', { definition });
+      await service.triggerNodeTest(organizationId, userId, workflowId, 'n2', { definition });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
           userId,
+          organizationId,
           action: 'execution.node-test',
           resource: 'workflow',
           resourceId: workflowId,
@@ -640,15 +663,15 @@ describe('ExecutionsService', () => {
     });
 
     it('should return paginated executions for the workflow owner', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, userId });
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.findMany.mockResolvedValue([exec('e1'), exec('e2', 'FAILED')]);
       prisma.workflowExecution.count.mockResolvedValue(2);
 
-      const result = await service.list(userId, workflowId, {});
+      const result = await service.list(organizationId, workflowId, {});
 
       expect(prisma.workflow.findUnique).toHaveBeenCalledWith({
         where: { id: workflowId },
-        select: { userId: true },
+        select: { organizationId: true },
       });
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -668,23 +691,25 @@ describe('ExecutionsService', () => {
     it('should throw NotFoundException when workflow does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.list(userId, workflowId, {})).rejects.toThrow(NotFoundException);
+      await expect(service.list(organizationId, workflowId, {})).rejects.toThrow(NotFoundException);
       expect(prisma.workflowExecution.findMany).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when workflow belongs to another user', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ userId: otherUserId });
+      prisma.workflow.findUnique.mockResolvedValue({ organizationId: otherOrganizationId });
 
-      await expect(service.list(userId, workflowId, {})).rejects.toThrow(ForbiddenException);
+      await expect(service.list(organizationId, workflowId, {})).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(prisma.workflowExecution.findMany).not.toHaveBeenCalled();
     });
 
     it('should filter by status', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ userId });
+      prisma.workflow.findUnique.mockResolvedValue({ organizationId });
       prisma.workflowExecution.findMany.mockResolvedValue([]);
       prisma.workflowExecution.count.mockResolvedValue(0);
 
-      await service.list(userId, workflowId, { status: 'FAILED' });
+      await service.list(organizationId, workflowId, { status: 'FAILED' });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -697,13 +722,13 @@ describe('ExecutionsService', () => {
     });
 
     it('should filter by createdAt date range', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ userId });
+      prisma.workflow.findUnique.mockResolvedValue({ organizationId });
       prisma.workflowExecution.findMany.mockResolvedValue([]);
       prisma.workflowExecution.count.mockResolvedValue(0);
 
       const from = new Date('2026-04-01T00:00:00Z');
       const to = new Date('2026-04-30T23:59:59Z');
-      await service.list(userId, workflowId, { from, to });
+      await service.list(organizationId, workflowId, { from, to });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -713,11 +738,11 @@ describe('ExecutionsService', () => {
     });
 
     it('should apply pagination skip/take from page and pageSize', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ userId });
+      prisma.workflow.findUnique.mockResolvedValue({ organizationId });
       prisma.workflowExecution.findMany.mockResolvedValue([]);
       prisma.workflowExecution.count.mockResolvedValue(0);
 
-      await service.list(userId, workflowId, { page: 3, pageSize: 10 });
+      await service.list(organizationId, workflowId, { page: 3, pageSize: 10 });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 20, take: 10 }),
@@ -725,7 +750,7 @@ describe('ExecutionsService', () => {
     });
   });
 
-  describe('listAllForUser', () => {
+  describe('listAllForOrg', () => {
     const exec = (
       id: string,
       wfId: string,
@@ -744,26 +769,26 @@ describe('ExecutionsService', () => {
       createdAt,
     });
 
-    it('should return paginated executions filtered by workflow.userId via the relation', async () => {
+    it('should return paginated executions filtered by workflow.organizationId via the relation', async () => {
       prisma.workflowExecution.findMany.mockResolvedValue([
         exec('e1', 'wf-a'),
         exec('e2', 'wf-b', 'FAILED'),
       ]);
       prisma.workflowExecution.count.mockResolvedValue(2);
 
-      const result = await service.listAllForUser(userId, {});
+      const result = await service.listAllForOrg(organizationId, {});
 
       expect(prisma.workflow.findUnique).not.toHaveBeenCalled();
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { workflow: { userId } },
+          where: { workflow: { organizationId } },
           orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           skip: 0,
           take: 20,
         }),
       );
       expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
-        where: { workflow: { userId } },
+        where: { workflow: { organizationId } },
       });
       expect(result.total).toBe(2);
       expect(result.page).toBe(1);
@@ -777,25 +802,25 @@ describe('ExecutionsService', () => {
       prisma.workflowExecution.findMany.mockResolvedValue([]);
       prisma.workflowExecution.count.mockResolvedValue(0);
 
-      const result = await service.listAllForUser(userId, {});
+      const result = await service.listAllForOrg(organizationId, {});
 
       expect(result.items).toEqual([]);
       expect(result.total).toBe(0);
     });
 
-    it('should combine status filter with the userId relation filter', async () => {
+    it('should combine status filter with the organizationId relation filter', async () => {
       prisma.workflowExecution.findMany.mockResolvedValue([]);
       prisma.workflowExecution.count.mockResolvedValue(0);
 
-      await service.listAllForUser(userId, { status: 'FAILED' });
+      await service.listAllForOrg(organizationId, { status: 'FAILED' });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { workflow: { userId }, status: 'FAILED' },
+          where: { workflow: { organizationId }, status: 'FAILED' },
         }),
       );
       expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
-        where: { workflow: { userId }, status: 'FAILED' },
+        where: { workflow: { organizationId }, status: 'FAILED' },
       });
     });
 
@@ -805,11 +830,11 @@ describe('ExecutionsService', () => {
 
       const from = new Date('2026-04-01T00:00:00Z');
       const to = new Date('2026-04-30T23:59:59Z');
-      await service.listAllForUser(userId, { from, to });
+      await service.listAllForOrg(organizationId, { from, to });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { workflow: { userId }, createdAt: { gte: from, lte: to } },
+          where: { workflow: { organizationId }, createdAt: { gte: from, lte: to } },
         }),
       );
     });
@@ -818,7 +843,7 @@ describe('ExecutionsService', () => {
       prisma.workflowExecution.findMany.mockResolvedValue([]);
       prisma.workflowExecution.count.mockResolvedValue(0);
 
-      await service.listAllForUser(userId, { page: 3, pageSize: 5 });
+      await service.listAllForOrg(organizationId, { page: 3, pageSize: 5 });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 10, take: 5 }),
@@ -834,7 +859,7 @@ describe('ExecutionsService', () => {
       ]);
       prisma.workflowExecution.count.mockResolvedValue(1);
 
-      const result = await service.listAllForUser(userId, {});
+      const result = await service.listAllForOrg(organizationId, {});
 
       expect(result.items[0].triggerData).toEqual({
         user: 'ada',
@@ -842,31 +867,33 @@ describe('ExecutionsService', () => {
       });
     });
 
-    it('should add workflowId equality filter alongside the userId relation filter', async () => {
+    it('should add workflowId equality filter alongside the organizationId relation filter', async () => {
       prisma.workflowExecution.findMany.mockResolvedValue([exec('e1', 'wf-a')]);
       prisma.workflowExecution.count.mockResolvedValue(1);
 
-      await service.listAllForUser(userId, { workflowId: 'wf-a' });
+      await service.listAllForOrg(organizationId, { workflowId: 'wf-a' });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { workflow: { userId }, workflowId: 'wf-a' },
+          where: { workflow: { organizationId }, workflowId: 'wf-a' },
         }),
       );
       expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
-        where: { workflow: { userId }, workflowId: 'wf-a' },
+        where: { workflow: { organizationId }, workflowId: 'wf-a' },
       });
     });
 
-    it('should still scope by userId when a workflowId not owned by the caller is passed (IDOR)', async () => {
+    it('should still scope by organizationId when a workflowId not owned by the caller is passed (IDOR)', async () => {
       prisma.workflowExecution.findMany.mockResolvedValue([]);
       prisma.workflowExecution.count.mockResolvedValue(0);
 
-      const result = await service.listAllForUser(userId, { workflowId: 'wf-of-someone-else' });
+      const result = await service.listAllForOrg(organizationId, {
+        workflowId: 'wf-of-someone-else',
+      });
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { workflow: { userId }, workflowId: 'wf-of-someone-else' },
+          where: { workflow: { organizationId }, workflowId: 'wf-of-someone-else' },
         }),
       );
       expect(result.items).toEqual([]);
@@ -881,7 +908,7 @@ describe('ExecutionsService', () => {
         ]);
         prisma.workflowExecution.count.mockResolvedValue(2);
 
-        const result = await service.listAllForUser(userId, { pageSize: 5 });
+        const result = await service.listAllForOrg(organizationId, { pageSize: 5 });
 
         expect(result.nextCursor).toBeNull();
       });
@@ -893,7 +920,7 @@ describe('ExecutionsService', () => {
         ]);
         prisma.workflowExecution.count.mockResolvedValue(10);
 
-        const result = await service.listAllForUser(userId, { pageSize: 2 });
+        const result = await service.listAllForOrg(organizationId, { pageSize: 2 });
 
         expect(typeof result.nextCursor).toBe('string');
         expect(result.nextCursor).not.toBe('');
@@ -912,13 +939,13 @@ describe('ExecutionsService', () => {
         ]);
         prisma.workflowExecution.count.mockResolvedValue(5);
 
-        await service.listAllForUser(userId, { cursor, pageSize: 10 });
+        await service.listAllForOrg(organizationId, { cursor, pageSize: 10 });
 
         expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
               AND: expect.arrayContaining([
-                expect.objectContaining({ workflow: { userId } }),
+                expect.objectContaining({ workflow: { organizationId } }),
                 {
                   OR: [
                     { createdAt: { lt: cursorCreatedAt } },
@@ -934,7 +961,9 @@ describe('ExecutionsService', () => {
       });
 
       it('should reject a malformed cursor with BadRequestException', async () => {
-        await expect(service.listAllForUser(userId, { cursor: 'not-base64!@#' })).rejects.toThrow();
+        await expect(
+          service.listAllForOrg(organizationId, { cursor: 'not-base64!@#' }),
+        ).rejects.toThrow();
         expect(prisma.workflowExecution.findMany).not.toHaveBeenCalled();
       });
 
@@ -955,7 +984,7 @@ describe('ExecutionsService', () => {
         prisma.workflowExecution.findMany.mockResolvedValue(peekRows);
         prisma.workflowExecution.count.mockResolvedValue(50);
 
-        const result = await service.listAllForUser(userId, { cursor, pageSize: 2 });
+        const result = await service.listAllForOrg(organizationId, { cursor, pageSize: 2 });
 
         expect(result.items).toHaveLength(2);
         expect(result.items.map((i) => i.id)).toEqual(['e1', 'e2']);
@@ -976,13 +1005,13 @@ describe('ExecutionsService', () => {
         ]);
         prisma.workflowExecution.count.mockResolvedValue(50);
 
-        const result = await service.listAllForUser(userId, { cursor, pageSize: 2 });
+        const result = await service.listAllForOrg(organizationId, { cursor, pageSize: 2 });
 
         expect(result.items).toHaveLength(1);
         expect(result.nextCursor).toBeNull();
       });
 
-      it('should keep userId scoping when a cursor is provided (cross-tenant isolation)', async () => {
+      it('should keep organizationId scoping when a cursor is provided (cross-tenant isolation)', async () => {
         const cursor = Buffer.from(
           JSON.stringify({
             createdAt: new Date('2026-04-20T10:00:00.000Z').toISOString(),
@@ -994,13 +1023,13 @@ describe('ExecutionsService', () => {
         prisma.workflowExecution.findMany.mockResolvedValue([]);
         prisma.workflowExecution.count.mockResolvedValue(0);
 
-        await service.listAllForUser(userId, { cursor });
+        await service.listAllForOrg(organizationId, { cursor });
 
         const call = prisma.workflowExecution.findMany.mock.calls[0][0] as {
           where: { AND: Array<Record<string, unknown>> };
         };
         expect(call.where.AND).toEqual(
-          expect.arrayContaining([expect.objectContaining({ workflow: { userId } })]),
+          expect.arrayContaining([expect.objectContaining({ workflow: { organizationId } })]),
         );
       });
 
@@ -1021,7 +1050,7 @@ describe('ExecutionsService', () => {
           prisma.workflowExecution.findMany.mockResolvedValueOnce(slice);
           prisma.workflowExecution.count.mockResolvedValueOnce(25);
 
-          const result = await service.listAllForUser(userId, { cursor, pageSize: 10 });
+          const result = await service.listAllForOrg(organizationId, { cursor, pageSize: 10 });
           collected.push(...result.items.map((i) => i.id));
           if (!result.nextCursor) break;
           cursor = result.nextCursor;
@@ -1047,17 +1076,17 @@ describe('ExecutionsService', () => {
       finishedAt: new Date('2026-04-20T10:00:05Z'),
       error: null,
       createdAt: new Date('2026-04-20T09:59:00Z'),
-      workflow: { userId },
+      workflow: { organizationId },
     };
 
     it('should return execution detail for the owner', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue(fullExec);
 
-      const result = await service.findOne(userId, executionId);
+      const result = await service.findOne(organizationId, executionId);
 
       expect(prisma.workflowExecution.findUnique).toHaveBeenCalledWith({
         where: { id: executionId },
-        include: { workflow: { select: { userId: true } } },
+        include: { workflow: { select: { organizationId: true } } },
       });
       expect(result.id).toBe(executionId);
       expect(result.status).toBe('SUCCESS');
@@ -1069,16 +1098,18 @@ describe('ExecutionsService', () => {
     it('should throw NotFoundException when execution does not exist', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne(userId, executionId)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(organizationId, executionId)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException when execution belongs to another user', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         ...fullExec,
-        workflow: { userId: otherUserId },
+        workflow: { organizationId: otherOrganizationId },
       });
 
-      await expect(service.findOne(userId, executionId)).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne(organizationId, executionId)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should redact secret-like keys in triggerData', async () => {
@@ -1087,7 +1118,7 @@ describe('ExecutionsService', () => {
         triggerData: { user: 'ada', password: 'p', authorization: 'Bearer t' },
       });
 
-      const result = await service.findOne(userId, executionId);
+      const result = await service.findOne(organizationId, executionId);
 
       expect(result.triggerData).toEqual({
         user: 'ada',
@@ -1101,7 +1132,7 @@ describe('ExecutionsService', () => {
     const owned = {
       id: executionId,
       workflowId,
-      workflow: { userId },
+      workflow: { organizationId },
     };
 
     const step = (overrides: Record<string, unknown> = {}) => ({
@@ -1124,7 +1155,7 @@ describe('ExecutionsService', () => {
       prisma.workflowExecution.findUnique.mockResolvedValue(owned);
       prisma.executionStep.findMany.mockResolvedValue([step()]);
 
-      const result = await service.listSteps(userId, executionId);
+      const result = await service.listSteps(organizationId, executionId);
 
       expect(prisma.executionStep.findMany).toHaveBeenCalledWith({
         where: { executionId },
@@ -1144,7 +1175,7 @@ describe('ExecutionsService', () => {
         }),
       ]);
 
-      const [s] = await service.listSteps(userId, executionId);
+      const [s] = await service.listSteps(organizationId, executionId);
 
       expect(s.inputData).toEqual({
         url: 'https://x',
@@ -1159,17 +1190,21 @@ describe('ExecutionsService', () => {
     it('should throw NotFoundException when execution does not exist', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue(null);
 
-      await expect(service.listSteps(userId, executionId)).rejects.toThrow(NotFoundException);
+      await expect(service.listSteps(organizationId, executionId)).rejects.toThrow(
+        NotFoundException,
+      );
       expect(prisma.executionStep.findMany).not.toHaveBeenCalled();
     });
 
     it('should throw ForbiddenException when execution belongs to another user', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         ...owned,
-        workflow: { userId: otherUserId },
+        workflow: { organizationId: otherOrganizationId },
       });
 
-      await expect(service.listSteps(userId, executionId)).rejects.toThrow(ForbiddenException);
+      await expect(service.listSteps(organizationId, executionId)).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(prisma.executionStep.findMany).not.toHaveBeenCalled();
     });
   });

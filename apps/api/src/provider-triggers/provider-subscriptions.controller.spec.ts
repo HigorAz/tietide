@@ -4,6 +4,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { ProviderSubscriptionsController } from './provider-subscriptions.controller';
 import { ProviderSubscriptionsService } from './provider-subscriptions.service';
 
@@ -41,6 +42,14 @@ describe('ProviderSubscriptionsController (integration)', () => {
           return true;
         },
       })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
+          return true;
+        },
+      })
       .compile();
 
     app = module.createNestApplication();
@@ -70,7 +79,7 @@ describe('ProviderSubscriptionsController (integration)', () => {
       .expect(200);
 
     expect(res.body).toEqual([subscription]);
-    expect(service.listForWorkflow).toHaveBeenCalledWith('owner-uuid', workflowId);
+    expect(service.listForWorkflow).toHaveBeenCalledWith('org-uuid', workflowId);
   });
 
   it('should return 400 when workflowId is not a UUID', async () => {

@@ -45,7 +45,7 @@ describe('ProviderSubscriptionsService', () => {
         },
       ]);
       expect(prisma.workflow.findFirst).toHaveBeenCalledWith({
-        where: { id: 'wf1', userId: 'u1' },
+        where: { id: 'wf1', organizationId: 'u1' },
         select: { id: true },
       });
     });

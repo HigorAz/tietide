@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { AxiosError } from 'axios';
-import { onResponseRejected } from './client';
-import { useAuthStore } from '@/stores/authStore';
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { AxiosHeaders } from 'axios';
+import { onResponseRejected, attachRequestHeaders } from './client';
+import { useAuthStore, ACTIVE_ORG_STORAGE_KEY } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
 
 const make401 = (): AxiosError => ({ response: { status: 401 } }) as unknown as AxiosError;
+const make403 = (message: string): AxiosError =>
+  ({ response: { status: 403, data: { message } } }) as unknown as AxiosError;
+const emptyConfig = (): InternalAxiosRequestConfig =>
+  ({ headers: new AxiosHeaders() }) as InternalAxiosRequestConfig;
 
 describe('client 401 interceptor (onResponseRejected)', () => {
   beforeEach(() => {
@@ -51,6 +56,68 @@ describe('client 401 interceptor (onResponseRejected)', () => {
     await expect(onResponseRejected(err)).rejects.toBe(err);
 
     expect(useAuthStore.getState().token).toBe('jwt-123');
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+});
+
+describe('client request headers (attachRequestHeaders)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('attaches the bearer token and X-Org-Id from localStorage', () => {
+    localStorage.setItem('tietide-token', 'jwt-abc');
+    localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'org-9');
+
+    const config = attachRequestHeaders(emptyConfig());
+
+    expect(config.headers.Authorization).toBe('Bearer jwt-abc');
+    expect(config.headers['X-Org-Id']).toBe('org-9');
+  });
+
+  it('omits X-Org-Id when no active workspace is set', () => {
+    localStorage.setItem('tietide-token', 'jwt-abc');
+
+    const config = attachRequestHeaders(emptyConfig());
+
+    expect(config.headers['X-Org-Id']).toBeUndefined();
+  });
+});
+
+describe('client 403 org-access interceptor', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      token: 'jwt-123',
+      user: null,
+      organizations: [
+        { id: 'a', name: 'A', slug: 'a', role: 'MEMBER' },
+        { id: 'b', name: 'B', slug: 'b', role: 'MEMBER' },
+      ],
+      activeOrganization: { id: 'a', name: 'A', slug: 'a', role: 'MEMBER' },
+      hydrated: true,
+    });
+    useToastStore.setState({ toasts: [] });
+    localStorage.clear();
+    localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'a');
+  });
+
+  it('drops the active workspace and toasts on a membership-loss 403', async () => {
+    await expect(
+      onResponseRejected(make403('Not a member of this organization')),
+    ).rejects.toBeTruthy();
+
+    expect(useAuthStore.getState().activeOrganization?.id).toBe('b');
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.message).toMatch(/access to that workspace/i);
+  });
+
+  it('leaves the workspace alone for an ordinary role 403 (not a membership loss)', async () => {
+    await expect(
+      onResponseRejected(make403('Insufficient organization role')),
+    ).rejects.toBeTruthy();
+
+    expect(useAuthStore.getState().activeOrganization?.id).toBe('a');
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 });

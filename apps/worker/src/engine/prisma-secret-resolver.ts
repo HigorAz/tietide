@@ -4,7 +4,7 @@ import { CryptoService } from '../crypto/crypto.service';
 import { SecretNotFoundError, type SecretResolver } from './secret-resolver';
 
 interface ExecutionCache {
-  userId: string;
+  organizationId: string;
   secrets: Map<string, string>;
 }
 
@@ -27,7 +27,7 @@ export class PrismaSecretResolver implements SecretResolver {
     }
 
     const row = await this.prisma.secret.findFirst({
-      where: { userId: entry.userId, name },
+      where: { organizationId: entry.organizationId, name },
     });
 
     if (!row) {
@@ -37,7 +37,10 @@ export class PrismaSecretResolver implements SecretResolver {
     const plaintext = this.crypto.decrypt(row.value, row.nonce);
     entry.secrets.set(name, plaintext);
 
-    this.log.log({ executionId, userId: entry.userId, secretName: name }, 'secret.read');
+    this.log.log(
+      { executionId, organizationId: entry.organizationId, secretName: name },
+      'secret.read',
+    );
 
     return plaintext;
   }
@@ -54,7 +57,7 @@ export class PrismaSecretResolver implements SecretResolver {
 
     const execution = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
-      include: { workflow: { select: { userId: true } } },
+      include: { workflow: { select: { organizationId: true } } },
     });
 
     if (!execution) {
@@ -62,7 +65,7 @@ export class PrismaSecretResolver implements SecretResolver {
     }
 
     const entry: ExecutionCache = {
-      userId: execution.workflow.userId,
+      organizationId: execution.workflow.organizationId,
       secrets: new Map(),
     };
     this.cache.set(executionId, entry);

@@ -46,17 +46,18 @@ export class SubworkflowAction implements INodeExecutor {
 
     const config = subworkflowConfigSchema.parse(input.params);
 
-    // Look up the parent execution to find the caller's userId, then scope
-    // the target workflow lookup to that user. This is the IDOR guard.
+    // Look up the parent execution to find the caller's organization, then scope
+    // the target workflow lookup to that org. This is the cross-tenant IDOR guard:
+    // a workflow may only invoke sibling workflows within its own workspace.
     const parent = await this.prisma.workflowExecution.findUnique({
       where: { id: context.executionId },
-      include: { workflow: { select: { userId: true } } },
+      include: { workflow: { select: { organizationId: true } } },
     });
     if (!parent) {
       throw new Error(`Subworkflow caller execution ${context.executionId} not found`);
     }
     const target = await this.prisma.workflow.findFirst({
-      where: { id: config.workflowId, userId: parent.workflow.userId },
+      where: { id: config.workflowId, organizationId: parent.workflow.organizationId },
       select: { id: true },
     });
     if (!target) {

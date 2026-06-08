@@ -140,7 +140,7 @@ describe('UsageService', () => {
 
       expect(result.activeWorkflows).toBe(7);
       expect(prisma.workflow.count).toHaveBeenCalledWith({
-        where: { userId, isActive: true },
+        where: { organizationId: userId, isActive: true },
       });
     });
   });
@@ -400,7 +400,7 @@ describe('UsageService', () => {
 
       expect(prisma.workflowExecution.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ workflow: { userId } }),
+          where: expect.objectContaining({ workflow: { organizationId: userId } }),
         }),
       );
     });
@@ -413,7 +413,7 @@ describe('UsageService', () => {
       await service.getSummary(otherUserId, UsageRange.D7);
 
       expect(prisma.workflow.count).toHaveBeenCalledWith({
-        where: { userId: otherUserId, isActive: true },
+        where: { organizationId: otherUserId, isActive: true },
       });
     });
 

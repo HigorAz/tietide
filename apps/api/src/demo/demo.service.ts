@@ -31,22 +31,23 @@ export class DemoService {
     private readonly audit: AuditLogService,
   ) {}
 
-  async seedForUser(userId: string): Promise<DemoSeedResult> {
+  async seedForOrg(organizationId: string, userId: string): Promise<DemoSeedResult> {
     const seeded: SeededDemoWorkflow[] = [];
 
     for (const fixture of DEMO_WORKFLOWS) {
-      seeded.push(await this.seedFixture(userId, fixture));
+      seeded.push(await this.seedFixture(organizationId, userId, fixture));
     }
 
     return { workflows: seeded };
   }
 
   private async seedFixture(
+    organizationId: string,
     userId: string,
     fixture: DemoWorkflowFixture,
   ): Promise<SeededDemoWorkflow> {
     const existing = await this.prisma.workflow.findFirst({
-      where: { userId, name: fixture.name },
+      where: { organizationId, name: fixture.name },
       select: { id: true, name: true, isActive: true },
     });
 
@@ -59,6 +60,7 @@ export class DemoService {
     } else {
       const created = await this.prisma.workflow.create({
         data: {
+          organizationId,
           userId,
           name: fixture.name,
           description: fixture.description,
@@ -72,6 +74,7 @@ export class DemoService {
 
       await this.audit.log({
         userId,
+        organizationId,
         action: 'demo.seed',
         resource: 'workflow',
         resourceId: created.id,
@@ -81,7 +84,7 @@ export class DemoService {
 
     let webhookPath: string | undefined;
     if (fixture.webhook) {
-      webhookPath = await this.ensureWebhook(userId, workflow.id, fixture.webhook);
+      webhookPath = await this.ensureWebhook(organizationId, userId, workflow.id, fixture.webhook);
     }
 
     return {
@@ -95,6 +98,7 @@ export class DemoService {
   }
 
   private async ensureWebhook(
+    organizationId: string,
     userId: string,
     workflowId: string,
     config: DemoWebhookConfig,
@@ -122,6 +126,7 @@ export class DemoService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'demo.seed',
       resource: 'webhook',
       resourceId: workflowId,

@@ -9,6 +9,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { EnvVarsController } from './env-vars.controller';
 import { EnvVarsService } from './env-vars.service';
 
@@ -41,6 +42,14 @@ describe('EnvVarsController (USER scope) integration', () => {
           if (!authedUser) throw new UnauthorizedException('Missing or invalid token');
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
           return true;
         },
       })
@@ -86,7 +95,7 @@ describe('EnvVarsController (USER scope) integration', () => {
       });
       expect(envVarsService.list).toHaveBeenCalledWith({
         scope: 'USER',
-        ownerUserId: 'owner-uuid',
+        organizationId: 'org-uuid',
         limit: undefined,
         cursor: undefined,
       });
@@ -106,7 +115,7 @@ describe('EnvVarsController (USER scope) integration', () => {
       expect(res.body).not.toHaveProperty('valueNonce');
       expect(envVarsService.create).toHaveBeenCalledWith({
         scope: 'USER',
-        ownerUserId: 'owner-uuid',
+        organizationId: 'org-uuid',
         actorUserId: 'owner-uuid',
         dto: validBody,
       });
@@ -152,7 +161,7 @@ describe('EnvVarsController (USER scope) integration', () => {
       // Here we just confirm the called value matches the JWT, never the body.
       await request(app.getHttpServer()).post('/env-vars').send(validBody).expect(201);
       expect(envVarsService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ ownerUserId: 'owner-uuid', actorUserId: 'owner-uuid' }),
+        expect.objectContaining({ organizationId: 'org-uuid', actorUserId: 'owner-uuid' }),
       );
     });
   });
@@ -169,7 +178,7 @@ describe('EnvVarsController (USER scope) integration', () => {
       expect(res.body).not.toHaveProperty('valueEnc');
       expect(envVarsService.update).toHaveBeenCalledWith({
         scope: 'USER',
-        ownerUserId: 'owner-uuid',
+        organizationId: 'org-uuid',
         actorUserId: 'owner-uuid',
         id: uuid,
         dto: { value: 'rotated' },
@@ -200,7 +209,7 @@ describe('EnvVarsController (USER scope) integration', () => {
 
       expect(envVarsService.remove).toHaveBeenCalledWith({
         scope: 'USER',
-        ownerUserId: 'owner-uuid',
+        organizationId: 'org-uuid',
         actorUserId: 'owner-uuid',
         id: uuid,
       });

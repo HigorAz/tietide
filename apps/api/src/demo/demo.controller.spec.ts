@@ -4,12 +4,13 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { DemoController } from './demo.controller';
 import { DemoService } from './demo.service';
 
 describe('DemoController (integration)', () => {
   let app: INestApplication;
-  let demoService: { seedForUser: jest.Mock };
+  let demoService: { seedForOrg: jest.Mock };
   let authedUser: { id: string; email: string; role: string } | null;
 
   const seedResult = {
@@ -26,7 +27,7 @@ describe('DemoController (integration)', () => {
   };
 
   beforeEach(async () => {
-    demoService = { seedForUser: jest.fn() };
+    demoService = { seedForOrg: jest.fn() };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -41,6 +42,14 @@ describe('DemoController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: unknown }>();
+          req.org = { id: 'org-uuid', role: 'SUPERADMIN' };
           return true;
         },
       })
@@ -63,7 +72,7 @@ describe('DemoController (integration)', () => {
 
   describe('POST /demo/seed', () => {
     it('should return 200 with the seeded payload', async () => {
-      demoService.seedForUser.mockResolvedValue(seedResult);
+      demoService.seedForOrg.mockResolvedValue(seedResult);
 
       const res = await request(app.getHttpServer()).post('/demo/seed').expect(200);
 
@@ -71,21 +80,21 @@ describe('DemoController (integration)', () => {
     });
 
     it('should call the service with the authenticated user id, not any value from the body', async () => {
-      demoService.seedForUser.mockResolvedValue(seedResult);
+      demoService.seedForOrg.mockResolvedValue(seedResult);
 
       await request(app.getHttpServer())
         .post('/demo/seed')
         .send({ userId: 'forged-id' })
         .expect(200);
 
-      expect(demoService.seedForUser).toHaveBeenCalledWith('owner-uuid');
+      expect(demoService.seedForOrg).toHaveBeenCalledWith('org-uuid', 'owner-uuid');
     });
 
     it('should return 401 when the guard rejects the request', async () => {
       authedUser = null;
 
       await request(app.getHttpServer()).post('/demo/seed').expect(401);
-      expect(demoService.seedForUser).not.toHaveBeenCalled();
+      expect(demoService.seedForOrg).not.toHaveBeenCalled();
     });
   });
 });
