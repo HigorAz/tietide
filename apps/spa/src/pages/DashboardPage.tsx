@@ -1,11 +1,17 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as Tabs from '@radix-ui/react-tabs';
-import type { UsageRange } from '@/api/usage';
+import type { StatusCount, TriggerCount, UsageRange } from '@/api/usage';
 import { useUsageStore } from '@/stores/usageStore';
 import { StatCard } from '@/components/usage/StatCard';
 import { RunsPerDayChart } from '@/components/usage/RunsPerDayChart';
+import { ErrorRateChart } from '@/components/usage/ErrorRateChart';
 import { TopWorkflowsTable } from '@/components/usage/TopWorkflowsTable';
+import { DonutChart, type DonutDatum } from '@/components/usage/DonutChart';
+import { BusiestHoursChart } from '@/components/usage/BusiestHoursChart';
+import { RecentFailuresList } from '@/components/usage/RecentFailuresList';
+import { ConnectionHealthCard } from '@/components/usage/ConnectionHealthCard';
+import { NodeFailuresTable } from '@/components/usage/NodeFailuresTable';
 import { cn } from '@/utils/cn';
 
 const RANGE_OPTIONS: { value: UsageRange; label: string }[] = [
@@ -23,6 +29,40 @@ const formatDuration = (ms: number): string => {
 };
 
 const formatRangeHint = (range: UsageRange): string => `last ${range.replace('d', '')} days`;
+
+// Donut palette keyed by execution status / a teal-leaning sequence for triggers.
+const STATUS_COLORS: Record<string, string> = {
+  SUCCESS: '#12B886',
+  FAILED: '#FF6B6B',
+  RUNNING: '#00D4B3',
+  PENDING: '#F59F00',
+  CANCELLED: '#6B7C93',
+  SKIPPED: '#4C6EF5',
+};
+
+const TRIGGER_PALETTE = [
+  '#00D4B3',
+  '#4C6EF5',
+  '#F59F00',
+  '#FF6B6B',
+  '#12B886',
+  '#A98EDA',
+  '#6B7C93',
+];
+
+const toStatusDonut = (rows: StatusCount[]): DonutDatum[] =>
+  rows.map((s) => ({
+    name: s.status,
+    value: s.count,
+    color: STATUS_COLORS[s.status] ?? '#6B7C93',
+  }));
+
+const toTriggerDonut = (rows: TriggerCount[]): DonutDatum[] =>
+  rows.map((t, i) => ({
+    name: t.triggerType,
+    value: t.count,
+    color: TRIGGER_PALETTE[i % TRIGGER_PALETTE.length],
+  }));
 
 export function DashboardPage(): JSX.Element {
   const navigate = useNavigate();
@@ -103,16 +143,20 @@ export function DashboardPage(): JSX.Element {
               <StatCard
                 label="Total runs"
                 value={summary.totalRuns.toLocaleString()}
+                delta={summary.comparison.totalRunsDelta}
                 hint={formatRangeHint(range)}
               />
               <StatCard
                 label="Success rate"
                 value={formatPercent(summary.successRate)}
+                delta={summary.comparison.successRateDelta}
                 hint={formatRangeHint(range)}
               />
               <StatCard
                 label="Avg duration"
                 value={formatDuration(summary.avgDurationMs)}
+                delta={summary.comparison.avgDurationDelta}
+                invertDelta
                 hint="across terminal runs"
               />
               <StatCard
@@ -122,7 +166,34 @@ export function DashboardPage(): JSX.Element {
               />
             </section>
 
-            <RunsPerDayChart data={summary.runsPerDay} />
+            <section aria-label="Run trends" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <RunsPerDayChart data={summary.runsPerDay} />
+              <ErrorRateChart data={summary.runsPerDay} />
+            </section>
+
+            <section aria-label="Distributions" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <DonutChart
+                title="Execution status"
+                data={toStatusDonut(summary.statusBreakdown)}
+                emptyMessage="No executions in this window yet."
+                testId="status-donut"
+              />
+              <DonutChart
+                title="Trigger types"
+                data={toTriggerDonut(summary.triggerDistribution)}
+                emptyMessage="No executions in this window yet."
+                testId="trigger-donut"
+              />
+            </section>
+
+            <BusiestHoursChart data={summary.busiestHours} />
+
+            <section aria-label="Triage" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <RecentFailuresList items={summary.recentFailures} />
+              <ConnectionHealthCard items={summary.connectionHealth} />
+            </section>
+
+            <NodeFailuresTable rows={summary.nodeFailures} />
 
             <TopWorkflowsTable rows={summary.topWorkflows} onRowClick={handleRowClick} />
           </>
