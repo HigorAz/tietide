@@ -11,6 +11,7 @@ import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AccountService } from './account.service';
 
 describe('AuthController (integration)', () => {
   let app: INestApplication;
@@ -22,6 +23,12 @@ describe('AuthController (integration)', () => {
     resetPassword: jest.Mock;
     getProfile: jest.Mock;
     logout: jest.Mock;
+  };
+  let accountService: {
+    updateProfile: jest.Mock;
+    changePassword: jest.Mock;
+    resendVerification: jest.Mock;
+    deleteAccount: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
 
@@ -35,11 +42,20 @@ describe('AuthController (integration)', () => {
       getProfile: jest.fn(),
       logout: jest.fn(),
     };
+    accountService = {
+      updateProfile: jest.fn(),
+      changePassword: jest.fn(),
+      resendVerification: jest.fn(),
+      deleteAccount: jest.fn(),
+    };
     authedUser = { id: 'uuid-1', email: 'test@example.com', role: 'USER' };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: authService }],
+      providers: [
+        { provide: AuthService, useValue: authService },
+        { provide: AccountService, useValue: accountService },
+      ],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({
@@ -388,6 +404,7 @@ describe('AuthController (integration)', () => {
       email: 'test@example.com',
       name: 'Test User',
       role: 'USER',
+      emailVerified: true,
       createdAt: new Date('2026-04-15T00:00:00Z').toISOString(),
     };
 
@@ -438,6 +455,180 @@ describe('AuthController (integration)', () => {
 
       await request(app.getHttpServer()).post('/auth/logout').expect(401);
       expect(authService.logout).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('PATCH /auth/profile', () => {
+    const updated = {
+      id: 'uuid-1',
+      email: 'test@example.com',
+      name: 'New Name',
+      role: 'USER',
+      emailVerified: true,
+      createdAt: new Date('2026-04-15T00:00:00Z').toISOString(),
+    };
+
+    it('should update the name using the authenticated id (never the body)', async () => {
+      accountService.updateProfile.mockResolvedValue(updated);
+
+      const res = await request(app.getHttpServer())
+        .patch('/auth/profile')
+        .send({ name: 'New Name' })
+        .expect(200);
+
+      expect(res.body).toEqual(updated);
+      expect(res.body).not.toHaveProperty('password');
+      expect(accountService.updateProfile).toHaveBeenCalledWith('uuid-1', 'New Name');
+    });
+
+    it('should return 400 when the name is empty', async () => {
+      await request(app.getHttpServer()).patch('/auth/profile').send({ name: '' }).expect(400);
+      expect(accountService.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when the name exceeds 100 characters', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/profile')
+        .send({ name: 'a'.repeat(101) })
+        .expect(400);
+      expect(accountService.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when unauthenticated', async () => {
+      authedUser = null;
+      await request(app.getHttpServer()).patch('/auth/profile').send({ name: 'X' }).expect(401);
+      expect(accountService.updateProfile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('PATCH /auth/password', () => {
+    const validBody = { currentPassword: 'oldpass123', newPassword: 'newpass123' };
+
+    it('should return 200 with a fresh token on a valid change', async () => {
+      accountService.changePassword.mockResolvedValue({
+        accessToken: 'fresh',
+        tokenType: 'Bearer',
+      });
+
+      const res = await request(app.getHttpServer())
+        .patch('/auth/password')
+        .send(validBody)
+        .expect(200);
+
+      expect(res.body).toEqual({ accessToken: 'fresh', tokenType: 'Bearer' });
+      expect(accountService.changePassword).toHaveBeenCalledWith(
+        'uuid-1',
+        'oldpass123',
+        'newpass123',
+      );
+    });
+
+    it('should return 401 when the current password is wrong', async () => {
+      accountService.changePassword.mockRejectedValue(
+        new UnauthorizedException('Current password is incorrect'),
+      );
+
+      await request(app.getHttpServer()).patch('/auth/password').send(validBody).expect(401);
+    });
+
+    it('should return 400 when the new password is weak (no digit)', async () => {
+      await request(app.getHttpServer())
+        .patch('/auth/password')
+        .send({ ...validBody, newPassword: 'onlyletters' })
+        .expect(400);
+      expect(accountService.changePassword).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when unauthenticated', async () => {
+      authedUser = null;
+      await request(app.getHttpServer()).patch('/auth/password').send(validBody).expect(401);
+      expect(accountService.changePassword).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /auth/resend-verification', () => {
+    const neutral = {
+      message:
+        'If that email is registered and still unverified, we’ve sent a new verification link.',
+    };
+
+    it('should return 202 with a neutral message (no enumeration), public route', async () => {
+      authedUser = null; // public — must work without a session
+      accountService.resendVerification.mockResolvedValue(neutral);
+
+      const res = await request(app.getHttpServer())
+        .post('/auth/resend-verification')
+        .send({ email: 'test@example.com' })
+        .expect(202);
+
+      expect(res.body).toEqual(neutral);
+      expect(accountService.resendVerification).toHaveBeenCalledWith('test@example.com');
+    });
+
+    it('should lowercase + trim the email before passing to the service', async () => {
+      accountService.resendVerification.mockResolvedValue(neutral);
+
+      await request(app.getHttpServer())
+        .post('/auth/resend-verification')
+        .send({ email: '  TEST@Example.COM  ' })
+        .expect(202);
+
+      expect(accountService.resendVerification).toHaveBeenCalledWith('test@example.com');
+    });
+
+    it('should return 400 when the email is invalid', async () => {
+      await request(app.getHttpServer())
+        .post('/auth/resend-verification')
+        .send({ email: 'nope' })
+        .expect(400);
+      expect(accountService.resendVerification).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('DELETE /auth/account', () => {
+    it('should return 204 and delete using the authenticated id', async () => {
+      accountService.deleteAccount.mockResolvedValue(undefined);
+
+      await request(app.getHttpServer())
+        .delete('/auth/account')
+        .send({ password: 'rightpass' })
+        .expect(204);
+
+      expect(accountService.deleteAccount).toHaveBeenCalledWith('uuid-1', 'rightpass');
+    });
+
+    it('should return 401 when the password is wrong', async () => {
+      accountService.deleteAccount.mockRejectedValue(
+        new UnauthorizedException('Invalid credentials'),
+      );
+
+      await request(app.getHttpServer())
+        .delete('/auth/account')
+        .send({ password: 'wrong' })
+        .expect(401);
+    });
+
+    it('should return 400 when blocked (last SUPERADMIN of a shared workspace)', async () => {
+      accountService.deleteAccount.mockRejectedValue(new BadRequestException('Promote another'));
+
+      await request(app.getHttpServer())
+        .delete('/auth/account')
+        .send({ password: 'rightpass' })
+        .expect(400);
+    });
+
+    it('should return 400 when the password is missing (DTO validation)', async () => {
+      await request(app.getHttpServer()).delete('/auth/account').send({}).expect(400);
+      expect(accountService.deleteAccount).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when unauthenticated', async () => {
+      authedUser = null;
+      await request(app.getHttpServer())
+        .delete('/auth/account')
+        .send({ password: 'rightpass' })
+        .expect(401);
+      expect(accountService.deleteAccount).not.toHaveBeenCalled();
     });
   });
 });
