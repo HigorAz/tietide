@@ -213,6 +213,11 @@ export class OrganizationsService {
           await tx.organizationMember.create({
             data: { organizationId: created.id, userId, role: 'SUPERADMIN' },
           });
+          // Every workspace is a billing entity — provision its FREE subscription
+          // up front so an org never exists without one.
+          await tx.subscription.create({
+            data: { organizationId: created.id, plan: 'FREE', status: 'ACTIVE' },
+          });
           return created;
         });
       } catch (err) {

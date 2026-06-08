@@ -29,6 +29,7 @@ interface PrismaMock {
     updateMany: jest.Mock;
     deleteMany: jest.Mock;
   };
+  subscription: { create: jest.Mock };
   user: { update: jest.Mock; updateMany: jest.Mock };
 }
 
@@ -67,6 +68,7 @@ describe('OrganizationsService', () => {
         updateMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      subscription: { create: jest.fn() },
       user: { update: jest.fn(), updateMany: jest.fn() },
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };

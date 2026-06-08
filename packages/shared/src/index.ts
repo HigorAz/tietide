@@ -40,6 +40,13 @@ export {
 export { ConnectionType, ConnectionStatus, ConnectionProvider } from './types/connections.types.js';
 export { OrgRole, ORG_ROLE_RANK } from './types/organization.types.js';
 export {
+  PlanTier,
+  PLAN_LIMITS,
+  PAID_PLANS,
+  isPaidPlan,
+  type PlanLimits,
+} from './billing/plan-limits.js';
+export {
   PILL_SAMPLE_KEY,
   RESERVED_CONFIG_KEYS,
   type ReservedConfigKey,
