@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ORG_ROLE_RANK, type OrgRole } from '@tietide/shared';
-import { useAuthStore } from '@/stores/authStore';
 import { useMembersStore } from '@/stores/membersStore';
 import { useToastStore } from '@/stores/toastStore';
 import { cn } from '@/utils/cn';
-import type { OrgMember } from '@/api/organizations';
-import { InviteMemberDialog } from '@/components/organizations/InviteMemberDialog';
-import { ChangeRoleDialog } from '@/components/organizations/ChangeRoleDialog';
-import { RemoveMemberDialog } from '@/components/organizations/RemoveMemberDialog';
+import type { OrganizationSummary, OrgMember } from '@/api/organizations';
+import { InviteMemberDialog } from './InviteMemberDialog';
+import { ChangeRoleDialog } from './ChangeRoleDialog';
+import { RemoveMemberDialog } from './RemoveMemberDialog';
+import { roleLabel } from './roleLabels';
 
 const ALL_ROLES: OrgRole[] = ['SUPERADMIN', 'ADMIN', 'MEMBER', 'VIEWER'];
 
@@ -19,51 +19,50 @@ const ghostBtn = cn(
   'hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal',
 );
 
-export function OrgMembersPage(): JSX.Element {
-  const activeOrg = useAuthStore((s) => s.activeOrganization);
+export interface MembersManagerProps {
+  activeOrg: OrganizationSummary;
+}
+
+/**
+ * Members + invitations management for a single workspace. Rendered inside the
+ * Account Settings "Members" card (the parent guarantees an active workspace).
+ * Lifted out of the former OrgMembersPage so the same logic serves the settings
+ * surface without duplication.
+ */
+export function MembersManager({ activeOrg }: MembersManagerProps): JSX.Element {
   const { members, invites, status, fetch, invite, changeRole, removeMember, revokeInvite } =
     useMembersStore();
   const toast = useToastStore((s) => s.show);
 
-  const myRole = activeOrg?.role;
+  const myRole = activeOrg.role;
   const canManage = myRole === 'SUPERADMIN' || myRole === 'ADMIN';
-  const assignableRoles = useMemo(() => (myRole ? rolesUpTo(myRole) : []), [myRole]);
+  const assignableRoles = useMemo(() => rolesUpTo(myRole), [myRole]);
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [roleTarget, setRoleTarget] = useState<OrgMember | null>(null);
   const [removeTarget, setRemoveTarget] = useState<OrgMember | null>(null);
 
-  const orgId = activeOrg?.id;
+  const orgId = activeOrg.id;
   useEffect(() => {
-    if (orgId) void fetch(orgId, canManage);
+    void fetch(orgId, canManage);
   }, [orgId, canManage, fetch]);
 
-  if (!activeOrg) {
-    return (
-      <div className="p-6">
-        <p className="text-sm text-text-secondary">
-          Select or create a workspace to manage its members.
-        </p>
-      </div>
-    );
-  }
-
   const canActOn = (m: OrgMember): boolean =>
-    canManage && !!myRole && ORG_ROLE_RANK[m.role] <= ORG_ROLE_RANK[myRole];
+    canManage && ORG_ROLE_RANK[m.role] <= ORG_ROLE_RANK[myRole];
 
   return (
-    <div className="p-6">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-text-primary">Members</h1>
-          <p className="text-sm text-text-secondary">{activeOrg.name}</p>
-        </div>
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm text-text-secondary">
+          People with access to{' '}
+          <span className="font-medium text-text-primary">{activeOrg.name}</span>.
+        </p>
         {canManage && (
           <button
             type="button"
             onClick={() => setInviteOpen(true)}
             className={cn(
-              'rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
+              'shrink-0 rounded-md bg-accent-teal px-3 py-1.5 text-sm font-semibold text-deep-blue transition',
               'hover:bg-accent-teal/90 focus:outline-none focus:ring-1 focus:ring-accent-teal',
             )}
           >
@@ -89,7 +88,7 @@ export function OrgMembersPage(): JSX.Element {
             <tr key={m.userId} className="border-b border-white/5">
               <td className="py-2 text-text-primary">{m.name}</td>
               <td className="py-2 text-text-secondary">{m.email}</td>
-              <td className="py-2 text-text-secondary">{m.role}</td>
+              <td className="py-2 text-text-secondary">{roleLabel(m.role)}</td>
               {canManage && (
                 <td className="py-2 text-right">
                   {canActOn(m) && (
@@ -114,8 +113,8 @@ export function OrgMembersPage(): JSX.Element {
       </table>
 
       {canManage && invites.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-2 text-sm font-semibold text-text-primary">Pending invitations</h2>
+        <section className="mt-6">
+          <h3 className="mb-2 text-sm font-semibold text-text-primary">Pending invitations</h3>
           <ul className="space-y-1">
             {invites.map((inv) => (
               <li
@@ -123,7 +122,7 @@ export function OrgMembersPage(): JSX.Element {
                 className="flex items-center justify-between rounded-md bg-white/5 px-3 py-2 text-sm"
               >
                 <span className="text-text-secondary">
-                  {inv.email} · <span className="text-text-primary">{inv.role}</span>
+                  {inv.email} · <span className="text-text-primary">{roleLabel(inv.role)}</span>
                 </span>
                 <button
                   type="button"
@@ -165,7 +164,7 @@ export function OrgMembersPage(): JSX.Element {
           onSubmit={async (role) => {
             await changeRole(activeOrg.id, roleTarget.userId, role);
             setRoleTarget(null);
-            toast({ tone: 'success', message: `${roleTarget.name} is now ${role}.` });
+            toast({ tone: 'success', message: `${roleTarget.name} is now ${roleLabel(role)}.` });
           }}
         />
       )}

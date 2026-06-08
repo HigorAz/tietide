@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, ChevronsUpDown, Check } from 'lucide-react';
+import { Building2, ChevronsUpDown, Check, Plus } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAuthStore } from '@/stores/authStore';
+import { CreateWorkspaceDialog } from '@/components/organizations/CreateWorkspaceDialog';
 
 export interface OrgSwitcherProps {
   collapsed?: boolean;
@@ -18,13 +19,14 @@ export function OrgSwitcher({ collapsed = false }: OrgSwitcherProps): JSX.Elemen
   const active = useAuthStore((s) => s.activeOrganization);
   const switchOrganization = useAuthStore((s) => s.switchOrganization);
   const [open, setOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
-  // Collapsed rail: a single icon link to the workspaces page (no room for a menu).
+  // Collapsed rail: a single icon link to workspace settings (no room for a menu).
   if (collapsed) {
     return (
       <div className="flex justify-center border-b border-white/5 px-2 py-2">
         <Link
-          to="/organizations"
+          to="/settings"
           aria-label="Workspaces"
           title={active?.name ?? 'Workspaces'}
           className="rounded p-1 text-text-secondary transition hover:bg-white/5 hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-teal"
@@ -83,24 +85,30 @@ export function OrgSwitcher({ collapsed = false }: OrgSwitcherProps): JSX.Elemen
 
           <div className="my-1 border-t border-white/5" />
 
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              setCreateOpen(true);
+            }}
+            className={cn(itemClass, 'text-text-secondary')}
+          >
+            <Plus aria-hidden className="h-4 w-4 shrink-0" />
+            <span>New workspace</span>
+          </button>
           <Link
-            to="/organizations/members"
+            to="/settings"
             role="menuitem"
             onClick={() => setOpen(false)}
             className={cn(itemClass, 'text-text-secondary')}
           >
-            Manage members
-          </Link>
-          <Link
-            to="/organizations"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className={cn(itemClass, 'text-text-secondary')}
-          >
-            Workspaces
+            Workspace settings
           </Link>
         </div>
       )}
+
+      {createOpen && <CreateWorkspaceDialog onClose={() => setCreateOpen(false)} />}
     </div>
   );
 }
