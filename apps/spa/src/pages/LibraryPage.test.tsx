@@ -32,18 +32,18 @@ const mockedList = vi.mocked(libraryApi.listTemplates);
 const mockedInstantiate = vi.mocked(libraryApi.instantiateTemplate);
 
 const makeTemplate = (overrides: Partial<WorkflowTemplate> = {}): WorkflowTemplate => ({
-  slug: 'cron-fetch-process',
-  name: 'Demo: Cron → Fetch → Archive',
-  description: 'Cron fixture',
-  category: 'Schedule',
-  nodeTypes: ['cron-trigger', 'http-request'],
+  slug: 'lead-capture-to-crm',
+  name: 'Lead capture → CRM → hot-lead alert',
+  description: 'Normalize a lead and push it to HubSpot',
+  category: 'Sales',
+  nodeTypes: ['webhook-trigger', 'code', 'hubspot-create-contact'],
   ...overrides,
 });
 
 const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   id: 'wf-new',
-  name: 'Demo: Cron → Fetch → Archive',
-  description: 'Cron fixture',
+  name: 'Lead capture → CRM → hot-lead alert',
+  description: 'Sales template',
   definition: { nodes: [], edges: [] },
   isActive: false,
   version: 1,
@@ -57,36 +57,47 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
   ...overrides,
 });
 
+// Spans 4 departments; Marketing has two templates so we can assert one section
+// holding multiple cards.
 const sampleTemplates: WorkflowTemplate[] = [
   makeTemplate({
-    slug: 'webhook-conditional-notification',
-    name: 'Demo: Webhook → Enrich → IF → Notify',
-    description: 'Inbound webhook with conditional notify',
-    category: 'Webhook',
-    nodeTypes: ['webhook-trigger', 'http-request', 'conditional'],
+    slug: 'lead-capture-to-crm',
+    name: 'Lead capture → CRM → hot-lead alert',
+    description: 'Push inbound leads to the CRM',
+    category: 'Sales',
+    nodeTypes: ['webhook-trigger', 'code', 'hubspot-create-contact'],
   }),
   makeTemplate({
-    slug: 'cron-fetch-process',
-    name: 'Demo: Cron → Fetch → Archive',
-    description: 'Hourly cron pulls and archives',
-    category: 'Schedule',
-    nodeTypes: ['cron-trigger', 'http-request'],
+    slug: 'new-subscriber-welcome',
+    name: 'New subscriber welcome series',
+    description: 'Welcome a new Mailchimp subscriber by email',
+    category: 'Marketing',
+    nodeTypes: ['mailchimp-subscriber-added', 'gmail-send'],
   }),
   makeTemplate({
-    slug: 'manual-ai-docs-showcase',
-    name: 'Demo: Manual → Multi-step (AI Docs Showcase)',
-    description: 'Pipeline rich enough for the AI docs generator',
-    category: 'AI',
-    nodeTypes: ['manual-trigger', 'http-request', 'conditional'],
+    slug: 'daily-hn-ai-digest',
+    name: 'Daily Hacker News AI digest',
+    description: 'Summarize Hacker News stories with Claude',
+    category: 'Marketing',
+    nodeTypes: ['cron-trigger', 'http-request', 'claude-messages'],
   }),
   makeTemplate({
-    slug: 'manual-failure-dlq',
-    name: 'Demo: Manual → Failure (DLQ Showcase)',
-    description: 'DLQ resilience demo',
-    category: 'Reliability',
-    nodeTypes: ['manual-trigger', 'http-request'],
+    slug: 'github-issue-ai-triage',
+    name: 'GitHub issue AI triage',
+    description: 'Triage new GitHub issues with Claude',
+    category: 'Engineering',
+    nodeTypes: ['github-issue-opened', 'claude-messages', 'code'],
+  }),
+  makeTemplate({
+    slug: 'weather-ops-alert',
+    name: 'Weather ops alert',
+    description: 'Alert on severe weather from the Open-Meteo API',
+    category: 'Operations & Finance',
+    nodeTypes: ['cron-trigger', 'http-request', 'telegram-send-message'],
   }),
 ];
+
+const representedDepartments = ['Sales', 'Marketing', 'Engineering', 'Operations & Finance'];
 
 const renderLibrary = (): ReturnType<typeof render> =>
   render(
@@ -109,6 +120,9 @@ const resetStore = (): void => {
   });
 };
 
+const sectionHeadings = (): string[] =>
+  screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent ?? '');
+
 describe('LibraryPage', () => {
   beforeEach(() => {
     resetStore();
@@ -117,68 +131,63 @@ describe('LibraryPage', () => {
     mockedInstantiate.mockReset();
   });
 
-  it('renders one card per template returned by listTemplates (AC: SPA grid renders all templates)', async () => {
+  it('renders one section per department with a heading and one card per template (AC: grouped sections)', async () => {
     mockedList.mockResolvedValueOnce(sampleTemplates);
 
     renderLibrary();
 
-    expect(await screen.findByText('Demo: Webhook → Enrich → IF → Notify')).toBeInTheDocument();
-    for (const tpl of sampleTemplates) {
-      expect(screen.getByText(tpl.name)).toBeInTheDocument();
+    await screen.findByText('Lead capture → CRM → hot-lead alert');
+
+    // One section heading (h2) per represented department, in fixed order.
+    expect(sectionHeadings()).toEqual(representedDepartments);
+    for (const dept of representedDepartments) {
+      expect(screen.getByRole('heading', { level: 2, name: dept })).toBeInTheDocument();
     }
+
+    // One card per template overall.
+    expect(screen.getAllByTestId('template-card')).toHaveLength(sampleTemplates.length);
+
+    // The Marketing section holds its two cards.
+    const marketing = screen.getByRole('list', { name: /marketing templates/i });
+    expect(within(marketing).getAllByTestId('template-card')).toHaveLength(2);
+    expect(within(marketing).getByText('Daily Hacker News AI digest')).toBeInTheDocument();
+    expect(within(marketing).getByText('New subscriber welcome series')).toBeInTheDocument();
+
     expect(mockedList).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the category badge on every card', async () => {
-    mockedList.mockResolvedValueOnce(sampleTemplates);
-
-    renderLibrary();
-
-    // Wait for at least one card to render before asserting badges.
-    await screen.findByText('Demo: Webhook → Enrich → IF → Notify');
-
-    // Each category appears twice (filter chip + card badge), so use getAllByText.
-    for (const cat of ['Webhook', 'Schedule', 'AI', 'Reliability']) {
-      expect(screen.getAllByText(cat).length).toBeGreaterThanOrEqual(1);
-    }
-
-    // Specifically assert the card-level badge by scoping inside a card.
-    const card = screen
-      .getByText('Demo: Webhook → Enrich → IF → Notify')
-      .closest('[data-testid="template-card"]') as HTMLElement;
-    expect(within(card).getByText('Webhook')).toBeInTheDocument();
-  });
-
-  it('filters cards client-side by name as the user types (AC: search filters client-side by name)', async () => {
+  it('filters cards by name across groups and hides empty groups (AC: search across groups)', async () => {
     const user = userEvent.setup();
     mockedList.mockResolvedValueOnce(sampleTemplates);
 
     renderLibrary();
 
-    expect(await screen.findByText(/cron → fetch → archive/i)).toBeInTheDocument();
+    await screen.findByText('Lead capture → CRM → hot-lead alert');
 
     const search = screen.getByRole('searchbox', { name: /search templates/i });
-    await user.type(search, 'webhook');
+    await user.type(search, 'welcome');
 
-    expect(screen.getByText(/webhook → enrich → if → notify/i)).toBeInTheDocument();
-    expect(screen.queryByText(/cron → fetch → archive/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/ai docs showcase/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/dlq showcase/i)).not.toBeInTheDocument();
+    // Only the matching Marketing card remains; its section heading stays, the
+    // other departments' headings are gone (empty groups hidden).
+    expect(screen.getByText('New subscriber welcome series')).toBeInTheDocument();
+    expect(screen.queryByText('Lead capture → CRM → hot-lead alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Daily Hacker News AI digest')).not.toBeInTheDocument();
+    expect(sectionHeadings()).toEqual(['Marketing']);
   });
 
-  it('narrows results when a category filter is selected', async () => {
+  it('filters cards by description across groups (AC: search by name/description)', async () => {
     const user = userEvent.setup();
     mockedList.mockResolvedValueOnce(sampleTemplates);
 
     renderLibrary();
 
-    expect(await screen.findByText(/cron → fetch → archive/i)).toBeInTheDocument();
+    await screen.findByText('Lead capture → CRM → hot-lead alert');
 
-    await user.click(screen.getByRole('button', { name: /^filter by ai$/i }));
+    const search = screen.getByRole('searchbox', { name: /search templates/i });
+    await user.type(search, 'open-meteo');
 
-    expect(screen.getByText(/ai docs showcase/i)).toBeInTheDocument();
-    expect(screen.queryByText(/cron → fetch → archive/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/dlq showcase/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Weather ops alert')).toBeInTheDocument();
+    expect(sectionHeadings()).toEqual(['Operations & Finance']);
   });
 
   it('navigates to /workflows/:newId after a successful instantiation (AC: Use template navigates to editor)', async () => {
@@ -188,12 +197,12 @@ describe('LibraryPage', () => {
 
     renderLibrary();
 
-    const cronCard = (await screen.findByText(/cron → fetch → archive/i)).closest(
+    const card = (await screen.findByText('Lead capture → CRM → hot-lead alert')).closest(
       '[data-testid="template-card"]',
     ) as HTMLElement;
-    await user.click(within(cronCard).getByRole('button', { name: /use template/i }));
+    await user.click(within(card).getByRole('button', { name: /use template/i }));
 
-    await waitFor(() => expect(mockedInstantiate).toHaveBeenCalledWith('cron-fetch-process'));
+    await waitFor(() => expect(mockedInstantiate).toHaveBeenCalledWith('lead-capture-to-crm'));
     expect(await screen.findByTestId('peek-id')).toHaveTextContent('instantiated-uuid');
     expect(screen.getByTestId('peek-from')).toHaveTextContent('/library');
   });
@@ -205,7 +214,7 @@ describe('LibraryPage', () => {
 
     renderLibrary();
 
-    const card = (await screen.findByText(/cron → fetch → archive/i)).closest(
+    const card = (await screen.findByText('Lead capture → CRM → hot-lead alert')).closest(
       '[data-testid="template-card"]',
     ) as HTMLElement;
     const button = within(card).getByRole('button', { name: /use template/i });
@@ -213,7 +222,6 @@ describe('LibraryPage', () => {
 
     expect(await screen.findByText(/template not found/i)).toBeInTheDocument();
     expect(useToastStore.getState().toasts[0].tone).toBe('error');
-    // Button is re-enabled after the failure (user can retry).
     await waitFor(() => expect(button).not.toBeDisabled());
   });
 
@@ -229,7 +237,6 @@ describe('LibraryPage', () => {
 
     expect(screen.getByText(/loading templates/i)).toBeInTheDocument();
 
-    // Drain the pending fetch before unmount so the state update settles inside act().
     resolve(sampleTemplates);
     await waitFor(() => expect(screen.queryByText(/loading templates/i)).not.toBeInTheDocument());
   });
@@ -240,11 +247,12 @@ describe('LibraryPage', () => {
 
     renderLibrary();
 
-    expect(await screen.findByText(/cron → fetch → archive/i)).toBeInTheDocument();
+    await screen.findByText('Lead capture → CRM → hot-lead alert');
 
     const search = screen.getByRole('searchbox', { name: /search templates/i });
     await user.type(search, 'xyzzz');
 
     expect(screen.getByText(/no templates match/i)).toBeInTheDocument();
+    expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
   });
 });
