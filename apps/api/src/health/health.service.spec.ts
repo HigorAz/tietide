@@ -7,7 +7,10 @@ import { HealthService } from './health.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 
-jest.mock('node:fs', () => ({ readFileSync: jest.fn() }));
+// Keep existsSync on the mock: importing PrismaService pulls in @prisma/client,
+// whose env loader calls fs.existsSync at import time — a bare readFileSync-only
+// mock makes the whole suite fail to load.
+jest.mock('node:fs', () => ({ readFileSync: jest.fn(), existsSync: jest.fn(() => false) }));
 const readFileSyncMock = readFileSync as jest.Mock;
 
 describe('HealthService', () => {

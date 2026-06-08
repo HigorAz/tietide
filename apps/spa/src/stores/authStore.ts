@@ -7,6 +7,11 @@ import {
   forgotPassword as apiForgotPassword,
   resetPassword as apiResetPassword,
   getMe as apiGetMe,
+  updateProfile as apiUpdateProfile,
+  changePassword as apiChangePassword,
+  resendVerification as apiResendVerification,
+  logout as apiLogout,
+  deleteAccount as apiDeleteAccount,
   type LoginCredentials,
   type RegisterPayload,
 } from '@/api/auth';
@@ -45,6 +50,17 @@ export interface AuthActions {
   // Consumes the reset token, sets the new password, and establishes the session.
   resetPassword: (token: string, password: string) => Promise<void>;
   logout: () => void;
+  // Update the display name and reflect it in the cached user.
+  updateProfile: (name: string) => Promise<void>;
+  // Change the password; persists the fresh token the API returns so this device
+  // stays signed in while every other session is revoked.
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  // Request a new verification email; returns the neutral server message.
+  resendVerification: (email: string) => Promise<string>;
+  // Revoke every session server-side (tokenVersion bump), then clear this one.
+  logoutEverywhere: () => Promise<void>;
+  // Delete (anonymize) the account, then clear the local session.
+  deleteAccount: (password: string) => Promise<void>;
   hydrate: () => Promise<void>;
   // Refresh the membership list and reconcile the active workspace (the persisted
   // one if still a member, else the first available, else none).
@@ -129,6 +145,38 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
     set({ user: null, token: null, organizations: [], activeOrganization: null });
+  },
+
+  updateProfile: async (name) => {
+    const user = await apiUpdateProfile(name);
+    set({ user });
+  },
+
+  changePassword: async (currentPassword, newPassword) => {
+    const { accessToken } = await apiChangePassword(currentPassword, newPassword);
+    // The change revokes every prior session; persist the fresh token so the
+    // current device is not logged out by its own password change.
+    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    set({ token: accessToken });
+  },
+
+  resendVerification: async (email) => {
+    const { message } = await apiResendVerification(email);
+    return message;
+  },
+
+  logoutEverywhere: async () => {
+    try {
+      await apiLogout();
+    } finally {
+      // Clear locally even if the request failed — the user asked to sign out.
+      get().logout();
+    }
+  },
+
+  deleteAccount: async (password) => {
+    await apiDeleteAccount(password);
+    get().logout();
   },
 
   hydrate: async () => {

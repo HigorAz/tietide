@@ -111,6 +111,22 @@ describe('JwtStrategy', () => {
       ).rejects.toThrow(UnauthorizedException);
     });
 
+    it('rejects a soft-deleted (anonymized) user even with a matching token version', async () => {
+      const strategy = makeStrategy(
+        makePrisma({
+          id: 'user-1',
+          email: 'a@b.com',
+          role: 'USER',
+          tokenVersion: 0,
+          deletedAt: new Date('2026-06-08T00:00:00Z'),
+        }),
+      );
+
+      await expect(
+        strategy.validate({ sub: 'user-1', email: 'a@b.com', role: 'USER', tokenVersion: 0 }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
     it('rejects tokens with the oauth-state audience claim before any DB lookup', async () => {
       const prisma = makePrisma(null);
       const strategy = makeStrategy(prisma);

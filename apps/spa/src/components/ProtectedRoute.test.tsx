@@ -61,8 +61,22 @@ describe('ProtectedRoute', () => {
   });
 });
 
-const adminUser: PublicUser = { id: 'u1', email: 'a@x.io', name: 'Admin', role: 'ADMIN' };
-const normalUser: PublicUser = { id: 'u2', email: 'b@x.io', name: 'User', role: 'USER' };
+const adminUser: PublicUser = {
+  id: 'u1',
+  email: 'a@x.io',
+  name: 'Admin',
+  role: 'ADMIN',
+  emailVerified: true,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+};
+const normalUser: PublicUser = {
+  id: 'u2',
+  email: 'b@x.io',
+  name: 'User',
+  role: 'USER',
+  emailVerified: true,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+};
 
 const renderAdminAt = (initial: string) =>
   render(

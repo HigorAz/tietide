@@ -47,6 +47,8 @@ const makeUser = (overrides: Partial<PublicUser> = {}): PublicUser => ({
   email: 'alice@example.com',
   name: 'Alice',
   role: 'USER',
+  emailVerified: true,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
   ...overrides,
 });
 

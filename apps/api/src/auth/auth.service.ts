@@ -116,6 +116,7 @@ export class AuthService {
         role: true,
         tokenVersion: true,
         emailVerified: true,
+        deletedAt: true,
       },
     });
 
@@ -123,7 +124,9 @@ export class AuthService {
     // missing — so the endpoint's timing does not reveal whether the email is
     // registered. Decide success only after the comparison.
     const passwordMatches = await bcrypt.compare(dto.password, user?.password ?? this.dummyHash);
-    if (!user || !passwordMatches) {
+    // A soft-deleted (anonymized) account is treated exactly like a non-existent
+    // one — generic invalid-credentials, no oracle for the deleted address.
+    if (!user || user.deletedAt || !passwordMatches) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -261,7 +264,14 @@ export class AuthService {
   async getProfile(userId: string): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, role: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        emailVerified: true,
+        createdAt: true,
+      },
     });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -269,7 +279,9 @@ export class AuthService {
     return user;
   }
 
-  private async issueVerificationToken(userId: string, email: string): Promise<void> {
+  // Public so AccountService can reuse the exact single-use, hashed-at-rest token
+  // issuance for "resend verification" without duplicating the security logic.
+  async issueVerificationToken(userId: string, email: string): Promise<void> {
     const rawToken = randomBytes(32).toString('base64url');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
     const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS);
@@ -291,7 +303,9 @@ export class AuthService {
     await this.mailer.sendPasswordResetEmail(email, rawToken);
   }
 
-  private signSession(user: SessionUser): LoginResponseDto {
+  // Public so AccountService can mint the fresh post-password-change session that
+  // keeps the current device signed in while the tokenVersion bump revokes others.
+  signSession(user: SessionUser): LoginResponseDto {
     const accessToken = this.jwt.sign({
       sub: user.id,
       email: user.email,

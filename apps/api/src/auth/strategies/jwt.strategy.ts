@@ -47,13 +47,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // demoted admin loses access even while holding a token minted as ADMIN.
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, email: true, role: true, tokenVersion: true },
+      select: { id: true, email: true, role: true, tokenVersion: true, deletedAt: true },
     });
 
     // Tokens issued before tokenVersion existed carry no claim → treat as 0,
     // which matches every backfilled user until their first revocation.
     const presentedVersion = payload.tokenVersion ?? 0;
-    if (!user || user.tokenVersion !== presentedVersion) {
+    // A soft-deleted (anonymized) account must never authenticate, even though its
+    // row still exists to preserve authored data. The deletion bumps tokenVersion
+    // too, but gate on deletedAt explicitly as defense-in-depth.
+    if (!user || user.deletedAt || user.tokenVersion !== presentedVersion) {
       throw new UnauthorizedException();
     }
 

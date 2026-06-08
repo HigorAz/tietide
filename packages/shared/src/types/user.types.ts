@@ -10,8 +10,11 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  emailVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export type PublicUser = Omit<User, 'createdAt' | 'updatedAt'>;
+// The shape returned by GET /v1/auth/me — safe profile fields the Settings page
+// surfaces (member-since via createdAt, verification state via emailVerified).
+export type PublicUser = Omit<User, 'updatedAt'>;
