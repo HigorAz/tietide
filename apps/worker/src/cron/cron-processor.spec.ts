@@ -2,6 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkerEntitlementsService } from '../billing/worker-entitlements.service';
 import { EXECUTION_QUEUE_NAME } from './cron.constants';
 import { CronProcessor, type CronFirePayload } from './cron-processor';
 
@@ -42,6 +43,7 @@ describe('CronProcessor', () => {
   let processor: CronProcessor;
   let prisma: PrismaMock;
   let executionQueue: QueueMock;
+  let entitlements: { canRun: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -55,12 +57,14 @@ describe('CronProcessor', () => {
       },
     };
     executionQueue = { add: jest.fn(async () => ({ id: 'job' })) };
+    entitlements = { canRun: jest.fn(async () => true) };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
         CronProcessor,
         { provide: PrismaService, useValue: prisma },
         { provide: getQueueToken(EXECUTION_QUEUE_NAME), useValue: executionQueue },
+        { provide: WorkerEntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
@@ -81,6 +85,21 @@ describe('CronProcessor', () => {
         where: { id: 'wf-1' },
         select: { id: true, organizationId: true, isActive: true },
       });
+    });
+
+    it('skips the tick without creating or enqueueing when the run quota is exhausted', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: 'wf-1',
+        organizationId: 'org-1',
+        isActive: true,
+      });
+      entitlements.canRun.mockResolvedValueOnce(false);
+
+      await processor.process(buildJob());
+
+      expect(entitlements.canRun).toHaveBeenCalledWith('org-1');
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(executionQueue.add).not.toHaveBeenCalled();
     });
 
     it('should create a WorkflowExecution row with a deterministic idempotency key', async () => {

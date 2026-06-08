@@ -4,6 +4,7 @@ import type { Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from './execution-queue.constants';
 import type { ExecutionResponseDto } from './dto/execution-response.dto';
 import type {
@@ -65,6 +66,7 @@ export class ExecutionsService {
     private readonly prisma: PrismaService,
     @InjectQueue(EXECUTION_QUEUE_NAME) private readonly queue: Queue,
     private readonly audit: AuditLogService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async triggerManual(
@@ -83,6 +85,10 @@ export class ExecutionsService {
     if (workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
+
+    // Run-quota gate: FREE workspaces block once the included runs are spent;
+    // paid (metered) plans never block. Dry-run/node-test paths are exempt.
+    await this.entitlements.assertCanRun(organizationId);
 
     if (options.idempotencyKey) {
       const existing = await this.prisma.workflowExecution.findFirst({

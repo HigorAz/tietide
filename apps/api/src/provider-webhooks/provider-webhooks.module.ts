@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CryptoModule } from '../crypto/crypto.module';
 import { ProviderTriggerModule } from '../provider-triggers/provider-trigger.module';
+import { BillingModule } from '../billing/billing.module';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import { ProviderWebhooksController } from './provider-webhooks.controller';
 import { ProviderWebhooksService } from './provider-webhooks.service';
@@ -12,6 +13,7 @@ import { ProviderWebhooksService } from './provider-webhooks.service';
     PrismaModule,
     CryptoModule,
     ProviderTriggerModule,
+    BillingModule,
     BullModule.registerQueue({ name: EXECUTION_QUEUE_NAME }),
   ],
   controllers: [ProviderWebhooksController],

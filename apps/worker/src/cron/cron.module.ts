@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from '../prisma/prisma.module';
+import { WorkerBillingModule } from '../billing/billing.module';
 import { CRON_QUEUE_NAME, EXECUTION_QUEUE_NAME } from './cron.constants';
 import { CronTriggerService } from './cron-trigger.service';
 import { CronProcessor } from './cron-processor';
@@ -8,6 +9,7 @@ import { CronProcessor } from './cron-processor';
 @Module({
   imports: [
     PrismaModule,
+    WorkerBillingModule,
     BullModule.registerQueue({ name: CRON_QUEUE_NAME }, { name: EXECUTION_QUEUE_NAME }),
   ],
   providers: [CronTriggerService, CronProcessor],

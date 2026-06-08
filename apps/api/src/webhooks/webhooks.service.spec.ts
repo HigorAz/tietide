@@ -4,6 +4,7 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { createHmac } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import { WebhooksService } from './webhooks.service';
 
@@ -56,6 +57,7 @@ describe('WebhooksService', () => {
         WebhooksService,
         { provide: PrismaService, useValue: prisma },
         { provide: getQueueToken(EXECUTION_QUEUE_NAME), useValue: queue },
+        { provide: EntitlementsService, useValue: { assertCanRun: jest.fn() } },
       ],
     }).compile();
 

@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import { ProviderTriggerRegistry } from '../provider-triggers/provider-trigger.registry';
+import { EntitlementsService } from '../billing/entitlements.service';
 import {
   OutlookMessageReceivedTrigger,
   OUTLOOK_MESSAGE_RECEIVED_TYPE,
@@ -73,6 +74,7 @@ describe('ProviderWebhooksService — Microsoft 365 integration', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: CryptoService, useValue: crypto },
         { provide: getQueueToken(EXECUTION_QUEUE_NAME), useValue: queue },
+        { provide: EntitlementsService, useValue: { assertCanRun: jest.fn() } },
       ],
     }).compile();
 

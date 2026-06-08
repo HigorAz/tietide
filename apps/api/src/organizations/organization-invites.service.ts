@@ -9,6 +9,7 @@ import { ORG_ROLE_RANK, type OrgRole } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { MailerService } from '../mailer/mailer.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { OrganizationAccessService } from './organization-access.service';
 import type { CreateInviteDto } from './dto/create-invite.dto';
 import type { AcceptInviteDto } from './dto/accept-invite.dto';
@@ -29,6 +30,7 @@ export class OrganizationInvitesService {
     private readonly audit: AuditLogService,
     private readonly mailer: MailerService,
     private readonly access: OrganizationAccessService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async create(
@@ -47,6 +49,8 @@ export class OrganizationInvitesService {
     if (!org) {
       throw new NotFoundException('Organization not found');
     }
+    // Seat cap: members + outstanding invites must stay within the plan's seats.
+    await this.entitlements.assertCanAddSeat(orgId, true);
 
     const rawToken = randomBytes(32).toString('base64url');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
@@ -117,6 +121,14 @@ export class OrganizationInvitesService {
     // the single-use token out from under the rightful invitee.
     if (!invite || invite.email.toLowerCase() !== userEmail.toLowerCase()) {
       throw new BadRequestException(INVALID_INVITE);
+    }
+
+    // Seat cap, checked BEFORE consuming the single-use token so a full workspace
+    // doesn't burn the invite. Already-members re-accept idempotently (no new seat),
+    // so they bypass the cap.
+    const alreadyMember = await this.access.getMembership(invite.organizationId, userId);
+    if (!alreadyMember) {
+      await this.entitlements.assertCanAddSeat(invite.organizationId, false);
     }
 
     const now = new Date();

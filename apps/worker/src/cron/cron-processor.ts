@@ -3,6 +3,7 @@ import { Logger } from '@nestjs/common';
 import type { Job, Queue } from 'bullmq';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkerEntitlementsService } from '../billing/worker-entitlements.service';
 import { CRON_QUEUE_NAME, EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from './cron.constants';
 import { isUniqueViolation } from '../common/prisma-error';
 
@@ -30,6 +31,7 @@ export class CronProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(EXECUTION_QUEUE_NAME) private readonly executionQueue: Queue,
+    private readonly entitlements: WorkerEntitlementsService,
   ) {
     super();
   }
@@ -62,6 +64,16 @@ export class CronProcessor extends WorkerHost {
       this.log.log(
         { workflowId, idempotencyKey, executionId: existing.id },
         'Duplicate cron tick, skipping',
+      );
+      return;
+    }
+
+    // Run-quota gate: a FREE workspace over its included runs pauses scheduled
+    // ticks (skip, don't throw — a throw would just retry). Paid plans never block.
+    if (!(await this.entitlements.canRun(workflow.organizationId))) {
+      this.log.log(
+        { workflowId, jobId: job.id },
+        'Cron tick skipped: workspace run quota exhausted',
       );
       return;
     }

@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { ORG_ROLE_RANK, type OrgRole } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { OrganizationAccessService } from './organization-access.service';
 import type { CreateOrganizationDto } from './dto/create-organization.dto';
 import type { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -26,9 +27,13 @@ export class OrganizationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
     private readonly access: OrganizationAccessService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async create(userId: string, dto: CreateOrganizationDto): Promise<OrganizationSummaryDto> {
+    // Free-tier guard: a user may own only so many FREE workspaces. Joining other
+    // people's workspaces is never capped (see EntitlementsService).
+    await this.entitlements.assertCanCreateWorkspace(userId);
     const org = await this.createWithUniqueSlug(userId, dto.name);
 
     await this.access.adoptAsDefaultIfNone(userId, org.id);

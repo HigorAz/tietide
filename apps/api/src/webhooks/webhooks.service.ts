@@ -4,6 +4,7 @@ import type { Queue } from 'bullmq';
 import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import type { WorkflowExecutionJobPayload } from '../executions/executions.service';
 import { assertFreshTimestamp, assertValidHexHmac } from './signature-helpers';
@@ -31,6 +32,7 @@ export class WebhooksService {
   constructor(
     private readonly prisma: PrismaService,
     @InjectQueue(EXECUTION_QUEUE_NAME) private readonly queue: Queue,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async trigger(input: WebhookTriggerInput): Promise<WebhookTriggerResult> {
@@ -68,6 +70,12 @@ export class WebhooksService {
       );
       return { executionId: existing.id, status: existing.status };
     }
+
+    // Run-quota gate (checked after the cheap replay short-circuit): a FREE
+    // workspace over its included runs returns 402 and does not enqueue. The
+    // provider will redeliver; the webhook resumes once the plan is upgraded or
+    // the period resets. Paid (metered) plans never block here.
+    await this.entitlements.assertCanRun(webhook.workflow.organizationId);
 
     const triggerDataJson = triggerData as Prisma.InputJsonValue;
     let created: { id: string };
