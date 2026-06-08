@@ -15,8 +15,19 @@ const sample: UsageSummary = {
   successRate: 0.8,
   avgDurationMs: 1200,
   activeWorkflows: 2,
-  runsPerDay: Array.from({ length: 7 }, (_, i) => ({ date: `2026-05-0${i + 1}`, count: i })),
+  runsPerDay: Array.from({ length: 7 }, (_, i) => ({
+    date: `2026-05-0${i + 1}`,
+    count: i,
+    failed: 0,
+  })),
   topWorkflows: [{ id: 'wf-a', name: 'Alpha', runs: 4, successRate: 1 }],
+  statusBreakdown: [{ status: 'SUCCESS', count: 4 }],
+  triggerDistribution: [{ triggerType: 'manual', count: 5 }],
+  busiestHours: Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 })),
+  recentFailures: [],
+  connectionHealth: [{ status: 'ACTIVE', count: 1 }],
+  nodeFailures: [],
+  comparison: { totalRunsDelta: null, successRateDelta: 0, avgDurationDelta: null },
 };
 
 const reset = (): void => {
