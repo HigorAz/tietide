@@ -44,18 +44,65 @@ const sampleSummary: UsageSummary = {
   avgDurationMs: 4200,
   activeWorkflows: 7,
   runsPerDay: [
-    { date: '2026-04-28', count: 3 },
-    { date: '2026-04-29', count: 5 },
-    { date: '2026-04-30', count: 0 },
-    { date: '2026-05-01', count: 8 },
-    { date: '2026-05-02', count: 4 },
-    { date: '2026-05-03', count: 6 },
-    { date: '2026-05-04', count: 12 },
+    { date: '2026-04-28', count: 3, failed: 0 },
+    { date: '2026-04-29', count: 5, failed: 1 },
+    { date: '2026-04-30', count: 0, failed: 0 },
+    { date: '2026-05-01', count: 8, failed: 2 },
+    { date: '2026-05-02', count: 4, failed: 0 },
+    { date: '2026-05-03', count: 6, failed: 1 },
+    { date: '2026-05-04', count: 12, failed: 3 },
   ],
   topWorkflows: [
     { id: 'wf-a', name: 'Alpha', runs: 42, successRate: 0.95 },
     { id: 'wf-b', name: 'Beta', runs: 30, successRate: 0.5 },
   ],
+  statusBreakdown: [
+    { status: 'SUCCESS', count: 132 },
+    { status: 'FAILED', count: 7 },
+    { status: 'RUNNING', count: 1 },
+    { status: 'PENDING', count: 2 },
+    { status: 'CANCELLED', count: 0 },
+    { status: 'SKIPPED', count: 0 },
+  ],
+  triggerDistribution: [
+    { triggerType: 'cron', count: 80 },
+    { triggerType: 'webhook', count: 62 },
+  ],
+  busiestHours: Array.from({ length: 24 }, (_, hour) => ({ hour, count: hour })),
+  recentFailures: [
+    {
+      id: 'ex-1',
+      workflowId: 'wf-a',
+      workflowName: 'Alpha',
+      error: 'connection refused',
+      finishedAt: '2026-05-04T10:00:05.000Z',
+      createdAt: '2026-05-04T10:00:00.000Z',
+    },
+  ],
+  connectionHealth: [
+    { status: 'ACTIVE', count: 3 },
+    { status: 'EXPIRED', count: 0 },
+    { status: 'ERROR', count: 1 },
+    { status: 'REVOKED', count: 0 },
+  ],
+  nodeFailures: [{ nodeType: 'http-request', failures: 5, avgDurationMs: 1500 }],
+  comparison: { totalRunsDelta: 0.25, successRateDelta: 0.02, avgDurationDelta: -0.1 },
+};
+
+const emptySummary: UsageSummary = {
+  totalRuns: 0,
+  successRate: 0,
+  avgDurationMs: 0,
+  activeWorkflows: 0,
+  runsPerDay: sampleSummary.runsPerDay.map((p) => ({ ...p, count: 0, failed: 0 })),
+  topWorkflows: [],
+  statusBreakdown: sampleSummary.statusBreakdown.map((s) => ({ ...s, count: 0 })),
+  triggerDistribution: [],
+  busiestHours: sampleSummary.busiestHours.map((h) => ({ ...h, count: 0 })),
+  recentFailures: [],
+  connectionHealth: sampleSummary.connectionHealth.map((c) => ({ ...c, count: 0 })),
+  nodeFailures: [],
+  comparison: { totalRunsDelta: null, successRateDelta: 0, avgDurationDelta: null },
 };
 
 const resetStore = (): void => {
@@ -130,8 +177,8 @@ describe('DashboardPage', () => {
 
     renderDashboard();
 
-    const table = await screen.findByRole('table');
-    await user.click(within(table).getByRole('button', { name: /open alpha/i }));
+    const rows = await screen.findAllByRole('button', { name: /open alpha/i });
+    await user.click(rows[0]);
 
     expect(await screen.findByTestId('peek-from')).toHaveTextContent('/dashboard');
   });
@@ -176,5 +223,63 @@ describe('DashboardPage', () => {
     renderDashboard();
 
     expect(await screen.findByText(/no workflow runs in this window/i)).toBeInTheDocument();
+  });
+
+  it('renders the status donut, trigger donut, error-rate and busiest-hours charts', async () => {
+    mockedFetch.mockResolvedValueOnce(sampleSummary);
+
+    renderDashboard();
+
+    expect(await screen.findByTestId('status-donut')).toBeInTheDocument();
+    expect(screen.getByTestId('trigger-donut')).toBeInTheDocument();
+    expect(screen.getByTestId('error-rate-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('busiest-hours-chart')).toBeInTheDocument();
+  });
+
+  it('renders recent failures linking to the execution detail and connection health', async () => {
+    mockedFetch.mockResolvedValueOnce(sampleSummary);
+
+    renderDashboard();
+
+    const failureLink = await screen.findByRole('link', { name: /alpha/i });
+    expect(failureLink).toHaveAttribute('href', '/executions/ex-1');
+    expect(screen.getByRole('link', { name: /view connections/i })).toHaveAttribute(
+      'href',
+      '/connections',
+    );
+  });
+
+  it('renders the top failing nodes table', async () => {
+    mockedFetch.mockResolvedValueOnce(sampleSummary);
+
+    renderDashboard();
+
+    expect(await screen.findByText('http-request')).toBeInTheDocument();
+  });
+
+  it('shows a previous-period delta on the headline stat cards', async () => {
+    mockedFetch.mockResolvedValueOnce(sampleSummary);
+
+    renderDashboard();
+
+    const metrics = await screen.findByRole('region', { name: /summary metrics/i });
+    const deltas = within(metrics).getAllByTestId('stat-delta');
+    // Total runs (+25%), success rate (+2%), avg duration (-10%) — active workflows has none.
+    expect(deltas).toHaveLength(3);
+    expect(deltas[0]).toHaveTextContent('25%');
+  });
+
+  it('handles empty states across the new sections when there is no data', async () => {
+    mockedFetch.mockResolvedValueOnce(emptySummary);
+
+    renderDashboard();
+
+    expect(await screen.findByText(/no failures in this window/i)).toBeInTheDocument();
+    expect(screen.getByText(/no node failures in this window/i)).toBeInTheDocument();
+    expect(screen.getByText(/no connections configured/i)).toBeInTheDocument();
+    // donuts collapse to their empty message (one per donut)
+    expect(screen.getAllByText(/no executions in this window/i).length).toBeGreaterThanOrEqual(2);
+    // prior window empty → no-prior-data on the comparable stat cards
+    expect(screen.getAllByText(/no prior data/i).length).toBeGreaterThanOrEqual(1);
   });
 });

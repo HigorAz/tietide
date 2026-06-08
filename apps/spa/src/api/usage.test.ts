@@ -16,8 +16,15 @@ const sampleSummary: UsageSummary = {
   successRate: 0.93,
   avgDurationMs: 4200,
   activeWorkflows: 7,
-  runsPerDay: [{ date: '2026-04-28', count: 18 }],
+  runsPerDay: [{ date: '2026-04-28', count: 18, failed: 1 }],
   topWorkflows: [{ id: 'wf-a', name: 'Alpha', runs: 42, successRate: 0.95 }],
+  statusBreakdown: [{ status: 'SUCCESS', count: 18 }],
+  triggerDistribution: [{ triggerType: 'cron', count: 18 }],
+  busiestHours: Array.from({ length: 24 }, (_, hour) => ({ hour, count: 0 })),
+  recentFailures: [],
+  connectionHealth: [{ status: 'ACTIVE', count: 1 }],
+  nodeFailures: [],
+  comparison: { totalRunsDelta: 0.1, successRateDelta: 0.05, avgDurationDelta: null },
 };
 
 describe('usage API client', () => {

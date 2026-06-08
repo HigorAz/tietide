@@ -32,13 +32,13 @@ beforeAll(() => {
 import { RunsPerDayChart } from './RunsPerDayChart';
 
 const sampleData = [
-  { date: '2026-04-28', count: 3 },
-  { date: '2026-04-29', count: 5 },
-  { date: '2026-04-30', count: 0 },
-  { date: '2026-05-01', count: 8 },
-  { date: '2026-05-02', count: 4 },
-  { date: '2026-05-03', count: 6 },
-  { date: '2026-05-04', count: 12 },
+  { date: '2026-04-28', count: 3, failed: 0 },
+  { date: '2026-04-29', count: 5, failed: 1 },
+  { date: '2026-04-30', count: 0, failed: 0 },
+  { date: '2026-05-01', count: 8, failed: 2 },
+  { date: '2026-05-02', count: 4, failed: 0 },
+  { date: '2026-05-03', count: 6, failed: 1 },
+  { date: '2026-05-04', count: 12, failed: 3 },
 ];
 
 describe('RunsPerDayChart', () => {

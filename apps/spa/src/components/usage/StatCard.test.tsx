@@ -21,4 +21,40 @@ describe('StatCard', () => {
 
     expect(screen.queryByText(/last \d+ days/i)).not.toBeInTheDocument();
   });
+
+  it('renders an upward delta as a positive percentage', () => {
+    render(<StatCard label="Total runs" value="150" delta={0.5} />);
+
+    const delta = screen.getByTestId('stat-delta');
+    expect(delta).toHaveTextContent('50%');
+    expect(delta.textContent).toMatch(/▲|\+/);
+  });
+
+  it('renders a downward delta as a negative percentage', () => {
+    render(<StatCard label="Total runs" value="50" delta={-0.5} />);
+
+    const delta = screen.getByTestId('stat-delta');
+    expect(delta).toHaveTextContent('50%');
+    expect(delta.textContent).toMatch(/▼|-/);
+  });
+
+  it('shows a no-prior-data hint when delta is null', () => {
+    render(<StatCard label="Total runs" value="150" delta={null} />);
+
+    expect(screen.getByTestId('stat-delta')).toHaveTextContent(/no prior data|—/i);
+  });
+
+  it('does not render a delta element when delta is undefined', () => {
+    render(<StatCard label="Total runs" value="150" />);
+
+    expect(screen.queryByTestId('stat-delta')).not.toBeInTheDocument();
+  });
+
+  it('treats a downward delta as the good direction when invertDelta is set', () => {
+    render(<StatCard label="Avg duration" value="1s" delta={-0.2} invertDelta />);
+
+    const delta = screen.getByTestId('stat-delta');
+    expect(delta).toHaveTextContent('20%');
+    expect(delta.className).toMatch(/text-success/);
+  });
 });

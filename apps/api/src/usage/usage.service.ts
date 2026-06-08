@@ -3,10 +3,22 @@ import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsageRange } from './dto/usage-summary-query.dto';
 import type {
-  RunsPerDayPointDto,
+  ConnectionHealthDto,
+  NodeFailureDto,
+  RecentFailureDto,
   TopWorkflowDto,
   UsageSummaryResponseDto,
 } from './dto/usage-summary-response.dto';
+import {
+  bucketRunsPerDay,
+  computeAvgDurationMs,
+  computeBusiestHours,
+  computeComparison,
+  computeStatusBreakdown,
+  computeTriggerDistribution,
+  type ExecutionRow,
+  type PeriodTotals,
+} from './usage.aggregations';
 
 const RANGE_DAYS: Record<UsageRange, number> = {
   [UsageRange.D7]: 7,
@@ -14,14 +26,41 @@ const RANGE_DAYS: Record<UsageRange, number> = {
   [UsageRange.D90]: 90,
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
 const TOP_WORKFLOWS_LIMIT = 5;
+const RECENT_FAILURES_LIMIT = 10;
+const NODE_FAILURES_LIMIT = 8;
 
-interface ExecutionRow {
+// Zero-filled in this order for a stable connection-health donut.
+const ALL_CONNECTION_STATUSES = ['ACTIVE', 'EXPIRED', 'ERROR', 'REVOKED'] as const;
+
+const EXECUTION_SELECT = {
+  workflowId: true,
+  status: true,
+  triggerType: true,
+  startedAt: true,
+  finishedAt: true,
+  createdAt: true,
+} as const;
+
+interface RecentFailureRow {
+  id: string;
   workflowId: string;
-  status: string;
-  startedAt: Date | null;
+  error: string | null;
   finishedAt: Date | null;
   createdAt: Date;
+  workflow: { name: string } | null;
+}
+
+interface ConnectionGroup {
+  status: string;
+  _count: { _all: number };
+}
+
+interface NodeGroup {
+  nodeType: string;
+  _count: { _all: number };
+  _avg: { durationMs: number | null };
 }
 
 @Injectable()
@@ -31,7 +70,9 @@ export class UsageService {
   async getSummary(organizationId: string, range: UsageRange): Promise<UsageSummaryResponseDto> {
     const rangeDays = RANGE_DAYS[range];
     const now = new Date();
-    const since = new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+    const windowMs = rangeDays * DAY_MS;
+    const since = new Date(now.getTime() - windowMs);
+    const prevSince = new Date(now.getTime() - 2 * windowMs);
 
     const baseWhere: Prisma.WorkflowExecutionWhereInput = {
       workflow: { organizationId },
@@ -39,34 +80,81 @@ export class UsageService {
       isDryRun: false,
     };
 
-    const [executions, activeWorkflows] = await Promise.all([
+    const [
+      executions,
+      prevExecutions,
+      recentFailureRows,
+      activeWorkflows,
+      connectionGroups,
+      nodeGroups,
+    ] = await Promise.all([
       this.prisma.workflowExecution.findMany({
         where: baseWhere,
+        select: EXECUTION_SELECT,
+      }) as Promise<ExecutionRow[]>,
+      this.prisma.workflowExecution.findMany({
+        where: {
+          workflow: { organizationId },
+          isDryRun: false,
+          createdAt: { gte: prevSince, lt: since },
+        },
+        select: EXECUTION_SELECT,
+      }) as Promise<ExecutionRow[]>,
+      this.prisma.workflowExecution.findMany({
+        where: { ...baseWhere, status: 'FAILED' },
         select: {
+          id: true,
           workflowId: true,
-          status: true,
-          startedAt: true,
+          error: true,
           finishedAt: true,
           createdAt: true,
+          workflow: { select: { name: true } },
         },
-      }) as Promise<ExecutionRow[]>,
+        orderBy: { createdAt: 'desc' },
+        take: RECENT_FAILURES_LIMIT,
+      }) as Promise<RecentFailureRow[]>,
       this.prisma.workflow.count({ where: { organizationId, isActive: true } }),
+      this.prisma.connection.groupBy({
+        by: ['status'],
+        where: { organizationId },
+        _count: { _all: true },
+      }) as unknown as Promise<ConnectionGroup[]>,
+      this.prisma.executionStep.groupBy({
+        by: ['nodeType'],
+        where: {
+          status: 'FAILED',
+          execution: { isDryRun: false, createdAt: { gte: since }, workflow: { organizationId } },
+        },
+        _count: { _all: true },
+        _avg: { durationMs: true },
+      }) as unknown as Promise<NodeGroup[]>,
     ]);
 
     const totalRuns = executions.length;
-    const successCount = executions.filter((e) => e.status === 'SUCCESS').length;
-    const successRate = totalRuns === 0 ? 0 : successCount / totalRuns;
+    const successRate = computeSuccessRate(executions);
     const avgDurationMs = computeAvgDurationMs(executions);
-    const runsPerDay = bucketRunsPerDay(executions, now, rangeDays);
-    const topWorkflows = await this.computeTopWorkflows(executions);
+
+    const currentTotals: PeriodTotals = { totalRuns, successRate, avgDurationMs };
+    const prevTotals: PeriodTotals = {
+      totalRuns: prevExecutions.length,
+      successRate: computeSuccessRate(prevExecutions),
+      avgDurationMs: computeAvgDurationMs(prevExecutions),
+    };
 
     return {
       totalRuns,
       successRate,
       avgDurationMs,
       activeWorkflows,
-      runsPerDay,
-      topWorkflows,
+      runsPerDay: bucketRunsPerDay(executions, now, rangeDays),
+      topWorkflows: await this.computeTopWorkflows(executions),
+      statusBreakdown: computeStatusBreakdown(executions),
+      triggerDistribution: computeTriggerDistribution(executions),
+      busiestHours: computeBusiestHours(executions),
+      recentFailures: recentFailureRows.map(toRecentFailureDto),
+      connectionHealth: toConnectionHealth(connectionGroups),
+      nodeFailures: toNodeFailures(nodeGroups),
+      comparison: computeComparison(currentTotals, prevTotals),
     };
   }
 
@@ -103,44 +191,35 @@ export class UsageService {
   }
 }
 
-function computeAvgDurationMs(executions: ExecutionRow[]): number {
-  let totalMs = 0;
-  let n = 0;
-  for (const e of executions) {
-    if (e.startedAt && e.finishedAt) {
-      totalMs += e.finishedAt.getTime() - e.startedAt.getTime();
-      n += 1;
-    }
-  }
-  return n === 0 ? 0 : Math.round(totalMs / n);
+function computeSuccessRate(rows: ExecutionRow[]): number {
+  if (rows.length === 0) return 0;
+  const successes = rows.filter((e) => e.status === 'SUCCESS').length;
+  return successes / rows.length;
 }
 
-function bucketRunsPerDay(
-  executions: ExecutionRow[],
-  now: Date,
-  rangeDays: number,
-): RunsPerDayPointDto[] {
-  const counts = new Map<string, number>();
-  for (const e of executions) {
-    const t = e.startedAt ?? e.createdAt;
-    const key = utcDateKey(t);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  const points: RunsPerDayPointDto[] = [];
-  const todayMidnightUtc = utcMidnight(now);
-  for (let i = rangeDays - 1; i >= 0; i--) {
-    const day = new Date(todayMidnightUtc.getTime() - i * 24 * 60 * 60 * 1000);
-    const key = utcDateKey(day);
-    points.push({ date: key, count: counts.get(key) ?? 0 });
-  }
-  return points;
+function toRecentFailureDto(r: RecentFailureRow): RecentFailureDto {
+  return {
+    id: r.id,
+    workflowId: r.workflowId,
+    workflowName: r.workflow?.name ?? '(unknown workflow)',
+    error: r.error ?? null,
+    finishedAt: r.finishedAt ? r.finishedAt.toISOString() : null,
+    createdAt: r.createdAt.toISOString(),
+  };
 }
 
-function utcDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+function toConnectionHealth(groups: ConnectionGroup[]): ConnectionHealthDto[] {
+  const byStatus = new Map(groups.map((g) => [g.status, g._count._all]));
+  return ALL_CONNECTION_STATUSES.map((status) => ({ status, count: byStatus.get(status) ?? 0 }));
 }
 
-function utcMidnight(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+function toNodeFailures(groups: NodeGroup[]): NodeFailureDto[] {
+  return groups
+    .map((g) => ({
+      nodeType: g.nodeType,
+      failures: g._count._all,
+      avgDurationMs: Math.round(g._avg.durationMs ?? 0),
+    }))
+    .sort((a, b) => b.failures - a.failures)
+    .slice(0, NODE_FAILURES_LIMIT);
 }

@@ -12,6 +12,12 @@ interface PrismaMock {
   workflowExecution: {
     findMany: jest.Mock;
   };
+  connection: {
+    groupBy: jest.Mock;
+  };
+  executionStep: {
+    groupBy: jest.Mock;
+  };
 }
 
 const userId = 'user-uuid-1';
@@ -23,18 +29,21 @@ const NOW = new Date('2026-05-04T12:00:00Z');
 const exec = (overrides: {
   workflowId?: string;
   status?: string;
+  triggerType?: string;
   startedAt?: Date | null;
   finishedAt?: Date | null;
   createdAt?: Date;
 }): {
   workflowId: string;
   status: string;
+  triggerType: string;
   startedAt: Date | null;
   finishedAt: Date | null;
   createdAt: Date;
 } => ({
   workflowId: overrides.workflowId ?? 'wf-a',
   status: overrides.status ?? 'SUCCESS',
+  triggerType: overrides.triggerType ?? 'manual',
   startedAt:
     overrides.startedAt === undefined ? new Date('2026-05-04T10:00:00Z') : overrides.startedAt,
   finishedAt:
@@ -64,7 +73,16 @@ describe('UsageService', () => {
       workflowExecution: {
         findMany: jest.fn(),
       },
+      connection: {
+        groupBy: jest.fn(),
+      },
+      executionStep: {
+        groupBy: jest.fn(),
+      },
     };
+    // Defaults so existing tests that only configure executions/workflow stay green.
+    prisma.connection.groupBy.mockResolvedValue([]);
+    prisma.executionStep.groupBy.mockResolvedValue([]);
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [UsageService, { provide: PrismaService, useValue: prisma }],
@@ -443,6 +461,233 @@ describe('UsageService', () => {
           where: expect.objectContaining({ isDryRun: false }),
         }),
       );
+    });
+  });
+
+  describe('getSummary — status breakdown, triggers, error-rate, busiest hours', () => {
+    it('counts each ExecutionStatus, with all six statuses present (stable donut)', async () => {
+      prisma.workflowExecution.findMany
+        .mockResolvedValueOnce([
+          exec({ status: 'SUCCESS' }),
+          exec({ status: 'SUCCESS' }),
+          exec({ status: 'FAILED' }),
+          exec({ status: 'RUNNING' }),
+        ])
+        .mockResolvedValueOnce([]) // prior window
+        .mockResolvedValueOnce([]); // recent failures
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-a', name: 'Alpha' }]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      const byStatus = new Map(result.statusBreakdown.map((s) => [s.status, s.count]));
+      expect(result.statusBreakdown).toHaveLength(6);
+      expect(byStatus.get('SUCCESS')).toBe(2);
+      expect(byStatus.get('FAILED')).toBe(1);
+      expect(byStatus.get('RUNNING')).toBe(1);
+      expect(byStatus.get('PENDING')).toBe(0);
+    });
+
+    it('groups runs by triggerType ordered by count desc', async () => {
+      prisma.workflowExecution.findMany
+        .mockResolvedValueOnce([
+          exec({ triggerType: 'cron' }),
+          exec({ triggerType: 'cron' }),
+          exec({ triggerType: 'webhook' }),
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-a', name: 'Alpha' }]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      expect(result.triggerDistribution[0]).toEqual({ triggerType: 'cron', count: 2 });
+      expect(result.triggerDistribution[1]).toEqual({ triggerType: 'webhook', count: 1 });
+    });
+
+    it('carries per-day FAILED counts on runsPerDay (error-rate trend)', async () => {
+      prisma.workflowExecution.findMany
+        .mockResolvedValueOnce([
+          exec({ status: 'FAILED', startedAt: new Date('2026-05-04T03:00:00Z'), finishedAt: null }),
+          exec({
+            status: 'SUCCESS',
+            startedAt: new Date('2026-05-04T04:00:00Z'),
+            finishedAt: null,
+          }),
+        ])
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([]);
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-a', name: 'Alpha' }]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      const today = result.runsPerDay.find((p) => p.date === '2026-05-04');
+      expect(today).toEqual({ date: '2026-05-04', count: 2, failed: 1 });
+    });
+
+    it('returns 24 busiest-hour buckets', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      expect(result.busiestHours).toHaveLength(24);
+    });
+  });
+
+  describe('getSummary — recent failures', () => {
+    it('returns the latest FAILED executions (newest first, capped) with workflow name', async () => {
+      prisma.workflowExecution.findMany
+        .mockResolvedValueOnce([]) // current window
+        .mockResolvedValueOnce([]) // prior window
+        .mockResolvedValueOnce([
+          {
+            id: 'ex-1',
+            workflowId: 'wf-a',
+            error: 'boom',
+            finishedAt: new Date('2026-05-04T10:00:05Z'),
+            createdAt: new Date('2026-05-04T10:00:00Z'),
+            workflow: { name: 'Alpha' },
+          },
+        ]);
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      expect(result.recentFailures).toEqual([
+        {
+          id: 'ex-1',
+          workflowId: 'wf-a',
+          workflowName: 'Alpha',
+          error: 'boom',
+          finishedAt: '2026-05-04T10:00:05.000Z',
+          createdAt: '2026-05-04T10:00:00.000Z',
+        },
+      ]);
+
+      const failCall = prisma.workflowExecution.findMany.mock.calls[2][0] as {
+        where: Record<string, unknown>;
+        orderBy: unknown;
+        take: number;
+      };
+      expect(failCall.where).toEqual(
+        expect.objectContaining({
+          workflow: { organizationId: userId },
+          isDryRun: false,
+          status: 'FAILED',
+        }),
+      );
+      expect(failCall.orderBy).toEqual({ createdAt: 'desc' });
+      expect(typeof failCall.take).toBe('number');
+    });
+  });
+
+  describe('getSummary — connection health', () => {
+    it('groups connections by status for the org only, zero-filling all statuses', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([]);
+      prisma.connection.groupBy.mockResolvedValue([
+        { status: 'ACTIVE', _count: { _all: 3 } },
+        { status: 'ERROR', _count: { _all: 1 } },
+      ]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      const byStatus = new Map(result.connectionHealth.map((c) => [c.status, c.count]));
+      expect(byStatus.get('ACTIVE')).toBe(3);
+      expect(byStatus.get('ERROR')).toBe(1);
+      expect(byStatus.get('EXPIRED')).toBe(0);
+      expect(byStatus.get('REVOKED')).toBe(0);
+
+      expect(prisma.connection.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['status'],
+          where: { organizationId: userId },
+          _count: { _all: true },
+        }),
+      );
+    });
+  });
+
+  describe('getSummary — per-node failure stats', () => {
+    it('aggregates FAILED steps by nodeType, org-scoped, sorted desc, with rounded avg duration', async () => {
+      prisma.workflowExecution.findMany.mockResolvedValue([]);
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([]);
+      prisma.executionStep.groupBy.mockResolvedValue([
+        { nodeType: 'http-request', _count: { _all: 2 }, _avg: { durationMs: 1500 } },
+        { nodeType: 'slack-post-message', _count: { _all: 5 }, _avg: { durationMs: 800.4 } },
+      ]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      expect(result.nodeFailures[0]).toEqual({
+        nodeType: 'slack-post-message',
+        failures: 5,
+        avgDurationMs: 800,
+      });
+      expect(result.nodeFailures[1]).toEqual({
+        nodeType: 'http-request',
+        failures: 2,
+        avgDurationMs: 1500,
+      });
+
+      expect(prisma.executionStep.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ['nodeType'],
+          where: expect.objectContaining({
+            status: 'FAILED',
+            execution: expect.objectContaining({
+              isDryRun: false,
+              workflow: { organizationId: userId },
+            }),
+          }),
+          _count: { _all: true },
+          _avg: { durationMs: true },
+        }),
+      );
+    });
+  });
+
+  describe('getSummary — previous-period comparison', () => {
+    it('queries the prior equivalent window and computes deltas', async () => {
+      prisma.workflowExecution.findMany
+        .mockResolvedValueOnce([exec({ status: 'SUCCESS' }), exec({ status: 'SUCCESS' })]) // current: 2
+        .mockResolvedValueOnce([exec({ status: 'SUCCESS' })]) // prior: 1
+        .mockResolvedValueOnce([]); // recent failures
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-a', name: 'Alpha' }]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      expect(result.comparison.totalRunsDelta).toBeCloseTo(1, 5); // (2-1)/1
+      expect(result.comparison.successRateDelta).toBeCloseTo(0, 5);
+
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      const prevCall = prisma.workflowExecution.findMany.mock.calls[1][0] as {
+        where: { createdAt: { gte: Date; lt: Date } };
+      };
+      expect(prevCall.where.createdAt.gte.getTime()).toBe(NOW.getTime() - 2 * sevenDaysMs);
+      expect(prevCall.where.createdAt.lt.getTime()).toBe(NOW.getTime() - sevenDaysMs);
+    });
+
+    it('returns null deltas when the prior window is empty (no divide-by-zero)', async () => {
+      prisma.workflowExecution.findMany
+        .mockResolvedValueOnce([exec({ status: 'SUCCESS' })]) // current
+        .mockResolvedValueOnce([]) // prior empty
+        .mockResolvedValueOnce([]); // recent failures
+      prisma.workflow.count.mockResolvedValue(0);
+      prisma.workflow.findMany.mockResolvedValue([{ id: 'wf-a', name: 'Alpha' }]);
+
+      const result = await service.getSummary(userId, UsageRange.D7);
+
+      expect(result.comparison.totalRunsDelta).toBeNull();
+      expect(result.comparison.avgDurationDelta).toBeNull();
     });
   });
 });
