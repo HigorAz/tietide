@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { MailerService } from '../mailer/mailer.service';
 import { AuthService } from './auth.service';
 import type { LoginResponseDto } from './dto/login-response.dto';
 import type { RegisterResponseDto } from './dto/register-response.dto';
@@ -27,6 +28,7 @@ export class AccountService {
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
     private readonly audit: AuditLogService,
+    private readonly mailer: MailerService,
   ) {}
 
   async updateProfile(userId: string, name: string): Promise<UserResponseDto> {
@@ -108,7 +110,9 @@ export class AccountService {
   async deleteAccount(userId: string, password: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, password: true, deletedAt: true },
+      // Capture the real email now — the row is anonymized below, so we must read
+      // it before the transaction to address the confirmation email correctly.
+      select: { id: true, email: true, password: true, deletedAt: true },
     });
     const matches = await bcrypt.compare(password, user?.password ?? '');
     if (!user || user.deletedAt || !matches) {
@@ -184,5 +188,9 @@ export class AccountService {
       resource: 'user',
       resourceId: userId,
     });
+
+    // Best-effort confirmation to the original address (MailerService swallows any
+    // delivery failure, so it can never undo a deletion that already committed).
+    await this.mailer.sendAccountDeletedEmail(user.email);
   }
 }
