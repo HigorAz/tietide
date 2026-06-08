@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkerEntitlementsService } from '../billing/worker-entitlements.service';
 import { PollTriggerRegistry } from './poll-trigger.registry';
 import { PollConnectionLoader } from './poll-connection-loader';
 import { PollProcessor } from './poll-processor';
@@ -24,6 +25,7 @@ describe('PollProcessor', () => {
   let registry: PollTriggerRegistry;
   let trigger: { defaultIntervalSeconds: number; poll: jest.Mock; type: string };
   let loader: { load: jest.Mock };
+  let entitlements: { canRun: jest.Mock };
 
   const organizationId = 'org-1';
   const workflowId = 'wf-1';
@@ -86,6 +88,7 @@ describe('PollProcessor', () => {
         config: { accessToken: 'tok' },
       })),
     };
+    entitlements = { canRun: jest.fn(async () => true) };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -94,6 +97,7 @@ describe('PollProcessor', () => {
         { provide: PollTriggerRegistry, useValue: registry },
         { provide: PollConnectionLoader, useValue: loader },
         { provide: getQueueToken(EXECUTION_QUEUE_NAME), useValue: executionQueue },
+        { provide: WorkerEntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
@@ -125,6 +129,17 @@ describe('PollProcessor', () => {
         create: expect.objectContaining({ cursor: '13' }),
       }),
     );
+  });
+
+  it('skips polling (no provider call, no cursor advance) when the run quota is exhausted', async () => {
+    entitlements.canRun.mockResolvedValueOnce(false);
+
+    await processor.process(makeJob());
+
+    expect(entitlements.canRun).toHaveBeenCalledWith(organizationId);
+    expect(trigger.poll).not.toHaveBeenCalled();
+    expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+    expect(prisma.triggerCursor.upsert).not.toHaveBeenCalled();
   });
 
   it('reads existing cursor on subsequent ticks', async () => {

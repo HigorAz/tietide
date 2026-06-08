@@ -121,3 +121,28 @@ describe('client 403 org-access interceptor', () => {
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 });
+
+describe('client 402 plan-limit interceptor', () => {
+  beforeEach(() => {
+    useAuthStore.setState({ token: 'jwt-123', user: null, hydrated: true });
+    useToastStore.setState({ toasts: [] });
+  });
+
+  const make402 = (reason?: string): AxiosError =>
+    ({ response: { status: 402, data: reason ? { reason } : {} } }) as unknown as AxiosError;
+
+  it('toasts a targeted upgrade prompt keyed by the reason', async () => {
+    await expect(onResponseRejected(make402('seats'))).rejects.toBeTruthy();
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.tone).toBe('error');
+    expect(toasts[0]?.message).toMatch(/seat limit/i);
+  });
+
+  it('falls back to a generic upgrade message for an unknown reason', async () => {
+    await expect(onResponseRejected(make402())).rejects.toBeTruthy();
+
+    expect(useToastStore.getState().toasts[0]?.message).toMatch(/upgrade your plan/i);
+  });
+});

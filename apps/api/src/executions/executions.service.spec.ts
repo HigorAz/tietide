@@ -4,6 +4,8 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PaymentRequiredException } from '../billing/payment-required.exception';
 import { ExecutionsService } from './executions.service';
 import { EXECUTION_QUEUE_NAME } from './execution-queue.constants';
 
@@ -32,6 +34,7 @@ describe('ExecutionsService', () => {
   let prisma: PrismaMock;
   let queue: QueueMock;
   let audit: { log: jest.Mock };
+  let entitlements: { assertCanRun: jest.Mock };
 
   const userId = 'user-uuid-1';
   const organizationId = 'org-uuid-1';
@@ -53,6 +56,7 @@ describe('ExecutionsService', () => {
     };
     queue = { add: jest.fn(async () => undefined) };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    entitlements = { assertCanRun: jest.fn().mockResolvedValue(undefined) };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -60,6 +64,7 @@ describe('ExecutionsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: getQueueToken(EXECUTION_QUEUE_NAME), useValue: queue },
         { provide: AuditLogService, useValue: audit },
+        { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
@@ -68,6 +73,20 @@ describe('ExecutionsService', () => {
   });
 
   describe('triggerManual', () => {
+    it('rejects with 402 and creates no execution when the run quota is exhausted', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      entitlements.assertCanRun.mockRejectedValueOnce(
+        new PaymentRequiredException('runs', 'over quota'),
+      );
+
+      await expect(
+        service.triggerManual(organizationId, userId, workflowId, {}),
+      ).rejects.toBeInstanceOf(PaymentRequiredException);
+      expect(entitlements.assertCanRun).toHaveBeenCalledWith(organizationId);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
     it('should create a PENDING execution and enqueue a BullMQ job for the owner', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.create.mockResolvedValue({

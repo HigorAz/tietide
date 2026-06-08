@@ -116,8 +116,56 @@ model Organization {
   tags                 Tag[]
   environmentVariables EnvironmentVariable[]
   auditLogs            AuditLog[]
+  subscription         Subscription?
 
   @@map("organizations")
+}
+
+// Per-workspace billing plan. The workspace is the billing entity; its owner
+// (SUPERADMIN) pays. Hybrid pricing: per-seat subscription + metered runs above
+// an included quota. One row per Organization (provisioned at create time, FREE).
+// Plan LIMITS live in @tietide/shared PLAN_LIMITS; Stripe is the billing source
+// of truth for paid plans — webhooks keep this row in sync.
+enum PlanTier {
+  FREE
+  PRO
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  UNPAID
+}
+
+model Subscription {
+  id                   String             @id @default(uuid())
+  organizationId       String             @unique @map("organization_id")
+  plan                 PlanTier           @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId     String?            @unique @map("stripe_customer_id")
+  stripeSubscriptionId String?            @unique @map("stripe_subscription_id")
+  // Stripe price ids for the seat (licensed) and metered (usage) line items, and
+  // the metered subscription_item id usage records are reported against.
+  seatPriceId          String?            @map("seat_price_id")
+  meteredPriceId       String?            @map("metered_price_id")
+  meteredSubItemId     String?            @map("metered_sub_item_id")
+  // Purchased seat quantity (kept in sync with member count for paid plans).
+  seats                Int                @default(1)
+  currentPeriodStart   DateTime?          @map("current_period_start")
+  currentPeriodEnd     DateTime?          @map("current_period_end")
+  cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@map("subscriptions")
 }
 
 model OrganizationMember {

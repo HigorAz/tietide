@@ -9,6 +9,8 @@ import { randomBytes } from 'node:crypto';
 import { ORG_ROLE_RANK, type OrgRole } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { SeatSyncService } from '../billing/seat-sync.service';
 import { OrganizationAccessService } from './organization-access.service';
 import type { CreateOrganizationDto } from './dto/create-organization.dto';
 import type { UpdateOrganizationDto } from './dto/update-organization.dto';
@@ -26,9 +28,14 @@ export class OrganizationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
     private readonly access: OrganizationAccessService,
+    private readonly entitlements: EntitlementsService,
+    private readonly seatSync: SeatSyncService,
   ) {}
 
   async create(userId: string, dto: CreateOrganizationDto): Promise<OrganizationSummaryDto> {
+    // Free-tier guard: a user may own only so many FREE workspaces. Joining other
+    // people's workspaces is never capped (see EntitlementsService).
+    await this.entitlements.assertCanCreateWorkspace(userId);
     const org = await this.createWithUniqueSlug(userId, dto.name);
 
     await this.access.adoptAsDefaultIfNone(userId, org.id);
@@ -189,6 +196,8 @@ export class OrganizationsService {
     await this.prisma.organizationMember.delete({
       where: { organizationId_userId: { organizationId: orgId, userId: targetUserId } },
     });
+    // A seat freed up → reconcile the Stripe seat quantity (async, no-op for FREE).
+    await this.seatSync.enqueue(orgId);
     await this.audit.log({
       userId: actingUserId,
       organizationId: orgId,
@@ -212,6 +221,11 @@ export class OrganizationsService {
           });
           await tx.organizationMember.create({
             data: { organizationId: created.id, userId, role: 'SUPERADMIN' },
+          });
+          // Every workspace is a billing entity — provision its FREE subscription
+          // up front so an org never exists without one.
+          await tx.subscription.create({
+            data: { organizationId: created.id, plan: 'FREE', status: 'ACTIVE' },
           });
           return created;
         });

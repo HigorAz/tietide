@@ -25,6 +25,7 @@ import { FoldersModule } from './folders/folders.module';
 import { TagsModule } from './tags/tags.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
     TagsModule,
     MetricsModule,
     OrganizationsModule,
+    BillingModule,
   ],
 })
 export class AppModule {}
