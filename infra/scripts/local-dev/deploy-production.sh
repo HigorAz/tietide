@@ -68,18 +68,37 @@ git pull --ff-only origin "${BRANCH}"
 
 NEW_HEAD=$(git rev-parse HEAD)
 
-if [ "${OLD_HEAD}" = "${NEW_HEAD}" ]; then
-  echo "✓ Already up to date (${NEW_HEAD:0:7}). Nothing to do."
-  # Keep the marker authoritative even on no-op runs (e.g. first run after this
-  # marker was introduced, or if it was deleted).
-  write_marker "${NEW_HEAD}"
+# The marker records the SHA prod last *successfully* deployed — not merely what git
+# points at. A deploy that fails AFTER `git pull` (e.g. the DB is unreachable when
+# `prisma migrate deploy` runs) leaves HEAD advanced but the site broken. The old code
+# keyed "nothing to do" off git movement alone, so the very next tick saw OLD==NEW,
+# declared success, wrote the marker, and masked the outage permanently. Key it off the
+# marker instead, so the timer keeps re-running the deploy until it actually lands.
+LAST_DEPLOYED=""
+[ -f "${MARKER_FILE}" ] && LAST_DEPLOYED=$(tr -d '[:space:]' < "${MARKER_FILE}" 2>/dev/null || true)
+
+if [ -n "${LAST_DEPLOYED}" ] && [ "${LAST_DEPLOYED}" = "${NEW_HEAD}" ]; then
+  echo "✓ Already deployed (${NEW_HEAD:0:7}). Nothing to do."
   exit 0
 fi
 
-echo "→ Updated ${OLD_HEAD:0:7} → ${NEW_HEAD:0:7}"
+# Detect what changed since the last *successful* deploy, not just this run's pull, so
+# a retry after a failed deploy still applies the migrations/code it owes. Fall back to
+# this run's pre-pull HEAD when the marker is missing or no longer a valid commit
+# (fresh box / first run after the marker was introduced).
+DIFF_BASE="${LAST_DEPLOYED}"
+if [ -z "${DIFF_BASE}" ] || ! git cat-file -e "${DIFF_BASE}^{commit}" 2>/dev/null; then
+  DIFF_BASE="${OLD_HEAD}"
+fi
+
+if [ "${DIFF_BASE}" = "${NEW_HEAD}" ]; then
+  echo "→ Code already at ${NEW_HEAD:0:7}; (re)publishing marker only."
+else
+  echo "→ Deploying ${DIFF_BASE:0:7} → ${NEW_HEAD:0:7} (last live: ${LAST_DEPLOYED:-none})"
+fi
 
 # pnpm install only if pnpm-lock.yaml changed
-if ! git diff --quiet "${OLD_HEAD}" "${NEW_HEAD}" -- pnpm-lock.yaml; then
+if ! git diff --quiet "${DIFF_BASE}" "${NEW_HEAD}" -- pnpm-lock.yaml; then
   echo "→ Lockfile changed — running pnpm install"
   pnpm install --frozen-lockfile
 else
@@ -87,7 +106,7 @@ else
 fi
 
 # Apply Prisma migrations only if any landed
-if ! git diff --quiet "${OLD_HEAD}" "${NEW_HEAD}" -- apps/api/prisma/migrations/; then
+if ! git diff --quiet "${DIFF_BASE}" "${NEW_HEAD}" -- apps/api/prisma/migrations/; then
   echo "→ New Prisma migrations — applying"
   pnpm --filter @tietide/api exec prisma migrate deploy
 else
@@ -102,7 +121,7 @@ fi
 # marker must NOT advance, or the promote workflow would go green prematurely.
 SERVING_NEW_HEAD=true
 
-if ! git diff --quiet "${OLD_HEAD}" "${NEW_HEAD}" -- apps/ packages/; then
+if ! git diff --quiet "${DIFF_BASE}" "${NEW_HEAD}" -- apps/ packages/; then
   echo "→ App/package code changed — rebuilding artifacts (services stay up during build)"
   rebuild_all
 
@@ -125,15 +144,17 @@ else
 fi
 
 echo ""
-echo "Files changed in this deploy:"
-git diff --stat "${OLD_HEAD}" "${NEW_HEAD}"
+echo "Files changed since last live (${DIFF_BASE:0:7} → ${NEW_HEAD:0:7}):"
+git diff --stat "${DIFF_BASE}" "${NEW_HEAD}"
 echo ""
 # Publish the now-serving SHA so the promote-to-production workflow can confirm the
-# deploy landed. Skipped when we rebuilt but couldn't restart — the marker then
-# stays at OLD_HEAD until a manual restart, correctly reflecting what's live.
+# deploy landed. ONLY advances after a successful rebuild+restart (or a clean no-op),
+# so a failed deploy leaves the marker at the last good SHA and the next timer tick
+# re-runs the deploy until it converges. Skipped when we rebuilt but couldn't restart —
+# the marker then stays put until a manual restart, correctly reflecting what's live.
 if [ "${SERVING_NEW_HEAD}" = "true" ]; then
   write_marker "${NEW_HEAD}"
 else
-  echo "→ Marker left at ${OLD_HEAD:0:7} — restart pending, new build not yet live"
+  echo "→ Marker left at ${LAST_DEPLOYED:-unknown} — restart pending, new build not yet live"
 fi
 echo "✓ Deploy complete at $(date -Iseconds)"
