@@ -60,6 +60,9 @@ docs/claude/
 docs/guides/
 docs/planning/
 
+# Local audit-prep study notes (personal, never committed)
+docs/audit-prep/
+
 # Office lock files
 .~lock.*
 ~$*

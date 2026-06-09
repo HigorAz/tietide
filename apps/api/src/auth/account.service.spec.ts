@@ -98,6 +98,19 @@ describe('AccountService', () => {
       expect(prisma.user.update).not.toHaveBeenCalled();
     });
 
+    it('tags the wrong-password 401 with reason "invalid_credentials" so the SPA does not force-logout', async () => {
+      prisma.user.findUnique.mockResolvedValue(stored);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      const err = await service.changePassword('u1', 'wrong', 'newpass123').catch((e) => e);
+
+      expect(err).toBeInstanceOf(UnauthorizedException);
+      expect((err as UnauthorizedException).getResponse()).toMatchObject({
+        message: 'Current password is incorrect',
+        reason: 'invalid_credentials',
+      });
+    });
+
     it('sets the new password, bumps tokenVersion, and returns a fresh session', async () => {
       prisma.user.findUnique.mockResolvedValue(stored);
       (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
@@ -189,6 +202,19 @@ describe('AccountService', () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(prisma.user.update).not.toHaveBeenCalled();
       expect(mailer.sendAccountDeletedEmail).not.toHaveBeenCalled();
+    });
+
+    it('tags the wrong-password 401 with reason "invalid_credentials" so the SPA does not force-logout', async () => {
+      prisma.user.findUnique.mockResolvedValue(stored);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      const err = await service.deleteAccount('u1', 'wrong').catch((e) => e);
+
+      expect(err).toBeInstanceOf(UnauthorizedException);
+      expect((err as UnauthorizedException).getResponse()).toMatchObject({
+        message: 'Invalid credentials',
+        reason: 'invalid_credentials',
+      });
     });
 
     it('hard-deletes a sole-member workspace and anonymizes the user', async () => {
