@@ -11,6 +11,13 @@ import type { UserResponseDto } from './dto/user-response.dto';
 
 const BCRYPT_ROUNDS = 12;
 
+// Machine-readable discriminator attached to credential-rejection 401s (wrong
+// current password / wrong delete-confirmation password). Lets the SPA tell these
+// apart from a genuinely expired/revoked session 401: the global exception filter
+// passes `reason` through to the body, and the client skips its force-logout when
+// it sees this value (otherwise a typo would sign the user out). See client.ts.
+const INVALID_CREDENTIALS_REASON = 'invalid_credentials';
+
 // Neutral regardless of whether the address belongs to a real, unverified account,
 // so the endpoint cannot be used to enumerate registered emails (mirrors W2.1).
 const NEUTRAL_RESEND_RESPONSE: RegisterResponseDto = {
@@ -66,7 +73,10 @@ export class AccountService {
 
     const matches = await bcrypt.compare(currentPassword, user.password);
     if (!matches) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new UnauthorizedException({
+        message: 'Current password is incorrect',
+        reason: INVALID_CREDENTIALS_REASON,
+      });
     }
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
@@ -116,7 +126,10 @@ export class AccountService {
     });
     const matches = await bcrypt.compare(password, user?.password ?? '');
     if (!user || user.deletedAt || !matches) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException({
+        message: 'Invalid credentials',
+        reason: INVALID_CREDENTIALS_REASON,
+      });
     }
 
     const memberships = await this.prisma.organizationMember.findMany({
