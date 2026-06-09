@@ -1,6 +1,10 @@
 services:
   postgres:
     image: postgres:16-alpine
+    # Without a restart policy, a docker daemon restart (or any stray `docker
+    # stop`/`compose down`) leaves the DB down permanently — which crash-loops the
+    # host-run API into a 502 and never self-heals on the WSL prod box.
+    restart: unless-stopped
     ports:
       - '5432:5432'
     environment:
@@ -17,6 +21,7 @@ services:
 
   valkey:
     image: valkey/valkey:8-alpine
+    restart: unless-stopped
     ports:
       - '6379:6379'
     volumes:
@@ -29,6 +34,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    restart: unless-stopped
     ports:
       - '11434:11434'
     volumes:
@@ -54,6 +60,7 @@ services:
 
   chromadb:
     image: chromadb/chroma:latest
+    restart: unless-stopped
     ports:
       - '8001:8000'
     volumes:
@@ -90,6 +97,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:latest
+    restart: unless-stopped
     ports:
       - '8025:8025'
       - '1025:1025'

@@ -13,6 +13,13 @@ mkdir -p "$LOGS"
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
+# pnpm is a standalone install, NOT in nvm's bin. deploy-production.sh sets this up
+# and inherits it down to us, but a *direct* `start-prod.sh` (manual recovery, or any
+# non-login shell) has no pnpm on PATH and dies at the first `pnpm` call with
+# "pnpm: command not found". Put it on PATH here too so this script stands alone.
+export PNPM_HOME="${PNPM_HOME:-$HOME/.local/share/pnpm}"
+case ":$PATH:" in *":$PNPM_HOME/bin:"*) ;; *) export PATH="$PNPM_HOME/bin:$PATH" ;; esac
+
 cd "$REPO"
 
 echo "→ Starting Docker dependencies (incl. the AI docs service)..."
