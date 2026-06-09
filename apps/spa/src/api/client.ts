@@ -31,6 +31,14 @@ api.interceptors.request.use(attachRequestHeaders);
 // hitting a mutation is left for the page to handle.
 const ORG_ACCESS_LOST = /member of this organization|organization context/i;
 
+// A 401 carrying this `reason` is a deliberate credential rejection on an
+// authenticated endpoint (wrong current password on change-password, wrong
+// password on delete-account) — NOT an expired session. The page that made the
+// call surfaces the message itself, so the interceptor must leave the session
+// intact instead of force-logging-out. Kept in sync with the API's
+// INVALID_CREDENTIALS_REASON (account.service.ts).
+const INVALID_CREDENTIALS_REASON = 'invalid_credentials';
+
 // 402 plan-limit messages, keyed by the `reason` the API attaches. Shows a
 // targeted upgrade prompt; call sites may also catch 402 for an inline CTA.
 const PLAN_LIMIT_MESSAGES: Record<string, string> = {
@@ -49,11 +57,16 @@ export function onResponseRejected(error: AxiosError): Promise<never> {
   const status = error.response?.status;
 
   if (status === 401 && useAuthStore.getState().token) {
-    useAuthStore.getState().logout();
-    useToastStore.getState().show({
-      tone: 'error',
-      message: 'Your session has expired. Please sign in again.',
-    });
+    const reason = (error.response?.data as { reason?: string } | undefined)?.reason;
+    // A wrong-password rejection is not a stale session — let the calling page
+    // show the error and keep the user signed in.
+    if (reason !== INVALID_CREDENTIALS_REASON) {
+      useAuthStore.getState().logout();
+      useToastStore.getState().show({
+        tone: 'error',
+        message: 'Your session has expired. Please sign in again.',
+      });
+    }
   }
 
   if (status === 403 && useAuthStore.getState().token) {

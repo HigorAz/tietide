@@ -34,6 +34,22 @@ describe('client 401 interceptor (onResponseRejected)', () => {
     expect(toasts[0]?.message).toMatch(/session has expired/i);
   });
 
+  it('does not logout or toast on a credential-rejection 401 (e.g. wrong current password)', async () => {
+    localStorage.setItem('tietide-token', 'jwt-123');
+    useAuthStore.setState({ token: 'jwt-123', user: null, hydrated: true });
+    const err = {
+      response: { status: 401, data: { reason: 'invalid_credentials' } },
+    } as unknown as AxiosError;
+
+    // Still rejects so the calling page surfaces the real message itself.
+    await expect(onResponseRejected(err)).rejects.toBe(err);
+
+    // Session is untouched — the user stays signed in.
+    expect(useAuthStore.getState().token).toBe('jwt-123');
+    expect(localStorage.getItem('tietide-token')).toBe('jwt-123');
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
   it('rejects with the original error so callers still see the failure', async () => {
     useAuthStore.setState({ token: 'jwt-123', hydrated: true });
     const err = make401();
