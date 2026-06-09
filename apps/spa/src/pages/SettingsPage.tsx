@@ -2,7 +2,6 @@ import { useAuthStore } from '@/stores/authStore';
 import { ProfileSection } from '@/components/settings/ProfileSection';
 import { SecuritySection } from '@/components/settings/SecuritySection';
 import { WorkspaceShortcutsSection } from '@/components/settings/WorkspaceShortcutsSection';
-import { WorkspacesSettings } from '@/components/settings/WorkspacesSettings';
 import { DangerZoneSection } from '@/components/settings/DangerZoneSection';
 
 export function SettingsPage(): JSX.Element {
@@ -31,7 +30,6 @@ export function SettingsPage(): JSX.Element {
         <ProfileSection user={user} />
         <SecuritySection user={user} />
         <WorkspaceShortcutsSection />
-        <WorkspacesSettings />
         <DangerZoneSection />
       </div>
     </div>

@@ -26,7 +26,7 @@ export function OrgSwitcher({ collapsed = false }: OrgSwitcherProps): JSX.Elemen
     return (
       <div className="flex justify-center border-b border-white/5 px-2 py-2">
         <Link
-          to="/settings"
+          to="/workspace-settings"
           aria-label="Workspaces"
           title={active?.name ?? 'Workspaces'}
           className="rounded p-1 text-text-secondary transition hover:bg-white/5 hover:text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-teal"
@@ -97,14 +97,6 @@ export function OrgSwitcher({ collapsed = false }: OrgSwitcherProps): JSX.Elemen
             <Plus aria-hidden className="h-4 w-4 shrink-0" />
             <span>New workspace</span>
           </button>
-          <Link
-            to="/settings"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className={cn(itemClass, 'text-text-secondary')}
-          >
-            Workspace settings
-          </Link>
         </div>
       )}
 

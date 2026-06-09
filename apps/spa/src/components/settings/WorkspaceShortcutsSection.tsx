@@ -11,8 +11,8 @@ interface Shortcut {
 }
 
 // Links to the workspace-scoped management surfaces that have their own pages.
-// Workspaces themselves are managed below on this page; Secrets have no standalone
-// page (they live inside the editor), so both are omitted here.
+// Workspaces themselves are managed on the Workspace settings page; Secrets have no
+// standalone page (they live inside the editor), so both are omitted here.
 const shortcuts: Shortcut[] = [
   {
     to: '/connections',

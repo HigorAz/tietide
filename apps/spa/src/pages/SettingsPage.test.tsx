@@ -50,15 +50,23 @@ describe('SettingsPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the Profile, Security, Workspace and Danger sections', () => {
+  it('renders the Profile, Security, Shortcuts and Danger sections', () => {
     seedStore(baseUser);
     renderPage();
 
     expect(screen.getByRole('region', { name: /profile/i })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /security/i })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: /workspace/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: /shortcuts/i })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: /danger zone/i })).toBeInTheDocument();
     expect(screen.getByText('alice@example.com')).toBeInTheDocument();
+  });
+
+  it('no longer renders workspace management (moved to Workspace settings)', () => {
+    seedStore(baseUser);
+    renderPage();
+
+    expect(screen.queryByRole('region', { name: /your workspaces/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /plan & billing/i })).not.toBeInTheDocument();
   });
 
   it('calls updateProfile with the edited display name', async () => {
