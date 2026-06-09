@@ -16,13 +16,14 @@ describe('SidebarFooter', () => {
     useAuthStore.setState({ user: null, token: 'jwt-test', logout: vi.fn() });
   });
 
-  it('should render Help, Account settings, and Sign out in that DOM order', () => {
+  it('should render Help, Workspace settings, Account settings, and Sign out in that DOM order', () => {
     render(<SidebarFooter collapsed={false} />);
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(3);
+    expect(buttons).toHaveLength(4);
     expect(buttons[0]).toHaveAccessibleName(/help/i);
-    expect(buttons[1]).toHaveAccessibleName(/account settings/i);
-    expect(buttons[2]).toHaveAccessibleName(/sign out/i);
+    expect(buttons[1]).toHaveAccessibleName(/workspace settings/i);
+    expect(buttons[2]).toHaveAccessibleName(/account settings/i);
+    expect(buttons[3]).toHaveAccessibleName(/sign out/i);
   });
 
   it('should call useNavigate with /settings when Account settings is clicked', async () => {
@@ -31,6 +32,14 @@ describe('SidebarFooter', () => {
     await user.click(screen.getByRole('button', { name: /account settings/i }));
     expect(mockNavigate).toHaveBeenCalledTimes(1);
     expect(mockNavigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('should call useNavigate with /workspace-settings when Workspace settings is clicked', async () => {
+    const user = userEvent.setup();
+    render(<SidebarFooter collapsed={false} />);
+    await user.click(screen.getByRole('button', { name: /workspace settings/i }));
+    expect(mockNavigate).toHaveBeenCalledTimes(1);
+    expect(mockNavigate).toHaveBeenCalledWith('/workspace-settings');
   });
 
   it('should call authStore.logout and navigate to /login on Sign out', async () => {
@@ -56,6 +65,8 @@ describe('SidebarFooter', () => {
     render(<SidebarFooter collapsed={true} />);
     const help = screen.getByRole('button', { name: /help/i });
     expect(help).toHaveAttribute('title', 'Help');
+    const workspaceSettings = screen.getByRole('button', { name: /workspace settings/i });
+    expect(workspaceSettings).toHaveAttribute('title', 'Workspace settings');
     const settings = screen.getByRole('button', { name: /account settings/i });
     expect(settings).toHaveAttribute('title', 'Account settings');
     const signOut = screen.getByRole('button', { name: /sign out/i });

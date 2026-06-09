@@ -13,6 +13,7 @@ import { LibraryPage } from '@/pages/LibraryPage';
 import { ConnectionsPage } from '@/pages/ConnectionsPage';
 import { InviteAcceptPage } from '@/pages/InviteAcceptPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { WorkspaceSettingsPage } from '@/pages/WorkspaceSettingsPage';
 import { SettingsEnvVarsPage } from '@/pages/settings/EnvVarsPage';
 import { AdminEnvVarsPage } from '@/pages/admin/EnvVarsPage';
 import { AuditLogPage } from '@/pages/admin/AuditLogPage';
@@ -43,11 +44,15 @@ const router = createBrowserRouter([
           { path: '/history', element: <GlobalHistoryPage /> },
           { path: '/library', element: <LibraryPage /> },
           { path: '/connections', element: <ConnectionsPage /> },
-          // Workspaces moved into Account Settings; keep old URLs working.
-          { path: '/organizations', element: <Navigate to="/settings" replace /> },
-          { path: '/organizations/members', element: <Navigate to="/settings" replace /> },
+          // Workspace management lives on its own page now; keep old URLs working.
+          { path: '/organizations', element: <Navigate to="/workspace-settings" replace /> },
+          {
+            path: '/organizations/members',
+            element: <Navigate to="/workspace-settings" replace />,
+          },
           { path: '/organizations/accept-invite', element: <InviteAcceptPage /> },
           { path: '/settings', element: <SettingsPage /> },
+          { path: '/workspace-settings', element: <WorkspaceSettingsPage /> },
           { path: '/settings/env-vars', element: <SettingsEnvVarsPage /> },
           {
             path: '/admin/env-vars',
