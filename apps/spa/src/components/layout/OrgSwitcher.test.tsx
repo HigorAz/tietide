@@ -64,6 +64,15 @@ describe('OrgSwitcher', () => {
     expect(screen.getByRole('link', { name: /workspaces/i })).toBeInTheDocument();
   });
 
+  it('no longer offers a Workspace settings item in the dropdown', async () => {
+    const user = userEvent.setup();
+    renderSwitcher();
+
+    await user.click(screen.getByRole('button', { name: /acme/i }));
+    expect(screen.getByRole('menuitem', { name: /new workspace/i })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /workspace settings/i })).not.toBeInTheDocument();
+  });
+
   it('creates a new workspace from the switcher and switches to it', async () => {
     const user = userEvent.setup();
     mockedCreate.mockResolvedValueOnce(org('new', 'New Team'));

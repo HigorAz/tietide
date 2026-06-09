@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { HelpCircle, LogOut, Settings } from 'lucide-react';
+import { Building2, HelpCircle, LogOut, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
@@ -22,6 +22,10 @@ export function SidebarFooter({ collapsed }: SidebarFooterProps): JSX.Element {
     navigate('/settings');
   };
 
+  const handleWorkspaceSettings = (): void => {
+    navigate('/workspace-settings');
+  };
+
   const handleSignOut = (): void => {
     logout();
     navigate('/login', { replace: true });
@@ -34,6 +38,12 @@ export function SidebarFooter({ collapsed }: SidebarFooterProps): JSX.Element {
         icon={HelpCircle}
         label="Help"
         symbol="?"
+        collapsed={collapsed}
+      />
+      <FooterButton
+        onClick={handleWorkspaceSettings}
+        icon={Building2}
+        label="Workspace settings"
         collapsed={collapsed}
       />
       <FooterButton
