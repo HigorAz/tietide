@@ -7,6 +7,7 @@ import { FieldLabel } from './FieldLabel';
 import { GenericFieldRow } from './GenericFieldRow';
 import { OptionsSection } from './OptionsSection';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { useStepLayout, useReportConfigValidity } from '../steps/StepLayoutContext';
 
 export type FieldSpec =
   | {
@@ -95,6 +96,14 @@ export function GenericConnectorForm({
 
   const connIssue = issueFor('connectionId');
 
+  // Configure validity ignores connectionId problems — the connection lives in
+  // step 1, so a missing connection must not keep the Configure step invalid
+  // (and thus permanently lock Test).
+  const layout = useStepLayout();
+  const configureValid =
+    parsed.success || parsed.error.issues.every((i) => i.path[0] === 'connectionId');
+  useReportConfigValidity(configureValid);
+
   const requiredFields = fields.filter(isRequiredField);
   const optionalFields = fields.filter((f) => !isRequiredField(f));
 
@@ -105,23 +114,34 @@ export function GenericConnectorForm({
   return (
     <div data-testid={testId} className="flex flex-col gap-4">
       {helpBanner}
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel label={`${providerLabel} connection`} />
+      {layout ? (
+        // Inside the step panel the label + error live in the Connection step,
+        // so the picker carries the error and renders no surrounding chrome.
         <ConnectionPicker
           provider={provider}
           value={connectionId || null}
           onChange={(next) => updateNodeConfig(nodeId, { connectionId: next })}
+          errorMessage={connIssue ? `Select a ${providerLabel} connection.` : null}
         />
-        {connIssue && (
-          <p
-            data-testid={`${testId}-connection-error`}
-            role="alert"
-            className="text-xs text-red-400"
-          >
-            Select a {providerLabel} connection.
-          </p>
-        )}
-      </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel label={`${providerLabel} connection`} />
+          <ConnectionPicker
+            provider={provider}
+            value={connectionId || null}
+            onChange={(next) => updateNodeConfig(nodeId, { connectionId: next })}
+          />
+          {connIssue && (
+            <p
+              data-testid={`${testId}-connection-error`}
+              role="alert"
+              className="text-xs text-red-400"
+            >
+              Select a {providerLabel} connection.
+            </p>
+          )}
+        </div>
+      )}
 
       {requiredFields.map((f) => (
         <GenericFieldRow

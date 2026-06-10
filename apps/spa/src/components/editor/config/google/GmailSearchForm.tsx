@@ -5,6 +5,7 @@ import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
+import { useStepLayout, useReportConfigValidity } from '../../steps/StepLayoutContext';
 
 const inputClass = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
@@ -37,25 +38,40 @@ export function GmailSearchForm({ nodeId, config }: NodeConfigFormProps): JSX.El
   const queryIssue = issueFor('query');
   const maxIssue = issueFor('maxResults');
 
+  // Connection problems gate step 1, not the Configure step's Test gate.
+  const layout = useStepLayout();
+  useReportConfigValidity(
+    parsed.success || parsed.error.issues.every((i) => i.path[0] === 'connectionId'),
+  );
+
   return (
     <div data-testid="gmail-search-form" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <span className={labelClass}>Connection</span>
+      {layout ? (
         <ConnectionPicker
           provider="google"
           value={connectionId || null}
           onChange={(next) => updateNodeConfig(nodeId, { connectionId: next })}
+          errorMessage={connectionIssue ? 'Select a Google connection.' : null}
         />
-        {connectionIssue && (
-          <p
-            data-testid="gmail-search-connection-error"
-            role="alert"
-            className="text-xs text-red-400"
-          >
-            Select a Google connection.
-          </p>
-        )}
-      </div>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <span className={labelClass}>Connection</span>
+          <ConnectionPicker
+            provider="google"
+            value={connectionId || null}
+            onChange={(next) => updateNodeConfig(nodeId, { connectionId: next })}
+          />
+          {connectionIssue && (
+            <p
+              data-testid="gmail-search-connection-error"
+              role="alert"
+              className="text-xs text-red-400"
+            >
+              Select a Google connection.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor={queryId} className={labelClass}>

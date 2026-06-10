@@ -7,6 +7,7 @@ import type { NodeConfigFormProps } from './formRegistry';
 import { HeadersEditor } from './HeadersEditor';
 import { DataPillInput } from './DataPillInput';
 import { PillSampleField } from './PillSampleField';
+import { useReportConfigValidity } from '../steps/StepLayoutContext';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
@@ -54,6 +55,10 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
   const urlIssue = parsed.success
     ? null
     : (parsed.error.issues.find((i) => i.path[0] === 'url')?.message ?? null);
+
+  // The HTTP connection is optional (allowClear) and not part of this schema,
+  // so Configure validity is simply the zod parse result plus a valid body.
+  useReportConfigValidity(parsed.success && bodyError === null);
 
   const handleBodyChange = (next: string) => {
     setBodyText(next);
