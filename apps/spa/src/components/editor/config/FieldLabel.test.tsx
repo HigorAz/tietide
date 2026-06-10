@@ -26,7 +26,9 @@ describe('FieldLabel', () => {
     const trigger = screen.getByTestId('field-label-help');
     expect(trigger).toBeInTheDocument();
     fireEvent.focus(trigger);
-    expect(await screen.findByText('The maximum number of items to return.')).toBeInTheDocument();
+    // Radix renders the content both visibly and in an a11y span, so there are 2 matches.
+    const shown = await screen.findAllByText('The maximum number of items to return.');
+    expect(shown.length).toBeGreaterThan(0);
   });
 
   it('does not render an info trigger when no help is provided', () => {
