@@ -40,6 +40,7 @@ export const ConnectionProvider = {
   POSTGRES: 'postgres',
   MYSQL: 'mysql',
   S3: 's3',
+  HTTP: 'http',
 } as const;
 
 export type ConnectionProvider = (typeof ConnectionProvider)[keyof typeof ConnectionProvider];
