@@ -1,6 +1,6 @@
 // Pure helpers for the structured ErrorCard: detecting the failing template
 // path inside a worker error message (so it can be highlighted as a React
-// <mark>, never via dangerouslySetInnerHTML) and deriving a plain-language hint
+// <mark> built from React nodes, never raw HTML) and deriving a plain-language hint
 // from known error wordings. No React, no `any` — fully unit-testable.
 
 export interface TemplatePathSpan {
