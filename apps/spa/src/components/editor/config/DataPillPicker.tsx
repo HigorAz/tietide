@@ -8,7 +8,7 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
 import { getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
 import { groupSuggestions } from '@/lib/group-suggestions';
 import { buildPillToken } from '@/lib/dataPillToken';
-import { parseJsonSample } from '@/lib/parseJsonSample';
+import { parsePillSample } from '@/lib/parsePillSample';
 import { humanizePath } from '@/lib/humanize-path';
 import { getNodeIcon } from '@/components/editor/nodes/nodeIcons';
 import { cn } from '@/utils/cn';
@@ -217,22 +217,4 @@ export function DataPillPicker(): JSX.Element | null {
       {list}
     </div>
   );
-}
-
-/**
- * Coerce a stored `__pillSample` config value into a structured override for the
- * picker. Strings are parsed as JSON; already-structured objects/arrays pass
- * through. Empty strings, invalid JSON, and bare primitives yield `undefined`
- * so the picker falls back to the node's schema.
- */
-function parsePillSample(raw: unknown): unknown {
-  if (raw === undefined || raw === null) return undefined;
-  if (typeof raw === 'string') {
-    // Same tolerant parse as the PillSampleField editor so the picker and the
-    // field agree on what counts as a valid sample (smart quotes etc.).
-    const result = parseJsonSample(raw);
-    return result.ok ? result.value : undefined;
-  }
-  if (typeof raw === 'object') return raw;
-  return undefined;
 }

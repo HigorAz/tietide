@@ -63,6 +63,39 @@ describe('AppShell', () => {
     expect(screen.getByRole('dialog', { name: /navigation/i })).toBeInTheDocument();
   });
 
+  it('should release a leaked page scroll-lock on navigation', async () => {
+    const user = userEvent.setup();
+    // Simulate the residue react-remove-scroll (Radix Select/Dialog) can leave on
+    // <body> when a locking layer unmounts mid-open during navigation.
+    document.body.setAttribute('data-scroll-locked', '1');
+    document.body.style.overflow = 'hidden';
+    document.body.style.marginRight = '15px';
+    document.body.style.pointerEvents = 'none';
+    try {
+      render(
+        <MemoryRouter initialEntries={['/first']}>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route path="/first" element={<Link to="/second">Go to second</Link>} />
+              <Route path="/second" element={<div>Second page</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>,
+      );
+
+      await user.click(screen.getByRole('link', { name: /go to second/i }));
+
+      expect(screen.getByText('Second page')).toBeInTheDocument();
+      expect(document.body.hasAttribute('data-scroll-locked')).toBe(false);
+      expect(document.body.style.overflow).toBe('');
+      expect(document.body.style.marginRight).toBe('');
+      expect(document.body.style.pointerEvents).toBe('');
+    } finally {
+      document.body.removeAttribute('data-scroll-locked');
+      document.body.removeAttribute('style');
+    }
+  });
+
   it('should reset the main scroll container to the top on navigation', async () => {
     const user = userEvent.setup();
     // jsdom does not implement scrollTo; spy on the prototype so the effect's

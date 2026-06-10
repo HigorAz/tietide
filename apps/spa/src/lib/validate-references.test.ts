@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Edge, Node } from 'reactflow';
-import { NodeType } from '@tietide/shared';
+import { NodeType, PILL_SAMPLE_KEY } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import { findInvalidReferences, invalidTokensForNode } from './validate-references';
 
@@ -72,6 +72,48 @@ describe('findInvalidReferences', () => {
     });
     const invalid = findInvalidReferences(nodes, edges);
     expect(invalid.map((r) => r.reason)).toEqual(['missing']);
+  });
+});
+
+describe('findInvalidReferences with __pillSample overrides', () => {
+  // Code's static output schema is { result, duration } — `count` only exists
+  // when the node carries an OUTPUT SAMPLE (or a "Test this node" capture).
+  const codeGraph = (sinkConfig: Record<string, unknown>, sample?: unknown) => {
+    const codeConfig = sample === undefined ? {} : { [PILL_SAMPLE_KEY]: sample };
+    const nodes = [
+      N('t', NodeType.MANUAL_TRIGGER, 'Trigger'),
+      N('c', NodeType.CODE, 'Code', codeConfig), // alias `code`
+      N('b', NodeType.HTTP_REQUEST, 'Sink', sinkConfig),
+    ];
+    const edges = [E('t', 'c'), E('c', 'b')];
+    return { nodes, edges };
+  };
+
+  it('does not flag a field that exists only in the node OUTPUT SAMPLE', () => {
+    const { nodes, edges } = codeGraph({ url: '{{steps.code.count}}' }, { count: '1' });
+    expect(findInvalidReferences(nodes, edges)).toEqual([]);
+  });
+
+  it('accepts a pill sample stored as a JSON string (as the form persists it)', () => {
+    const { nodes, edges } = codeGraph(
+      { url: '{{steps.code.count}}' },
+      JSON.stringify({ count: '1' }),
+    );
+    expect(findInvalidReferences(nodes, edges)).toEqual([]);
+  });
+
+  it('still flags a field absent from both the sample and the static schema', () => {
+    const { nodes, edges } = codeGraph({ url: '{{steps.code.nope}}' }, { count: '1' });
+    const invalid = findInvalidReferences(nodes, edges);
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]).toMatchObject({ reason: 'unknown-field' });
+  });
+
+  it('without a sample, the static code schema still rejects an unknown field', () => {
+    const { nodes, edges } = codeGraph({ url: '{{steps.code.count}}' });
+    const invalid = findInvalidReferences(nodes, edges);
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]).toMatchObject({ reason: 'unknown-field' });
   });
 });
 

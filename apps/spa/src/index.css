@@ -42,6 +42,33 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Themed scrollbars — quiet slate by default, brighten to teal on hover. Applies
+   everywhere (page, node library, config panels) so no white OS bar leaks through. */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(107, 124, 147, 0.4) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(107, 124, 147, 0.4); /* --text-secondary @ 40% */
+  border-radius: 9999px;
+  /* padding-box inset so the thumb reads thinner than the 10px track. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 212, 179, 0.6); /* --accent-teal */
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Keep autofilled inputs on-theme — Chrome/Safari otherwise paint a white fill
    that breaks the dark surfaces (most visible on the auth pages). */
 input:-webkit-autofill,
@@ -52,6 +79,76 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
   box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
   transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Themed checkboxes & radios, app-wide. The native controls render as a white
+   OS box that clashes with the dark theme (Tailwind's `text-accent-teal` only
+   sets `color`, which a native checkbox ignores). `appearance: none` lets us
+   paint a custom teal-on-elevated control with a white tick / centre dot, so
+   every checkbox across config forms, dashboards and modals matches the UI
+   without touching each call site. */
+input[type='checkbox'],
+input[type='radio'] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background-color: var(--bg-elevated);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+input[type='checkbox'] {
+  border-radius: 0.25rem;
+}
+input[type='radio'] {
+  border-radius: 9999px;
+}
+input[type='checkbox']:hover:not(:disabled),
+input[type='radio']:hover:not(:disabled) {
+  border-color: var(--accent-teal);
+}
+input[type='checkbox']:checked,
+input[type='radio']:checked {
+  background-color: var(--accent-teal);
+  border-color: var(--accent-teal);
+}
+/* White tick rendered as a centred background SVG (reliable across browsers). */
+input[type='checkbox']:checked {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23f6f8fa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+  background-size: 0.7rem;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+/* Radio centre dot via an inset ring that punches a hole in the teal fill. */
+input[type='radio']:checked {
+  box-shadow: inset 0 0 0 3px var(--bg-elevated);
+}
+input[type='checkbox']:focus-visible,
+input[type='radio']:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 212, 179, 0.6);
+}
+input[type='radio']:checked:focus-visible {
+  box-shadow:
+    inset 0 0 0 3px var(--bg-elevated),
+    0 0 0 2px rgba(0, 212, 179, 0.6);
+}
+input[type='checkbox']:disabled,
+input[type='radio']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Danger variant — keeps the "Add error handler" toggle semantically red. */
+input[type='checkbox'].checkbox-danger:checked {
+  background-color: var(--feedback-error);
+  border-color: var(--feedback-error);
 }
 
 /* Touch tuning for the React Flow editor: the default node connection handles
