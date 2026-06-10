@@ -63,6 +63,30 @@ describe('AppShell', () => {
     expect(screen.getByRole('dialog', { name: /navigation/i })).toBeInTheDocument();
   });
 
+  it('should clear a leaked inline overflow on <main> on navigation', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/first']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/first" element={<Link to="/second">Go to second</Link>} />
+            <Route path="/second" element={<div>Second page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    // Simulate react-joyride's scroll-parent fix mangling the scroll container.
+    const main = screen.getByRole('main');
+    main.style.overflow = 'visible';
+    expect(main.style.overflow).toBe('visible');
+
+    await user.click(screen.getByRole('link', { name: /go to second/i }));
+
+    expect(screen.getByText('Second page')).toBeInTheDocument();
+    expect(main.style.overflow).toBe('');
+  });
+
   it('should release a leaked page scroll-lock on navigation', async () => {
     const user = userEvent.setup();
     // Simulate the residue react-remove-scroll (Radix Select/Dialog) can leave on

@@ -21,14 +21,15 @@ export function AppShell(): JSX.Element {
   useEffect(() => {
     mainRef.current?.scrollTo?.({ top: 0 });
 
-    // Defensive page-scroll-lock release. Radix Select/Dialog lock page scroll
-    // via react-remove-scroll, which ref-counts a `data-scroll-locked` attribute
-    // and inline overflow/margin/pointer-events on <body>. When such a layer
-    // unmounts mid-open during navigation (e.g. leaving the editor with a config
-    // dropdown still settling), that counter can stick — the page then refuses to
-    // scroll until a hard refresh. Known upstream bug (radix-ui/primitives #1241,
-    // shadcn-ui/ui #6988). Clearing the residue on every route change restores
-    // scrolling without a reload. No-op when nothing leaked.
+    // Defensive scroll restore. Two libraries can leave the page unscrollable:
+    //  1. react-joyride (AppTour) sets `main.style.overflow = "initial"` (= visible)
+    //     when the current page isn't overflowing and never restores it — the real
+    //     cause of "scroll dies after leaving the editor". We also pass
+    //     `disableScrollParentFix` to stop it at the source; this clears any residue.
+    //  2. Radix Select/Dialog (react-remove-scroll) can leave a body scroll-lock
+    //     (`data-scroll-locked` + inline overflow/margin/pointer-events).
+    // Clearing both on every route change keeps scrolling working without a reload.
+    mainRef.current?.style.removeProperty('overflow');
     const { body } = document;
     body.removeAttribute('data-scroll-locked');
     for (const prop of ['overflow', 'padding-right', 'margin-right', 'pointer-events']) {
