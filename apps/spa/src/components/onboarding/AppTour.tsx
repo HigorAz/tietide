@@ -123,6 +123,12 @@ export function AppTour(): JSX.Element | null {
       showProgress
       showSkipButton
       disableScrolling={false}
+      // Our scroll container is <main> (the shell is locked to the viewport), not
+      // the document. Without this, react-joyride's "scroll parent fix" sets
+      // `main.style.overflow = "initial"` whenever the current page isn't
+      // overflowing (e.g. the editor, which exactly fills <main>) and never
+      // restores it — leaving the next, taller page unscrollable until a reload.
+      disableScrollParentFix
       styles={JOYRIDE_STYLES}
       locale={{
         back: 'Back',
