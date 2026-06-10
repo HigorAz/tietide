@@ -81,6 +81,8 @@ export function HeadersEditor({
     <div data-testid="headers-editor" className="flex flex-col gap-1.5">
       {rows.map((row) => (
         <div key={row.id} className="flex items-center gap-1.5">
+          {/* The key is a header NAME (a static identifier), so it stays a plain
+              input. Data pills belong in the header value, below. */}
           <input
             type="text"
             placeholder={keyPlaceholder}

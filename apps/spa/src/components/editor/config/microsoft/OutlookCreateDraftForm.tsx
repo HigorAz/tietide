@@ -6,8 +6,6 @@ import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
-const inputClass =
-  'w-full rounded-md border border-white/10 bg-elevated px-3 py-2 text-sm text-text-primary focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
 export function OutlookCreateDraftForm({ nodeId, config }: NodeConfigFormProps): JSX.Element {
@@ -130,13 +128,12 @@ export function OutlookCreateDraftForm({ nodeId, config }: NodeConfigFormProps):
         <label htmlFor={bodyField} className={labelClass}>
           Body
         </label>
-        <textarea
+        <DataPillInput
           id={bodyField}
+          nodeId={nodeId}
           value={body}
-          rows={5}
-          className={inputClass}
           aria-invalid={issueFor('body') !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { body: e.target.value })}
+          onChange={(next) => updateNodeConfig(nodeId, { body: next })}
         />
         {issueFor('body') && (
           <p role="alert" className="text-xs text-red-400">

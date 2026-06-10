@@ -3,7 +3,7 @@ import type { NodeConfigFormProps } from '../formRegistry';
 import { GenericConnectorForm, type FieldSpec } from '../GenericConnectorForm';
 
 const FIELDS: ReadonlyArray<FieldSpec> = [
-  { kind: 'text', key: 'propertyName', label: 'Property name (for propertyChange events)' },
+  { kind: 'pill', key: 'propertyName', label: 'Property name (for propertyChange events)' },
 ];
 
 export function HubspotContactChangedForm(props: NodeConfigFormProps): JSX.Element {

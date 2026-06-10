@@ -143,13 +143,12 @@ export function GitHubCommentIssueForm({ nodeId, config }: NodeConfigFormProps):
         <label htmlFor={bodyFieldId} className={labelClass}>
           Comment body (Markdown)
         </label>
-        <textarea
+        <DataPillInput
           id={bodyFieldId}
+          nodeId={nodeId}
           value={body}
-          rows={5}
           aria-invalid={bodyIssue !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { body: e.target.value })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { body: next })}
         />
         {bodyIssue && (
           <p

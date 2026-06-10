@@ -104,13 +104,12 @@ export function ExcelAppendForm({ nodeId, config }: NodeConfigFormProps): JSX.El
         <label htmlFor={sheetId} className={labelClass}>
           Worksheet name
         </label>
-        <input
+        <DataPillInput
           id={sheetId}
-          type="text"
+          nodeId={nodeId}
           value={worksheet}
-          onChange={(e) => updateNodeConfig(nodeId, { worksheet: e.target.value })}
           placeholder="Sheet1"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { worksheet: next })}
         />
         {issueFor('worksheet') && (
           <p data-testid="excel-append-sheet-error" role="alert" className="text-xs text-red-400">

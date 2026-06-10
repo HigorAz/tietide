@@ -1,16 +1,10 @@
 import { useId } from 'react';
 import { slackUploadFileConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -113,14 +107,13 @@ export function SlackUploadFileForm({ nodeId, config }: NodeConfigFormProps): JS
         <label htmlFor={contentId} className={labelClass}>
           Content (base64)
         </label>
-        <textarea
+        <DataPillInput
           id={contentId}
+          nodeId={nodeId}
           value={contentBase64}
-          rows={3}
           placeholder="{{stepX.contentBase64}}"
           aria-invalid={contentIssue !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { contentBase64: e.target.value })}
-          className={cn(inputClass, 'font-mono text-xs')}
+          onChange={(next) => updateNodeConfig(nodeId, { contentBase64: next })}
         />
         {contentIssue && (
           <p
@@ -137,14 +130,11 @@ export function SlackUploadFileForm({ nodeId, config }: NodeConfigFormProps): JS
         <label htmlFor={commentId} className={labelClass}>
           Initial comment (optional)
         </label>
-        <textarea
+        <DataPillInput
           id={commentId}
+          nodeId={nodeId}
           value={initialComment}
-          rows={2}
-          onChange={(e) =>
-            updateNodeConfig(nodeId, { initialComment: e.target.value || undefined })
-          }
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { initialComment: next || undefined })}
         />
       </div>
     </div>

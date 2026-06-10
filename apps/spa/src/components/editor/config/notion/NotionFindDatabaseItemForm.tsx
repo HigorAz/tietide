@@ -1,16 +1,10 @@
 import { useId } from 'react';
 import { notionFindDatabaseItemConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -106,16 +100,15 @@ export function NotionFindDatabaseItemForm({ nodeId, config }: NodeConfigFormPro
         <label htmlFor={filterId} className={labelClass}>
           Filter (optional JSON)
         </label>
-        <textarea
+        <DataPillInput
           id={filterId}
+          nodeId={nodeId}
           value={filterText}
-          rows={5}
           placeholder='{"property": "Email", "email": {"equals": "a@b.com"}}'
-          onChange={(e) => {
-            const next = tryParseJson(e.target.value);
-            updateNodeConfig(nodeId, { filter: next.ok ? next.value : e.target.value });
+          onChange={(next) => {
+            const parsedNext = tryParseJson(next);
+            updateNodeConfig(nodeId, { filter: parsedNext.ok ? parsedNext.value : next });
           }}
-          className={cn(inputClass, 'font-mono text-xs')}
         />
         {filterIssue && (
           <p
@@ -132,16 +125,15 @@ export function NotionFindDatabaseItemForm({ nodeId, config }: NodeConfigFormPro
         <label htmlFor={sortsId} className={labelClass}>
           Sorts (optional JSON array)
         </label>
-        <textarea
+        <DataPillInput
           id={sortsId}
+          nodeId={nodeId}
           value={sortsText}
-          rows={3}
           placeholder='[{"timestamp": "created_time", "direction": "descending"}]'
-          onChange={(e) => {
-            const next = tryParseJson(e.target.value);
-            updateNodeConfig(nodeId, { sorts: next.ok ? next.value : e.target.value });
+          onChange={(next) => {
+            const parsedNext = tryParseJson(next);
+            updateNodeConfig(nodeId, { sorts: parsedNext.ok ? parsedNext.value : next });
           }}
-          className={cn(inputClass, 'font-mono text-xs')}
         />
       </div>
     </div>

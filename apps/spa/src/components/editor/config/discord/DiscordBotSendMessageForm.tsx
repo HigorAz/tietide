@@ -1,16 +1,10 @@
 import { useId } from 'react';
 import { discordBotSendMessageConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -71,14 +65,13 @@ export function DiscordBotSendMessageForm({ nodeId, config }: NodeConfigFormProp
         <label htmlFor={contentId} className={labelClass}>
           Message
         </label>
-        <textarea
+        <DataPillInput
           id={contentId}
+          nodeId={nodeId}
           value={content}
-          rows={4}
           placeholder="Hello {{trigger.user}}!"
           aria-invalid={issueFor('content') !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { content: e.target.value })}
-          className={cn(inputClass, 'font-mono text-xs')}
+          onChange={(next) => updateNodeConfig(nodeId, { content: next })}
         />
         {issueFor('content') && (
           <p role="alert" className="text-xs text-red-400">

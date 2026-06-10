@@ -4,6 +4,7 @@ import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
+import { DataPillInput } from '../DataPillInput';
 
 const inputClass = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
@@ -60,13 +61,12 @@ export function ExcelRowUpdatedForm({ nodeId, config }: NodeConfigFormProps): JS
         <label htmlFor={workbookFieldId} className={labelClass}>
           Workbook (drive item) ID
         </label>
-        <input
+        <DataPillInput
           id={workbookFieldId}
-          type="text"
+          nodeId={nodeId}
           value={workbookId}
-          onChange={(e) => updateNodeConfig(nodeId, { workbookId: e.target.value })}
           placeholder="01ABCDEF..."
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { workbookId: next })}
         />
         {issueFor('workbookId') && (
           <p role="alert" className="text-xs text-red-400">
@@ -79,13 +79,12 @@ export function ExcelRowUpdatedForm({ nodeId, config }: NodeConfigFormProps): JS
         <label htmlFor={worksheetFieldId} className={labelClass}>
           Worksheet name
         </label>
-        <input
+        <DataPillInput
           id={worksheetFieldId}
-          type="text"
+          nodeId={nodeId}
           value={worksheet}
-          onChange={(e) => updateNodeConfig(nodeId, { worksheet: e.target.value })}
           placeholder="Sheet1"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { worksheet: next })}
         />
         {issueFor('worksheet') && (
           <p role="alert" className="text-xs text-red-400">
@@ -98,13 +97,12 @@ export function ExcelRowUpdatedForm({ nodeId, config }: NodeConfigFormProps): JS
         <label htmlFor={tableFieldId} className={labelClass}>
           Table name (default: Table1)
         </label>
-        <input
+        <DataPillInput
           id={tableFieldId}
-          type="text"
+          nodeId={nodeId}
           value={tableName}
-          onChange={(e) => updateNodeConfig(nodeId, { tableName: e.target.value || undefined })}
           placeholder="Table1"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { tableName: next || undefined })}
         />
         <p className="text-xs text-text-muted">
           Fires when an existing row&apos;s values change. Brand-new rows are handled by

@@ -100,13 +100,12 @@ export function SheetsAppendForm({ nodeId, config }: NodeConfigFormProps): JSX.E
         <label htmlFor={sheetId} className={labelClass}>
           Sheet name
         </label>
-        <input
+        <DataPillInput
           id={sheetId}
-          type="text"
+          nodeId={nodeId}
           value={sheet}
-          onChange={(e) => updateNodeConfig(nodeId, { sheet: e.target.value })}
           placeholder="Sheet1"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { sheet: next })}
         />
         {issueFor('sheet') && (
           <p data-testid="sheets-append-sheet-error" role="alert" className="text-xs text-red-400">

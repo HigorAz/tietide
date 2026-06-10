@@ -136,13 +136,12 @@ export function TwilioMakeCallForm({ nodeId, config }: NodeConfigFormProps): JSX
           <label htmlFor={sourceId} className={labelClass}>
             Inline TwiML
           </label>
-          <textarea
+          <DataPillInput
             id={sourceId}
+            nodeId={nodeId}
             value={twiml}
-            rows={4}
             placeholder="<Response><Say>Hello</Say></Response>"
-            onChange={(e) => updateNodeConfig(nodeId, { twiml: e.target.value || undefined })}
-            className={cn(inputClass, 'font-mono text-xs')}
+            onChange={(next) => updateNodeConfig(nodeId, { twiml: next || undefined })}
           />
         </div>
       )}

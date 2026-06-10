@@ -3,9 +3,9 @@ import type { NodeConfigFormProps } from '../formRegistry';
 import { GenericConnectorForm, type FieldSpec } from '../GenericConnectorForm';
 
 const FIELDS: ReadonlyArray<FieldSpec> = [
-  { kind: 'text', key: 'prompt', label: 'Prompt', multiline: true, required: true },
+  { kind: 'pill', key: 'prompt', label: 'Prompt', required: true },
   { kind: 'pill', key: 'imageUrl', label: 'Image URL', placeholder: 'https://…/image.png' },
-  { kind: 'text', key: 'imageBase64', label: 'Image base64 (alternative to URL)', multiline: true },
+  { kind: 'pill', key: 'imageBase64', label: 'Image base64 (alternative to URL)' },
   {
     kind: 'select',
     key: 'mediaType',

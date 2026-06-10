@@ -1,16 +1,10 @@
 import { useId } from 'react';
 import { githubCreatePrConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -195,12 +189,11 @@ export function GitHubCreatePrForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={bodyFieldId} className={labelClass}>
           Body (Markdown, optional)
         </label>
-        <textarea
+        <DataPillInput
           id={bodyFieldId}
+          nodeId={nodeId}
           value={body}
-          rows={5}
-          onChange={(e) => updateNodeConfig(nodeId, { body: e.target.value || undefined })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { body: next || undefined })}
         />
       </div>
 

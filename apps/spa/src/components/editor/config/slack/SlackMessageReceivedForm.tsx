@@ -4,6 +4,7 @@ import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
+import { DataPillInput } from '../DataPillInput';
 
 const inputClass = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
@@ -84,14 +85,13 @@ export function SlackMessageReceivedForm({ nodeId, config }: NodeConfigFormProps
         <label htmlFor={channelInputId} className={labelClass}>
           Channel ID filter (optional)
         </label>
-        <input
+        <DataPillInput
           id={channelInputId}
-          type="text"
+          nodeId={nodeId}
           value={channelId}
           placeholder="C0123ABCDEF"
           aria-invalid={channelIssue !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { channelId: e.target.value || undefined })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { channelId: next || undefined })}
         />
         {channelIssue && (
           <p
@@ -108,13 +108,12 @@ export function SlackMessageReceivedForm({ nodeId, config }: NodeConfigFormProps
         <label htmlFor={keywordInputId} className={labelClass}>
           Keyword filter (optional)
         </label>
-        <input
+        <DataPillInput
           id={keywordInputId}
-          type="text"
+          nodeId={nodeId}
           value={keyword}
           placeholder="deploy"
-          onChange={(e) => updateNodeConfig(nodeId, { keyword: e.target.value || undefined })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { keyword: next || undefined })}
         />
       </div>
     </div>

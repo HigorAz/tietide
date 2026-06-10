@@ -70,13 +70,12 @@ export function OpenAIChatCompletionForm({ nodeId, config }: NodeConfigFormProps
         <label htmlFor={modelInputId} className={labelClass}>
           Model
         </label>
-        <input
+        <DataPillInput
           id={modelInputId}
-          type="text"
+          nodeId={nodeId}
           value={model}
           placeholder="gpt-4o"
-          onChange={(e) => updateNodeConfig(nodeId, { model: e.target.value })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { model: next })}
         />
       </div>
 
@@ -84,13 +83,12 @@ export function OpenAIChatCompletionForm({ nodeId, config }: NodeConfigFormProps
         <label htmlFor={systemId} className={labelClass}>
           System prompt (optional)
         </label>
-        <textarea
+        <DataPillInput
           id={systemId}
+          nodeId={nodeId}
           value={system}
-          rows={3}
           placeholder="You are a concise assistant."
-          onChange={(e) => updateNodeConfig(nodeId, { system: e.target.value || undefined })}
-          className={cn(inputClass, 'font-mono text-xs')}
+          onChange={(next) => updateNodeConfig(nodeId, { system: next || undefined })}
         />
       </div>
 

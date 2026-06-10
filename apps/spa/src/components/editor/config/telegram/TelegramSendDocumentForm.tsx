@@ -1,17 +1,11 @@
 import { useId } from 'react';
 import { telegramSendDocumentConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 import { TelegramMediaFields } from './TelegramMediaFields';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -79,13 +73,12 @@ export function TelegramSendDocumentForm({ nodeId, config }: NodeConfigFormProps
         <label htmlFor={captionId} className={labelClass}>
           Caption (optional)
         </label>
-        <textarea
+        <DataPillInput
           id={captionId}
+          nodeId={nodeId}
           value={caption}
-          rows={2}
           placeholder="Optional caption"
-          onChange={(e) => updateNodeConfig(nodeId, { caption: e.target.value || undefined })}
-          className={cn(inputClass, 'text-xs')}
+          onChange={(next) => updateNodeConfig(nodeId, { caption: next || undefined })}
         />
       </div>
     </div>

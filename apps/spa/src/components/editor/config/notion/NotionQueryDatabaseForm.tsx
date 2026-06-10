@@ -109,16 +109,15 @@ export function NotionQueryDatabaseForm({ nodeId, config }: NodeConfigFormProps)
         <label htmlFor={filterId} className={labelClass}>
           Filter (optional JSON)
         </label>
-        <textarea
+        <DataPillInput
           id={filterId}
+          nodeId={nodeId}
           value={filterText}
-          rows={4}
           placeholder='{"property":"Status","status":{"equals":"Done"}}'
-          onChange={(e) => {
-            const next = tryParseJson(e.target.value);
-            updateNodeConfig(nodeId, { filter: next.ok ? next.value : e.target.value });
+          onChange={(next) => {
+            const parsedNext = tryParseJson(next);
+            updateNodeConfig(nodeId, { filter: parsedNext.ok ? parsedNext.value : next });
           }}
-          className={cn(inputClass, 'font-mono text-xs')}
         />
       </div>
 
@@ -126,16 +125,15 @@ export function NotionQueryDatabaseForm({ nodeId, config }: NodeConfigFormProps)
         <label htmlFor={sortsId} className={labelClass}>
           Sorts (optional JSON array)
         </label>
-        <textarea
+        <DataPillInput
           id={sortsId}
+          nodeId={nodeId}
           value={sortsText}
-          rows={3}
           placeholder='[{"property":"Created","direction":"ascending"}]'
-          onChange={(e) => {
-            const next = tryParseJson(e.target.value);
-            updateNodeConfig(nodeId, { sorts: next.ok ? next.value : e.target.value });
+          onChange={(next) => {
+            const parsedNext = tryParseJson(next);
+            updateNodeConfig(nodeId, { sorts: parsedNext.ok ? parsedNext.value : next });
           }}
-          className={cn(inputClass, 'font-mono text-xs')}
         />
       </div>
 
