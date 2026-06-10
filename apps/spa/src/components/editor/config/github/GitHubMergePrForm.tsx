@@ -12,7 +12,7 @@ const FIELDS: ReadonlyArray<FieldSpec> = [
     label: 'Merge method',
     options: GITHUB_MERGE_METHODS.map((m) => ({ value: m, label: m })),
   },
-  { kind: 'text', key: 'commitTitle', label: 'Commit title' },
+  { kind: 'pill', key: 'commitTitle', label: 'Commit title' },
 ];
 
 export function GitHubMergePrForm(props: NodeConfigFormProps): JSX.Element {

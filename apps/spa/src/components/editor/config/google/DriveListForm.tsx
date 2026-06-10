@@ -79,13 +79,12 @@ export function DriveListForm({ nodeId, config }: NodeConfigFormProps): JSX.Elem
         <label htmlFor={queryId} className={labelClass}>
           Drive query (optional)
         </label>
-        <input
+        <DataPillInput
           id={queryId}
-          type="text"
+          nodeId={nodeId}
           value={query}
-          onChange={(e) => updateNodeConfig(nodeId, { query: e.target.value || undefined })}
           placeholder="name contains 'report'"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { query: next || undefined })}
         />
       </div>
 

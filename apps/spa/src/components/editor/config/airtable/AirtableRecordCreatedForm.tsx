@@ -10,7 +10,7 @@ const FIELDS: ReadonlyArray<FieldSpec> = [
     required: true,
     placeholder: 'appXXXXXXXXXXXXXX',
   },
-  { kind: 'text', key: 'tableIdOrName', label: 'Table ID or name', required: true },
+  { kind: 'pill', key: 'tableIdOrName', label: 'Table ID or name', required: true },
   { kind: 'number', key: 'intervalSeconds', label: 'Poll interval (seconds)' },
 ];
 

@@ -1,16 +1,10 @@
 import { useId } from 'react';
 import { sheetsFindRowConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const checkboxClass =
   'h-4 w-4 rounded border-white/10 bg-elevated text-accent-teal focus:ring-accent-teal';
@@ -103,14 +97,13 @@ export function SheetsFindRowForm({ nodeId, config }: NodeConfigFormProps): JSX.
         <label htmlFor={rangeField} className={labelClass}>
           Range (A1 notation)
         </label>
-        <input
+        <DataPillInput
           id={rangeField}
-          type="text"
+          nodeId={nodeId}
           value={range}
           placeholder="Sheet1!A:D"
           aria-invalid={rangeIssue !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { range: e.target.value })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { range: next })}
         />
         {rangeIssue && (
           <p role="alert" className="text-xs text-red-400">
@@ -123,14 +116,13 @@ export function SheetsFindRowForm({ nodeId, config }: NodeConfigFormProps): JSX.
         <label htmlFor={columnField} className={labelClass}>
           Column (header name or 0-based index)
         </label>
-        <input
+        <DataPillInput
           id={columnField}
-          type="text"
+          nodeId={nodeId}
           value={column}
           placeholder="email or 1"
           aria-invalid={columnIssue !== null}
-          onChange={(e) => onColumnChange(e.target.value)}
-          className={inputClass}
+          onChange={(next) => onColumnChange(next)}
         />
         {columnIssue && (
           <p role="alert" className="text-xs text-red-400">

@@ -3,7 +3,7 @@ import type { NodeConfigFormProps } from '../formRegistry';
 import { GenericConnectorForm, type FieldSpec } from '../GenericConnectorForm';
 
 const FIELDS: ReadonlyArray<FieldSpec> = [
-  { kind: 'text', key: 'input', label: 'Input text', multiline: true, required: true },
+  { kind: 'pill', key: 'input', label: 'Input text', required: true },
   { kind: 'pill', key: 'model', label: 'Model', placeholder: 'text-embedding-3-small' },
 ];
 

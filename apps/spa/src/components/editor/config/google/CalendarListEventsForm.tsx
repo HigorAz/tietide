@@ -66,13 +66,12 @@ export function CalendarListEventsForm({ nodeId, config }: NodeConfigFormProps):
         <label htmlFor={calendarField} className={labelClass}>
           Calendar ID (default: primary)
         </label>
-        <input
+        <DataPillInput
           id={calendarField}
-          type="text"
+          nodeId={nodeId}
           value={calendarId}
           placeholder="primary"
-          onChange={(e) => updateNodeConfig(nodeId, { calendarId: e.target.value || undefined })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { calendarId: next || undefined })}
         />
       </div>
 
@@ -118,13 +117,12 @@ export function CalendarListEventsForm({ nodeId, config }: NodeConfigFormProps):
         <label htmlFor={queryField} className={labelClass}>
           Text search (optional)
         </label>
-        <input
+        <DataPillInput
           id={queryField}
-          type="text"
+          nodeId={nodeId}
           value={query}
           placeholder="standup"
-          onChange={(e) => updateNodeConfig(nodeId, { query: e.target.value || undefined })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { query: next || undefined })}
         />
       </div>
 

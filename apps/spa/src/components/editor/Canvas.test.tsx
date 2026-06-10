@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Edge, Node } from 'reactflow';
-import { createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NodeType } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { initialToastState, useToastStore } from '@/stores/toastStore';
@@ -221,6 +221,53 @@ describe('Canvas', () => {
       fireEvent.click(screen.getByTestId('trigger-pane-click'));
 
       expect(useEditorStore.getState().selectedNodeId).toBeNull();
+    });
+  });
+
+  describe('edge deletion', () => {
+    it('should disable React Flow built-in delete so deleteSelected is the single delete path', () => {
+      render(<Canvas />);
+      expect(lastReactFlowProps.current?.deleteKeyCode).toBeNull();
+    });
+
+    it('should select the right-clicked edge and open a "Delete connection" menu', () => {
+      const edge: Edge = { id: 'edge-1', source: 'node-a', target: 'node-b', type: 'livingInk' };
+      useEditorStore.setState({ edges: [edge], selectedNodeId: 'node-a' });
+      render(<Canvas />);
+
+      const onEdgeContextMenu = lastReactFlowProps.current?.onEdgeContextMenu as (
+        e: { preventDefault: () => void; clientX: number; clientY: number },
+        edge: Edge,
+      ) => void;
+      const preventDefault = vi.fn();
+      act(() => onEdgeContextMenu({ preventDefault, clientX: 10, clientY: 20 }, edge));
+
+      expect(preventDefault).toHaveBeenCalledTimes(1);
+      expect(useEditorStore.getState().edges[0].selected).toBe(true);
+      expect(useEditorStore.getState().selectedNodeId).toBeNull();
+      expect(screen.getByRole('menuitem', { name: 'Delete connection' })).toBeInTheDocument();
+    });
+
+    it('should remove the selected edge when "Delete connection" is clicked', () => {
+      const edge: Edge = {
+        id: 'edge-1',
+        source: 'node-a',
+        target: 'node-b',
+        type: 'livingInk',
+        selected: true,
+      };
+      useEditorStore.setState({ edges: [edge] });
+      render(<Canvas />);
+
+      const onEdgeContextMenu = lastReactFlowProps.current?.onEdgeContextMenu as (
+        e: { preventDefault: () => void; clientX: number; clientY: number },
+        edge: Edge,
+      ) => void;
+      act(() => onEdgeContextMenu({ preventDefault: vi.fn(), clientX: 10, clientY: 20 }, edge));
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete connection' }));
+
+      expect(useEditorStore.getState().edges).toHaveLength(0);
     });
   });
 

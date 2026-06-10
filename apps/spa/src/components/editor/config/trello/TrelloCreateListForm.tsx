@@ -10,7 +10,7 @@ const FIELDS: ReadonlyArray<FieldSpec> = [
     required: true,
     placeholder: '24-char hex Trello id',
   },
-  { kind: 'text', key: 'name', label: 'List name', required: true },
+  { kind: 'pill', key: 'name', label: 'List name', required: true },
   {
     kind: 'select',
     key: 'pos',

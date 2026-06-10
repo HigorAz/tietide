@@ -98,14 +98,13 @@ export function TelegramEditMessageForm({ nodeId, config }: NodeConfigFormProps)
         <label htmlFor={textId} className={labelClass}>
           New text
         </label>
-        <textarea
+        <DataPillInput
           id={textId}
+          nodeId={nodeId}
           value={text}
-          rows={4}
           placeholder="Updated message"
           aria-invalid={issueFor('text') !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { text: e.target.value })}
-          className={cn(inputClass, 'font-mono text-xs')}
+          onChange={(next) => updateNodeConfig(nodeId, { text: next })}
         />
         {issueFor('text') && (
           <p role="alert" className="text-xs text-red-400">

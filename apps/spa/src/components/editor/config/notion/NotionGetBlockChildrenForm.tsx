@@ -11,7 +11,7 @@ const FIELDS: ReadonlyArray<FieldSpec> = [
     placeholder: '32-char or UUID Notion id',
   },
   { kind: 'number', key: 'pageSize', label: 'Page size (1–100)' },
-  { kind: 'text', key: 'startCursor', label: 'Start cursor' },
+  { kind: 'pill', key: 'startCursor', label: 'Start cursor' },
 ];
 
 export function NotionGetBlockChildrenForm(props: NodeConfigFormProps): JSX.Element {

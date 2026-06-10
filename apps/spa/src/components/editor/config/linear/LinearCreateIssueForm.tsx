@@ -115,12 +115,11 @@ export function LinearCreateIssueForm({ nodeId, config }: NodeConfigFormProps): 
         <label htmlFor={descFieldId} className={labelClass}>
           Description (optional)
         </label>
-        <textarea
+        <DataPillInput
           id={descFieldId}
+          nodeId={nodeId}
           value={description}
-          rows={4}
-          onChange={(e) => updateNodeConfig(nodeId, { description: e.target.value || undefined })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { description: next || undefined })}
         />
       </div>
 

@@ -53,8 +53,9 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
     ? null
     : (parsed.error.issues.find((i) => i.path[0] === 'url')?.message ?? null);
 
-  const handleBodyBlur = () => {
-    const trimmed = bodyText.trim();
+  const handleBodyChange = (next: string) => {
+    setBodyText(next);
+    const trimmed = next.trim();
     if (trimmed === '') {
       setBodyError(null);
       updateNodeConfig(nodeId, { body: undefined });
@@ -121,16 +122,14 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
         <label htmlFor={bodyId} className={labelClass}>
           Body
         </label>
-        <textarea
+        <DataPillInput
           id={bodyId}
+          nodeId={nodeId}
           value={bodyText}
-          onChange={(e) => setBodyText(e.target.value)}
-          onBlur={handleBodyBlur}
+          onChange={handleBodyChange}
           placeholder={'{ "key": "value" }'}
-          rows={6}
-          className={cn(inputClass, 'font-mono text-xs')}
         />
-        <p className="text-xs text-text-muted">JSON. Committed on blur.</p>
+        <p className="text-xs text-text-muted">JSON. Supports {'{{data pills}}'}.</p>
         {bodyError && (
           <p data-testid="http-body-error" role="alert" className="text-xs text-red-400">
             {bodyError}

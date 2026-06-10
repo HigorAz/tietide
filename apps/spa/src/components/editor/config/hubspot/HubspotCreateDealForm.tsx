@@ -11,8 +11,8 @@ const FIELDS: ReadonlyArray<FieldSpec> = [
     required: true,
   },
   { kind: 'number', key: 'amount', label: 'Amount (USD)', placeholder: '5000' },
-  { kind: 'text', key: 'pipelineId', label: 'Pipeline ID' },
-  { kind: 'text', key: 'stageId', label: 'Stage ID' },
+  { kind: 'pill', key: 'pipelineId', label: 'Pipeline ID' },
+  { kind: 'pill', key: 'stageId', label: 'Stage ID' },
 ];
 
 export function HubspotCreateDealForm(props: NodeConfigFormProps): JSX.Element {

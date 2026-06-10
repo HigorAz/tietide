@@ -80,14 +80,13 @@ export function DocsInsertTextForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={textField} className={labelClass}>
           Text to insert
         </label>
-        <textarea
+        <DataPillInput
           id={textField}
+          nodeId={nodeId}
           value={text}
-          rows={4}
           placeholder="Text to insert"
           aria-invalid={textIssue !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { text: e.target.value })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { text: next })}
         />
         {textIssue && (
           <p role="alert" className="text-xs text-red-400">

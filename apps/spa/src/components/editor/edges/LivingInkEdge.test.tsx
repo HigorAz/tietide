@@ -81,6 +81,27 @@ describe('LivingInkEdge', () => {
     });
   });
 
+  describe('edge selection', () => {
+    it('should render a wide transparent interaction path so the thin line is clickable', () => {
+      const { container } = renderEdge();
+      const hit = container.querySelector('path.react-flow__edge-interaction');
+      expect(hit).not.toBeNull();
+      // A generous, invisible hit area — not the 2.5px visible stroke.
+      expect(Number(hit?.getAttribute('stroke-width'))).toBeGreaterThanOrEqual(15);
+      expect(hit?.getAttribute('stroke')).toBe('transparent');
+      // Must capture pointer events to be selectable.
+      expect(hit?.getAttribute('class') ?? '').not.toContain('pointer-events-none');
+    });
+
+    it('should emphasize the visible stroke when the edge is selected', () => {
+      const { container } = renderEdge({ selected: true });
+      const path = container.querySelector('path.react-flow__edge-path');
+      const className = path?.getAttribute('class') ?? '';
+      expect(className).not.toContain('opacity-70');
+      expect(Number(path?.getAttribute('stroke-width'))).toBeGreaterThan(2.5);
+    });
+  });
+
   describe('bezier path (getBezierPath)', () => {
     it('should compute a cubic bezier path (starts with M, contains C)', () => {
       const { container } = renderEdge();

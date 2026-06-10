@@ -86,14 +86,13 @@ export function SheetsUpdateRowForm({ nodeId, config }: NodeConfigFormProps): JS
         <label htmlFor={sheetField} className={labelClass}>
           Sheet / tab name
         </label>
-        <input
+        <DataPillInput
           id={sheetField}
-          type="text"
+          nodeId={nodeId}
           value={sheet}
           placeholder="Sheet1"
           aria-invalid={sheetIssue !== null}
-          onChange={(e) => updateNodeConfig(nodeId, { sheet: e.target.value })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { sheet: next })}
         />
         {sheetIssue && (
           <p role="alert" className="text-xs text-red-400">

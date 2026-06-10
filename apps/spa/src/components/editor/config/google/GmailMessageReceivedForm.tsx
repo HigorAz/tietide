@@ -4,6 +4,7 @@ import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
+import { DataPillInput } from '../DataPillInput';
 
 const inputClass = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
@@ -62,13 +63,12 @@ export function GmailMessageReceivedForm({ nodeId, config }: NodeConfigFormProps
         <label htmlFor={topicId} className={labelClass}>
           Pub/Sub topic name
         </label>
-        <input
+        <DataPillInput
           id={topicId}
-          type="text"
+          nodeId={nodeId}
           value={topicName}
-          onChange={(e) => updateNodeConfig(nodeId, { topicName: e.target.value })}
           placeholder="projects/my-project/topics/gmail-watch"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { topicName: next })}
         />
         {issueFor('topicName') && (
           <p
