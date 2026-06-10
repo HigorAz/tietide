@@ -58,6 +58,8 @@ describe('GenericConnectorForm', () => {
     const updateNodeConfig = vi.fn();
     useEditorStore.setState({ updateNodeConfig });
     renderForm();
+    // Optional checkbox fields live inside the collapsed Options section.
+    fireEvent.click(screen.getByText(/Options/));
     const sw = screen.getByRole('switch', { name: /Verbose/i });
     expect(sw).toBeInTheDocument();
     fireEvent.click(sw);
