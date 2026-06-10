@@ -13,7 +13,16 @@ export interface ConnectionPickerProps {
   value: string | null;
   onChange: (id: string | null) => void;
   disabled?: boolean;
+  // When true the dropdown offers a "None" option so the selection can be
+  // cleared back to null. Used by optional-connection nodes (e.g. HTTP Request)
+  // that can also run unauthenticated. Default false keeps required pickers
+  // unchanged.
+  allowClear?: boolean;
 }
+
+// Radix Select.Item cannot use an empty-string value, so a sentinel stands in
+// for "no connection" and is mapped back to null on change.
+const NONE_VALUE = '__none__';
 
 const formatLastUsed = (iso: string | null): string => {
   if (!iso) return 'Never used';
@@ -36,6 +45,7 @@ export function ConnectionPicker({
   value,
   onChange,
   disabled = false,
+  allowClear = false,
 }: ConnectionPickerProps): JSX.Element {
   const connections = useConnectionsStore((s) => s.connections);
   const status = useConnectionsStore((s) => s.status);
@@ -103,7 +113,7 @@ export function ConnectionPicker({
       )}
       <Select.Root
         value={value ?? ''}
-        onValueChange={(next) => onChange(next || null)}
+        onValueChange={(next) => onChange(next === NONE_VALUE ? null : next || null)}
         disabled={disabled}
       >
         <Select.Trigger
@@ -134,6 +144,22 @@ export function ConnectionPicker({
             )}
           >
             <Select.Viewport className="p-1">
+              {allowClear && (
+                <Select.Item
+                  value={NONE_VALUE}
+                  className={cn(
+                    'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm text-text-secondary outline-none',
+                    'data-[highlighted]:bg-white/5 data-[state=checked]:bg-white/10',
+                  )}
+                >
+                  <span className="w-4 flex-shrink-0">
+                    <Select.ItemIndicator>
+                      <Check aria-hidden className="h-4 w-4 text-accent-teal" />
+                    </Select.ItemIndicator>
+                  </span>
+                  <Select.ItemText>None — no authentication</Select.ItemText>
+                </Select.Item>
+              )}
               {compatible.map((conn) => (
                 <ConnectionPickerOption key={conn.id} connection={conn} />
               ))}

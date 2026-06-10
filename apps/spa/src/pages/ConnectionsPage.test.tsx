@@ -61,12 +61,19 @@ describe('ConnectionsPage', () => {
     window.open = originalOpen;
   });
 
+  // Providers live in the "Available Connections" tab. Activate it first.
+  const openAvailableTab = async (user: ReturnType<typeof userEvent.setup>): Promise<void> => {
+    await user.click(screen.getByRole('tab', { name: /available connections/i }));
+  };
+
   it('should render all 6 providers in the picker', async () => {
+    const user = userEvent.setup();
     mockedList.mockResolvedValueOnce([]);
 
     render(<ConnectionsPage />);
 
     await waitFor(() => expect(mockedList).toHaveBeenCalled());
+    await openAvailableTab(user);
 
     for (const label of ['Google', 'Microsoft', 'Slack', 'Notion', 'OpenAI', 'Anthropic']) {
       expect(screen.getByText(label)).toBeInTheDocument();
@@ -107,6 +114,7 @@ describe('ConnectionsPage', () => {
 
     render(<ConnectionsPage />);
     await waitFor(() => expect(mockedList).toHaveBeenCalled());
+    await openAvailableTab(user);
 
     await user.click(screen.getByTestId('provider-card-google'));
     // OAuth modal opens first; popup is opened from the Connect button inside it.
@@ -130,6 +138,7 @@ describe('ConnectionsPage', () => {
 
     render(<ConnectionsPage />);
     await waitFor(() => expect(mockedList).toHaveBeenCalledTimes(1));
+    await openAvailableTab(user);
 
     await user.click(screen.getByTestId('provider-card-google'));
     await user.click(await screen.findByRole('button', { name: /connect with google/i }));
@@ -155,6 +164,7 @@ describe('ConnectionsPage', () => {
 
     render(<ConnectionsPage />);
     await waitFor(() => expect(mockedList).toHaveBeenCalled());
+    await openAvailableTab(user);
 
     await user.click(screen.getByTestId('provider-card-openai'));
 
@@ -292,6 +302,80 @@ describe('ConnectionsPage', () => {
       expect(await screen.findByLabelText(/api key/i)).toBeInTheDocument();
       // Cleanup: close modal so subsequent state remains tidy.
       await user.click(screen.getByRole('button', { name: /cancel/i }));
+    });
+  });
+
+  describe('tabs and search', () => {
+    it('renders My Connections and Available Connections tabs', async () => {
+      mockedList.mockResolvedValueOnce([]);
+
+      render(<ConnectionsPage />);
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+
+      expect(screen.getByRole('tab', { name: /my connections/i })).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /available connections/i })).toBeInTheDocument();
+    });
+
+    it('filters My Connections by name', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([
+        make({ id: 'a', name: 'Prod OpenAI', provider: 'openai' }),
+        make({ id: 'b', name: 'Team Slack', provider: 'slack' }),
+      ]);
+
+      render(<ConnectionsPage />);
+      await waitFor(() => expect(screen.getByText('Prod OpenAI')).toBeInTheDocument());
+
+      await user.type(screen.getByRole('searchbox', { name: /search your connections/i }), 'Prod');
+
+      expect(screen.getByText('Prod OpenAI')).toBeInTheDocument();
+      expect(screen.queryByText('Team Slack')).not.toBeInTheDocument();
+    });
+
+    it('filters My Connections by application', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([
+        make({ id: 'a', name: 'Prod OpenAI', provider: 'openai' }),
+        make({ id: 'b', name: 'Team Slack', provider: 'slack' }),
+      ]);
+
+      render(<ConnectionsPage />);
+      await waitFor(() => expect(screen.getByText('Prod OpenAI')).toBeInTheDocument());
+
+      await user.type(screen.getByRole('searchbox', { name: /search your connections/i }), 'slack');
+
+      expect(screen.getByText('Team Slack')).toBeInTheDocument();
+      expect(screen.queryByText('Prod OpenAI')).not.toBeInTheDocument();
+    });
+
+    it('filters Available Connections by application', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([]);
+
+      render(<ConnectionsPage />);
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+      await user.click(screen.getByRole('tab', { name: /available connections/i }));
+
+      await user.type(
+        screen.getByRole('searchbox', { name: /search available connections/i }),
+        'slack',
+      );
+
+      expect(screen.getByTestId('provider-card-slack')).toBeInTheDocument();
+      expect(screen.queryByTestId('provider-card-google')).not.toBeInTheDocument();
+    });
+
+    it('opens the HTTP modal from the HTTP provider card', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([]);
+
+      render(<ConnectionsPage />);
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+      await user.click(screen.getByRole('tab', { name: /available connections/i }));
+
+      await user.click(screen.getByTestId('provider-card-http'));
+
+      expect(await screen.findByLabelText(/authentication method/i)).toBeInTheDocument();
     });
   });
 });

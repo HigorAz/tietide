@@ -6,10 +6,19 @@ import { buildSetupGuideUrl } from './setupGuideUrl';
 
 export interface ProviderPickerProps {
   onPick: (provider: ProviderEntry) => void;
+  // Optional search term — filters the catalog by application label / id.
+  query?: string;
 }
 
-export function ProviderPicker({ onPick }: ProviderPickerProps): JSX.Element {
+export function ProviderPicker({ onPick, query = '' }: ProviderPickerProps): JSX.Element {
   const [iconErrors, setIconErrors] = useState<Record<string, true>>({});
+
+  const q = query.trim().toLowerCase();
+  const providers = q
+    ? PROVIDER_CATALOG.filter(
+        (p) => p.label.toLowerCase().includes(q) || p.id.toLowerCase().includes(q),
+      )
+    : PROVIDER_CATALOG;
 
   return (
     <section aria-labelledby="available-providers-heading">
@@ -19,8 +28,13 @@ export function ProviderPicker({ onPick }: ProviderPickerProps): JSX.Element {
       >
         Available providers
       </h2>
+      {providers.length === 0 && (
+        <p className="rounded-lg border border-dashed border-white/10 bg-surface p-8 text-center text-sm text-text-secondary">
+          No applications match “{query}”.
+        </p>
+      )}
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-        {PROVIDER_CATALOG.map((provider) => {
+        {providers.map((provider) => {
           const showFallback = iconErrors[provider.id];
           return (
             <li key={provider.id} className="relative">

@@ -167,6 +167,7 @@ export {
   postgresCustomConfigSchema,
   mysqlCustomConfigSchema,
   s3CustomConfigSchema,
+  httpConnectionConfigSchema,
   DISCORD_WEBHOOK_URL_REGEX,
   PROVIDER_CONFIG_SCHEMAS,
   type GoogleOAuth2Config,
@@ -191,6 +192,7 @@ export {
   type PostgresCustomConfig,
   type MysqlCustomConfig,
   type S3CustomConfig,
+  type HttpConnectionConfig,
   type ProviderConfigMap,
 } from './schemas/connections.schema.js';
 export {

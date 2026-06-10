@@ -15,6 +15,7 @@ import { AirtableHealthChecker } from './health/checkers/airtable.checker';
 import { LinearHealthChecker } from './health/checkers/linear.checker';
 import { GitHubHealthChecker } from './health/checkers/github.checker';
 import { OllamaHealthChecker } from './health/checkers/ollama.checker';
+import { HttpHealthChecker } from './health/checkers/http.checker';
 
 @Module({
   imports: [forwardRef(() => OAuthModule)],
@@ -36,6 +37,7 @@ import { OllamaHealthChecker } from './health/checkers/ollama.checker';
         registry.register(LinearHealthChecker.fromConfig(config));
         registry.register(GitHubHealthChecker.fromConfig(config));
         registry.register(OllamaHealthChecker.fromConfig());
+        registry.register(new HttpHealthChecker());
         return registry;
       },
       inject: [ConfigService],
