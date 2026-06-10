@@ -135,7 +135,7 @@ export function NodeConfigPanel() {
           data-testid="node-config-error-handler-toggle"
           checked={hasErrorHandler}
           onChange={(e) => updateNodeConfig(selectedNodeId, { hasErrorHandler: e.target.checked })}
-          className="mt-0.5 h-4 w-4 cursor-pointer accent-red-500"
+          className="checkbox-danger mt-0.5 h-4 w-4 cursor-pointer"
         />
         <label
           htmlFor={`error-handler-${selectedNodeId}`}
