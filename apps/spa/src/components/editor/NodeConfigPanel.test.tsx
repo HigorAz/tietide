@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { NODE_CATALOG, NodeType } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import {
@@ -275,7 +275,7 @@ describe('NodeConfigPanel', () => {
       expect(screen.getByTestId('node-run-inspection')).toBeInTheDocument();
     });
 
-    it('should show this node’s input and output JSON in result view', () => {
+    it('should show this node’s input and output data in result view', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       seedRun(nodeId, {
         input: { url: 'https://api.example.com' },
@@ -284,8 +284,10 @@ describe('NodeConfigPanel', () => {
       enterResultView();
 
       render(<NodeConfigPanel />);
+      // Input + Output sections are open by default; the shared DataViewer (Tree
+      // mode) surfaces the values.
       expect(screen.getByTestId('node-run-input')).toHaveTextContent('api.example.com');
-      expect(screen.getByTestId('node-run-output')).toHaveTextContent('"status": 201');
+      expect(screen.getByTestId('node-run-output')).toHaveTextContent('201');
     });
 
     it('should show a "not executed" hint in result view when this node has no run data', () => {
@@ -303,14 +305,18 @@ describe('NodeConfigPanel', () => {
       expect(screen.getByText(/not executed/i)).toBeInTheDocument();
     });
 
-    it('should render the read-only config block in run inspection', () => {
+    it('should render the labeled config field list in run inspection', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       useEditorStore.getState().updateNodeConfig(nodeId, { url: 'https://example.com' });
       seedRun(nodeId);
       enterResultView();
 
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-run-config')).toHaveTextContent('https://example.com');
+      // Configuration is collapsed by default — expand its section to reveal the
+      // labeled field list (never a JSON blob, per the locked decision).
+      const configCard = screen.getByTestId('run-section-card-configuration');
+      fireEvent.click(within(configCard).getByRole('button', { name: /configuration/i }));
+      expect(screen.getByTestId('config-field-list')).toHaveTextContent('https://example.com');
     });
 
     it('should render the error block when the selected node failed (result view)', () => {
