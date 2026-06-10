@@ -51,6 +51,27 @@ describe('EditorContextMenu', () => {
       expect(screen.getByRole('menuitem', { name: 'Paste' })).not.toBeDisabled();
       expect(screen.getByRole('menuitem', { name: 'Paste from JSON' })).not.toBeDisabled();
     });
+
+    it('should render only a "Delete connection" item in the edge variant', () => {
+      renderMenu({ variant: 'edge' });
+      expect(screen.getByRole('menuitem', { name: 'Delete connection' })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Copy' })).toBeNull();
+      expect(screen.queryByRole('menuitem', { name: 'Paste' })).toBeNull();
+      expect(screen.queryByRole('menuitem', { name: 'Delete' })).toBeNull();
+    });
+  });
+
+  describe('edge variant actions', () => {
+    it('should call onDelete then onClose when "Delete connection" is clicked', () => {
+      const onDelete = vi.fn();
+      const onClose = vi.fn();
+      renderMenu({ variant: 'edge', onDelete, onClose });
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete connection' }));
+
+      expect(onDelete).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('actions', () => {

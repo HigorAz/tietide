@@ -330,11 +330,16 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     deleteSelected: () => {
       const prev = get();
       const removedIds = new Set(prev.nodes.filter((n) => n.selected === true).map((n) => n.id));
-      if (removedIds.size === 0) return;
+      const removedEdgeIds = new Set(
+        prev.edges.filter((e) => e.selected === true).map((e) => e.id),
+      );
+      if (removedIds.size === 0 && removedEdgeIds.size === 0) return;
 
       const nextNodes = prev.nodes.filter((n) => !removedIds.has(n.id));
+      // Drop edges explicitly selected for deletion, plus any that lose an
+      // endpoint to a deleted node.
       const nextEdges = prev.edges.filter(
-        (e) => !removedIds.has(e.source) && !removedIds.has(e.target),
+        (e) => !removedEdgeIds.has(e.id) && !removedIds.has(e.source) && !removedIds.has(e.target),
       );
       const nextSelection =
         prev.selectedNodeId !== null && removedIds.has(prev.selectedNodeId)
