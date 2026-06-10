@@ -189,6 +189,7 @@ export function Canvas() {
         // too. Disabling React Flow's built-in delete keeps a single delete path
         // and avoids duplicate undo snapshots.
         deleteKeyCode={null}
+        proOptions={{ hideAttribution: true }}
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
         {...editorTouchProps(isMobile)}
