@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ConnectionType } from '@tietide/shared';
+import { Search } from 'lucide-react';
+import { ConnectionProvider, ConnectionType } from '@tietide/shared';
 import { useConnectionsStore } from '@/stores/connectionsStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useOAuthPopup } from '@/hooks/useOAuthPopup';
 import { ProviderPicker } from '@/components/connections/ProviderPicker';
 import { ConnectionRow } from '@/components/connections/ConnectionRow';
 import { ApiKeyConnectionModal } from '@/components/connections/ApiKeyConnectionModal';
+import { HttpConnectionModal } from '@/components/connections/HttpConnectionModal';
 import { OAuthConnectionModal } from '@/components/connections/OAuthConnectionModal';
 import { DeleteConnectionDialog } from '@/components/connections/DeleteConnectionDialog';
-import { PROVIDER_CATALOG, type ProviderEntry } from '@/components/connections/providerCatalog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import {
+  PROVIDER_CATALOG,
+  getProviderLabel,
+  type ProviderEntry,
+} from '@/components/connections/providerCatalog';
 import type { ConnectionView } from '@/api/connections';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
@@ -59,8 +66,22 @@ export function ConnectionsPage(): JSX.Element {
 
   const [apiKeyProvider, setApiKeyProvider] = useState<ProviderEntry | null>(null);
   const [oauthProvider, setOauthProvider] = useState<ProviderEntry | null>(null);
+  const [httpModalOpen, setHttpModalOpen] = useState<boolean>(false);
   const [toRevoke, setToRevoke] = useState<ConnectionView | null>(null);
+  const [mineQuery, setMineQuery] = useState<string>('');
+  const [availableQuery, setAvailableQuery] = useState<string>('');
   const deepLinkHandledRef = useRef<boolean>(false);
+
+  // My Connections search matches the connection name OR its application
+  // (provider label / raw provider id).
+  const filteredConnections = useMemo(() => {
+    const q = mineQuery.trim().toLowerCase();
+    if (!q) return connections;
+    return connections.filter((c) => {
+      const haystack = `${c.name} ${getProviderLabel(c.provider)} ${c.provider}`.toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [connections, mineQuery]);
 
   useEffect(() => {
     if (!closing || !initialOutcome) return;
@@ -131,6 +152,12 @@ export function ConnectionsPage(): JSX.Element {
   }, [closing]);
 
   const handlePick = (provider: ProviderEntry): void => {
+    // HTTP has multiple auth shapes (bearer / api-key / basic) that don't fit
+    // the flat schema-driven modal — it gets its own auth-type-aware modal.
+    if (provider.id === ConnectionProvider.HTTP) {
+      setHttpModalOpen(true);
+      return;
+    }
     // API_KEY and CUSTOM both render via the same form-from-schema modal.
     if (provider.type === ConnectionType.API_KEY || provider.type === ConnectionType.CUSTOM) {
       setApiKeyProvider(provider);
@@ -174,6 +201,17 @@ export function ConnectionsPage(): JSX.Element {
       await create(body);
       toast({ tone: 'success', message: 'Connection added' });
       setApiKeyProvider(null);
+    } catch (err) {
+      toast({ tone: 'error', message: errorMessage(err, 'Could not create connection') });
+      throw err;
+    }
+  };
+
+  const handleHttpCreate = async (body: Parameters<typeof create>[0]): Promise<void> => {
+    try {
+      await create(body);
+      toast({ tone: 'success', message: 'Connection added' });
+      setHttpModalOpen(false);
     } catch (err) {
       toast({ tone: 'error', message: errorMessage(err, 'Could not create connection') });
       throw err;
@@ -227,63 +265,107 @@ export function ConnectionsPage(): JSX.Element {
         </p>
       </header>
 
-      <section aria-labelledby="your-connections-heading">
-        <h2
-          id="your-connections-heading"
-          className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-secondary"
-        >
-          Your connections
-        </h2>
+      <Tabs defaultValue="mine">
+        <TabsList>
+          <TabsTrigger value="mine">My Connections</TabsTrigger>
+          <TabsTrigger value="available">Available Connections</TabsTrigger>
+        </TabsList>
 
-        {status === 'loading' && connections.length === 0 && (
-          <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-surface p-4 text-sm text-text-secondary">
-            <Spinner size="sm" label="Loading connections" />
-            <span>Loading…</span>
-          </div>
-        )}
-
-        {status === 'error' && (
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">
-            <span>Could not load connections: {error ?? 'unknown error'}</span>
-            <button
-              type="button"
-              onClick={() => void fetch()}
+        <TabsContent value="mine" className="mt-5">
+          <label className="relative mb-4 flex items-center">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute left-3 h-4 w-4 text-text-muted"
+            />
+            <input
+              type="search"
+              value={mineQuery}
+              onChange={(e) => setMineQuery(e.target.value)}
+              placeholder="Search by name or application…"
+              aria-label="Search your connections"
               className={cn(
-                'rounded-md border border-error/40 px-2.5 py-1 text-xs font-medium text-error transition',
-                'hover:bg-error/10 focus:outline-none focus:ring-1 focus:ring-error',
+                'w-full rounded-md border border-white/5 bg-elevated py-2 pl-9 pr-3 text-sm text-text-primary',
+                'placeholder:text-text-muted focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
               )}
-            >
-              Retry
-            </button>
-          </div>
-        )}
+            />
+          </label>
 
-        {status === 'ready' && connections.length === 0 && (
-          <div className="rounded-lg border border-dashed border-white/10 bg-surface p-8 text-center">
-            <p className="text-sm text-text-secondary">
-              No connections yet. Pick a provider below to add your first one.
-            </p>
-          </div>
-        )}
+          {status === 'loading' && connections.length === 0 && (
+            <div className="flex items-center gap-2 rounded-lg border border-white/5 bg-surface p-4 text-sm text-text-secondary">
+              <Spinner size="sm" label="Loading connections" />
+              <span>Loading…</span>
+            </div>
+          )}
 
-        {connections.length > 0 && (
-          <ul className="flex flex-col gap-2">
-            {connections.map((c) => (
-              <ConnectionRow
-                key={c.id}
-                connection={c}
-                isTesting={Boolean(testingIds[c.id])}
-                isDeleting={Boolean(deletingIds[c.id])}
-                onTest={(id) => void handleTest(id)}
-                onRevoke={(conn) => setToRevoke(conn)}
-                onRename={handleRename}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
+          {status === 'error' && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">
+              <span>Could not load connections: {error ?? 'unknown error'}</span>
+              <button
+                type="button"
+                onClick={() => void fetch()}
+                className={cn(
+                  'rounded-md border border-error/40 px-2.5 py-1 text-xs font-medium text-error transition',
+                  'hover:bg-error/10 focus:outline-none focus:ring-1 focus:ring-error',
+                )}
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
-      <ProviderPicker onPick={handlePick} />
+          {status === 'ready' && connections.length === 0 && (
+            <div className="rounded-lg border border-dashed border-white/10 bg-surface p-8 text-center">
+              <p className="text-sm text-text-secondary">
+                No connections yet. Open the Available Connections tab to add your first one.
+              </p>
+            </div>
+          )}
+
+          {connections.length > 0 && filteredConnections.length === 0 && (
+            <div className="rounded-lg border border-dashed border-white/10 bg-surface p-8 text-center">
+              <p className="text-sm text-text-secondary">No connections match “{mineQuery}”.</p>
+            </div>
+          )}
+
+          {filteredConnections.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {filteredConnections.map((c) => (
+                <ConnectionRow
+                  key={c.id}
+                  connection={c}
+                  isTesting={Boolean(testingIds[c.id])}
+                  isDeleting={Boolean(deletingIds[c.id])}
+                  onTest={(id) => void handleTest(id)}
+                  onRevoke={(conn) => setToRevoke(conn)}
+                  onRename={handleRename}
+                />
+              ))}
+            </ul>
+          )}
+        </TabsContent>
+
+        <TabsContent value="available" className="mt-5">
+          <label className="relative mb-4 flex items-center">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute left-3 h-4 w-4 text-text-muted"
+            />
+            <input
+              type="search"
+              value={availableQuery}
+              onChange={(e) => setAvailableQuery(e.target.value)}
+              placeholder="Search applications…"
+              aria-label="Search available connections"
+              className={cn(
+                'w-full rounded-md border border-white/5 bg-elevated py-2 pl-9 pr-3 text-sm text-text-primary',
+                'placeholder:text-text-muted focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+              )}
+            />
+          </label>
+
+          <ProviderPicker onPick={handlePick} query={availableQuery} />
+        </TabsContent>
+      </Tabs>
 
       {apiKeyProvider && (
         <ApiKeyConnectionModal
@@ -292,6 +374,10 @@ export function ConnectionsPage(): JSX.Element {
           onClose={() => setApiKeyProvider(null)}
           onCreate={handleApiKeyCreate}
         />
+      )}
+
+      {httpModalOpen && (
+        <HttpConnectionModal onClose={() => setHttpModalOpen(false)} onCreate={handleHttpCreate} />
       )}
 
       {oauthProvider && (

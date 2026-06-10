@@ -210,6 +210,31 @@ describe('ConnectionPicker', () => {
     expect(trigger).toHaveTextContent('Work Google');
   });
 
+  describe('allowClear', () => {
+    it('should not render a None option by default', async () => {
+      const user = userEvent.setup();
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />);
+
+      await user.click(screen.getByRole('combobox', { name: /connection/i }));
+      expect(screen.queryByRole('option', { name: /no authentication/i })).not.toBeInTheDocument();
+    });
+
+    it('should render a None option and call onChange(null) when selected', async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value="g-1" onChange={onChange} allowClear />);
+
+      await user.click(screen.getByRole('combobox', { name: /connection/i }));
+      await user.click(await screen.findByRole('option', { name: /no authentication/i }));
+
+      expect(onChange).toHaveBeenCalledWith(null);
+    });
+  });
+
   describe('stale id warning', () => {
     it('should show a stale-id warning when value is set but no matching connection exists', () => {
       // Repro: the workflow node stored a connectionId for a connection

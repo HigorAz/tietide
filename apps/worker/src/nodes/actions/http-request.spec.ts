@@ -447,6 +447,132 @@ describe('HttpRequestAction', () => {
     });
   });
 
+  describe('connection-based auth', () => {
+    const connInput = (params: Record<string, unknown>, connectionId: string): NodeInput => ({
+      data: {},
+      params,
+      connectionId,
+    });
+
+    const stubGetConnection = (
+      config: Record<string, unknown>,
+    ): ExecutionContext['getConnection'] =>
+      (async () => ({
+        id: 'conn-1',
+        type: 'CUSTOM',
+        provider: 'http',
+        config,
+      })) as unknown as ExecutionContext['getConnection'];
+
+    const ctxWithConnection = (config: Record<string, unknown>): ExecutionContext =>
+      makeContext({ getConnection: stubGetConnection(config) });
+
+    it('injects a Bearer Authorization header from a bearer connection', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await action.execute(
+        connInput({ method: 'GET', url: 'https://api.test/me' }, 'conn-1'),
+        ctxWithConnection({ authType: 'bearer', token: 'jwt-abc' }),
+      );
+
+      const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(headers.authorization).toBe('Bearer jwt-abc');
+    });
+
+    it('injects a custom header from an apiKey connection', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await action.execute(
+        connInput({ method: 'GET', url: 'https://api.test/me' }, 'conn-1'),
+        ctxWithConnection({ authType: 'apiKey', headerName: 'X-Api-Key', apiKey: 'key-123' }),
+      );
+
+      const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(headers['x-api-key']).toBe('key-123');
+    });
+
+    it('injects a Basic Authorization header from a basic connection', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await action.execute(
+        connInput({ method: 'GET', url: 'https://api.test/me' }, 'conn-1'),
+        ctxWithConnection({ authType: 'basic', username: 'alice', password: 'pw' }),
+      );
+
+      const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+      const expected = `Basic ${Buffer.from('alice:pw').toString('base64')}`;
+      expect(headers.authorization).toBe(expected);
+    });
+
+    it('lets the connection auth header win over a manually-typed header of the same name', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await action.execute(
+        connInput(
+          { method: 'GET', url: 'https://api.test/me', headers: { authorization: 'Bearer stale' } },
+          'conn-1',
+        ),
+        ctxWithConnection({ authType: 'bearer', token: 'fresh' }),
+      );
+
+      const headers = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+      expect(headers.authorization).toBe('Bearer fresh');
+    });
+
+    it('does not call getConnection when no connectionId is present', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+      const getConnection = jest.fn(stubGetConnection({ authType: 'bearer', token: 'x' }));
+
+      await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/me' }),
+        makeContext({
+          getConnection: getConnection as unknown as ExecutionContext['getConnection'],
+        }),
+      );
+
+      expect(getConnection).not.toHaveBeenCalled();
+    });
+
+    it('throws when the referenced connection cannot be resolved (stale id)', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => {
+          throw new Error('Connection conn-1 not found');
+        }),
+      });
+
+      await expect(
+        action.execute(connInput({ method: 'GET', url: 'https://api.test/me' }, 'conn-1'), ctx),
+      ).rejects.toThrow(/not found/i);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('redacts the injected auth header value in the dry-run preview', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, {}));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      const result = await action.execute(
+        connInput({ method: 'POST', url: 'https://api.test/orders', body: { a: 1 } }, 'conn-1'),
+        makeContext({
+          isDryRun: true,
+          getConnection: stubGetConnection({ authType: 'bearer', token: 'super-secret-jwt' }),
+        }),
+      );
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      const sent = (result.data as { wouldHaveSent: { headers: Record<string, string> } })
+        .wouldHaveSent;
+      expect(sent.headers.authorization).not.toContain('super-secret-jwt');
+      expect(sent.headers.authorization).toMatch(/Bearer \*+/);
+    });
+  });
+
   describe('response size cap', () => {
     it('rejects a response whose Content-Length exceeds the cap', async () => {
       const big = String(11 * 1024 * 1024);

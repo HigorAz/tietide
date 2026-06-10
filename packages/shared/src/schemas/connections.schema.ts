@@ -220,6 +220,34 @@ export const s3CustomConfigSchema = z.object({
   forcePathStyle: z.boolean().optional(),
 });
 
+// Generic HTTP connection: reusable auth credentials injected as request headers
+// by the http-request node (used optionally — the node also runs unauthenticated).
+// Discriminated on `authType` so each method only carries the fields it needs:
+//   - bearer: Authorization: Bearer <token>
+//   - apiKey: <headerName>: <apiKey>
+//   - basic:  Authorization: Basic base64(username:password)
+// Stored encrypted via libsodium like every other connection; never logged.
+export const httpConnectionConfigSchema = z.discriminatedUnion('authType', [
+  z.object({
+    authType: z.literal('bearer'),
+    token: z.string().min(1).max(4096),
+  }),
+  z.object({
+    authType: z.literal('apiKey'),
+    headerName: z
+      .string()
+      .min(1)
+      .max(128)
+      .regex(/^[A-Za-z0-9-]+$/, { message: 'headerName must be a valid HTTP header name' }),
+    apiKey: z.string().min(1).max(4096),
+  }),
+  z.object({
+    authType: z.literal('basic'),
+    username: z.string().min(1).max(256),
+    password: z.string().min(1).max(256),
+  }),
+]);
+
 export type GoogleOAuth2Config = z.infer<typeof googleOAuth2ConfigSchema>;
 export type MicrosoftOAuth2Config = z.infer<typeof microsoftOAuth2ConfigSchema>;
 export type SlackOAuth2Config = z.infer<typeof slackOAuth2ConfigSchema>;
@@ -242,6 +270,7 @@ export type CalendlyApiKeyConfig = z.infer<typeof calendlyApiKeyConfigSchema>;
 export type PostgresCustomConfig = z.infer<typeof postgresCustomConfigSchema>;
 export type MysqlCustomConfig = z.infer<typeof mysqlCustomConfigSchema>;
 export type S3CustomConfig = z.infer<typeof s3CustomConfigSchema>;
+export type HttpConnectionConfig = z.infer<typeof httpConnectionConfigSchema>;
 
 export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.GOOGLE]: googleOAuth2ConfigSchema,
@@ -266,6 +295,7 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.POSTGRES]: postgresCustomConfigSchema,
   [ConnectionProvider.MYSQL]: mysqlCustomConfigSchema,
   [ConnectionProvider.S3]: s3CustomConfigSchema,
+  [ConnectionProvider.HTTP]: httpConnectionConfigSchema,
 } as const;
 
 export type ProviderConfigMap = {
@@ -291,4 +321,5 @@ export type ProviderConfigMap = {
   postgres: PostgresCustomConfig;
   mysql: MysqlCustomConfig;
   s3: S3CustomConfig;
+  http: HttpConnectionConfig;
 };

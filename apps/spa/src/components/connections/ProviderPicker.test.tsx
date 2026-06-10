@@ -40,9 +40,9 @@ describe('ProviderPicker', () => {
     // The picker labels both API_KEY and CUSTOM types as "API key" since users
     // see only one form-from-schema flow either way: OpenAI, Anthropic, Twilio,
     // Telegram, Discord (Webhook), Discord (Bot), Trello, Airtable, Linear,
-    // Stripe, Mailchimp, Calendly, Postgres, MySQL, S3 = 15.
+    // Stripe, Mailchimp, Calendly, Postgres, MySQL, S3, HTTP = 16.
     expect(screen.getAllByText(/^OAuth$/).length).toBe(6);
-    expect(screen.getAllByText(/^API key$/).length).toBe(15);
+    expect(screen.getAllByText(/^API key$/).length).toBe(16);
   });
 
   it('should call onPick with the provider entry when a card is clicked', async () => {

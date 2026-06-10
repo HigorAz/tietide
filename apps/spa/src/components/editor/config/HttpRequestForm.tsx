@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { httpRequestConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
+import { ConnectionPicker } from '@/components/editor/ConnectionPicker';
 import type { NodeConfigFormProps } from './formRegistry';
 import { HeadersEditor } from './HeadersEditor';
 import { DataPillInput } from './DataPillInput';
@@ -30,6 +31,7 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
 
   const method = typeof config.method === 'string' ? config.method : 'GET';
   const url = typeof config.url === 'string' ? config.url : '';
+  const connectionId = typeof config.connectionId === 'string' ? config.connectionId : null;
   const timeout = typeof config.timeout === 'number' ? config.timeout : undefined;
   const headers = isPlainRecord(config.headers) ? (config.headers as Record<string, string>) : {};
   const initialBodyText =
@@ -72,6 +74,21 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
 
   return (
     <div data-testid="http-request-form" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <span className={labelClass}>Authentication (optional)</span>
+        <ConnectionPicker
+          provider="http"
+          providerLabel="HTTP"
+          value={connectionId}
+          onChange={(next) => updateNodeConfig(nodeId, { connectionId: next })}
+          allowClear
+        />
+        <p className="text-xs text-text-muted">
+          Select an HTTP connection to attach auth headers, or leave empty to send without
+          authentication.
+        </p>
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <label htmlFor={methodId} className={labelClass}>
           Method

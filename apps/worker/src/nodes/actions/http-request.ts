@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
-import { httpRequestOutputSchema } from '@tietide/shared';
+import { httpRequestOutputSchema, type HttpConnectionConfig } from '@tietide/shared';
 import { assertUrlAllowed, type LookupFn } from './ssrf-guard';
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
@@ -38,7 +38,13 @@ export class HttpRequestAction implements INodeExecutor {
   async execute(input: NodeInput, context: ExecutionContext): Promise<NodeOutput> {
     const params = this.parseParams(input.params);
     const hasBody = this.shouldSendBody(params);
-    const headers = this.buildHeaders(params, hasBody);
+    // Resolve optional connection auth BEFORE the dry-run branch so the preview
+    // reflects what would actually be sent (a stale connectionId throws here,
+    // which is the correct fail-fast behavior even on a dry run).
+    const authHeaders = await this.resolveAuthHeaders(input, context);
+    // Connection-provided auth wins over a manually-typed header of the same
+    // key — selecting a connection is the explicit authentication intent.
+    const headers = { ...this.buildHeaders(params, hasBody), ...authHeaders };
     const body = hasBody ? this.serializeBody(params.body) : undefined;
 
     // Safe-by-default dry-run guard: never perform a *mutating* HTTP request
@@ -55,7 +61,9 @@ export class HttpRequestAction implements INodeExecutor {
           wouldHaveSent: {
             method: params.method,
             url: params.url,
-            headers,
+            // Redact connection-injected secrets so they never land in the
+            // persisted ExecutionStep.outputData.
+            headers: this.redactAuthHeaders(headers, authHeaders),
             body: hasBody ? params.body : undefined,
           },
         },
@@ -158,6 +166,53 @@ export class HttpRequestAction implements INodeExecutor {
       headers['content-type'] = 'application/json';
     }
     return headers;
+  }
+
+  // Fetches the optionally-selected HTTP connection and turns its stored
+  // credential into request headers. Returns {} when the node has no
+  // connectionId so unauthenticated requests are unaffected. Header keys are
+  // lowercased to match parseParams so they reliably override manual headers.
+  private async resolveAuthHeaders(
+    input: NodeInput,
+    context: ExecutionContext,
+  ): Promise<Record<string, string>> {
+    const connectionId = input.connectionId;
+    if (typeof connectionId !== 'string' || connectionId.length === 0) {
+      return {};
+    }
+
+    const connection = await context.getConnection<HttpConnectionConfig>(connectionId);
+    const config = connection.config;
+
+    switch (config.authType) {
+      case 'bearer':
+        return { authorization: `Bearer ${config.token}` };
+      case 'apiKey':
+        return { [config.headerName.toLowerCase()]: config.apiKey };
+      case 'basic': {
+        const encoded = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+        return { authorization: `Basic ${encoded}` };
+      }
+      default:
+        return {};
+    }
+  }
+
+  // Masks the value of any header that was injected from a connection so the
+  // dry-run preview never persists the decrypted secret. Preserves the auth
+  // scheme prefix (Bearer/Basic) for readability.
+  private redactAuthHeaders(
+    headers: Record<string, string>,
+    authHeaders: Record<string, string>,
+  ): Record<string, string> {
+    const redacted = { ...headers };
+    for (const key of Object.keys(authHeaders)) {
+      const value = redacted[key];
+      if (typeof value !== 'string') continue;
+      const [scheme] = value.split(' ');
+      redacted[key] = scheme === 'Bearer' || scheme === 'Basic' ? `${scheme} ***` : '***';
+    }
+    return redacted;
   }
 
   private headersToObject(headers: Headers): Record<string, string> {

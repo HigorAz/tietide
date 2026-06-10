@@ -19,6 +19,7 @@ import calendlyIcon from '@/assets/providers/calendly.svg';
 import postgresIcon from '@/assets/providers/postgres.svg';
 import mysqlIcon from '@/assets/providers/mysql.svg';
 import s3Icon from '@/assets/providers/s3.svg';
+import httpIcon from '@/assets/providers/http.svg';
 
 export interface ProviderEntry {
   id: ConnectionProvider;
@@ -172,6 +173,12 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     label: 'S3 / R2 / MinIO',
     type: ConnectionType.CUSTOM,
     iconUrl: s3Icon,
+  },
+  {
+    id: ConnectionProvider.HTTP,
+    label: 'HTTP',
+    type: ConnectionType.CUSTOM,
+    iconUrl: httpIcon,
   },
 ] as const;
 
