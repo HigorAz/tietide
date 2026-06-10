@@ -1,14 +1,15 @@
 import type { Edge, Node } from 'reactflow';
 import {
+  PILL_SAMPLE_KEY,
   TEMPLATE_OPERATORS,
   TEMPLATE_TOKEN_REGEX,
   TRIGGER_ALIAS,
   assignNodeAliases,
-  nodeOutputSchemas,
   type WorkflowNode,
 } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
-import { bfsAncestors } from '@/lib/upstream-schema';
+import { bfsAncestors, getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
+import { parsePillSample } from '@/lib/parsePillSample';
 
 export type InvalidReferenceReason = 'missing' | 'not-upstream' | 'unknown-field';
 
@@ -29,6 +30,8 @@ interface ValidationContext {
   nodeById: Map<string, Node<CustomNodeData>>;
   triggerId: string | undefined;
   aliasToId: Map<string, string>;
+  /** Per-node `__pillSample` overrides keyed by nodeId — the top-priority pill source. */
+  overrides: Record<string, unknown>;
 }
 
 function buildContext(nodes: Node<CustomNodeData>[], edges: Edge[]): ValidationContext {
@@ -39,7 +42,27 @@ function buildContext(nodes: Node<CustomNodeData>[], edges: Edge[]): ValidationC
     if (alias === TRIGGER_ALIAS) triggerId = id;
     else aliasToId.set(alias, id);
   }
-  return { nodes, edges, nodeById: new Map(nodes.map((n) => [n.id, n])), triggerId, aliasToId };
+  return {
+    nodes,
+    edges,
+    nodeById: new Map(nodes.map((n) => [n.id, n])),
+    triggerId,
+    aliasToId,
+    overrides: buildOverrides(nodes),
+  };
+}
+
+// A user-declared OUTPUT SAMPLE (or a "Test this node" capture) is stored under
+// `__pillSample` and is the top-priority pill source — the same one the picker
+// uses. Building it here lets the validator agree with the picker: a field the
+// picker offers from a sample is never flagged as a broken pill.
+function buildOverrides(nodes: Node<CustomNodeData>[]): Record<string, unknown> {
+  const map: Record<string, unknown> = {};
+  for (const n of nodes) {
+    const parsed = parsePillSample(n.data.config?.[PILL_SAMPLE_KEY]);
+    if (parsed !== undefined) map[n.id] = parsed;
+  }
+  return map;
 }
 
 function toAliasInput(n: Node<CustomNodeData>): WorkflowNode {
@@ -56,7 +79,7 @@ function toAliasInput(n: Node<CustomNodeData>): WorkflowNode {
 interface ParsedToken {
   /** Resolved node id this token points at, or undefined if the root is unknown. */
   targetId: string | undefined;
-  /** First path segment after the root, for concrete-schema field checks. */
+  /** First path segment after the root, for field-existence checks. */
   firstField: string | undefined;
 }
 
@@ -80,31 +103,52 @@ function parseToken(inner: string, ctx: ValidationContext): ParsedToken | null {
   return { targetId: ctx.nodeById.has(head) ? head : undefined, firstField: segments[1] };
 }
 
-function concreteFieldKeys(nodeType: string): Set<string> | null {
-  const schema = nodeOutputSchemas[nodeType] as
-    | { _def?: { typeName?: string }; shape?: Record<string, unknown> }
-    | undefined;
-  if (!schema || schema._def?.typeName !== 'ZodObject' || !schema.shape) return null;
-  return new Set(Object.keys(schema.shape));
+interface NodeFields {
+  /** The node exposes a whole-output/record pill — any first field is acceptable. */
+  anyField: boolean;
+  /** Known top-level field names the node offers as pills. */
+  fields: Set<string>;
+}
+
+// Fold the picker's own suggestions (for one target node's upstream graph) into a
+// per-ancestor field set. Because this is the SAME resolution the data-pill picker
+// uses (sample override → live → static schema → example → generic), a field the
+// picker offers is never rejected here. A suggestion with an empty path means the
+// node's whole output is a record/unknown — no concrete fields to validate.
+function buildFieldIndex(suggestions: PathSuggestion[]): Map<string, NodeFields> {
+  const index = new Map<string, NodeFields>();
+  for (const s of suggestions) {
+    let entry = index.get(s.nodeId);
+    if (!entry) {
+      entry = { anyField: false, fields: new Set<string>() };
+      index.set(s.nodeId, entry);
+    }
+    const first = s.path.split('.')[0];
+    if (!first) entry.anyField = true;
+    else entry.fields.add(first);
+  }
+  return index;
 }
 
 function classify(
   inner: string,
   ctx: ValidationContext,
   ancestors: Set<string>,
+  fieldIndex: Map<string, NodeFields>,
 ): InvalidReferenceReason | null {
   const parsed = parseToken(inner, ctx);
   if (!parsed) return null;
   if (parsed.targetId === undefined) return 'missing';
   if (!ancestors.has(parsed.targetId)) return 'not-upstream';
 
-  // Best-effort field check: only for nodes with a concrete object schema and a
-  // plain identifier first segment that isn't a chained operator.
+  // Best-effort field check: only for a plain identifier first segment that isn't
+  // a chained operator, and only when the node exposes a concrete field set.
   const field = parsed.firstField;
   if (field && IDENTIFIER_RE.test(field) && !OPERATOR_NAMES.has(field)) {
-    const node = ctx.nodeById.get(parsed.targetId);
-    const keys = node ? concreteFieldKeys(node.data.nodeType) : null;
-    if (keys && !keys.has(field)) return 'unknown-field';
+    const entry = fieldIndex.get(parsed.targetId);
+    if (entry && !entry.anyField && entry.fields.size > 0 && !entry.fields.has(field)) {
+      return 'unknown-field';
+    }
   }
   return null;
 }
@@ -137,11 +181,19 @@ function* eachToken(
 function nodeInvalid(node: Node<CustomNodeData>, ctx: ValidationContext): InvalidReference[] {
   const config = node.data.config;
   if (!config) return [];
+  // Skip the upstream-schema resolution for nodes with no pill tokens at all.
+  if (!JSON.stringify(config).includes('{{')) return [];
+
   const ancestors = new Set(bfsAncestors(node.id, ctx.edges));
+  const { suggestions } = getUpstreamSchemas(node.id, ctx.nodes, ctx.edges, {
+    overrides: ctx.overrides,
+  });
+  const fieldIndex = buildFieldIndex(suggestions);
+
   const out: InvalidReference[] = [];
   for (const [key, value] of Object.entries(config)) {
     for (const { fieldKey, inner, token } of eachToken(value, key)) {
-      const reason = classify(inner, ctx, ancestors);
+      const reason = classify(inner, ctx, ancestors, fieldIndex);
       if (reason) out.push({ nodeId: node.id, fieldKey, token, reason });
     }
   }
