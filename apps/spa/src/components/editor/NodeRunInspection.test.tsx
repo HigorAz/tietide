@@ -135,12 +135,6 @@ describe('NodeRunInspection', () => {
   });
 
   it('should emit a steps.<alias> path copy from the Output tree for an aliased node', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(window.navigator, 'clipboard', {
-      configurable: true,
-      writable: true,
-      value: { writeText },
-    });
     useEditorStore.setState({
       ...initialEditorState,
       nodes: [editorNode('node-a', 'Fetch', 'fetch')],
@@ -150,6 +144,10 @@ describe('NodeRunInspection', () => {
       nodes: new Map([['node-a', runState({ output: { id: 'abc' } })]]),
     });
     const user = userEvent.setup();
+    // MUST install the clipboard spy AFTER userEvent.setup() — setup installs its
+    // own stub that would otherwise clobber ours (see JsonTree.test.tsx).
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     render(<NodeRunInspection nodeId="node-a" config={{}} />);
     const outputCard = screen.getByTestId('run-section-card-output');
     // Hover the tree row to reveal the path-copy action, then click it.
@@ -160,12 +158,6 @@ describe('NodeRunInspection', () => {
   });
 
   it('should derive the trigger ref for a TRIGGER_ALIAS node', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(window.navigator, 'clipboard', {
-      configurable: true,
-      writable: true,
-      value: { writeText },
-    });
     useEditorStore.setState({
       ...initialEditorState,
       nodes: [editorNode('node-a', 'Trigger', TRIGGER_ALIAS)],
@@ -175,6 +167,8 @@ describe('NodeRunInspection', () => {
       nodes: new Map([['node-a', runState({ output: { id: 'abc' } })]]),
     });
     const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     render(<NodeRunInspection nodeId="node-a" config={{}} />);
     const outputCard = screen.getByTestId('run-section-card-output');
     const pathButtons = within(outputCard).getAllByRole('button', { name: /copy path/i });
