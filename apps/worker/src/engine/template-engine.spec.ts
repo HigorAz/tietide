@@ -17,6 +17,13 @@ describe('resolveTemplate', () => {
       expect(resolveTemplate('items: {{a.items}}', scope)).toBe('items: [1,2,3]');
     });
 
+    it('should insert a string value WITHOUT surrounding quotes when embedded in text', () => {
+      // A Code node OUTPUT SAMPLE like { count: "1" } makes `count` a string. When
+      // referenced inside a message it must read `…: 1`, never `…: "1"`.
+      const scope = { steps: { code: { count: '1' } } };
+      expect(resolveTemplate('emails: {{steps.code.count}}', scope)).toBe('emails: 1');
+    });
+
     it('should resolve multiple tokens in a single string', () => {
       const scope = { a: { first: 'x' }, b: { second: 'y' } };
       expect(resolveTemplate('{{a.first}}-{{b.second}}', scope)).toBe('x-y');
