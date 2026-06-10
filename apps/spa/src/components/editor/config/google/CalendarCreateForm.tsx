@@ -83,13 +83,12 @@ export function CalendarCreateForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={calId} className={labelClass}>
           Calendar ID
         </label>
-        <input
+        <DataPillInput
           id={calId}
-          type="text"
+          nodeId={nodeId}
           value={calendarId}
-          onChange={(e) => updateNodeConfig(nodeId, { calendarId: e.target.value })}
           placeholder="primary"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { calendarId: next })}
         />
       </div>
 
@@ -119,12 +118,11 @@ export function CalendarCreateForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={descId} className={labelClass}>
           Description (optional)
         </label>
-        <textarea
+        <DataPillInput
           id={descId}
+          nodeId={nodeId}
           value={description}
-          onChange={(e) => updateNodeConfig(nodeId, { description: e.target.value || undefined })}
-          rows={3}
-          className={cn(inputClass, 'font-mono text-xs')}
+          onChange={(next) => updateNodeConfig(nodeId, { description: next || undefined })}
         />
       </div>
 
@@ -132,13 +130,12 @@ export function CalendarCreateForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={startId} className={labelClass}>
           Start (ISO 8601)
         </label>
-        <input
+        <DataPillInput
           id={startId}
-          type="text"
+          nodeId={nodeId}
           value={start}
-          onChange={(e) => updateNodeConfig(nodeId, { start: e.target.value })}
           placeholder="2026-06-01T09:00:00Z"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { start: next })}
         />
         {issueFor('start') && (
           <p
@@ -155,13 +152,12 @@ export function CalendarCreateForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={endId} className={labelClass}>
           End (ISO 8601)
         </label>
-        <input
+        <DataPillInput
           id={endId}
-          type="text"
+          nodeId={nodeId}
           value={end}
-          onChange={(e) => updateNodeConfig(nodeId, { end: e.target.value })}
           placeholder="2026-06-01T09:30:00Z"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { end: next })}
         />
         {issueFor('end') && (
           <p data-testid="calendar-create-end-error" role="alert" className="text-xs text-red-400">

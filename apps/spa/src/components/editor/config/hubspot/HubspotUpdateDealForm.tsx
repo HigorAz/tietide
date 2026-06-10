@@ -1,16 +1,10 @@
 import { useId } from 'react';
 import { hubspotUpdateDealConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -101,16 +95,15 @@ export function HubspotUpdateDealForm({ nodeId, config }: NodeConfigFormProps): 
         <label htmlFor={propsFieldId} className={labelClass}>
           Properties (JSON)
         </label>
-        <textarea
+        <DataPillInput
           id={propsFieldId}
+          nodeId={nodeId}
           value={propsText}
-          rows={6}
           placeholder='{"dealstage": "closedwon"}'
-          onChange={(e) => {
-            const next = tryParseJson(e.target.value);
-            updateNodeConfig(nodeId, { properties: next.ok ? next.value : e.target.value });
+          onChange={(next) => {
+            const parsedNext = tryParseJson(next);
+            updateNodeConfig(nodeId, { properties: parsedNext.ok ? parsedNext.value : next });
           }}
-          className={cn(inputClass, 'font-mono text-xs')}
         />
       </div>
     </div>

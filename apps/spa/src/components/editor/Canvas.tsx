@@ -4,6 +4,7 @@ import ReactFlow, {
   BackgroundVariant,
   Controls,
   useReactFlow,
+  type Edge,
   type Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -29,6 +30,7 @@ interface MenuState {
   open: boolean;
   x: number;
   y: number;
+  variant: 'default' | 'edge';
 }
 
 interface DialogState {
@@ -37,7 +39,7 @@ interface DialogState {
   json: string;
 }
 
-const CLOSED_MENU: MenuState = { open: false, x: 0, y: 0 };
+const CLOSED_MENU: MenuState = { open: false, x: 0, y: 0, variant: 'default' };
 const CLOSED_DIALOG: DialogState = { open: false, mode: 'copy', json: '' };
 
 export function Canvas() {
@@ -110,7 +112,7 @@ export function Canvas() {
 
   const handlePaneContextMenu = useCallback((event: React.MouseEvent | MouseEvent) => {
     event.preventDefault();
-    setMenu({ open: true, x: event.clientX, y: event.clientY });
+    setMenu({ open: true, x: event.clientX, y: event.clientY, variant: 'default' });
   }, []);
 
   const handleNodeContextMenu = useCallback(
@@ -126,7 +128,25 @@ export function Canvas() {
         });
         selectNode(node.id);
       }
-      setMenu({ open: true, x: event.clientX, y: event.clientY });
+      setMenu({ open: true, x: event.clientX, y: event.clientY, variant: 'default' });
+    },
+    [selectNode],
+  );
+
+  const handleEdgeContextMenu = useCallback(
+    (event: React.MouseEvent | MouseEvent, edge: Edge) => {
+      event.preventDefault();
+      // Select only the right-clicked edge (clearing any node selection) so the
+      // menu's Delete acts on this connection alone.
+      const { nodes: curNodes, edges: curEdges } = useEditorStore.getState();
+      useEditorStore.setState({
+        edges: curEdges.map((e) => ({ ...e, selected: e.id === edge.id })),
+        nodes: curNodes.some((n) => n.selected)
+          ? curNodes.map((n) => (n.selected ? { ...n, selected: false } : n))
+          : curNodes,
+      });
+      selectNode(null);
+      setMenu({ open: true, x: event.clientX, y: event.clientY, variant: 'edge' });
     },
     [selectNode],
   );
@@ -161,8 +181,14 @@ export function Canvas() {
         onPaneClick={handlePaneClick}
         onPaneContextMenu={handlePaneContextMenu}
         onNodeContextMenu={handleNodeContextMenu}
+        onEdgeContextMenu={handleEdgeContextMenu}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        // The editor's own delete hotkey (useEditorHotkeys) owns Delete/Backspace
+        // and routes through deleteSelected() — which now removes selected edges
+        // too. Disabling React Flow's built-in delete keeps a single delete path
+        // and avoids duplicate undo snapshots.
+        deleteKeyCode={null}
         fitView
         fitViewOptions={FIT_VIEW_OPTIONS}
         {...editorTouchProps(isMobile)}
@@ -201,6 +227,7 @@ export function Canvas() {
         open={menu.open}
         x={menu.x}
         y={menu.y}
+        variant={menu.variant}
         canCopy={hasSelection}
         canDelete={hasSelection}
         onClose={closeMenu}

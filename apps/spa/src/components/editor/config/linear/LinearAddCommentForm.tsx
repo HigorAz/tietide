@@ -10,7 +10,7 @@ const FIELDS: ReadonlyArray<FieldSpec> = [
     required: true,
     placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
   },
-  { kind: 'text', key: 'body', label: 'Comment body', required: true, multiline: true },
+  { kind: 'pill', key: 'body', label: 'Comment body', required: true },
 ];
 
 export function LinearAddCommentForm(props: NodeConfigFormProps): JSX.Element {

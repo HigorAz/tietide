@@ -108,13 +108,12 @@ export function OneDriveCreateForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={mimeId} className={labelClass}>
           MIME type
         </label>
-        <input
+        <DataPillInput
           id={mimeId}
-          type="text"
+          nodeId={nodeId}
           value={mimeType}
-          onChange={(e) => updateNodeConfig(nodeId, { mimeType: e.target.value })}
           placeholder="text/plain"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { mimeType: next })}
         />
         {issueFor('mimeType') && (
           <p data-testid="onedrive-create-mime-error" role="alert" className="text-xs text-red-400">
@@ -151,15 +150,12 @@ export function OneDriveCreateForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={parentId} className={labelClass}>
           Parent folder ID (optional, OneDrive item ID)
         </label>
-        <input
+        <DataPillInput
           id={parentId}
-          type="text"
+          nodeId={nodeId}
           value={parentFolderId}
-          onChange={(e) =>
-            updateNodeConfig(nodeId, { parentFolderId: e.target.value || undefined })
-          }
           placeholder="01ABCDEFG..."
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { parentFolderId: next || undefined })}
         />
       </div>
 

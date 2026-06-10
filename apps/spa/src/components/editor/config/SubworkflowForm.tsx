@@ -3,6 +3,7 @@ import { subworkflowConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { WorkflowPicker } from '@/components/editor/WorkflowPicker';
 import type { NodeConfigFormProps } from './formRegistry';
+import { DataPillInput } from './DataPillInput';
 
 export function SubworkflowForm({ nodeId, config }: NodeConfigFormProps) {
   const updateNodeConfig = useEditorStore((s) => s.updateNodeConfig);
@@ -70,13 +71,11 @@ export function SubworkflowForm({ nodeId, config }: NodeConfigFormProps) {
         >
           Input Mapping
         </label>
-        <textarea
+        <DataPillInput
           id={inputMappingId}
-          spellCheck={false}
+          nodeId={nodeId}
           value={mappingDraft}
-          rows={6}
-          onChange={(e) => {
-            const next = e.target.value;
+          onChange={(next) => {
             setMappingDraft(next);
             try {
               const parsedJson = next.trim() === '' ? {} : (JSON.parse(next) as unknown);
@@ -94,7 +93,6 @@ export function SubworkflowForm({ nodeId, config }: NodeConfigFormProps) {
               setMappingError(`Invalid JSON: ${(err as Error).message}`);
             }
           }}
-          className="rounded-md border border-white/10 bg-elevated px-3 py-2 font-mono text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-accent-teal"
           placeholder={'{\n  "name": "{{trigger.name}}"\n}'}
         />
         <p className="text-xs text-text-muted">

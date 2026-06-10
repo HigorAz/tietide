@@ -2,12 +2,17 @@ import { useEffect, useRef } from 'react';
 import { Clipboard, ClipboardCopy, ClipboardPaste, Code2, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
+export type EditorContextMenuVariant = 'default' | 'edge';
+
 export interface EditorContextMenuProps {
   open: boolean;
   x: number;
   y: number;
   canCopy: boolean;
   canDelete: boolean;
+  // 'edge' collapses the menu to a single "Delete connection" action — the
+  // clipboard items are meaningless for a connection line.
+  variant?: EditorContextMenuVariant;
   onClose: () => void;
   onCopy: () => void;
   onPaste: () => void;
@@ -46,6 +51,7 @@ export function EditorContextMenu({
   y,
   canCopy,
   canDelete,
+  variant = 'default',
   onClose,
   onCopy,
   onPaste,
@@ -89,32 +95,38 @@ export function EditorContextMenu({
       className="fixed z-50 min-w-[10rem] rounded-md border border-white/10 bg-slate-800/95 py-1 shadow-xl backdrop-blur-sm"
       style={{ left: `${x}px`, top: `${y}px` }}
     >
-      <Item
-        label="Copy"
-        icon={<ClipboardCopy size={14} />}
-        disabled={!canCopy}
-        onClick={select(onCopy)}
-      />
-      <Item label="Paste" icon={<ClipboardPaste size={14} />} onClick={select(onPaste)} />
-      <div className="my-1 h-px bg-white/10" />
-      <Item
-        label="Copy as JSON"
-        icon={<Code2 size={14} />}
-        disabled={!canCopy}
-        onClick={select(onCopyAsJson)}
-      />
-      <Item
-        label="Paste from JSON"
-        icon={<Clipboard size={14} />}
-        onClick={select(onPasteFromJson)}
-      />
-      <div className="my-1 h-px bg-white/10" />
-      <Item
-        label="Delete"
-        icon={<Trash2 size={14} />}
-        disabled={!canDelete}
-        onClick={select(onDelete)}
-      />
+      {variant === 'edge' ? (
+        <Item label="Delete connection" icon={<Trash2 size={14} />} onClick={select(onDelete)} />
+      ) : (
+        <>
+          <Item
+            label="Copy"
+            icon={<ClipboardCopy size={14} />}
+            disabled={!canCopy}
+            onClick={select(onCopy)}
+          />
+          <Item label="Paste" icon={<ClipboardPaste size={14} />} onClick={select(onPaste)} />
+          <div className="my-1 h-px bg-white/10" />
+          <Item
+            label="Copy as JSON"
+            icon={<Code2 size={14} />}
+            disabled={!canCopy}
+            onClick={select(onCopyAsJson)}
+          />
+          <Item
+            label="Paste from JSON"
+            icon={<Clipboard size={14} />}
+            onClick={select(onPasteFromJson)}
+          />
+          <div className="my-1 h-px bg-white/10" />
+          <Item
+            label="Delete"
+            icon={<Trash2 size={14} />}
+            disabled={!canDelete}
+            onClick={select(onDelete)}
+          />
+        </>
+      )}
     </div>
   );
 }

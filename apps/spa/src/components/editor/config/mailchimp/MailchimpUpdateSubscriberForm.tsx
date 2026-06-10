@@ -151,16 +151,15 @@ export function MailchimpUpdateSubscriberForm({
         <label htmlFor={mergeFieldId} className={labelClass}>
           Merge fields (JSON, optional)
         </label>
-        <textarea
+        <DataPillInput
           id={mergeFieldId}
+          nodeId={nodeId}
           value={mergeText}
-          rows={5}
           placeholder='{"FNAME": "Jane"}'
-          onChange={(e) => {
-            const next = tryParseJson(e.target.value);
-            updateNodeConfig(nodeId, { mergeFields: next.ok ? next.value : e.target.value });
+          onChange={(next) => {
+            const parsedNext = tryParseJson(next);
+            updateNodeConfig(nodeId, { mergeFields: parsedNext.ok ? parsedNext.value : next });
           }}
-          className={cn(inputClass, 'font-mono text-xs')}
         />
       </div>
     </div>

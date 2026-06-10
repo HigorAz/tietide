@@ -1,14 +1,8 @@
 import { useId } from 'react';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { DataPillInput } from '../DataPillInput';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -79,15 +73,12 @@ export function DiscordReplyToCommandForm({ nodeId, config }: NodeConfigFormProp
             <label htmlFor={appIdId} className={labelClass}>
               Application ID <span className="text-text-muted">(optional)</span>
             </label>
-            <input
+            <DataPillInput
               id={appIdId}
-              type="text"
+              nodeId={nodeId}
               value={applicationId}
               placeholder="leave blank to use the triggering interaction"
-              onChange={(e) =>
-                updateNodeConfig(nodeId, { applicationId: e.target.value || undefined })
-              }
-              className={inputClass}
+              onChange={(next) => updateNodeConfig(nodeId, { applicationId: next || undefined })}
             />
           </div>
         </div>

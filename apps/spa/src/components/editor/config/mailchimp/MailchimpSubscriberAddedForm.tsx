@@ -6,7 +6,7 @@ import type { NodeConfigFormProps } from '../formRegistry';
 import { GenericConnectorForm, type FieldSpec } from '../GenericConnectorForm';
 
 const FIELDS: ReadonlyArray<FieldSpec> = [
-  { kind: 'text', key: 'listId', label: 'List ID', placeholder: 'abc1234567', required: true },
+  { kind: 'pill', key: 'listId', label: 'List ID', placeholder: 'abc1234567', required: true },
   {
     kind: 'select',
     key: 'eventType',

@@ -78,13 +78,12 @@ export function SheetsRowAddedForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={rangeId} className={labelClass}>
           Range (A1 notation)
         </label>
-        <input
+        <DataPillInput
           id={rangeId}
-          type="text"
+          nodeId={nodeId}
           value={range}
-          onChange={(e) => updateNodeConfig(nodeId, { range: e.target.value })}
           placeholder="Sheet1!A:Z"
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { range: next })}
         />
         {issueFor('range') && (
           <p

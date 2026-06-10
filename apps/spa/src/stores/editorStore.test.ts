@@ -490,7 +490,7 @@ describe('editorStore', () => {
       expect(useEditorStore.getState().edges).toHaveLength(0);
     });
 
-    it('should be a no-op when no nodes are selected', () => {
+    it('should be a no-op when nothing is selected', () => {
       const { addNode, deleteSelected } = useEditorStore.getState();
       addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
       useEditorStore.setState({ isDirty: false });
@@ -500,6 +500,30 @@ describe('editorStore', () => {
 
       expect(useEditorStore.getState().nodes).toEqual(before);
       expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('should remove a selected edge while leaving its endpoint nodes intact', () => {
+      const { addNode, onConnect, onEdgesChange, deleteSelected } = useEditorStore.getState();
+      addNode(NodeType.MANUAL_TRIGGER, { x: 0, y: 0 });
+      addNode(NodeType.HTTP_REQUEST, { x: 100, y: 0 });
+      const [source, target] = useEditorStore.getState().nodes;
+      onConnect({
+        source: source.id,
+        target: target.id,
+        sourceHandle: null,
+        targetHandle: null,
+      });
+      const edgeId = useEditorStore.getState().edges[0].id;
+      onEdgesChange([{ id: edgeId, type: 'select', selected: true }]);
+      useEditorStore.setState({ isDirty: false });
+      const pastBefore = useEditorStore.getState().past.length;
+
+      deleteSelected();
+
+      expect(useEditorStore.getState().edges).toHaveLength(0);
+      expect(useEditorStore.getState().nodes).toHaveLength(2);
+      expect(useEditorStore.getState().isDirty).toBe(true);
+      expect(useEditorStore.getState().past.length).toBe(pastBefore + 1);
     });
   });
 

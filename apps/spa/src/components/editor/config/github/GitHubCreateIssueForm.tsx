@@ -148,12 +148,11 @@ export function GitHubCreateIssueForm({ nodeId, config }: NodeConfigFormProps): 
         <label htmlFor={bodyFieldId} className={labelClass}>
           Body (Markdown, optional)
         </label>
-        <textarea
+        <DataPillInput
           id={bodyFieldId}
+          nodeId={nodeId}
           value={body}
-          rows={5}
-          onChange={(e) => updateNodeConfig(nodeId, { body: e.target.value || undefined })}
-          className={inputClass}
+          onChange={(next) => updateNodeConfig(nodeId, { body: next || undefined })}
         />
       </div>
 
