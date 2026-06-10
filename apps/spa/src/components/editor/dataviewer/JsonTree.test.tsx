@@ -14,18 +14,31 @@ const demo = {
 
 describe('JsonTree', () => {
   let show: ReturnType<typeof vi.fn>;
-  let writeText: ReturnType<typeof vi.fn>;
-  const originalClipboard = navigator.clipboard;
+  const originalDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+
+  /**
+   * Install a clipboard spy. MUST be called AFTER userEvent.setup() — userEvent
+   * installs its own clipboard stub on setup that would otherwise clobber ours,
+   * and jsdom's navigator.clipboard is a getter-only property (defineProperty,
+   * not Object.assign).
+   */
+  const stubClipboard = (): ReturnType<typeof vi.fn> => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    return writeText;
+  };
 
   beforeEach(() => {
     show = vi.fn();
     useToastStore.setState({ show });
-    writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
   });
 
   afterEach(() => {
-    Object.assign(navigator, { clipboard: originalClipboard });
+    if (originalDescriptor) {
+      Object.defineProperty(navigator, 'clipboard', originalDescriptor);
+    } else {
+      delete (navigator as { clipboard?: unknown }).clipboard;
+    }
     vi.restoreAllMocks();
   });
 
@@ -46,21 +59,23 @@ describe('JsonTree', () => {
     expect(screen.getByText('name')).toHaveClass('text-data-key');
   });
 
-  it('collapses deeper branches and toggles them on click', async () => {
+  it('expands the first level by default and collapses deeper branches', async () => {
     const user = userEvent.setup();
     render(<JsonTree value={demo} />);
-    // First level expanded → messages visible; its children collapsed by default.
+    // messages (depth 0) is open → its array items show as `{2 fields}` branches,
+    // but those items (depth 1) are collapsed so threadId (depth 2) stays hidden.
+    expect(screen.getAllByText('{2 fields}').length).toBe(2);
     expect(screen.queryByText('threadId')).not.toBeInTheDocument();
-    await user.click(screen.getByText('messages'));
-    // messages[0] branch now visible (still collapsed one level deeper)
-    expect(screen.getByText('[2 fields]')).toBeInTheDocument();
+    // Clicking messages[0] reveals its children.
+    await user.click(screen.getByText('0'));
+    expect(screen.getByText('threadId')).toBeInTheDocument();
   });
 
   it('copies a resolveTemplate-compatible pill from the path button', async () => {
     const user = userEvent.setup();
+    const writeText = stubClipboard();
     render(<JsonTree value={demo} pillRef="steps.gmail_search" />);
-    // Drill into messages → [0] → id
-    await user.click(screen.getByText('messages'));
+    // messages is open by default → click its [0] item to reveal id.
     await user.click(screen.getByText('0'));
     const idRow = screen.getByText('id').closest('[data-testid="json-row"]');
     expect(idRow).not.toBeNull();
@@ -70,6 +85,7 @@ describe('JsonTree', () => {
 
   it('copies the raw unquoted string from the value button', async () => {
     const user = userEvent.setup();
+    const writeText = stubClipboard();
     render(<JsonTree value={{ name: 'hello' }} pillRef="steps.x" />);
     const row = screen.getByText('"hello"').closest('[data-testid="json-row"]');
     await user.click(within(row as HTMLElement).getByLabelText('Copy value'));
