@@ -20,6 +20,9 @@ const conn = (overrides: Partial<ConnectionView> = {}): ConnectionView => ({
 
 beforeEach(() => {
   resetConnectionsStore();
+  // Default to a settled store so the component never triggers a real fetch;
+  // individual tests override connections/status as needed.
+  useConnectionsStore.setState({ status: 'ready' });
 });
 
 describe('humanizeKey', () => {
