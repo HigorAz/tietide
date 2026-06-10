@@ -184,10 +184,15 @@ describe('ConfigSteps', () => {
     expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'active');
 
     // Click the Configure header → it opens, Test collapses back to done.
-    const configureHeader = within(screen.getByTestId('config-step-configure')).getByRole('button');
-    fireEvent.click(configureHeader);
+    // The header is the section's first button (carries the step title).
+    const configureHeader = within(screen.getByTestId('config-step-configure'))
+      .getAllByRole('button')
+      .find((b) => within(b).queryByText('Configure'));
+    expect(configureHeader).toBeDefined();
+    fireEvent.click(configureHeader as HTMLElement);
 
     expect(screen.getByTestId('config-step-configure')).toHaveAttribute('data-status', 'active');
-    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'done');
+    // Test is unlocked but not yet tested, so it collapses to pending (only one open).
+    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'pending');
   });
 });
