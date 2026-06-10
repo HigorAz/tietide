@@ -96,12 +96,18 @@ describe('NodeConfigPanel', () => {
       expect(screen.getByRole('heading', { name: /HTTP Request/i })).toBeInTheDocument();
     });
 
-    it('should render the live Preview panel in the footer', () => {
+    it('should render the live Preview panel (now inside the Configure step)', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
+      // The preview moved inside step 2 of ConfigSteps; assert via its toggle.
       expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
       expect(screen.getByTestId('node-preview-toggle')).not.toBeDisabled();
+    });
+
+    it('should render the stepped Configure view (ConfigSteps) in configure mode', () => {
+      seedNodeOfType(NodeType.HTTP_REQUEST);
+      render(<NodeConfigPanel />);
+      expect(screen.getByTestId('config-step-configure')).toBeInTheDocument();
     });
 
     it('should clear the selection when the close button is clicked', () => {
@@ -133,15 +139,16 @@ describe('NodeConfigPanel', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       useEditorStore.getState().updateNodeConfig(nodeId, { hasErrorHandler: true });
       render(<NodeConfigPanel />);
-      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
-      expect(toggle.checked).toBe(true);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle');
+      // Now a role=switch ToggleSwitch (inside ConfigSteps) rather than a checkbox.
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
     });
 
     it('should call updateNodeConfig with hasErrorHandler:true when toggled on', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
-      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
-      expect(toggle.checked).toBe(false);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle');
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
 
       fireEvent.click(toggle);
 
@@ -154,8 +161,8 @@ describe('NodeConfigPanel', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       useEditorStore.getState().updateNodeConfig(nodeId, { hasErrorHandler: true });
       render(<NodeConfigPanel />);
-      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
-      expect(toggle.checked).toBe(true);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle');
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
 
       fireEvent.click(toggle);
 
@@ -200,7 +207,9 @@ describe('NodeConfigPanel', () => {
     it('should still render the live Preview panel inside the sheet', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
+      // Preview lives inside ConfigSteps (step 2) on mobile too.
+      expect(screen.getByTestId('config-step-configure')).toBeInTheDocument();
+      expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
     });
   });
 
@@ -348,7 +357,7 @@ describe('NodeConfigPanel', () => {
       // stays in configure view
 
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
     });
   });
 });
