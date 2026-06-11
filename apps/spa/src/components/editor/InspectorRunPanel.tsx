@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore, type NodeRunState } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
-import { JsonBlock } from './preview/JsonBlock';
+import { DataViewer } from './dataviewer/DataViewer';
+import { CopyJsonButton } from './run/CopyJsonButton';
+import { ErrorCard } from './run/ErrorCard';
+import { pillRefForAlias } from './run/pillRef';
 
 interface RunEntry {
   id: string;
   label: string;
+  alias: string | undefined;
   state: NodeRunState;
 }
 
@@ -16,20 +20,51 @@ const formatDuration = (ms: number | null): string => {
   return `${(ms / 1000).toFixed(2)}s`;
 };
 
+interface DataPaneProps {
+  label: string;
+  testId: string;
+  children: ReactNode;
+  copyValue: unknown;
+}
+
+/**
+ * A labeled data pane: header (label + copy-full-JSON button) over the shared
+ * DataViewer. Preserves the label + Copy affordance the old JsonBlock panes had
+ * (locked decision: copy-full-JSON must survive on both Input and Output panes).
+ */
+function DataPane({ label, testId, children, copyValue }: DataPaneProps): JSX.Element {
+  return (
+    <div data-testid={testId} className="space-y-1">
+      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-text-secondary">
+        <span>{label}</span>
+        <CopyJsonButton value={copyValue} />
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function InspectorRunPanel(): JSX.Element {
   const liveNodes = useExecutionLiveStore((s) => s.nodes);
   const viewAtTime = useExecutionLiveStore((s) => s.viewAtTime);
   const editorNodes = useEditorStore((s) => s.nodes);
+  const selectNode = useEditorStore((s) => s.selectNode);
+  const setViewMode = useEditorStore((s) => s.setViewMode);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const entries: RunEntry[] = useMemo(() => {
-    const labels = new Map(editorNodes.map((n) => [n.id, n.data.label]));
+    const byId = new Map(editorNodes.map((n) => [n.id, n.data]));
     return Array.from(liveNodes.entries())
       .filter(([, state]) => {
         if (viewAtTime === null) return true;
         return state.startedAt !== null && state.startedAt <= viewAtTime;
       })
-      .map(([id, state]) => ({ id, state, label: labels.get(id) ?? id }))
+      .map(([id, state]) => ({
+        id,
+        state,
+        label: byId.get(id)?.label ?? id,
+        alias: byId.get(id)?.alias,
+      }))
       .sort((a, b) => (a.state.startedAt ?? '').localeCompare(b.state.startedAt ?? ''));
   }, [liveNodes, editorNodes, viewAtTime]);
 
@@ -55,6 +90,7 @@ export function InspectorRunPanel(): JSX.Element {
   }
 
   const selected = entries.find((e) => e.id === selectedId) ?? entries[0];
+  const outputRef = pillRefForAlias(selected.alias);
 
   return (
     <div data-testid="inspector-run-panel" className="flex h-full min-h-0">
@@ -109,8 +145,12 @@ export function InspectorRunPanel(): JSX.Element {
           </span>
         </div>
 
-        <JsonBlock label="Input" testId="run-node-input" value={selected.state.input} />
-        <JsonBlock label="Output" testId="run-node-output" value={selected.state.output} />
+        <DataPane label="Input" testId="run-node-input-pane" copyValue={selected.state.input}>
+          <DataViewer value={selected.state.input} testId="run-node-input" />
+        </DataPane>
+        <DataPane label="Output" testId="run-node-output-pane" copyValue={selected.state.output}>
+          <DataViewer value={selected.state.output} testId="run-node-output" pillRef={outputRef} />
+        </DataPane>
 
         {selected.state.iterations && selected.state.iterations.length > 0 && (
           <div data-testid="run-node-iterations" className="space-y-1">
@@ -151,50 +191,17 @@ export function InspectorRunPanel(): JSX.Element {
           </div>
         )}
 
-        {selected.state.error && <NodeRunError error={selected.state.error} />}
+        {selected.state.error && (
+          <ErrorCard
+            error={selected.state.error}
+            testId="run-node-error"
+            onFixInConfigure={() => {
+              selectNode(selected.id);
+              setViewMode('configure');
+            }}
+          />
+        )}
       </div>
-    </div>
-  );
-}
-
-interface NodeRunErrorProps {
-  error: { message: string; code: string | null };
-}
-
-function NodeRunError({ error }: NodeRunErrorProps): JSX.Element {
-  const [copied, setCopied] = useState(false);
-
-  const text = useMemo(
-    () => `${error.message}${error.code ? `\n[${error.code}]` : ''}`,
-    [error.message, error.code],
-  );
-
-  const handleCopy = useCallback(async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard API unavailable / permission denied — degrade silently.
-    }
-  }, [text]);
-
-  return (
-    <div data-testid="run-node-error" className="space-y-1">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-status-failed">
-        <span>Error</span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          aria-label="Copy error message"
-          className="rounded px-1.5 py-0.5 text-[10px] text-status-failed/80 hover:bg-white/5 hover:text-status-failed focus:outline-none focus-visible:ring-1 focus-visible:ring-status-failed"
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
-      <pre className="whitespace-pre-wrap break-words rounded bg-status-failed/10 p-2 text-[11px] leading-tight text-status-failed select-text">
-        {text}
-      </pre>
     </div>
   );
 }

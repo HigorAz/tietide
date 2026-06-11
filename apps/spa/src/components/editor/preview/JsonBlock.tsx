@@ -1,13 +1,7 @@
-import { useState } from 'react';
-
-const stringify = (value: unknown): string => {
-  if (value === undefined) return 'null';
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
+import { Copy } from 'lucide-react';
+import { useCopy } from '../dataviewer/useCopy';
+import { RawJson } from '../dataviewer/RawJson';
+import { safeStringify } from '../dataviewer/valueFormat';
 
 export interface JsonBlockProps {
   label: string;
@@ -15,19 +9,14 @@ export interface JsonBlockProps {
   value: unknown;
 }
 
+/**
+ * Thin labeled wrapper around the shared RawJson pane, kept during the run-result
+ * migration so NodePreviewPanel keeps working unchanged. The raw `<pre>` blob now
+ * lives in RawJson (syntax-tinted); JsonBlock only owns the label + copy-full-JSON
+ * header, routed through useCopy/toast for confirmation consistency.
+ */
 export function JsonBlock({ label, testId, value }: JsonBlockProps): JSX.Element {
-  const text = stringify(value);
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard API unavailable / permission denied — degrade silently.
-    }
-  };
+  const copy = useCopy();
 
   return (
     <div data-testid={testId} className="space-y-1">
@@ -35,16 +24,14 @@ export function JsonBlock({ label, testId, value }: JsonBlockProps): JSX.Element
         <span>{label}</span>
         <button
           type="button"
-          onClick={handleCopy}
+          onClick={() => void copy(safeStringify(value), `${label} JSON`)}
           aria-label={`Copy ${label} JSON`}
-          className="rounded px-1.5 py-0.5 text-[10px] text-text-secondary hover:bg-white/5 hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+          className="rounded p-1 text-text-secondary transition hover:bg-white/5 hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
         >
-          {copied ? 'Copied' : 'Copy'}
+          <Copy size={12} aria-hidden />
         </button>
       </div>
-      <pre className="max-h-32 overflow-auto rounded bg-deep-blue/40 p-2 text-[11px] leading-tight text-text-primary">
-        {text}
-      </pre>
+      <RawJson value={value} />
     </div>
   );
 }

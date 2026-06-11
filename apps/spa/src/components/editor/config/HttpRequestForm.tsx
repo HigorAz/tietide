@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { httpRequestConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
@@ -7,6 +7,7 @@ import type { NodeConfigFormProps } from './formRegistry';
 import { HeadersEditor } from './HeadersEditor';
 import { DataPillInput } from './DataPillInput';
 import { PillSampleField } from './PillSampleField';
+import { useReportConfigValidity } from '../steps/StepLayoutContext';
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
 
@@ -44,6 +45,23 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
   const [bodyText, setBodyText] = useState(initialBodyText);
   const [bodyError, setBodyError] = useState<string | null>(null);
 
+  // The last body string we sourced FROM the store (not from the user's
+  // keystrokes). When `config.body` changes externally — undo/redo, a template
+  // instantiation, or a re-select of the same node id (the form is keyed by
+  // nodeId, so same-node external edits don't remount) — `initialBodyText`
+  // recomputes to a value this ref hasn't seen, so we resync the textarea.
+  // Typing never triggers this: handleBodyChange records what it commits here,
+  // so the next render's initialBodyText already matches and the buffer is
+  // left untouched (no clobbering of in-progress, not-yet-valid JSON).
+  const lastConfigBodyRef = useRef(initialBodyText);
+  useEffect(() => {
+    if (initialBodyText !== lastConfigBodyRef.current) {
+      lastConfigBodyRef.current = initialBodyText;
+      setBodyText(initialBodyText);
+      setBodyError(null);
+    }
+  }, [initialBodyText]);
+
   const parsed = httpRequestConfigSchema.safeParse({
     method,
     url,
@@ -55,19 +73,32 @@ export function HttpRequestForm({ nodeId, config }: NodeConfigFormProps) {
     ? null
     : (parsed.error.issues.find((i) => i.path[0] === 'url')?.message ?? null);
 
+  // The HTTP connection is optional (allowClear) and not part of this schema,
+  // so Configure validity is simply the zod parse result plus a valid body.
+  useReportConfigValidity(parsed.success && bodyError === null);
+
   const handleBodyChange = (next: string) => {
     setBodyText(next);
     const trimmed = next.trim();
     if (trimmed === '') {
       setBodyError(null);
+      // Record the next-render initialBodyText so the resync effect treats this
+      // as our own edit (body=undefined → ''), not an external change.
+      lastConfigBodyRef.current = '';
       updateNodeConfig(nodeId, { body: undefined });
       return;
     }
     try {
       const parsedBody: unknown = JSON.parse(trimmed);
       setBodyError(null);
+      // Mirror how the next render derives initialBodyText from config.body so
+      // the resync effect won't clobber the user's freshly typed buffer.
+      lastConfigBodyRef.current =
+        typeof parsedBody === 'string' ? parsedBody : JSON.stringify(parsedBody, null, 2);
       updateNodeConfig(nodeId, { body: parsedBody });
     } catch {
+      // Invalid JSON is held only in the local buffer (store is left as-is), so
+      // there is nothing to resync against — leave lastConfigBodyRef untouched.
       setBodyError('Body is not valid JSON.');
     }
   };

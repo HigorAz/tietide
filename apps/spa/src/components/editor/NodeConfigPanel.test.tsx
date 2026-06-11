@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { NODE_CATALOG, NodeType } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import {
@@ -96,12 +96,18 @@ describe('NodeConfigPanel', () => {
       expect(screen.getByRole('heading', { name: /HTTP Request/i })).toBeInTheDocument();
     });
 
-    it('should render the live Preview panel in the footer', () => {
+    it('should render the live Preview panel (now inside the Configure step)', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
+      // The preview moved inside step 2 of ConfigSteps; assert via its toggle.
       expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
       expect(screen.getByTestId('node-preview-toggle')).not.toBeDisabled();
+    });
+
+    it('should render the stepped Configure view (ConfigSteps) in configure mode', () => {
+      seedNodeOfType(NodeType.HTTP_REQUEST);
+      render(<NodeConfigPanel />);
+      expect(screen.getByTestId('config-step-configure')).toBeInTheDocument();
     });
 
     it('should clear the selection when the close button is clicked', () => {
@@ -133,15 +139,16 @@ describe('NodeConfigPanel', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       useEditorStore.getState().updateNodeConfig(nodeId, { hasErrorHandler: true });
       render(<NodeConfigPanel />);
-      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
-      expect(toggle.checked).toBe(true);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle');
+      // Now a role=switch ToggleSwitch (inside ConfigSteps) rather than a checkbox.
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
     });
 
     it('should call updateNodeConfig with hasErrorHandler:true when toggled on', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
-      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
-      expect(toggle.checked).toBe(false);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle');
+      expect(toggle).toHaveAttribute('aria-checked', 'false');
 
       fireEvent.click(toggle);
 
@@ -154,8 +161,8 @@ describe('NodeConfigPanel', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       useEditorStore.getState().updateNodeConfig(nodeId, { hasErrorHandler: true });
       render(<NodeConfigPanel />);
-      const toggle = screen.getByTestId('node-config-error-handler-toggle') as HTMLInputElement;
-      expect(toggle.checked).toBe(true);
+      const toggle = screen.getByTestId('node-config-error-handler-toggle');
+      expect(toggle).toHaveAttribute('aria-checked', 'true');
 
       fireEvent.click(toggle);
 
@@ -200,7 +207,9 @@ describe('NodeConfigPanel', () => {
     it('should still render the live Preview panel inside the sheet', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
+      // Preview lives inside ConfigSteps (step 2) on mobile too.
+      expect(screen.getByTestId('config-step-configure')).toBeInTheDocument();
+      expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
     });
   });
 
@@ -275,7 +284,7 @@ describe('NodeConfigPanel', () => {
       expect(screen.getByTestId('node-run-inspection')).toBeInTheDocument();
     });
 
-    it('should show this node’s input and output JSON in result view', () => {
+    it('should show this node’s input and output data in result view', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       seedRun(nodeId, {
         input: { url: 'https://api.example.com' },
@@ -284,8 +293,10 @@ describe('NodeConfigPanel', () => {
       enterResultView();
 
       render(<NodeConfigPanel />);
+      // Input + Output sections are open by default; the shared DataViewer (Tree
+      // mode) surfaces the values.
       expect(screen.getByTestId('node-run-input')).toHaveTextContent('api.example.com');
-      expect(screen.getByTestId('node-run-output')).toHaveTextContent('"status": 201');
+      expect(screen.getByTestId('node-run-output')).toHaveTextContent('201');
     });
 
     it('should show a "not executed" hint in result view when this node has no run data', () => {
@@ -303,14 +314,18 @@ describe('NodeConfigPanel', () => {
       expect(screen.getByText(/not executed/i)).toBeInTheDocument();
     });
 
-    it('should render the read-only config block in run inspection', () => {
+    it('should render the labeled config field list in run inspection', () => {
       const nodeId = seedNodeOfType(NodeType.HTTP_REQUEST);
       useEditorStore.getState().updateNodeConfig(nodeId, { url: 'https://example.com' });
       seedRun(nodeId);
       enterResultView();
 
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-run-config')).toHaveTextContent('https://example.com');
+      // Configuration is collapsed by default — expand its section to reveal the
+      // labeled field list (never a JSON blob, per the locked decision).
+      const configCard = screen.getByTestId('run-section-card-configuration');
+      fireEvent.click(within(configCard).getByRole('button', { name: /configuration/i }));
+      expect(screen.getByTestId('config-field-list')).toHaveTextContent('https://example.com');
     });
 
     it('should render the error block when the selected node failed (result view)', () => {
@@ -342,7 +357,7 @@ describe('NodeConfigPanel', () => {
       // stays in configure view
 
       render(<NodeConfigPanel />);
-      expect(screen.getByTestId('node-preview-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
     });
   });
 });

@@ -377,7 +377,8 @@ describe('WorkflowEditorPage', () => {
       await user.click(screen.getByRole('tab', { name: /run/i }));
 
       expect(screen.getByTestId('run-node-input')).toHaveTextContent('https://example.com');
-      expect(screen.getByTestId('run-node-output')).toHaveTextContent('"status": 200');
+      // Run tab now renders via the shared DataViewer (Tree mode) rather than a raw JSON blob.
+      expect(screen.getByTestId('run-node-output')).toHaveTextContent('200');
     });
   });
 

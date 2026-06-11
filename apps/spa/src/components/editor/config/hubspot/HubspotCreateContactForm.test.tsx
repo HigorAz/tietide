@@ -64,6 +64,8 @@ describe('HubspotCreateContactForm', () => {
         config={{ connectionId: CONNECTION_ID, email: 'a@b.com' }}
       />,
     );
+    // "First name" is optional, so it lives inside the collapsed Options section.
+    fireEvent.click(screen.getByText(/Options/));
     fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: 'Jane' } });
     expect(updateNodeConfig).toHaveBeenCalledWith(NODE_ID, { firstName: 'Jane' });
   });
