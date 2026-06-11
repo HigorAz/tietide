@@ -232,6 +232,12 @@ export interface TourDefinition {
   steps: TourStep[];
   /** True when this tour applies to the given route. */
   matchRoute: (pathname: string) => boolean;
+  /**
+   * Static route the Help hub navigates to before replaying this tour. Omitted
+   * for the editor tour, whose route is a dynamic /workflows/:id — it can only
+   * be replayed while already in an editor.
+   */
+  navRoute?: string;
 }
 
 const isEditorRoute = (pathname: string): boolean => /^\/workflows\/[^/]+/.test(pathname);
@@ -242,18 +248,21 @@ export const TOURS: Record<TourId, TourDefinition> = {
     label: 'Home',
     steps: HOME_TOUR_STEPS,
     matchRoute: (p) => p === '/',
+    navRoute: '/',
   },
   dashboard: {
     id: 'dashboard',
     label: 'Dashboard',
     steps: DASHBOARD_TOUR_STEPS,
     matchRoute: (p) => p === '/dashboard',
+    navRoute: '/dashboard',
   },
   workflows: {
     id: 'workflows',
     label: 'Workflows',
     steps: WORKFLOWS_TOUR_STEPS,
     matchRoute: (p) => p === '/workflows',
+    navRoute: '/workflows',
   },
   editor: {
     id: 'editor',
@@ -266,18 +275,21 @@ export const TOURS: Record<TourId, TourDefinition> = {
     label: 'Connections',
     steps: CONNECTIONS_TOUR_STEPS,
     matchRoute: (p) => p === '/connections',
+    navRoute: '/connections',
   },
   library: {
     id: 'library',
     label: 'Library',
     steps: LIBRARY_TOUR_STEPS,
     matchRoute: (p) => p === '/library',
+    navRoute: '/library',
   },
   history: {
     id: 'history',
     label: 'History',
     steps: HISTORY_TOUR_STEPS,
     matchRoute: (p) => p === '/history',
+    navRoute: '/history',
   },
 };
 
