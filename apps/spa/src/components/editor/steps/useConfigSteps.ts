@@ -42,9 +42,14 @@ export function useConfigSteps(input: ConfigStepsInput): UseConfigStepsResult {
       ? ['connection', 'configure', 'test']
       : ['configure', 'test'];
 
+    // An OPTIONAL connection is "complete" whenever no live selection is required
+    // to run: explicitly cleared (none) OR a saved id that went stale — the node
+    // still runs unauthenticated, so Test must NOT be locked. The amber
+    // "Connection unavailable" warning still surfaces via `connectionSummary`,
+    // which prioritises `stale`. A REQUIRED connection stays incomplete when
+    // stale (no usable credential to run with).
     const connectionComplete =
-      connection !== null &&
-      (connection.hasSelection || (connection.optional && !connection.stale));
+      connection !== null && (connection.hasSelection || connection.optional);
     const configureComplete = configureValid;
     const testComplete = tested;
 

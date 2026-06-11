@@ -83,14 +83,31 @@ describe('useConfigSteps', () => {
     expect(connection.status).toBe('done');
   });
 
-  it('does not count an optional connection as done when the saved id is stale', () => {
+  it('treats an optional+stale connection as complete and leaves Test unlocked (WR-04)', () => {
+    // An optional connection whose saved id no longer resolves can still run
+    // unauthenticated, so the step is complete-but-warn and Test is NOT locked.
     const { result } = renderHook(() =>
       useConfigSteps(
-        input({ connection: meta({ optional: true, stale: true }), configureValid: false }),
+        input({ connection: meta({ optional: true, stale: true }), configureValid: true }),
       ),
     );
     const connection = result.current.steps.find((s) => s.id === 'connection')!;
+    const test = result.current.steps.find((s) => s.id === 'test')!;
+    // Connection step is complete (done), and Test is reachable, not locked.
+    expect(connection.status).toBe('done');
+    expect(test.status).not.toBe('locked');
+  });
+
+  it('keeps a REQUIRED+stale connection incomplete and Test locked', () => {
+    const { result } = renderHook(() =>
+      useConfigSteps(
+        input({ connection: meta({ optional: false, stale: true }), configureValid: true }),
+      ),
+    );
+    const connection = result.current.steps.find((s) => s.id === 'connection')!;
+    const test = result.current.steps.find((s) => s.id === 'test')!;
     expect(connection.status).not.toBe('done');
+    expect(test.status).toBe('locked');
   });
 
   it('openStep on a done step opens it and closes the others (single-open invariant)', () => {
