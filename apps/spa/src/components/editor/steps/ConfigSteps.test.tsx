@@ -26,27 +26,22 @@ const googleConnection: ConnectionView = {
 };
 
 /** A node form with no connection requirement (renders no ConnectionPicker). */
-let plainRenderCount = 0;
-const PlainForm: ComponentType<NodeConfigFormProps> = ({ nodeId }) => {
-  plainRenderCount += 1;
-  return <div data-testid="plain-form-body">plain form for {nodeId}</div>;
-};
+const PlainForm: ComponentType<NodeConfigFormProps> = ({ nodeId }) => (
+  <div data-testid="plain-form-body">plain form for {nodeId}</div>
+);
 
 /**
  * A connector form: renders a real ConnectionPicker (so it registers the
  * connection step + portals into the slot) and reports configure validity.
- * Tracks its own mount count so a test can assert it is not remounted.
  */
-let connectorMountCount = 0;
 function makeConnectorForm(opts: {
   value: string | null;
   valid: boolean;
 }): ComponentType<NodeConfigFormProps> {
   return function ConnectorForm({ nodeId }: NodeConfigFormProps) {
     useReportConfigValidity(opts.valid);
-    // Increment on first render per instance via a marker the test can read.
     return (
-      <div data-testid="connector-form-body" data-form-instance={connectorMountCount}>
+      <div data-testid="connector-form-body">
         <ConnectionPicker provider="google" value={opts.value} onChange={() => {}} />
         <span>config for {nodeId}</span>
       </div>
@@ -60,8 +55,6 @@ const renderSteps = (
 ) => render(<ConfigSteps nodeId={NODE_ID} config={config} Form={Form} />);
 
 beforeEach(() => {
-  plainRenderCount = 0;
-  connectorMountCount = 0;
   useEditorStore.setState({
     ...initialEditorState,
     nodes: [
