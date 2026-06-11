@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { RunSectionTimeline } from './RunSectionTimeline';
+import { RunSectionTimeline, type RunSection } from './RunSectionTimeline';
 
 describe('RunSectionTimeline', () => {
   it('should render one card per section in order', () => {
@@ -157,6 +157,71 @@ describe('RunSectionTimeline', () => {
     await user.click(screen.getByRole('button', { name: 'action' }));
     // Section stays open — header toggle was not triggered.
     expect(screen.getByText('open body')).toBeInTheDocument();
+  });
+
+  it('should seed a newly-inserted section from its defaultOpen when the id set changes (WR-04)', () => {
+    const baseSections: RunSection[] = [
+      { id: 'input', title: 'Input', tone: 'neutral', defaultOpen: true, children: <div>in</div> },
+      {
+        id: 'output',
+        title: 'Output',
+        tone: 'success',
+        defaultOpen: true,
+        children: <div>out</div>,
+      },
+    ];
+    const { rerender } = render(<RunSectionTimeline sections={baseSections} />);
+    expect(screen.queryByText('error body')).not.toBeInTheDocument();
+
+    // Re-render with an Error card inserted before Output (success → failed run on
+    // the same component instance). It must render OPEN from its defaultOpen.
+    const failedSections: RunSection[] = [
+      baseSections[0],
+      {
+        id: 'error',
+        title: 'Error',
+        tone: 'failed',
+        defaultOpen: true,
+        children: <div>error body</div>,
+      },
+      { ...baseSections[1], tone: 'failed' },
+    ];
+    rerender(<RunSectionTimeline sections={failedSections} />);
+    expect(screen.getByText('error body')).toBeInTheDocument();
+  });
+
+  it('should preserve a user toggle on a still-present section across an id-set change', async () => {
+    const user = userEvent.setup();
+    const a: RunSection = {
+      id: 'a',
+      title: 'Alpha',
+      tone: 'neutral',
+      defaultOpen: true,
+      children: <div>A body</div>,
+    };
+    const b: RunSection = {
+      id: 'b',
+      title: 'Beta',
+      tone: 'neutral',
+      defaultOpen: true,
+      children: <div>B body</div>,
+    };
+    const { rerender } = render(<RunSectionTimeline sections={[a, b]} />);
+    // Collapse Alpha.
+    await user.click(screen.getByRole('button', { name: /alpha/i }));
+    expect(screen.queryByText('A body')).not.toBeInTheDocument();
+
+    // Insert a new section c → Alpha's collapsed state must survive reconciliation.
+    const c: RunSection = {
+      id: 'c',
+      title: 'Gamma',
+      tone: 'neutral',
+      defaultOpen: true,
+      children: <div>C body</div>,
+    };
+    rerender(<RunSectionTimeline sections={[a, b, c]} />);
+    expect(screen.queryByText('A body')).not.toBeInTheDocument();
+    expect(screen.getByText('C body')).toBeInTheDocument();
   });
 
   it('should apply tone-based border classes to the rail dot', () => {

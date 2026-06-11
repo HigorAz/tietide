@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -40,6 +40,23 @@ export function RunSectionTimeline({
   const [open, setOpen] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(sections.map((s) => [s.id, s.defaultOpen])),
   );
+
+  // Reconcile the open map when the section id SET changes (e.g. a success run
+  // → failed run on the same selected node inserts the Error card). Newly-added
+  // sections seed from their `defaultOpen` (so the Error card opens by default),
+  // removed ids drop, and user toggles on still-present sections are preserved
+  // (WR-04). Keyed on the joined id set so reordering/content swaps don't reset.
+  const sectionIdKey = sections.map((s) => s.id).join('|');
+  useEffect(() => {
+    setOpen((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const s of sections) next[s.id] = prev[s.id] ?? s.defaultOpen;
+      return next;
+    });
+    // `sections` is intentionally excluded — we only reconcile on the id set,
+    // not on every per-render rebuild of the sections array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionIdKey]);
 
   const allOpen = sections.length > 0 && sections.every((s) => open[s.id]);
 
