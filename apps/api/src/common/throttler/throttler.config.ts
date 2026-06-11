@@ -17,21 +17,38 @@ export const IP_THROTTLER_NAME = 'ip';
 export const DEFAULT_IP_THROTTLE_TTL_MS = 60_000;
 export const DEFAULT_IP_THROTTLE_LIMIT = 30;
 
-// @nestjs/throttler stores a route's `@Throttle({ ip: ... })` limit metadata under
-// `THROTTLER:LIMIT` + the throttler name. We read this key to make the `ip` throttler
-// a pure opt-in layer: it skips every route that has NOT explicitly set an `ip` limit,
-// so it never clamps the limits of non-credential routes (e.g. a route whose own
-// `default` override exceeds the global ceiling). Only credential routes opt in.
-const IP_THROTTLER_LIMIT_METADATA_KEY = `THROTTLER:LIMIT${IP_THROTTLER_NAME}`;
-const ipThrottlerReflector = new Reflector();
+// Named, opt-in throttlers for the env-tunable per-category caps (W5.8). Each layers
+// on top of the `default` tracker (per-user / per-(ip,email)) but reads its limit/ttl
+// from its own env knobs at module init, so the documented incident-response env vars
+// (THROTTLE_AUTH_*, THROTTLE_EXECUTE_*, THROTTLE_AI_*) actually take effect. Routes opt
+// in by declaring `@Throttle({ <name>: { ... } })`; the guard substitutes the
+// env-resolved limit/ttl for these names so the per-route decorator value can never
+// pin the cap to a compile-time constant (the original W5.8 bug).
+export const AUTH_THROTTLER_NAME = 'auth';
+export const EXECUTE_THROTTLER_NAME = 'execute';
+export const AI_THROTTLER_NAME = 'ai';
 
-/** True when the handled route did NOT opt into the per-IP aggregate cap. */
-function shouldSkipIpThrottler(context: ExecutionContext): boolean {
-  const optedIn = ipThrottlerReflector.getAllAndOverride(IP_THROTTLER_LIMIT_METADATA_KEY, [
-    context.getHandler(),
-    context.getClass(),
-  ]);
-  return optedIn === undefined;
+// @nestjs/throttler stores a route's `@Throttle({ <name>: ... })` limit metadata under
+// `THROTTLER:LIMIT` + the throttler name. We read this key to make each layered
+// throttler a pure opt-in layer: it skips every route that has NOT explicitly set a
+// limit for that name, so it never clamps the limits of unrelated routes (e.g. a route
+// whose own `default` override exceeds the global ceiling). Only routes that opt in are
+// subject to the layered cap.
+const throttlerOptInReflector = new Reflector();
+
+/**
+ * Build a `skipIf` predicate that skips any route which did NOT opt into the named
+ * throttler `name` (i.e. did not declare a `@Throttle({ [name]: ... })` limit).
+ */
+function makeOptInSkip(name: string): (context: ExecutionContext) => boolean {
+  const limitMetadataKey = `THROTTLER:LIMIT${name}`;
+  return (context: ExecutionContext): boolean => {
+    const optedIn = throttlerOptInReflector.getAllAndOverride(limitMetadataKey, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    return optedIn === undefined;
+  };
 }
 // Workflow execute (and dry-run /test): enqueues a BullMQ job. Worker
 // concurrency is 5, so a per-user budget of 20/min absorbs editor bursts
@@ -73,6 +90,9 @@ export type AuthThrottleSettings = ThrottleSettings;
 export function buildThrottlerOptions(config: ConfigService): ThrottlerModuleOptions {
   const ttl = config.get<number>('THROTTLE_TTL_MS', DEFAULT_THROTTLE_TTL_MS);
   const limit = config.get<number>('THROTTLE_LIMIT', DEFAULT_THROTTLE_LIMIT);
+  const auth = buildAuthThrottleSettings(config);
+  const execute = buildExecuteThrottleSettings(config);
+  const ai = buildAiThrottleSettings(config);
   return [
     {
       name: DEFAULT_THROTTLER_NAME,
@@ -91,7 +111,30 @@ export function buildThrottlerOptions(config: ConfigService): ThrottlerModuleOpt
       ttl,
       limit,
       getTracker: (req: Record<string, unknown>) => resolveClientIp(req as TrackableRequest),
-      skipIf: shouldSkipIpThrottler,
+      skipIf: makeOptInSkip(IP_THROTTLER_NAME),
+    },
+    {
+      // Per-category env-tunable caps (W5.8). Limit/ttl resolved from env at module
+      // init so the documented incident-response knobs actually bite. Opt-in only: a
+      // route must declare `@Throttle({ auth|execute|ai: { ... } })`. Buckets on the
+      // default tracker (per-user / per-(ip,email)). The guard overwrites the per-route
+      // decorator limit with these env values so the decorator can't pin a stale cap.
+      name: AUTH_THROTTLER_NAME,
+      ttl: auth.ttl,
+      limit: auth.limit,
+      skipIf: makeOptInSkip(AUTH_THROTTLER_NAME),
+    },
+    {
+      name: EXECUTE_THROTTLER_NAME,
+      ttl: execute.ttl,
+      limit: execute.limit,
+      skipIf: makeOptInSkip(EXECUTE_THROTTLER_NAME),
+    },
+    {
+      name: AI_THROTTLER_NAME,
+      ttl: ai.ttl,
+      limit: ai.limit,
+      skipIf: makeOptInSkip(AI_THROTTLER_NAME),
     },
   ];
 }

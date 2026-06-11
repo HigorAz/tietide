@@ -317,16 +317,19 @@ Real users get `429 Too Many Requests` from `/v1/auth/login` or `/v1/workflows`.
 
 ```bash
 docker exec tietide-api env | grep THROTTLE
-# THROTTLE_TTL=60         (window in seconds)
-# THROTTLE_LIMIT=100      (global per-IP per window)
-# THROTTLE_AUTH_LIMIT=5   (auth endpoints — tighter)
+# THROTTLE_TTL_MS=60000      (global window, milliseconds)
+# THROTTLE_LIMIT=100         (global per-bucket per window)
+# THROTTLE_AUTH_LIMIT=5      (auth endpoints — tighter, per-account)
+# THROTTLE_AUTH_TTL_MS=60000 (auth window, milliseconds)
+# THROTTLE_EXECUTE_LIMIT=20  (workflow execute / dry-run — per-tenant)
+# THROTTLE_AI_LIMIT=3        (AI doc generation — CPU-bound, tightest)
 ```
 
-Login is intentionally tight (5/min/IP) to stop credential stuffing. If a corporate NAT is putting many users behind one IP, that limit is too low for the topology — not a bug.
+Login is intentionally tight (5/min/account) to stop credential stuffing. If a corporate NAT is putting many users behind one IP, the per-account auth bucket is unaffected (it buckets by the targeted email, not the shared IP); the separate per-IP aggregate cap (`THROTTLE_IP_LIMIT`, default 30/min) is what a shared NAT egress shares.
 
 ### Recover
 
-For corporate-NAT cases, raise `THROTTLE_AUTH_LIMIT` carefully (e.g., 20) and restart the API. **Never disable** the limiter — it is the only thing standing between the auth endpoint and a brute-force attack.
+For corporate-NAT cases, raise `THROTTLE_IP_LIMIT` carefully (e.g., 60) and restart the API. The per-account `THROTTLE_AUTH_LIMIT` can likewise be tuned. All `THROTTLE_*` knobs are read at startup and take effect on the next API boot (the named-throttler limits resolve from these env vars at module init). **Never disable** the limiter — it is the only thing standing between the auth endpoint and a brute-force attack.
 
 ```bash
 # After editing .env

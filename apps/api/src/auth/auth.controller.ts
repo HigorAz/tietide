@@ -23,11 +23,11 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+  AUTH_THROTTLER_NAME,
   DEFAULT_AUTH_THROTTLE_LIMIT,
   DEFAULT_AUTH_THROTTLE_TTL_MS,
   DEFAULT_IP_THROTTLE_LIMIT,
   DEFAULT_IP_THROTTLE_TTL_MS,
-  DEFAULT_THROTTLER_NAME,
   IP_THROTTLER_NAME,
 } from '../common/throttler/throttler.config';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -59,7 +59,11 @@ export class AuthController {
 
   @Post('register')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
@@ -82,7 +86,11 @@ export class AuthController {
 
   @Post('verify-email')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
@@ -105,7 +113,11 @@ export class AuthController {
 
   @Post('forgot-password')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
@@ -127,7 +139,11 @@ export class AuthController {
 
   @Post('reset-password')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
@@ -150,7 +166,11 @@ export class AuthController {
 
   @Post('login')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
@@ -211,7 +231,11 @@ export class AuthController {
 
   @Post('resend-verification')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
@@ -234,7 +258,11 @@ export class AuthController {
   @Delete('account')
   @UseGuards(JwtAuthGuard)
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },

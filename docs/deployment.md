@@ -97,11 +97,19 @@ AI_SERVICE_URL=http://ai:8000
 # Lock CORS to your real frontend origin
 CORS_ORIGIN=https://tietide.example.com
 
-# Rate limiting (production-tighter than dev)
-THROTTLE_TTL=60
+# Rate limiting (production-tighter than dev). All windows are milliseconds.
+# Read at API startup; the per-category named throttlers resolve their limits from
+# these vars at module init, so changes take effect on the next API boot.
+THROTTLE_TTL_MS=60000
 THROTTLE_LIMIT=60
 THROTTLE_AUTH_TTL_MS=60000
 THROTTLE_AUTH_LIMIT=5
+THROTTLE_IP_TTL_MS=60000
+THROTTLE_IP_LIMIT=30
+THROTTLE_EXECUTE_TTL_MS=60000
+THROTTLE_EXECUTE_LIMIT=20
+THROTTLE_AI_TTL_MS=60000
+THROTTLE_AI_LIMIT=3
 
 # Backups (paths inside the VPS, not the container)
 BACKUP_DIR=/var/backups/tietide

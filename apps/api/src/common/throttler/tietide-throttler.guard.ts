@@ -6,13 +6,31 @@ import {
   InjectThrottlerStorage,
   ThrottlerGuard,
   type ThrottlerModuleOptions,
+  type ThrottlerOptions,
+  type ThrottlerRequest,
   type ThrottlerStorage,
 } from '@nestjs/throttler';
 import { resolveThrottleTracker, type TrackableRequest } from './throttle-tracker';
+import { AI_THROTTLER_NAME, AUTH_THROTTLER_NAME, EXECUTE_THROTTLER_NAME } from './throttler.config';
 
 interface BearerCarryingRequest extends TrackableRequest {
   headers?: { authorization?: unknown };
 }
+
+/**
+ * Named throttlers whose effective limit/ttl must come from the env-resolved module
+ * options (W5.8), never from the per-route `@Throttle` decorator metadata. @nestjs's
+ * base guard prefers the decorator's `THROTTLER:LIMIT<name>` value over the configured
+ * `namedThrottler.limit`, so a route's static decorator value would otherwise pin the
+ * cap to a compile-time constant and the documented THROTTLE_AUTH/EXECUTE/AI_* env
+ * knobs would be a no-op. We treat the decorator purely as an opt-in marker and force
+ * the configured limit/ttl in {@link TieTideThrottlerGuard.handleRequest}.
+ */
+const ENV_DRIVEN_THROTTLER_NAMES: ReadonlySet<string> = new Set([
+  AUTH_THROTTLER_NAME,
+  EXECUTE_THROTTLER_NAME,
+  AI_THROTTLER_NAME,
+]);
 
 /**
  * ThrottlerGuard that buckets authenticated requests per-tenant (by verified
@@ -34,6 +52,31 @@ export class TieTideThrottlerGuard extends ThrottlerGuard {
     private readonly jwt: JwtService,
   ) {
     super(options, storageService, reflector);
+  }
+
+  /**
+   * For the env-driven named throttlers (auth/execute/ai) substitute the
+   * module-configured limit/ttl — which {@link buildThrottlerOptions} resolved from
+   * env at init — for the per-route decorator values. This makes the documented
+   * THROTTLE_AUTH/EXECUTE/AI_* env knobs authoritative (W5.8) while leaving the
+   * default and IP throttlers, and per-route overrides on them, untouched.
+   */
+  protected handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
+    const throttler = requestProps.throttler as ThrottlerOptions;
+    if (
+      typeof throttler.name === 'string' &&
+      ENV_DRIVEN_THROTTLER_NAMES.has(throttler.name) &&
+      typeof throttler.limit === 'number' &&
+      typeof throttler.ttl === 'number'
+    ) {
+      return super.handleRequest({
+        ...requestProps,
+        limit: throttler.limit,
+        ttl: throttler.ttl,
+        blockDuration: throttler.ttl,
+      });
+    }
+    return super.handleRequest(requestProps);
   }
 
   protected async getTracker(req: Record<string, unknown>): Promise<string> {

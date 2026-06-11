@@ -30,9 +30,9 @@ import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OrgContextGuard } from '../common/guards/org-context.guard';
 import {
+  AI_THROTTLER_NAME,
   DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
   DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
-  DEFAULT_THROTTLER_NAME,
 } from '../common/throttler/throttler.config';
 import type { OrgContext } from '../common/org-context/org-context.types';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
@@ -41,8 +41,12 @@ import {
   WorkflowDocumentationResponseDto,
 } from './dto/workflow-documentation-response.dto';
 
+// W5.8: env-tunable AI-doc-generation cap. Buckets on the default (per-user) tracker;
+// the guard substitutes the env-resolved limit/ttl so THROTTLE_AI_LIMIT /
+// THROTTLE_AI_TTL_MS take effect at runtime. The values are the opt-in marker +
+// compile-time fallback only.
 const AI_DOCS_THROTTLE = {
-  [DEFAULT_THROTTLER_NAME]: {
+  [AI_THROTTLER_NAME]: {
     ttl: DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
     limit: DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
   },

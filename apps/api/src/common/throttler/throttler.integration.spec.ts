@@ -6,18 +6,24 @@ import { Test } from '@nestjs/testing';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import request from 'supertest';
 import {
+  AI_THROTTLER_NAME,
   DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
   DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
   DEFAULT_THROTTLER_NAME,
   DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
   DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+  EXECUTE_THROTTLER_NAME,
   IP_THROTTLER_NAME,
 } from './throttler.config';
 import { AppThrottlerModule } from './throttler.module';
 
 @Controller('test')
 class TestController {
+  // Exercises the global `default` throttler. Overrides its limit to 5 locally so the
+  // assertion stays independent of the module-wide THROTTLE_LIMIT (raised to 100 so the
+  // per-category named caps can trip first on their own routes).
   @Post('global')
+  @Throttle({ [DEFAULT_THROTTLER_NAME]: { ttl: 60_000, limit: 5 } })
   global(): { ok: true } {
     return { ok: true };
   }
@@ -30,7 +36,7 @@ class TestController {
 
   @Post('execute')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    [EXECUTE_THROTTLER_NAME]: {
       ttl: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
       limit: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
     },
@@ -41,7 +47,7 @@ class TestController {
 
   @Post('ai-docs')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    [AI_THROTTLER_NAME]: {
       ttl: DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
       limit: DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
     },
@@ -76,7 +82,11 @@ class TestController {
       load: [
         () => ({
           THROTTLE_TTL_MS: 60_000,
-          THROTTLE_LIMIT: 5,
+          // Global default kept high enough that the per-category named throttlers
+          // (execute=20, ai=3) trip BEFORE the global ceiling on their routes, so the
+          // execute/ai assertions below exercise the category cap, not the global one.
+          // The dedicated /test/global route below overrides this to 5 locally.
+          THROTTLE_LIMIT: 100,
         }),
       ],
     }),
