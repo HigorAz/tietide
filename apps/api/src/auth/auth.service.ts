@@ -158,6 +158,18 @@ export class AuthService {
       throw new BadRequestException('This verification link is invalid or has expired.');
     }
 
+    // A soft-deleted (anonymized) account must never have its verification state
+    // flipped or a session minted from a stale token. Reject with the SAME generic
+    // message used for a bad token — before consuming it or signing — so the
+    // tombstoned address is not disclosed.
+    const owner = await this.prisma.user.findUnique({
+      where: { id: record.userId },
+      select: { deletedAt: true },
+    });
+    if (!owner || owner.deletedAt) {
+      throw new BadRequestException('This verification link is invalid or has expired.');
+    }
+
     // Atomically consume — single-use AND not expired. A replayed or stale link
     // flips zero rows and is rejected.
     const consumed = await this.prisma.emailVerificationToken.updateMany({
@@ -209,6 +221,18 @@ export class AuthService {
       select: { id: true, userId: true },
     });
     if (!record) {
+      throw new BadRequestException('This password reset link is invalid or has expired.');
+    }
+
+    // A soft-deleted (anonymized) account must never have its password set, its
+    // verification state flipped, or a session minted from a stale token. Reject
+    // with the SAME generic message used for a bad token — before consuming it or
+    // signing — so the tombstoned address is not disclosed.
+    const owner = await this.prisma.user.findUnique({
+      where: { id: record.userId },
+      select: { deletedAt: true },
+    });
+    if (!owner || owner.deletedAt) {
       throw new BadRequestException('This password reset link is invalid or has expired.');
     }
 

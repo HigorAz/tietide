@@ -208,6 +208,7 @@ describe('AuthService', () => {
 
     it('consumes a valid token, marks the user verified, and issues a session', async () => {
       prisma.emailVerificationToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.emailVerificationToken.updateMany.mockResolvedValue({ count: 1 });
       prisma.user.update.mockResolvedValue({
         id: 'uuid-1',
@@ -234,6 +235,7 @@ describe('AuthService', () => {
 
     it('rejects a token that is already consumed or expired (atomic consume flips 0 rows)', async () => {
       prisma.emailVerificationToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.emailVerificationToken.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.verifyEmail(dto)).rejects.toThrow(BadRequestException);
@@ -248,6 +250,19 @@ describe('AuthService', () => {
       const lookup = prisma.emailVerificationToken.findUnique.mock.calls[0][0];
       expect(lookup.where.tokenHash).toEqual(expect.any(String));
       expect(lookup.where.tokenHash).not.toEqual(dto.token);
+    });
+
+    it('rejects (generic invalid/expired) a token whose user is soft-deleted, without consuming it or issuing a session', async () => {
+      prisma.emailVerificationToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: new Date('2026-06-08T00:00:00Z') });
+
+      await expect(service.verifyEmail(dto)).rejects.toThrow(
+        'This verification link is invalid or has expired.',
+      );
+      // The stale token must NOT be consumed and no session minted on a tombstoned row.
+      expect(prisma.emailVerificationToken.updateMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(jwt.sign).not.toHaveBeenCalled();
     });
   });
 
@@ -288,6 +303,7 @@ describe('AuthService', () => {
 
     it('consumes the token, sets the password, verifies email, bumps tokenVersion, and logs in', async () => {
       prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
       prisma.user.update.mockResolvedValue({
         id: 'uuid-1',
@@ -335,10 +351,24 @@ describe('AuthService', () => {
 
     it('rejects an already-consumed or expired token (atomic consume flips 0 rows)', async () => {
       prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
       expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects (generic invalid/expired) a token whose user is soft-deleted, without consuming it or resetting the password', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: new Date('2026-06-08T00:00:00Z') });
+
+      await expect(service.resetPassword(dto)).rejects.toThrow(
+        'This password reset link is invalid or has expired.',
+      );
+      // The stale token must NOT be consumed and no password set / session minted on a tombstoned row.
+      expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(jwt.sign).not.toHaveBeenCalled();
     });
   });
 
