@@ -28,4 +28,10 @@ describe('schema.prisma index coverage (W3.4)', () => {
   it('keeps the ExecutionStep (executionId) index that serves its only query', () => {
     expect(modelBlock('ExecutionStep')).toContain('@@index([executionId])');
   });
+
+  it('indexes AuditLog by (action, resource) for the filter-dropdown distinct sweeps (W5.53)', () => {
+    // audit-log.service.listFilterValues: SELECT DISTINCT action / resource over
+    // audit_logs (not org-scoped) — unindexed otherwise → full table scan.
+    expect(modelBlock('AuditLog')).toContain('@@index([action, resource])');
+  });
 });

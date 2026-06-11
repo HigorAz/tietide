@@ -493,6 +493,9 @@ model AuditLog {
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
+  // Backs the (non-org-scoped) SELECT DISTINCT action / resource sweeps in
+  // AuditLogService.listFilterValues — avoids a full table scan of audit_logs.
+  @@index([action, resource])
   @@map("audit_logs")
 }
 
