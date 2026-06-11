@@ -17,18 +17,35 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { ProviderWebhooksService } from './provider-webhooks.service';
 import { ProviderWebhookResponseDto } from './dto/provider-webhook-response.dto';
 import { ProviderTriggerRegistry } from '../provider-triggers/provider-trigger.registry';
+import {
+  DEFAULT_WEBHOOK_THROTTLE_LIMIT,
+  DEFAULT_WEBHOOK_THROTTLE_TTL_MS,
+  IP_THROTTLER_NAME,
+} from '../common/throttler/throttler.config';
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
 }
 
 @ApiTags('provider-webhooks')
-@SkipThrottle()
+// W5.10: public, unauthenticated ingress. Each POST does a Prisma findUnique
+// and (on a valid sub) a libsodium decrypt of the signing secret BEFORE the
+// signature is verified. Previously @SkipThrottle() (never limited) — replaced
+// with a generous-but-bounded per-IP cap via the `ip` named throttler so a
+// flood of arbitrary :subscriptionId values can't drive unbounded pre-auth DB
+// lookups + decrypts. Real providers fan out across many IPs, so 300/IP/min
+// leaves legitimate webhook bursts untouched.
+@Throttle({
+  [IP_THROTTLER_NAME]: {
+    ttl: DEFAULT_WEBHOOK_THROTTLE_TTL_MS,
+    limit: DEFAULT_WEBHOOK_THROTTLE_LIMIT,
+  },
+})
 @Controller('provider-webhooks')
 export class ProviderWebhooksController {
   constructor(

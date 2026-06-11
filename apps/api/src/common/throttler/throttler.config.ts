@@ -42,6 +42,18 @@ export const DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT = 20;
 // ~10-60s of CPU per call. 3/min worst-cases at ~3 minutes of Ollama CPU.
 export const DEFAULT_AI_GENERATE_THROTTLE_TTL_MS = 60_000;
 export const DEFAULT_AI_GENERATE_THROTTLE_LIMIT = 3;
+// Public webhook ingress (inbound webhooks + provider webhooks) (W5.10). These
+// routes are unauthenticated and do a Prisma findUnique (provider path also
+// libsodium-decrypts the signing secret) BEFORE any auth/signature decision, so
+// an unauthenticated flood of arbitrary :path/:subscriptionId values drives
+// unbounded DB lookups + decrypts. They were previously @SkipThrottle() (never
+// limited). Replace that with a GENEROUS-but-bounded per-IP cap: legitimate
+// providers fan out across many source IPs and rarely exceed a few hundred
+// hits/min from a single IP, so 300/IP/min leaves real bursts untouched while
+// capping a single-IP flood. Keyed purely on the client IP (the `ip` named
+// throttler) — there is no authenticated identity to bucket on here.
+export const DEFAULT_WEBHOOK_THROTTLE_TTL_MS = 60_000;
+export const DEFAULT_WEBHOOK_THROTTLE_LIMIT = 300;
 
 export interface ThrottleSettings {
   ttl: number;
@@ -101,5 +113,12 @@ export function buildAiThrottleSettings(config: ConfigService): ThrottleSettings
   return {
     ttl: config.get<number>('THROTTLE_AI_TTL_MS', DEFAULT_AI_GENERATE_THROTTLE_TTL_MS),
     limit: config.get<number>('THROTTLE_AI_LIMIT', DEFAULT_AI_GENERATE_THROTTLE_LIMIT),
+  };
+}
+
+export function buildWebhookThrottleSettings(config: ConfigService): ThrottleSettings {
+  return {
+    ttl: config.get<number>('THROTTLE_WEBHOOK_TTL_MS', DEFAULT_WEBHOOK_THROTTLE_TTL_MS),
+    limit: config.get<number>('THROTTLE_WEBHOOK_LIMIT', DEFAULT_WEBHOOK_THROTTLE_LIMIT),
   };
 }
