@@ -53,9 +53,8 @@ export function RunSectionTimeline({
       for (const s of sections) next[s.id] = prev[s.id] ?? s.defaultOpen;
       return next;
     });
-    // `sections` is intentionally excluded — we only reconcile on the id set,
-    // not on every per-render rebuild of the sections array.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // `sections` is intentionally excluded — we only reconcile on the id set
+    // (`sectionIdKey`), not on every per-render rebuild of the sections array.
   }, [sectionIdKey]);
 
   const allOpen = sections.length > 0 && sections.every((s) => open[s.id]);
