@@ -31,19 +31,18 @@ export interface ConnectionPickerProps {
 // for "no connection" and is mapped back to null on change.
 const NONE_VALUE = '__none__';
 
+// Renders an ABSOLUTE last-used timestamp rather than a relative "Ns ago".
+// A relative string computed at render time silently goes stale while a dropdown
+// sits open and idle (it never re-renders); an absolute date/time is stable and
+// correct for the lifetime of the open menu (IN-04).
 const formatLastUsed = (iso: string | null): string => {
   if (!iso) return 'Never used';
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return 'Never used';
-  const seconds = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (seconds < 60) return `Last used ${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `Last used ${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Last used ${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `Last used ${days}d ago`;
-  return `Last used ${new Date(iso).toLocaleDateString()}`;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 'Never used';
+  return `Last used ${date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })}`;
 };
 
 export function ConnectionPicker({

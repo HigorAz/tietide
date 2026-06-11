@@ -53,6 +53,25 @@ describe('ConnectionPicker', () => {
     expect(trigger).toHaveTextContent(/select a google connection/i);
   });
 
+  it('should render an absolute (stable) last-used timestamp in the dropdown', async () => {
+    const user = userEvent.setup();
+    const lastUsedAt = '2026-05-01T12:00:00Z';
+    seedConnections([makeConnection({ id: 'g-1', name: 'Work Google', lastUsedAt })]);
+
+    render(<ConnectionPicker provider="google" value={null} onChange={vi.fn()} />);
+
+    await user.click(screen.getByRole('combobox', { name: /connection/i }));
+
+    const expected = `Last used ${new Date(lastUsedAt).toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })}`;
+    // Absolute, not relative — no "Ns ago" that would silently go stale while
+    // the menu sits open and idle.
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText(/ago$/)).not.toBeInTheDocument();
+  });
+
   it('should show only connections matching the provider in the dropdown', async () => {
     const user = userEvent.setup();
     seedConnections([
