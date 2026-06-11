@@ -14,14 +14,19 @@ export function useCopy(): CopyFn {
 
   return useCallback(
     async (text: string, what: string): Promise<void> => {
+      // Branch the failure message on the actual cause (IN-03): a missing API
+      // (insecure origin) is genuinely "unavailable", while a writeText rejection
+      // (denied permission, unfocused document) is just a failed copy — don't
+      // assert "unavailable" for the latter.
+      if (!navigator.clipboard?.writeText) {
+        show({ tone: 'error', message: 'Copy failed — clipboard unavailable' });
+        return;
+      }
       try {
-        if (!navigator.clipboard?.writeText) {
-          throw new Error('clipboard unavailable');
-        }
         await navigator.clipboard.writeText(text);
         show({ tone: 'success', message: `Copied ${what}` });
       } catch {
-        show({ tone: 'error', message: 'Copy failed — clipboard unavailable' });
+        show({ tone: 'error', message: 'Copy failed' });
       }
     },
     [show],

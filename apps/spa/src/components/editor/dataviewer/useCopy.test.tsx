@@ -40,7 +40,7 @@ describe('useCopy', () => {
 
     expect(show).toHaveBeenCalledWith({
       tone: 'error',
-      message: 'Copy failed — clipboard unavailable',
+      message: 'Copy failed',
     });
   });
 
