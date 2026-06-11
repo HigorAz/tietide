@@ -7,6 +7,11 @@ import { useConnectionsStore, resetConnectionsStore } from '@/stores/connections
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
 import type { Node } from 'reactflow';
+import {
+  StepLayoutProvider,
+  type ConnectionStepMeta,
+  type StepLayoutValue,
+} from './steps/StepLayoutContext';
 import { ConnectionPicker } from './ConnectionPicker';
 
 const makeConnection = (overrides: Partial<ConnectionView> = {}): ConnectionView => ({
@@ -46,6 +51,25 @@ describe('ConnectionPicker', () => {
     const trigger = screen.getByRole('combobox', { name: /connection/i });
     expect(trigger).toBeInTheDocument();
     expect(trigger).toHaveTextContent(/select a google connection/i);
+  });
+
+  it('should render an absolute (stable) last-used timestamp in the dropdown', async () => {
+    const user = userEvent.setup();
+    const lastUsedAt = '2026-05-01T12:00:00Z';
+    seedConnections([makeConnection({ id: 'g-1', name: 'Work Google', lastUsedAt })]);
+
+    render(<ConnectionPicker provider="google" value={null} onChange={vi.fn()} />);
+
+    await user.click(screen.getByRole('combobox', { name: /connection/i }));
+
+    const expected = `Last used ${new Date(lastUsedAt).toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })}`;
+    // Absolute, not relative — no "Ns ago" that would silently go stale while
+    // the menu sits open and idle.
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+    expect(screen.queryByText(/ago$/)).not.toBeInTheDocument();
   });
 
   it('should show only connections matching the provider in the dropdown', async () => {
@@ -232,6 +256,138 @@ describe('ConnectionPicker', () => {
       await user.click(await screen.findByRole('option', { name: /no authentication/i }));
 
       expect(onChange).toHaveBeenCalledWith(null);
+    });
+  });
+
+  describe('step-layout awareness', () => {
+    const makeLayout = (
+      slot: HTMLElement | null,
+      overrides: Partial<StepLayoutValue> = {},
+    ): StepLayoutValue => ({
+      connectionSlot: slot,
+      registerConnection: vi.fn(),
+      unregisterConnection: vi.fn(),
+      reportValidity: vi.fn(),
+      ...overrides,
+    });
+
+    it('registers connection meta matching props when inside a step layout', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+      const slot = document.createElement('div');
+      const registerConnection = vi.fn();
+      const layout = makeLayout(slot, { registerConnection });
+
+      render(
+        <StepLayoutProvider value={layout}>
+          <ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />
+        </StepLayoutProvider>,
+      );
+
+      expect(registerConnection).toHaveBeenCalled();
+      const meta = registerConnection.mock.calls.at(-1)?.[0] as ConnectionStepMeta;
+      expect(meta.provider).toBe('google');
+      expect(meta.optional).toBe(false);
+      expect(meta.hasSelection).toBe(true);
+      expect(meta.selectedName).toBe('Work Google');
+    });
+
+    it('registers optional=true when allowClear is set', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+      const registerConnection = vi.fn();
+      const layout = makeLayout(document.createElement('div'), { registerConnection });
+
+      render(
+        <StepLayoutProvider value={layout}>
+          <ConnectionPicker provider="google" value={null} onChange={vi.fn()} allowClear />
+        </StepLayoutProvider>,
+      );
+
+      const meta = registerConnection.mock.calls.at(-1)?.[0] as ConnectionStepMeta;
+      expect(meta.optional).toBe(true);
+      expect(meta.hasSelection).toBe(false);
+    });
+
+    it('portals the picker (wrapped in a connection card) into the connection slot, not the default container', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+      const slot = document.createElement('div');
+      document.body.appendChild(slot);
+      const layout = makeLayout(slot);
+
+      const { container } = render(
+        <StepLayoutProvider value={layout}>
+          <ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />
+        </StepLayoutProvider>,
+      );
+
+      expect(slot.querySelector('[data-testid="connection-card-change"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="connection-card-change"]')).toBeNull();
+      // the underlying picker control travels into the slot as well
+      expect(slot.querySelector('[role="combobox"]')).not.toBeNull();
+      document.body.removeChild(slot);
+    });
+
+    it('renders nothing inline when context is present but the slot is still null', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+      const layout = makeLayout(null);
+
+      const { container } = render(
+        <StepLayoutProvider value={layout}>
+          <ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />
+        </StepLayoutProvider>,
+      );
+
+      expect(container.querySelector('[role="combobox"]')).toBeNull();
+    });
+
+    it('renders inline WITHOUT a connection card when no step layout is present', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />);
+
+      expect(screen.queryByTestId('connection-card-change')).not.toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /connection/i })).toBeInTheDocument();
+    });
+
+    it('calls unregisterConnection on unmount', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+      const unregisterConnection = vi.fn();
+      const layout = makeLayout(document.createElement('div'), { unregisterConnection });
+
+      const { unmount } = render(
+        <StepLayoutProvider value={layout}>
+          <ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />
+        </StepLayoutProvider>,
+      );
+
+      expect(unregisterConnection).not.toHaveBeenCalled();
+      unmount();
+      expect(unregisterConnection).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('errorMessage prop', () => {
+    it('renders an alert with the error message when provided', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(
+        <ConnectionPicker
+          provider="google"
+          value={null}
+          onChange={vi.fn()}
+          errorMessage="Select a Google connection."
+        />,
+      );
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('Select a Google connection.');
+    });
+
+    it('does not render an alert when errorMessage is null/undefined', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+
+      render(<ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />);
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 

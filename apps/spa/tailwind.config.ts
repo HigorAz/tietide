@@ -25,6 +25,13 @@ const config: Config = {
         'status-running': '#FAB005',
         'status-success': '#12B886',
         'status-failed': '#F03E3E',
+        // Type colors for the run-result data viewer (JsonTree value tinting).
+        // CONTEXT-locked sketch 002-D palette.
+        'data-key': '#c5d5e8',
+        'data-string': '#7ee2c7',
+        'data-number': '#74c0fc',
+        'data-boolean': '#da77f2',
+        'data-null': '#6b7c93',
       },
       borderRadius: {
         sm: '4px',

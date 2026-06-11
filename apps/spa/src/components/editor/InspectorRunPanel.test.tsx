@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Node } from 'reactflow';
 import { NodeType } from '@tietide/shared';
@@ -12,11 +12,11 @@ import {
 } from '@/stores/executionLiveStore';
 import type { CustomNodeData } from './nodes/CustomNode.types';
 
-const editorNode = (id: string, label: string): Node<CustomNodeData> => ({
+const editorNode = (id: string, label: string, alias?: string): Node<CustomNodeData> => ({
   id,
   type: 'custom',
   position: { x: 0, y: 0 },
-  data: { label, nodeType: NodeType.HTTP_REQUEST },
+  data: { label, nodeType: NodeType.HTTP_REQUEST, ...(alias ? { alias } : {}) },
 });
 
 const runState = (overrides: Partial<NodeRunState> = {}): NodeRunState => ({
@@ -80,7 +80,7 @@ describe('InspectorRunPanel', () => {
     expect(tabs[1]).toHaveAttribute('data-testid', 'run-node-tab-a');
   });
 
-  it('should show input and output JSON for the first selected node', () => {
+  it('should show input and output data for the first selected node', () => {
     useEditorStore.setState({
       ...initialEditorState,
       nodes: [editorNode('node-a', 'Fetch')],
@@ -100,7 +100,7 @@ describe('InspectorRunPanel', () => {
 
     render(<InspectorRunPanel />);
     expect(screen.getByTestId('run-node-input')).toHaveTextContent('https://example.com');
-    expect(screen.getByTestId('run-node-output')).toHaveTextContent('"status": 200');
+    expect(screen.getByTestId('run-node-output')).toHaveTextContent('200');
   });
 
   it('should switch detail view when a different node tab is selected', async () => {
@@ -118,13 +118,13 @@ describe('InspectorRunPanel', () => {
     });
 
     render(<InspectorRunPanel />);
-    expect(screen.getByTestId('run-node-output')).toHaveTextContent('"from": "a"');
+    expect(screen.getByTestId('run-node-output')).toHaveTextContent('a');
 
     await user.click(screen.getByTestId('run-node-tab-b'));
-    expect(screen.getByTestId('run-node-output')).toHaveTextContent('"from": "b"');
+    expect(screen.getByTestId('run-node-output')).toHaveTextContent('b');
   });
 
-  it('should render the error block only when state.error is set', () => {
+  it('should render the ErrorCard only when state.error is set', () => {
     useEditorStore.setState({
       ...initialEditorState,
       nodes: [editorNode('node-a', 'Fetch')],
@@ -140,36 +140,43 @@ describe('InspectorRunPanel', () => {
     const errorBlock = screen.getByTestId('run-node-error');
     expect(errorBlock).toHaveTextContent('boom');
     expect(errorBlock).toHaveTextContent('E_BOOM');
+    expect(errorBlock).toHaveTextContent(/node failed/i);
   });
 
-  it('should render long error messages in full without a hard height cap', () => {
+  it('should not render the ErrorCard when there is no error', () => {
     useEditorStore.setState({
       ...initialEditorState,
-      nodes: [editorNode('node-a', 'Outlook: Send Email')],
+      nodes: [editorNode('node-a', 'Fetch')],
     });
-    const longMessage =
-      'Connection "e2a3dd0c-053f-41d0-8d5e-abc123def456789012345678" not found in the database for this user. Re-pick the connection in the node config and save the workflow before running.';
+    useExecutionLiveStore.setState({
+      ...initialExecutionLiveState,
+      nodes: new Map([['node-a', runState({ output: { ok: true } })]]),
+    });
+    render(<InspectorRunPanel />);
+    expect(screen.queryByTestId('run-node-error')).not.toBeInTheDocument();
+  });
+
+  it('should select the node and switch to configure when Fix in Configure is clicked', async () => {
+    const user = userEvent.setup();
+    useEditorStore.setState({
+      ...initialEditorState,
+      nodes: [editorNode('node-a', 'Fetch')],
+      viewMode: 'result',
+    });
     useExecutionLiveStore.setState({
       ...initialExecutionLiveState,
       nodes: new Map([
-        ['node-a', runState({ status: 'failed', error: { message: longMessage, code: null } })],
+        ['node-a', runState({ status: 'failed', error: { message: 'boom', code: null } })],
       ]),
     });
 
     render(<InspectorRunPanel />);
-    const errorBlock = screen.getByTestId('run-node-error');
-    // Full message rendered (no truncation in DOM).
-    expect(errorBlock).toHaveTextContent(longMessage);
-    // The <pre> wraps long tokens (so a UUID doesn't push a horizontal scrollbar)
-    // and is no longer artificially capped to max-h-32.
-    const pre = errorBlock.querySelector('pre');
-    expect(pre).not.toBeNull();
-    expect(pre?.className).toContain('whitespace-pre-wrap');
-    expect(pre?.className).toContain('break-words');
-    expect(pre?.className).not.toContain('max-h-32');
+    await user.click(screen.getByRole('button', { name: /fix in configure/i }));
+    expect(useEditorStore.getState().selectedNodeId).toBe('node-a');
+    expect(useEditorStore.getState().viewMode).toBe('configure');
   });
 
-  it('should render a Copy button for each JSON block (input and output)', () => {
+  it('should render a copy-json button on BOTH the Input and Output panes', () => {
     useEditorStore.setState({
       ...initialEditorState,
       nodes: [editorNode('node-a', 'Fetch')],
@@ -180,17 +187,13 @@ describe('InspectorRunPanel', () => {
     });
 
     render(<InspectorRunPanel />);
-    expect(screen.getByRole('button', { name: /copy input json/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /copy output json/i })).toBeInTheDocument();
+    const inputPane = screen.getByTestId('run-node-input-pane');
+    const outputPane = screen.getByTestId('run-node-output-pane');
+    expect(within(inputPane).getByRole('button', { name: /copy json/i })).toBeInTheDocument();
+    expect(within(outputPane).getByRole('button', { name: /copy json/i })).toBeInTheDocument();
   });
 
   it('should not throw when the clipboard API rejects', async () => {
-    Object.defineProperty(window.navigator, 'clipboard', {
-      configurable: true,
-      writable: true,
-      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
-    });
-
     useEditorStore.setState({
       ...initialEditorState,
       nodes: [editorNode('node-a', 'Fetch')],
@@ -201,9 +204,14 @@ describe('InspectorRunPanel', () => {
     });
 
     const user = userEvent.setup();
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
+    });
     render(<InspectorRunPanel />);
+    const inputPane = screen.getByTestId('run-node-input-pane');
     await expect(
-      user.click(screen.getByRole('button', { name: /copy input json/i })),
+      user.click(within(inputPane).getByRole('button', { name: /copy json/i })),
     ).resolves.not.toThrow();
   });
 
