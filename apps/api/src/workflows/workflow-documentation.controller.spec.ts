@@ -9,6 +9,8 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { WorkflowDocumentationController } from './workflow-documentation.controller';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
 
@@ -21,6 +23,7 @@ describe('WorkflowDocumentationController (integration)', () => {
     startRegeneration: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
+  let activeOrg: OrgContext | null;
 
   const uuid = '550e8400-e29b-41d4-a716-446655440000';
   const updatedAt = new Date('2026-04-26T01:00:00Z');
@@ -52,6 +55,7 @@ describe('WorkflowDocumentationController (integration)', () => {
       startRegeneration: jest.fn(),
     };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
+    activeOrg = { id: 'org-uuid', role: 'MEMBER' };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WorkflowDocumentationController],
@@ -65,6 +69,14 @@ describe('WorkflowDocumentationController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          const req = ctx.switchToHttp().getRequest<{ org: OrgContext | null }>();
+          req.org = activeOrg;
           return true;
         },
       })
@@ -89,7 +101,7 @@ describe('WorkflowDocumentationController (integration)', () => {
         .get(`/workflows/${uuid}/documentation`)
         .expect(200);
 
-      expect(docs.findExisting).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(docs.findExisting).toHaveBeenCalledWith('org-uuid', uuid);
       expect(res.headers.etag).toBe(expectedEtag);
       expect(res.headers['last-modified']).toBe(expectedLastModified);
       expect(res.body).toMatchObject({
@@ -143,6 +155,18 @@ describe('WorkflowDocumentationController (integration)', () => {
       docs.findExisting.mockRejectedValue(new ForbiddenException('No access'));
 
       await request(app.getHttpServer()).get(`/workflows/${uuid}/documentation`).expect(403);
+    });
+
+    it('passes the active org id (not the user id) to the service (W5.5)', async () => {
+      // A co-member of the owning org reads the doc: authorize by org, never author.
+      activeOrg = { id: 'owning-org', role: 'MEMBER' };
+      authedUser = { id: 'co-member-uuid', email: 'peer@example.com', role: 'USER' };
+      docs.findExisting.mockResolvedValue(result);
+
+      await request(app.getHttpServer()).get(`/workflows/${uuid}/documentation`).expect(200);
+
+      expect(docs.findExisting).toHaveBeenCalledWith('owning-org', uuid);
+      expect(docs.findExisting).not.toHaveBeenCalledWith('co-member-uuid', uuid);
     });
 
     it('should return 400 when id is not a UUID', async () => {
@@ -210,8 +234,36 @@ describe('WorkflowDocumentationController (integration)', () => {
         .post(`/workflows/${uuid}/documentation/regenerate`)
         .expect(202);
 
-      expect(docs.startRegeneration).toHaveBeenCalledWith('owner-uuid', uuid);
+      expect(docs.startRegeneration).toHaveBeenCalledWith('org-uuid', uuid);
       expect(res.body).toEqual({ workflowId: uuid, status: 'pending' });
+    });
+
+    it('authorizes by the active org id, not the caller user id (W5.5)', async () => {
+      // A co-member of the owning org (different user than the author) is allowed:
+      // the controller must hand the service `org.id`, never `user.id`.
+      activeOrg = { id: 'owning-org', role: 'MEMBER' };
+      authedUser = { id: 'co-member-uuid', email: 'peer@example.com', role: 'USER' };
+      docs.startRegeneration.mockResolvedValue({ workflowId: uuid, status: 'pending' });
+
+      await request(app.getHttpServer())
+        .post(`/workflows/${uuid}/documentation/regenerate`)
+        .expect(202);
+
+      expect(docs.startRegeneration).toHaveBeenCalledWith('owning-org', uuid);
+      expect(docs.startRegeneration).not.toHaveBeenCalledWith('co-member-uuid', uuid);
+    });
+
+    it('denies an ejected ex-author whose active org no longer owns the workflow (W5.5)', async () => {
+      // OrgContextGuard resolves a DIFFERENT org for the ejected author; the
+      // service then 403's because that org does not own the workflow.
+      activeOrg = { id: 'foreign-org', role: 'MEMBER' };
+      docs.startRegeneration.mockRejectedValue(new ForbiddenException('No access'));
+
+      await request(app.getHttpServer())
+        .post(`/workflows/${uuid}/documentation/regenerate`)
+        .expect(403);
+
+      expect(docs.startRegeneration).toHaveBeenCalledWith('foreign-org', uuid);
     });
 
     it('should return 401 when the guard rejects', async () => {

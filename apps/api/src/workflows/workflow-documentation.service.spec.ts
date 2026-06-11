@@ -16,8 +16,8 @@ describe('WorkflowDocumentationService', () => {
   };
   let ai: { generateDocs: jest.Mock };
 
-  const userId = 'user-uuid-1';
-  const otherUserId = 'user-uuid-2';
+  const orgId = 'org-uuid-1';
+  const otherOrgId = 'org-uuid-2';
   const workflowId = '550e8400-e29b-41d4-a716-446655440000';
   const definition = {
     nodes: [
@@ -28,7 +28,7 @@ describe('WorkflowDocumentationService', () => {
 
   const persistedWorkflow = {
     id: workflowId,
-    userId,
+    organizationId: orgId,
     name: 'Demo',
     definition,
     version: 3,
@@ -87,7 +87,7 @@ describe('WorkflowDocumentationService', () => {
       prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
       prisma.workflowDocumentation.findUnique.mockResolvedValue(cachedRow);
 
-      const result = await service.findExisting(userId, workflowId);
+      const result = await service.findExisting(orgId, workflowId);
 
       expect(ai.generateDocs).not.toHaveBeenCalled();
       expect(prisma.workflowDocumentation.upsert).not.toHaveBeenCalled();
@@ -106,7 +106,7 @@ describe('WorkflowDocumentationService', () => {
       prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
       prisma.workflowDocumentation.findUnique.mockResolvedValue(null);
 
-      const result = await service.findExisting(userId, workflowId);
+      const result = await service.findExisting(orgId, workflowId);
 
       expect(result).toBeNull();
       expect(ai.generateDocs).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('WorkflowDocumentationService', () => {
       prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
       prisma.workflowDocumentation.findUnique.mockResolvedValue({ ...cachedRow, version: 2 });
 
-      const result = await service.findExisting(userId, workflowId);
+      const result = await service.findExisting(orgId, workflowId);
 
       expect(result).not.toBeNull();
       expect(result?.version).toBe(2);
@@ -126,13 +126,34 @@ describe('WorkflowDocumentationService', () => {
     it('should throw NotFoundException when the workflow does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.findExisting(userId, workflowId)).rejects.toThrow(NotFoundException);
+      await expect(service.findExisting(orgId, workflowId)).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw ForbiddenException when the caller does not own the workflow', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persistedWorkflow, userId: otherUserId });
+    it('should throw ForbiddenException when the active org does not own the workflow', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        ...persistedWorkflow,
+        organizationId: otherOrgId,
+      });
 
-      await expect(service.findExisting(userId, workflowId)).rejects.toThrow(ForbiddenException);
+      await expect(service.findExisting(orgId, workflowId)).rejects.toThrow(ForbiddenException);
+      expect(ai.generateDocs).not.toHaveBeenCalled();
+    });
+
+    it('should allow a co-member of the owning org (authorizes by org, not author)', async () => {
+      // Workflow is owned by orgId; the caller's active org is orgId even though
+      // they are not the original author — co-members must not be 403'd (W5.5).
+      prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
+      prisma.workflowDocumentation.findUnique.mockResolvedValue(cachedRow);
+
+      const result = await service.findExisting(orgId, workflowId);
+
+      expect(result).not.toBeNull();
+      expect(prisma.workflow.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: workflowId },
+          select: expect.objectContaining({ organizationId: true }),
+        }),
+      );
     });
   });
 
@@ -151,7 +172,7 @@ describe('WorkflowDocumentationService', () => {
         documentation: aiResult.documentation,
       });
 
-      const result = await service.startRegeneration(userId, workflowId);
+      const result = await service.startRegeneration(orgId, workflowId);
 
       expect(result).toEqual({ workflowId, status: 'pending' });
 
@@ -178,8 +199,8 @@ describe('WorkflowDocumentationService', () => {
       );
       prisma.workflowDocumentation.upsert.mockResolvedValue(cachedRow);
 
-      await service.startRegeneration(userId, workflowId);
-      await service.startRegeneration(userId, workflowId);
+      await service.startRegeneration(orgId, workflowId);
+      await service.startRegeneration(orgId, workflowId);
 
       expect(ai.generateDocs).toHaveBeenCalledTimes(1);
 
@@ -190,26 +211,41 @@ describe('WorkflowDocumentationService', () => {
     it('should throw NotFoundException (and not generate) when the workflow does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
 
-      await expect(service.startRegeneration(userId, workflowId)).rejects.toThrow(
-        NotFoundException,
+      await expect(service.startRegeneration(orgId, workflowId)).rejects.toThrow(NotFoundException);
+      expect(ai.generateDocs).not.toHaveBeenCalled();
+    });
+
+    it('should throw ForbiddenException when the active org does not own the workflow', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        ...persistedWorkflow,
+        organizationId: otherOrgId,
+      });
+
+      await expect(service.startRegeneration(orgId, workflowId)).rejects.toThrow(
+        ForbiddenException,
       );
       expect(ai.generateDocs).not.toHaveBeenCalled();
     });
 
-    it('should throw ForbiddenException when the caller does not own the workflow', async () => {
-      prisma.workflow.findUnique.mockResolvedValue({ ...persistedWorkflow, userId: otherUserId });
+    it('should allow a co-member of the owning org to regenerate (authorizes by org)', async () => {
+      // An ejected ex-author whose active org no longer owns the workflow is blocked
+      // above; here the active org DOES own it, so a co-member must be allowed (W5.5).
+      prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
+      ai.generateDocs.mockResolvedValue(aiResult);
+      prisma.workflowDocumentation.upsert.mockResolvedValue(cachedRow);
 
-      await expect(service.startRegeneration(userId, workflowId)).rejects.toThrow(
-        ForbiddenException,
-      );
-      expect(ai.generateDocs).not.toHaveBeenCalled();
+      const result = await service.startRegeneration(orgId, workflowId);
+
+      expect(result).toEqual({ workflowId, status: 'pending' });
+      await flush();
+      expect(ai.generateDocs).toHaveBeenCalledTimes(1);
     });
 
     it('should swallow background AI failures (returns pending, no upsert)', async () => {
       prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
       ai.generateDocs.mockRejectedValue(new AiServiceUnavailableError('down'));
 
-      const result = await service.startRegeneration(userId, workflowId);
+      const result = await service.startRegeneration(orgId, workflowId);
       expect(result.status).toBe('pending');
 
       await flush();

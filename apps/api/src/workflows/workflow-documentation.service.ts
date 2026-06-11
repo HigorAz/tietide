@@ -27,7 +27,7 @@ export interface DocumentationRegenerationStarted {
 
 interface AuthorizedWorkflow {
   id: string;
-  userId: string;
+  organizationId: string;
   name: string;
   definition: Prisma.JsonValue;
   version: number;
@@ -48,10 +48,10 @@ export class WorkflowDocumentationService {
   ) {}
 
   async findExisting(
-    userId: string,
+    organizationId: string,
     workflowId: string,
   ): Promise<WorkflowDocumentationResult | null> {
-    await this.loadAuthorizedWorkflow(userId, workflowId);
+    await this.loadAuthorizedWorkflow(organizationId, workflowId);
 
     const row = await this.prisma.workflowDocumentation.findUnique({ where: { workflowId } });
     if (!row) return null;
@@ -74,10 +74,10 @@ export class WorkflowDocumentationService {
    * holding an HTTP request open past the Cloudflare 524 (~100s) edge timeout.
    */
   async startRegeneration(
-    userId: string,
+    organizationId: string,
     workflowId: string,
   ): Promise<DocumentationRegenerationStarted> {
-    const workflow = await this.loadAuthorizedWorkflow(userId, workflowId);
+    const workflow = await this.loadAuthorizedWorkflow(organizationId, workflowId);
 
     if (!this.inFlight.has(workflowId)) {
       this.inFlight.add(workflowId);
@@ -98,18 +98,21 @@ export class WorkflowDocumentationService {
   }
 
   private async loadAuthorizedWorkflow(
-    userId: string,
+    organizationId: string,
     workflowId: string,
   ): Promise<AuthorizedWorkflow> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { id: true, userId: true, name: true, definition: true, version: true },
+      select: { id: true, organizationId: true, name: true, definition: true, version: true },
     });
 
     if (!workflow) {
       throw new NotFoundException('Workflow not found');
     }
-    if (workflow.userId !== userId) {
+    // Authorize against the active organization, not the original author. An
+    // ejected ex-author whose active org no longer owns the workflow must be
+    // 403'd; conversely a co-member of the owning org must be allowed (W5.5).
+    if (workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
     return workflow;

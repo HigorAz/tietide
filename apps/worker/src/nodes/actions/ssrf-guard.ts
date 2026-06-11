@@ -70,11 +70,24 @@ function isBlockedV4(ip: string): boolean {
   return BLOCKED_V4_CIDRS.some(([base, bits]) => inV4Cidr(ipInt, base, bits));
 }
 
+function hexGroupsToV4(g1: string, g2: string): string {
+  const hi = parseInt(g1, 16);
+  const lo = parseInt(g2, 16);
+  return `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+}
+
 function isBlockedV6(ipRaw: string): boolean {
   const ip = ipRaw.toLowerCase().replace(/^\[|\]$/g, '');
   // IPv4-mapped (::ffff:a.b.c.d) — classify by the embedded v4 address.
   const mapped = ip.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
   if (mapped) return isBlockedV4(mapped[1]);
+  // IPv4-mapped in hex form — the WHATWG URL parser normalizes
+  // ::ffff:127.0.0.1 to ::ffff:7f00:1. Reconstruct the embedded v4 address.
+  const mappedHex = ip.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (mappedHex) return isBlockedV4(hexGroupsToV4(mappedHex[1], mappedHex[2]));
+  // NAT64 (64:ff9b::/96) embeds an IPv4 address in the low 32 bits.
+  const nat64 = ip.match(/^64:ff9b::([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (nat64) return isBlockedV4(hexGroupsToV4(nat64[1], nat64[2]));
   if (ip === '::1' || ip === '::') return true; // loopback / unspecified
   if (ip.startsWith('fe80') || ip.startsWith('fe9') || ip.startsWith('fea') || ip.startsWith('feb'))
     return true; // fe80::/10 link-local

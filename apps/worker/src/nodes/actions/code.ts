@@ -32,53 +32,94 @@ interface SandboxResult {
 
 // The worker entry-point. Runs as a string via `new Worker(source, { eval: true })`.
 // Kept self-contained: no closures over outer scope, no TypeScript syntax.
+//
+// SANDBOX ESCAPE PREVENTION (W5.1):
+// A vm context created from `Object.create(null)` already owns a SEPARATE set of
+// realm intrinsics (Object, Array, JSON, Math, Function, ...). We must NOT copy
+// the HOST realm's intrinsics or host objects into it — doing so leaks the host
+// `Function` constructor, reachable via `Object.constructor`, `input.constructor`,
+// `setTimeout.constructor`, etc., which `codeGeneration:{strings:false}` does NOT
+// block (that flag only governs code-gen by the CONTEXT realm's own functions).
+// Through a host Function constructor user code reaches the real `process` →
+// ENCRYPTION_MASTER_KEY/JWT_SECRET/DATABASE_URL and child_process (RCE).
+//
+// So we inject only:
+//  - DATA as JSON STRINGS (primitives carry no realm leak), re-parsed INSIDE the
+//    context with the context's own JSON so the resulting objects' `.constructor`
+//    is the sandboxed Function (blocked by codeGeneration), and
+//  - timers as CONTEXT-realm wrapper functions over a host bridge that is deleted
+//    before user code runs, so the host timer fns are never reachable as values.
 const WORKER_SOURCE = `
 const { parentPort, workerData } = require('node:worker_threads');
 const vm = require('node:vm');
 
 try {
+  // A null-proto sandbox: createContext populates it with the context realm's OWN
+  // intrinsics. We deliberately do NOT assign any host intrinsic or host object.
   const sandbox = Object.create(null);
-  sandbox.input = workerData.input;
-  // \`$nodes\` is the full upstream output scope keyed by node id, so user code can
-  // read sibling/ancestor outputs directly (vs \`input\`, the flattened last
-  // predecessor). Defaults to {} when there is no upstream.
-  sandbox.$nodes = workerData.scope || {};
-  // User-declared INPUT variables: each key (already identifier-validated at the
-  // engine boundary) is exposed as a bare global holding its resolved data-pill value.
-  const userInputs = workerData.inputs || {};
-  for (const k of Object.keys(userInputs)) {
-    sandbox[k] = userInputs[k];
-  }
-  sandbox.JSON = JSON;
-  sandbox.Math = Math;
-  sandbox.Date = Date;
-  sandbox.Array = Array;
-  sandbox.Object = Object;
-  sandbox.String = String;
-  sandbox.Number = Number;
-  sandbox.Boolean = Boolean;
-  sandbox.RegExp = RegExp;
-  sandbox.Error = Error;
-  sandbox.Promise = Promise;
-  sandbox.Symbol = Symbol;
-  sandbox.Map = Map;
-  sandbox.Set = Set;
-  // Timers — required for async user code. Wall-clock timeout still caps execution.
-  sandbox.setTimeout = setTimeout;
-  sandbox.clearTimeout = clearTimeout;
-  sandbox.setInterval = setInterval;
-  sandbox.clearInterval = clearInterval;
-  sandbox.queueMicrotask = queueMicrotask;
 
   const context = vm.createContext(sandbox, {
     name: 'tietide-code-sandbox',
     codeGeneration: { strings: false, wasm: false },
   });
 
-  const wrapped = '(async () => {\\n' + workerData.code + '\\n})()';
-  Promise.resolve(
-    vm.runInContext(wrapped, context, { timeout: workerData.timeoutMs, breakOnSigint: true }),
-  )
+  // Inject user DATA as plain JSON strings only (no host object references).
+  sandbox.__inputJson = JSON.stringify(workerData.input ?? {});
+  sandbox.__scopeJson = JSON.stringify(workerData.scope || {});
+  sandbox.__inputsJson = JSON.stringify(workerData.inputs || {});
+
+  // Host timer bridge — passed by VALUE into the bootstrap function, never exposed
+  // as a sandbox global. The wrappers we define are CONTEXT-realm functions.
+  const __bridge = {
+    setTimeout: (cb, ms) => setTimeout(cb, ms),
+    clearTimeout: (id) => clearTimeout(id),
+    setInterval: (cb, ms) => setInterval(cb, ms),
+    clearInterval: (id) => clearInterval(id),
+    queueMicrotask: (cb) => queueMicrotask(cb),
+  };
+
+  // Bootstrap runs INSIDE the context (compiled against it, so it is NOT subject to
+  // the runtime codeGeneration.strings restriction). It re-parses the injected JSON
+  // with the context's OWN JSON (so the objects are context-realm — their
+  // \`.constructor\` is the sandboxed Function, blocked by codeGeneration), binds
+  // globals, wires timer wrappers over the host bridge, then deletes every
+  // bootstrap-only handle so user code can reach neither the host bridge nor the
+  // raw JSON strings as globals.
+  const bootstrap = vm.compileFunction(
+    \`
+      "use strict";
+      globalThis.input = JSON.parse(__inputJson);
+      globalThis.$nodes = JSON.parse(__scopeJson);
+      const __userInputs = JSON.parse(__inputsJson);
+      for (const __k of Object.keys(__userInputs)) {
+        globalThis[__k] = __userInputs[__k];
+      }
+      globalThis.setTimeout = (cb, ms) => __b.setTimeout(cb, ms);
+      globalThis.clearTimeout = (id) => __b.clearTimeout(id);
+      globalThis.setInterval = (cb, ms) => __b.setInterval(cb, ms);
+      globalThis.clearInterval = (id) => __b.clearInterval(id);
+      globalThis.queueMicrotask = (cb) => __b.queueMicrotask(cb);
+      delete globalThis.__inputJson;
+      delete globalThis.__scopeJson;
+      delete globalThis.__inputsJson;
+    \`,
+    ['__b'],
+    { parsingContext: context },
+  );
+  bootstrap(__bridge);
+
+  // The user thunk is compiled against the context too, so its \`this\`/closure realm
+  // is the sandbox. Wrapping in an async IIFE preserves the existing top-level
+  // \`return\`/\`await\` ergonomics. Because it is compiled (not eval'd at runtime),
+  // codeGeneration.strings does not block it — but anything the user code itself
+  // tries to code-gen at runtime (eval/new Function) is still blocked.
+  const userFn = vm.compileFunction(
+    '"use strict";\\nreturn (async () => {\\n' + String(workerData.code) + '\\n})();',
+    [],
+    { parsingContext: context },
+  );
+
+  Promise.resolve(userFn())
     .then((result) => {
       // Strip non-JSON values so postMessage doesn't choke on functions/symbols/undefined.
       const safe = JSON.parse(JSON.stringify(result ?? null));
@@ -176,6 +217,10 @@ export class CodeAction implements INodeExecutor {
       const worker = new Worker(WORKER_SOURCE, {
         eval: true,
         workerData: { code: userCode, input, scope: scope ?? {}, inputs, timeoutMs },
+        // Defense-in-depth: hand the worker an EMPTY environment so that even a
+        // partial sandbox escape inside the worker cannot read ENCRYPTION_MASTER_KEY,
+        // JWT_SECRET, DATABASE_URL, etc. from process.env.
+        env: {},
         resourceLimits: {
           maxOldGenerationSizeMb: MEMORY_LIMIT_MB,
           maxYoungGenerationSizeMb: 16,

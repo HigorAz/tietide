@@ -22,8 +22,11 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { WorkflowVersionsService } from './workflow-versions.service';
 import {
   WorkflowVersionListResponseDto,
@@ -34,7 +37,7 @@ import {
 @ApiTags('workflow-versions')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 @Controller('workflows/:id/versions')
 export class WorkflowVersionsController {
   constructor(private readonly versions: WorkflowVersionsService) {}
@@ -48,13 +51,13 @@ export class WorkflowVersionsController {
   @ApiNotFoundResponse({ description: 'Workflow not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async list(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
   ): Promise<WorkflowVersionListResponseDto> {
     const parsedLimit = limit !== undefined ? Number.parseInt(limit, 10) : undefined;
-    return this.versions.list(user.id, id, { cursor, limit: parsedLimit });
+    return this.versions.list(org.id, id, { cursor, limit: parsedLimit });
   }
 
   @Get(':version')
@@ -63,11 +66,11 @@ export class WorkflowVersionsController {
   @ApiNotFoundResponse({ description: 'Workflow or version not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async getOne(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Param('version', ParseIntPipe) version: number,
   ): Promise<WorkflowVersionResponseDto> {
-    return this.versions.getOne(user.id, id, version);
+    return this.versions.getOne(org.id, id, version);
   }
 
   @Post(':version/restore')
@@ -82,10 +85,11 @@ export class WorkflowVersionsController {
   @ApiNotFoundResponse({ description: 'Workflow or version not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async restore(
+    @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Param('version', ParseIntPipe) version: number,
   ): Promise<WorkflowVersionRestoreResponseDto> {
-    return this.versions.restore(user.id, id, version);
+    return this.versions.restore(org.id, user.id, id, version);
   }
 }
