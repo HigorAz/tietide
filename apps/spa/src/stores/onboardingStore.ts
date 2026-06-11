@@ -8,6 +8,7 @@ export interface OnboardingState {
   tourStepIndex: number;
   helpDrawerOpen: boolean;
   cheatSheetOpen: boolean;
+  welcomeOpen: boolean;
 }
 
 export interface OnboardingActions {
@@ -19,6 +20,8 @@ export interface OnboardingActions {
   openCheatSheet: () => void;
   closeCheatSheet: () => void;
   toggleCheatSheet: () => void;
+  openWelcome: () => void;
+  closeWelcome: () => void;
 }
 
 export type OnboardingStore = OnboardingState & OnboardingActions;
@@ -29,6 +32,7 @@ export const initialOnboardingState: OnboardingState = {
   tourStepIndex: 0,
   helpDrawerOpen: false,
   cheatSheetOpen: false,
+  welcomeOpen: false,
 };
 
 export const useOnboardingStore = create<OnboardingStore>((set) => ({
@@ -42,4 +46,6 @@ export const useOnboardingStore = create<OnboardingStore>((set) => ({
   openCheatSheet: () => set({ cheatSheetOpen: true }),
   closeCheatSheet: () => set({ cheatSheetOpen: false }),
   toggleCheatSheet: () => set((s) => ({ cheatSheetOpen: !s.cheatSheetOpen })),
+  openWelcome: () => set({ welcomeOpen: true }),
+  closeWelcome: () => set({ welcomeOpen: false }),
 }));
