@@ -2,7 +2,7 @@ import { useLocation } from 'react-router-dom';
 import { ExternalLink, Keyboard, PlayCircle, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useOnboardingStore } from '@/stores/onboardingStore';
-import { hasTourForRoute } from '@/components/onboarding/tours';
+import { getTourIdForRoute, hasTourForRoute } from '@/components/onboarding/tours';
 import { cn } from '@/utils/cn';
 
 const QUICK_LINKS = [
@@ -23,9 +23,10 @@ export function HelpDrawer(): JSX.Element | null {
   const tourAvailable = hasTourForRoute(pathname);
 
   const handleTakeTour = (): void => {
-    if (!tourAvailable) return;
+    const tourId = getTourIdForRoute(pathname);
+    if (!tourId) return;
     close();
-    startTour({ scope: 'currentPage' });
+    startTour({ tourId });
   };
 
   const handleShortcuts = (): void => {

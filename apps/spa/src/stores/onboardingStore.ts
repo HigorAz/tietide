@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 
-export type TourScope = 'firstAccess' | 'currentPage';
+// The id of the tour currently running. Either a named per-route tour
+// (`'home'`, `'editor'`, …) or the special stitched first-access sequence.
+export const FIRST_ACCESS_TOUR_ID = 'firstAccess';
 
 export interface OnboardingState {
   tourRun: boolean;
-  tourScope: TourScope | null;
+  activeTourId: string | null;
   tourStepIndex: number;
   helpDrawerOpen: boolean;
   cheatSheetOpen: boolean;
@@ -12,7 +14,7 @@ export interface OnboardingState {
 }
 
 export interface OnboardingActions {
-  startTour: (payload: { scope: TourScope }) => void;
+  startTour: (payload: { tourId: string }) => void;
   finishTour: () => void;
   setStepIndex: (index: number) => void;
   openHelpDrawer: () => void;
@@ -28,7 +30,7 @@ export type OnboardingStore = OnboardingState & OnboardingActions;
 
 export const initialOnboardingState: OnboardingState = {
   tourRun: false,
-  tourScope: null,
+  activeTourId: null,
   tourStepIndex: 0,
   helpDrawerOpen: false,
   cheatSheetOpen: false,
@@ -38,8 +40,8 @@ export const initialOnboardingState: OnboardingState = {
 export const useOnboardingStore = create<OnboardingStore>((set) => ({
   ...initialOnboardingState,
 
-  startTour: ({ scope }) => set({ tourRun: true, tourScope: scope, tourStepIndex: 0 }),
-  finishTour: () => set({ tourRun: false, tourScope: null, tourStepIndex: 0 }),
+  startTour: ({ tourId }) => set({ tourRun: true, activeTourId: tourId, tourStepIndex: 0 }),
+  finishTour: () => set({ tourRun: false, activeTourId: null, tourStepIndex: 0 }),
   setStepIndex: (index) => set({ tourStepIndex: index }),
   openHelpDrawer: () => set({ helpDrawerOpen: true }),
   closeHelpDrawer: () => set({ helpDrawerOpen: false }),

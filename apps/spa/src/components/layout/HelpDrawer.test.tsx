@@ -37,7 +37,7 @@ describe('HelpDrawer', () => {
       useOnboardingStore.setState({ helpDrawerOpen: true, startTour });
       renderAt('/dashboard');
       await user.click(screen.getByRole('button', { name: /take the tour/i }));
-      expect(startTour).toHaveBeenCalledWith({ scope: 'currentPage' });
+      expect(startTour).toHaveBeenCalledWith({ tourId: 'dashboard' });
     });
 
     it('should re-trigger the tour for the editor when on /workflows/:id', async () => {
@@ -46,7 +46,7 @@ describe('HelpDrawer', () => {
       useOnboardingStore.setState({ helpDrawerOpen: true, startTour });
       renderAt('/workflows/abc-123');
       await user.click(screen.getByRole('button', { name: /take the tour/i }));
-      expect(startTour).toHaveBeenCalledWith({ scope: 'currentPage' });
+      expect(startTour).toHaveBeenCalledWith({ tourId: 'editor' });
     });
 
     it('should be disabled on routes without a tour (so users do not click into nothing)', () => {
