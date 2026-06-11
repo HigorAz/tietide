@@ -2,6 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsObject, IsOptional, ValidateNested } from 'class-validator';
 import { WorkflowDefinitionDto } from '../../workflows/dto/workflow-definition.dto';
+import {
+  DEFAULT_TRIGGER_DATA_MAX_BYTES,
+  MaxSerializedBytes,
+} from '../../common/validators/max-serialized-bytes.validator';
 
 export class TestExecutionDto {
   @ApiProperty({
@@ -21,5 +25,6 @@ export class TestExecutionDto {
   })
   @IsOptional()
   @IsObject()
+  @MaxSerializedBytes(DEFAULT_TRIGGER_DATA_MAX_BYTES)
   triggerData?: Record<string, unknown>;
 }

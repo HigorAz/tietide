@@ -1,4 +1,4 @@
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException, PayloadTooLargeException, UnauthorizedException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -310,6 +310,45 @@ describe('WebhooksService', () => {
 
       const jobPayload = queue.add.mock.calls[0]?.[1] as Record<string, unknown>;
       expect(jobPayload).toEqual(expect.objectContaining({ requestId: 'req-hook-corr' }));
+    });
+
+    it('should reject a parsed body larger than the trigger-data cap before persisting or enqueuing', async () => {
+      const ts = Math.floor(fixedNowMs / 1000).toString();
+      // ~70 KiB JSON object, over the 64 KiB DEFAULT_TRIGGER_DATA_MAX_BYTES cap
+      // but under the global 1 MiB Express body limit.
+      const rawBody = Buffer.from(JSON.stringify({ big: 'x'.repeat(70 * 1024) }));
+      const signature = sign(rawBody, ts);
+
+      prisma.webhook.findUnique.mockResolvedValue(activeWebhook());
+
+      await expect(service.trigger({ path, rawBody, signature, timestamp: ts })).rejects.toThrow(
+        PayloadTooLargeException,
+      );
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should accept a parsed body at the trigger-data cap', async () => {
+      const ts = Math.floor(fixedNowMs / 1000).toString();
+      // Build a body whose JSON serialization is just under the cap.
+      const value = 'x'.repeat(60 * 1024);
+      const rawBody = Buffer.from(JSON.stringify({ a: value }));
+      const signature = sign(rawBody, ts);
+
+      prisma.webhook.findUnique.mockResolvedValue(activeWebhook());
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'webhook',
+        triggerData: { a: value },
+        idempotencyKey: null,
+        createdAt: new Date(fixedNowMs),
+      });
+
+      const result = await service.trigger({ path, rawBody, signature, timestamp: ts });
+      expect(result).toEqual({ executionId, status: 'PENDING' });
+      expect(queue.add).toHaveBeenCalled();
     });
 
     it('should reject signatures of mismatched length without throwing a non-401 error', async () => {
