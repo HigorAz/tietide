@@ -23,16 +23,20 @@ export function useResizableWidth(): {
       e.preventDefault();
       const startX = e.clientX;
       const startW = width;
+      // Track the live dragged width so onUp persists the FINAL value, not the
+      // pre-drag `width` captured in this memoized closure (the move listeners
+      // close over the original `width`, so reading it in onUp lagged by a drag).
+      let latest = startW;
       const onMove = (ev: PointerEvent): void => {
         // Panel is on the right, so dragging the left edge leftwards widens it.
-        const next = Math.min(
+        latest = Math.min(
           MAX_PANEL_WIDTH,
           Math.max(MIN_PANEL_WIDTH, startW + (startX - ev.clientX)),
         );
-        setWidth(next);
+        setWidth(latest);
       };
       const onUp = (): void => {
-        window.localStorage.setItem(PANEL_WIDTH_KEY, String(width));
+        window.localStorage.setItem(PANEL_WIDTH_KEY, String(latest));
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
       };
