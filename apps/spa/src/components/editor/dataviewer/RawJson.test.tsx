@@ -42,4 +42,15 @@ describe('RawJson', () => {
     expect(() => render(<RawJson value={circular} testId="raw-circular" />)).not.toThrow();
     expect(screen.getByTestId('raw-circular')).toBeInTheDocument();
   });
+
+  it('caps an oversized payload and shows a truncation notice', () => {
+    // A long string blob serializes well past the 50k-char render cap.
+    render(<RawJson value={{ blob: 'x'.repeat(60_000) }} testId="raw-big" />);
+    expect(screen.getByTestId('raw-json-truncated')).toHaveTextContent(/output truncated/i);
+  });
+
+  it('does not show a truncation notice for small payloads', () => {
+    render(<RawJson value={{ a: 1 }} testId="raw-small" />);
+    expect(screen.queryByTestId('raw-json-truncated')).toBeNull();
+  });
 });

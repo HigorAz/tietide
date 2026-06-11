@@ -1,5 +1,6 @@
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 import { tokenizeJson, type JsonTokenType } from './jsonTokens';
+import { safeStringify } from './valueFormat';
 
 /** Token → Tailwind tint. 'key' and the scalar kinds map to the data-* tokens; */
 /** 'punct' (braces, commas, colons, whitespace) gets the muted secondary text. */
@@ -12,15 +13,13 @@ const TOKEN_CLASS: Record<JsonTokenType, string> = {
   punct: 'text-text-secondary',
 };
 
-/** Pretty-print, degrading undefined/circular values to a plain string (JsonBlock parity). */
-function stringify(value: unknown): string {
-  if (value === undefined) return 'null';
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
+/**
+ * Cap the serialized payload the pane will tokenize+render. A multi-MB blob would
+ * otherwise produce tens of thousands of spans and freeze the editor. Past the cap
+ * we show a truncated view + a notice; the full payload is still available via the
+ * header's "Copy JSON" button (which stringifies `value` directly, not this view).
+ */
+const RAW_MAX_CHARS = 50_000;
 
 export interface RawJsonProps {
   value: unknown;
@@ -29,7 +28,15 @@ export interface RawJsonProps {
 
 /** Syntax-tinted, vertically scrolling pretty-JSON pane. React spans only — no HTML injection. */
 export function RawJson({ value, testId }: RawJsonProps): JSX.Element {
-  const tokens = tokenizeJson(stringify(value));
+  // Memoize on `value` so unrelated parent re-renders (search box keystrokes,
+  // sibling-section toggles) don't re-stringify + re-tokenize the whole blob (WR-01).
+  const { tokens, truncated } = useMemo(() => {
+    const full = safeStringify(value);
+    const isTruncated = full.length > RAW_MAX_CHARS;
+    const source = isTruncated ? full.slice(0, RAW_MAX_CHARS) : full;
+    return { tokens: tokenizeJson(source), truncated: isTruncated };
+  }, [value]);
+
   return (
     <pre
       data-testid={testId}
@@ -44,6 +51,11 @@ export function RawJson({ value, testId }: RawJsonProps): JSX.Element {
           )}
         </Fragment>
       ))}
+      {truncated && (
+        <span data-testid="raw-json-truncated" className="mt-2 block text-text-muted">
+          {'\n'}… output truncated — use Copy JSON for the full payload.
+        </span>
+      )}
     </pre>
   );
 }
