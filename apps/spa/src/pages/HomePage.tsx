@@ -10,6 +10,7 @@ import { QuickActionsRow } from '@/components/home/QuickActionsRow';
 import { RecentActivitySection } from '@/components/home/RecentActivitySection';
 import { RecentWorkflowsSection } from '@/components/home/RecentWorkflowsSection';
 import { HomeEmptyState } from '@/components/home/HomeEmptyState';
+import { GettingStartedChecklist } from '@/components/onboarding/GettingStartedChecklist';
 import type { CreateWorkflowBody } from '@/api/workflows';
 
 const RECENT_WORKFLOWS_LIMIT = 3;
@@ -73,6 +74,8 @@ export function HomePage(): JSX.Element {
         <HomeGreeting name={user?.name} email={user?.email} />
 
         <QuickActionsRow onCreateWorkflow={() => setShowCreate(true)} />
+
+        <GettingStartedChecklist />
 
         {isEmpty ? (
           <HomeEmptyState />

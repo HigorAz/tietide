@@ -4,6 +4,8 @@ import { Search } from 'lucide-react';
 import type { Workflow } from '@tietide/shared';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useAuthStore } from '@/stores/authStore';
+import { markLibraryVisited } from '@/utils/tourStorage';
 import { getNodeIcon } from '@/components/editor/nodes/nodeIcons';
 import { ImportWorkflowButton } from '@/components/dashboard/ImportWorkflowButton';
 import type { WorkflowTemplate } from '@/api/library';
@@ -56,12 +58,19 @@ export function LibraryPage(): JSX.Element {
   const navigate = useNavigate();
   const { templates, status, error, search, fetch, setSearch, instantiate } = useLibraryStore();
   const toast = useToastStore((s) => s.show);
+  const userId = useAuthStore((s) => s.user?.id);
 
   const [busySlugs, setBusySlugs] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     void fetch();
   }, [fetch]);
+
+  // Mark the "Explore the library" onboarding milestone as soon as the user
+  // lands here.
+  useEffect(() => {
+    if (userId) markLibraryVisited(userId);
+  }, [userId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
