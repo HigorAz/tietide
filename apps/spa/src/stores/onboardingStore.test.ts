@@ -19,6 +19,19 @@ describe('onboardingStore', () => {
       expect(state.helpDrawerOpen).toBe(false);
       expect(state.cheatSheetOpen).toBe(false);
     });
+
+    it('should start with the welcome modal closed', () => {
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(false);
+    });
+  });
+
+  describe('welcome modal', () => {
+    it('should open and close the welcome modal', () => {
+      useOnboardingStore.getState().openWelcome();
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(true);
+      useOnboardingStore.getState().closeWelcome();
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(false);
+    });
   });
 
   describe('startTour', () => {
