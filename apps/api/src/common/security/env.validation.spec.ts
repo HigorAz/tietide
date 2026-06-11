@@ -79,6 +79,36 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ NODE_ENV: 'development', JWT_SECRET: 'x' })).not.toThrow();
   });
 
+  it('requires STRIPE_WEBHOOK_SECRET when STRIPE_SECRET_KEY is set in production', () => {
+    expect(() => validateEnv({ ...prodBase, STRIPE_SECRET_KEY: 'sk_live_x' })).toThrow(
+      /STRIPE_WEBHOOK_SECRET/,
+    );
+  });
+
+  it('rejects an empty STRIPE_WEBHOOK_SECRET when STRIPE_SECRET_KEY is set in production', () => {
+    expect(() =>
+      validateEnv({ ...prodBase, STRIPE_SECRET_KEY: 'sk_live_x', STRIPE_WEBHOOK_SECRET: '   ' }),
+    ).toThrow(/STRIPE_WEBHOOK_SECRET/);
+  });
+
+  it('accepts both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET set in production', () => {
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        STRIPE_SECRET_KEY: 'sk_live_x',
+        STRIPE_WEBHOOK_SECRET: 'whsec_real',
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET unset in production', () => {
+    expect(() => validateEnv(prodBase)).not.toThrow();
+  });
+
+  it('does not require STRIPE_WEBHOOK_SECRET when only the webhook secret is set (no secret key)', () => {
+    expect(() => validateEnv({ ...prodBase, STRIPE_WEBHOOK_SECRET: 'whsec_real' })).not.toThrow();
+  });
+
   it('aggregates every failing secret into one error', () => {
     expect(() =>
       validateEnv({

@@ -81,6 +81,22 @@ export function validateEnv(config: Record<string, unknown>): Record<string, unk
     }
   }
 
+  // Conditional pairing (W5.26): if the platform Stripe secret key is configured,
+  // the webhook signing secret MUST also be present. Otherwise the billing webhook
+  // receiver can never verify Stripe signatures and subscription sync silently
+  // breaks with only a warn log. Both-unset is valid (Stripe optional in dev/self-host).
+  const stripeKey =
+    typeof config.STRIPE_SECRET_KEY === 'string' ? config.STRIPE_SECRET_KEY.trim() : '';
+  if (stripeKey) {
+    const webhookSecret =
+      typeof config.STRIPE_WEBHOOK_SECRET === 'string' ? config.STRIPE_WEBHOOK_SECRET.trim() : '';
+    if (!webhookSecret) {
+      errors.push(
+        'STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set — webhook signature verification cannot work without it.',
+      );
+    }
+  }
+
   if (errors.length > 0) {
     throw new Error(`Invalid production environment:\n  - ${errors.join('\n  - ')}`);
   }

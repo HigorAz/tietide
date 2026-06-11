@@ -7,6 +7,7 @@ import {
   Logger,
   Post,
   Req,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -41,6 +42,16 @@ export class BillingWebhookController {
     @Req() req: RawBodyRequest,
     @Headers('stripe-signature') signature: string | undefined,
   ): Promise<{ received: true }> {
+    // Surface a partial misconfiguration (secret key set, but webhook signing
+    // secret blank) as 503 — distinct from attacker noise (400). Without the
+    // signing secret we can never verify the payload, so reject loudly rather
+    // than letting subscription sync silently break (W5.26).
+    if (this.stripe.hasSecretKey() && !this.stripe.isConfigured()) {
+      this.log.error(
+        'Stripe webhook received but STRIPE_WEBHOOK_SECRET is not configured — cannot verify signature',
+      );
+      throw new ServiceUnavailableException('Billing webhook is not fully configured');
+    }
     if (!signature) {
       throw new BadRequestException('Missing stripe-signature header');
     }

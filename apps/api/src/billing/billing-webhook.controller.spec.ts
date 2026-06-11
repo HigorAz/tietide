@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import type Stripe from 'stripe';
 import { StripeService } from './stripe.service';
 import { BillingService } from './billing.service';
@@ -8,6 +8,8 @@ describe('BillingWebhookController', () => {
   let stripe: {
     constructWebhookEvent: jest.Mock;
     retrieveSubscription: jest.Mock;
+    hasSecretKey: jest.Mock;
+    isConfigured: jest.Mock;
   };
   let billing: { syncFromStripeSubscription: jest.Mock; markSubscriptionDeleted: jest.Mock };
   let controller: BillingWebhookController;
@@ -18,6 +20,8 @@ describe('BillingWebhookController', () => {
     stripe = {
       constructWebhookEvent: jest.fn(),
       retrieveSubscription: jest.fn(),
+      hasSecretKey: jest.fn().mockReturnValue(true),
+      isConfigured: jest.fn().mockReturnValue(true),
     };
     billing = {
       syncFromStripeSubscription: jest.fn().mockResolvedValue(undefined),
@@ -32,6 +36,16 @@ describe('BillingWebhookController', () => {
   it('rejects a request with no signature header', async () => {
     await expect(controller.receive(req(), undefined)).rejects.toBeInstanceOf(BadRequestException);
     expect(stripe.constructWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns 503 when Stripe is partially configured (secret key set, webhook secret missing)', async () => {
+    stripe.hasSecretKey.mockReturnValue(true);
+    stripe.isConfigured.mockReturnValue(false);
+    await expect(controller.receive(req(), 'sig')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(stripe.constructWebhookEvent).not.toHaveBeenCalled();
+    expect(billing.syncFromStripeSubscription).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid signature with 400 and does not mutate state', async () => {
