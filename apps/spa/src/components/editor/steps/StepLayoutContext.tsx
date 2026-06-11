@@ -52,13 +52,22 @@ export function useStepLayout(): StepLayoutValue | null {
 /**
  * A node form calls this to report whether its Configure step is valid (so the
  * Test step can gate on it). Reports on every change of `valid`; no-op when
- * rendered outside a step layout. The provider resets validity to a safe
- * default when the active form changes, so forms that never call this leave the
- * Configure step treated as valid (Test never permanently locked).
+ * rendered outside a step layout.
+ *
+ * On unmount it reports `true` — the documented safe default (Test never
+ * permanently locked). This makes the default self-enforcing: when an invalid
+ * reporting form (e.g. GenericConnectorForm reporting `false`) is replaced by a
+ * form that never reports validity, the cleanup clears the stale `false` so the
+ * next node can't inherit a locked Test step. This no longer relies solely on
+ * the parent's manual `setConfigureValid(true)` reset on `nodeId` change.
  */
 export function useReportConfigValidity(valid: boolean): void {
   const layout = useStepLayout();
   useEffect(() => {
-    if (layout) layout.reportValidity(valid);
+    if (!layout) return undefined;
+    layout.reportValidity(valid);
+    return () => {
+      layout.reportValidity(true);
+    };
   }, [layout, valid]);
 }

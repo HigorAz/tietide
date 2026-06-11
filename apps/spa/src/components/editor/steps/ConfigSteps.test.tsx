@@ -146,6 +146,23 @@ describe('ConfigSteps', () => {
     expect(within(test).getByRole('button')).toBeDisabled();
   });
 
+  it('WR-05: switching from an invalid reporting node to a non-reporting node leaves Test unlocked', () => {
+    // Node A: a connector form that reports configure validity = false (Test locked).
+    const InvalidConnector = makeConnectorForm({ value: googleConnection.id, valid: false });
+    const { rerender } = render(
+      <ConfigSteps nodeId="node-A" config={{}} Form={InvalidConnector} />,
+    );
+    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'locked');
+
+    // Node B: a plain form that NEVER reports validity (manual/cron-style node).
+    // The previous form's unmount cleanup must clear the stale `false`, so Test
+    // is not inherited as locked even though node A left it invalid.
+    rerender(<ConfigSteps nodeId="node-B" config={{}} Form={PlainForm} />);
+
+    const test = screen.getByTestId('config-step-test');
+    expect(test).not.toHaveAttribute('data-status', 'locked');
+  });
+
   it('renders the error-handler ToggleSwitch in the Configure step body and dispatches on toggle', () => {
     renderSteps(PlainForm);
 
