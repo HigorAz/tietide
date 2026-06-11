@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { gmailSearchConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
@@ -121,18 +122,12 @@ export function GmailSearchForm({ nodeId, config }: NodeConfigFormProps): JSX.El
         )}
       </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          id={mockId}
-          type="checkbox"
-          checked={mockOnDryRun}
-          onChange={(e) => updateNodeConfig(nodeId, { mockOnDryRun: e.target.checked })}
-          className="h-4 w-4 rounded border-white/10 bg-elevated text-accent-teal focus:ring-accent-teal"
-        />
-        <label htmlFor={mockId} className="text-xs text-text-secondary">
-          Skip Gmail call on test runs (return mocked output)
-        </label>
-      </div>
+      <ToggleSwitch
+        id={mockId}
+        checked={mockOnDryRun}
+        onChange={(next) => updateNodeConfig(nodeId, { mockOnDryRun: next })}
+        label="Skip Gmail call on test runs (return mocked output)"
+      />
     </div>
   );
 }

@@ -25,4 +25,19 @@ describe('GmailSearchForm', () => {
     render(<GmailSearchForm nodeId={NODE_ID} config={{}} />);
     expect(screen.getByTestId('connection-picker-empty')).toBeInTheDocument();
   });
+
+  it('renders the dry-run mock setting as a shared ToggleSwitch (role=switch)', () => {
+    seedConnection();
+    render(
+      <GmailSearchForm
+        nodeId={NODE_ID}
+        config={{ connectionId: CONNECTION_ID, query: 'is:unread', mockOnDryRun: true }}
+      />,
+    );
+    const toggle = screen.getByRole('switch', {
+      name: /skip gmail call on test runs/i,
+    });
+    expect(toggle).toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
 });
