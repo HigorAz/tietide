@@ -25,7 +25,10 @@ import { Throttle } from '@nestjs/throttler';
 import {
   DEFAULT_AUTH_THROTTLE_LIMIT,
   DEFAULT_AUTH_THROTTLE_TTL_MS,
+  DEFAULT_IP_THROTTLE_LIMIT,
+  DEFAULT_IP_THROTTLE_TTL_MS,
   DEFAULT_THROTTLER_NAME,
+  IP_THROTTLER_NAME,
 } from '../common/throttler/throttler.config';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -60,6 +63,12 @@ export class AuthController {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
+    // W5.9: aggregate per-IP cap layered on top so one IP cannot rotate the email
+    // field to spray past the per-(ip,email) bucket.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
+    },
   })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -76,6 +85,11 @@ export class AuthController {
     [DEFAULT_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap bounds token-guessing sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.OK)
@@ -95,6 +109,11 @@ export class AuthController {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },
+    // W5.9: aggregate per-IP cap bounds email-rotation sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
+    },
   })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -111,6 +130,11 @@ export class AuthController {
     [DEFAULT_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap bounds reset-token-guessing sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.OK)
@@ -129,6 +153,12 @@ export class AuthController {
     [DEFAULT_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap so one IP cannot spray one password across many
+    // distinct emails by rotating the email field past the per-(ip,email) bucket.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.OK)
@@ -184,6 +214,11 @@ export class AuthController {
     [DEFAULT_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap bounds email-rotation sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.ACCEPTED)

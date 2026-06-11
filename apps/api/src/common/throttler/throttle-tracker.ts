@@ -31,8 +31,25 @@ export function resolveThrottleTracker(req: TrackableRequest): string {
     return `user:${rawUserId}`;
   }
 
-  const ip = (req.ips && req.ips.length > 0 ? req.ips[0] : req.ip) ?? 'unknown';
+  const ip = resolveClientIp(req);
   const rawEmail = req.body?.email;
   const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : undefined;
   return email ? `${ip}|${email}` : ip;
+}
+
+/**
+ * Resolve the real client IP, ignoring any account/email scoping (W5.9).
+ *
+ * This is the tracker for the dedicated per-IP aggregate throttler that layers on
+ * top of the per-(ip,email) {@link resolveThrottleTracker} bucket on credential
+ * routes: because the email is never folded in, an attacker cannot mint fresh
+ * buckets by rotating the email field — every request from one source IP lands in
+ * the same bucket, so the aggregate spray budget is enforced regardless of how
+ * many distinct target accounts are cycled.
+ *
+ * Proxy-aware: when `trust proxy` is enabled Express fills `req.ips` from
+ * `X-Forwarded-For` (left-most = real client); otherwise it uses `req.ip`.
+ */
+export function resolveClientIp(req: TrackableRequest): string {
+  return (req.ips && req.ips.length > 0 ? req.ips[0] : req.ip) ?? 'unknown';
 }
