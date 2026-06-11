@@ -19,7 +19,7 @@ export function EditorViewTabs(): JSX.Element | null {
   if (executionId === null) return null;
 
   return (
-    <span data-testid="editor-view-tabs" className="flex items-center">
+    <span data-testid="editor-view-tabs" data-tour="editor-view-tabs" className="flex items-center">
       <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as EditorViewMode)}>
         <TabsList aria-label="Editor view" className="border-b-0">
           <TabsTrigger value="configure">Configure</TabsTrigger>

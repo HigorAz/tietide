@@ -97,6 +97,7 @@ export function GlobalHistoryPage(): JSX.Element {
       <main className="mx-auto w-full max-w-6xl space-y-4 px-6 py-6">
         <section
           aria-label="Filters"
+          data-tour="history-filters"
           className="flex flex-wrap items-end gap-4 rounded-lg border border-white/5 bg-surface p-4"
         >
           <label className="flex flex-col gap-1 text-xs text-text-secondary">
@@ -172,7 +173,10 @@ export function GlobalHistoryPage(): JSX.Element {
         )}
 
         {list.length > 0 && (
-          <div className="overflow-x-auto rounded-lg border border-white/5 bg-surface">
+          <div
+            data-tour="history-list"
+            className="overflow-x-auto rounded-lg border border-white/5 bg-surface"
+          >
             <table className="w-full min-w-[40rem] text-sm">
               <thead className="bg-deep-blue/40 text-left text-xs uppercase tracking-wide text-text-secondary">
                 <tr>

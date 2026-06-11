@@ -4,6 +4,8 @@ import { Search } from 'lucide-react';
 import type { Workflow } from '@tietide/shared';
 import { useLibraryStore } from '@/stores/libraryStore';
 import { useToastStore } from '@/stores/toastStore';
+import { useAuthStore } from '@/stores/authStore';
+import { markLibraryVisited } from '@/utils/tourStorage';
 import { getNodeIcon } from '@/components/editor/nodes/nodeIcons';
 import { ImportWorkflowButton } from '@/components/dashboard/ImportWorkflowButton';
 import type { WorkflowTemplate } from '@/api/library';
@@ -56,12 +58,19 @@ export function LibraryPage(): JSX.Element {
   const navigate = useNavigate();
   const { templates, status, error, search, fetch, setSearch, instantiate } = useLibraryStore();
   const toast = useToastStore((s) => s.show);
+  const userId = useAuthStore((s) => s.user?.id);
 
   const [busySlugs, setBusySlugs] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     void fetch();
   }, [fetch]);
+
+  // Mark the "Explore the library" onboarding milestone as soon as the user
+  // lands here.
+  useEffect(() => {
+    if (userId) markLibraryVisited(userId);
+  }, [userId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -108,7 +117,7 @@ export function LibraryPage(): JSX.Element {
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-6 py-8">
-        <div className="mb-6">
+        <div data-tour="library-search" className="mb-6">
           <label className="relative flex items-center">
             <Search
               aria-hidden="true"
@@ -158,7 +167,7 @@ export function LibraryPage(): JSX.Element {
         )}
 
         {groups.length > 0 && (
-          <div className="flex flex-col gap-10">
+          <div data-tour="library-grid" className="flex flex-col gap-10">
             {groups.map((group) => (
               <section key={group.category} aria-label={group.category}>
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">

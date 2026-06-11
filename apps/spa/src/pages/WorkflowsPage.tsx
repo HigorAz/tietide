@@ -605,7 +605,7 @@ export function WorkflowsPage(): JSX.Element {
             onRequestDelete={(folder) => setFolderToDelete(folder)}
           />
 
-          <main className="min-w-0 flex-1 px-4 py-6 md:px-6 md:py-8">
+          <main data-tour="workflows-list" className="min-w-0 flex-1 px-4 py-6 md:px-6 md:py-8">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
               <label className="relative flex flex-1 items-center">
                 <Search
@@ -629,6 +629,7 @@ export function WorkflowsPage(): JSX.Element {
               <button
                 type="button"
                 onClick={() => setShowCreate(true)}
+                data-tour="workflows-new"
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-md bg-accent-teal px-3 py-2 text-sm font-semibold text-deep-blue transition',
                   'hover:bg-accent-teal-hover focus:outline-none focus:ring-1 focus:ring-accent-teal',
@@ -639,7 +640,10 @@ export function WorkflowsPage(): JSX.Element {
               </button>
             </div>
 
-            <div className="mb-6 rounded-md border border-white/5 bg-surface/40 px-3 py-2">
+            <div
+              data-tour="workflows-tags"
+              className="mb-6 rounded-md border border-white/5 bg-surface/40 px-3 py-2"
+            >
               <TagFilter
                 tags={tags}
                 selectedIds={selectedTagIds}

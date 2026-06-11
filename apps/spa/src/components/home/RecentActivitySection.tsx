@@ -19,7 +19,7 @@ export function RecentActivitySection({
 }: RecentActivitySectionProps): JSX.Element {
   const nameById = new Map(workflows.map((w) => [w.id, w.name]));
   return (
-    <section aria-label="Recent activity" className="space-y-3">
+    <section data-tour="home-recent-activity" aria-label="Recent activity" className="space-y-3">
       <header className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
           Recent activity

@@ -9,7 +9,7 @@ export interface QuickActionsRowProps {
 export function QuickActionsRow({ onCreateWorkflow }: QuickActionsRowProps): JSX.Element {
   const navigate = useNavigate();
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div data-tour="home-quick-actions" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <QuickActionCard
         icon={Plus}
         title="Create workflow"

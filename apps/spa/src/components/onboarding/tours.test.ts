@@ -1,88 +1,124 @@
 import { describe, it, expect } from 'vitest';
 import {
+  getTour,
   getTourSteps,
+  getTourIdForRoute,
   hasTourForRoute,
-  FIRST_ACCESS_STEPS,
-  DASHBOARD_TOUR_STEPS,
+  TOURS,
+  TOUR_ID,
+  TOUR_ORDER,
   EDITOR_TOUR_STEPS,
+  ORIENTATION_STEPS,
+  FIRST_ACCESS_STEPS,
+  FIRST_ACCESS_EDITOR_START,
 } from './tours';
 import { tourSelector, TOUR_TARGET } from './tourTargets';
 
 describe('tours', () => {
-  describe('DASHBOARD_TOUR_STEPS', () => {
-    it('should expose 3 steps (sidebar, workflows nav, library nav)', () => {
-      expect(DASHBOARD_TOUR_STEPS).toHaveLength(3);
+  describe('registry', () => {
+    it('should define a tour for every TourId with at least one step', () => {
+      for (const id of Object.values(TOUR_ID)) {
+        expect(TOURS[id]).toBeDefined();
+        expect(TOURS[id].steps.length).toBeGreaterThan(0);
+        expect(TOURS[id].label).toBeTruthy();
+      }
     });
 
-    it('should target the sidebar, workflows nav, and library nav by data-tour selectors', () => {
-      const targets = DASHBOARD_TOUR_STEPS.map((step) => step.target);
-      expect(targets).toEqual([
-        tourSelector(TOUR_TARGET.sidebar),
-        tourSelector(TOUR_TARGET.workflowsNav),
-        tourSelector(TOUR_TARGET.libraryNav),
-      ]);
+    it('should list every tour exactly once in TOUR_ORDER', () => {
+      expect([...TOUR_ORDER].sort()).toEqual([...Object.values(TOUR_ID)].sort());
+    });
+
+    it('every step should carry a target and content', () => {
+      for (const id of Object.values(TOUR_ID)) {
+        for (const step of TOURS[id].steps) {
+          expect(step.target).toBeTruthy();
+          expect(step.content).toBeTruthy();
+        }
+      }
+    });
+  });
+
+  describe('getTourIdForRoute', () => {
+    it.each([
+      ['/', TOUR_ID.home],
+      ['/dashboard', TOUR_ID.dashboard],
+      ['/workflows', TOUR_ID.workflows],
+      ['/workflows/abc-123', TOUR_ID.editor],
+      ['/connections', TOUR_ID.connections],
+      ['/library', TOUR_ID.library],
+      ['/history', TOUR_ID.history],
+    ])('should map %s to the %s tour', (route, expected) => {
+      expect(getTourIdForRoute(route)).toBe(expected);
+    });
+
+    it('should return null for routes without a tour', () => {
+      expect(getTourIdForRoute('/settings')).toBeNull();
+      expect(getTourIdForRoute('/workspace-settings')).toBeNull();
+    });
+  });
+
+  describe('getTourSteps / hasTourForRoute', () => {
+    it('should return the editor steps for an editor route', () => {
+      expect(getTourSteps('/workflows/abc-123')).toBe(EDITOR_TOUR_STEPS);
+      expect(hasTourForRoute('/workflows/abc-123')).toBe(true);
+    });
+
+    it('should return an empty array (and false) for routes without a tour', () => {
+      expect(getTourSteps('/settings')).toEqual([]);
+      expect(hasTourForRoute('/settings')).toBe(false);
+    });
+  });
+
+  describe('getTour', () => {
+    it('should resolve a definition by id', () => {
+      expect(getTour(TOUR_ID.connections).id).toBe('connections');
     });
   });
 
   describe('EDITOR_TOUR_STEPS', () => {
-    it('should expose 3 steps (canvas, run, test)', () => {
-      expect(EDITOR_TOUR_STEPS).toHaveLength(3);
+    it('should anchor on the node library, canvas, run and test targets', () => {
+      const targets = EDITOR_TOUR_STEPS.map((s) => s.target);
+      expect(targets).toContain(tourSelector(TOUR_TARGET.editorNodeLibrary));
+      expect(targets).toContain(tourSelector(TOUR_TARGET.editorCanvas));
+      expect(targets).toContain(tourSelector(TOUR_TARGET.editorRun));
+      expect(targets).toContain(tourSelector(TOUR_TARGET.editorTest));
     });
 
-    it('should target the editor canvas, the run button, and the test button', () => {
-      const targets = EDITOR_TOUR_STEPS.map((step) => step.target);
-      expect(targets).toEqual([
-        tourSelector(TOUR_TARGET.editorCanvas),
-        tourSelector(TOUR_TARGET.editorRun),
-        tourSelector(TOUR_TARGET.editorTest),
-      ]);
+    it('should teach the stepped panel, data pills, and reading results', () => {
+      const text = EDITOR_TOUR_STEPS.map((s) => String(s.content)).join(' ');
+      expect(text).toMatch(/Connection/);
+      expect(text).toMatch(/Configure/);
+      expect(text).toMatch(/data pill/i);
+      expect(text).toMatch(/tree or table/i);
     });
 
     it('should warn that side effects fire on Test by default', () => {
       const testStep = EDITOR_TOUR_STEPS.find(
-        (step) => step.target === tourSelector(TOUR_TARGET.editorTest),
+        (s) => s.target === tourSelector(TOUR_TARGET.editorTest),
       );
-      expect(testStep).toBeDefined();
       const content = String(testStep?.content ?? '');
       expect(content).toMatch(/side effect/i);
       expect(content).toMatch(/mockOnDryRun/);
     });
-  });
 
-  describe('FIRST_ACCESS_STEPS', () => {
-    it('should be the 6 onboarding steps (3 dashboard + 3 editor)', () => {
-      expect(FIRST_ACCESS_STEPS).toHaveLength(6);
-      expect(FIRST_ACCESS_STEPS).toEqual([...DASHBOARD_TOUR_STEPS, ...EDITOR_TOUR_STEPS]);
+    it('should center concept steps that have no stable anchor', () => {
+      const centered = EDITOR_TOUR_STEPS.filter((s) => s.placement === 'center');
+      expect(centered.length).toBeGreaterThan(0);
+      for (const step of centered) expect(step.target).toBe('body');
     });
   });
 
-  describe('getTourSteps', () => {
-    it('should return the dashboard tour for /dashboard', () => {
-      expect(getTourSteps('/dashboard')).toEqual(DASHBOARD_TOUR_STEPS);
+  describe('first-access sequence', () => {
+    it('should be orientation steps followed by the editor tour', () => {
+      expect(FIRST_ACCESS_STEPS).toEqual([...ORIENTATION_STEPS, ...EDITOR_TOUR_STEPS]);
     });
 
-    it('should return the editor tour for /workflows/:id', () => {
-      expect(getTourSteps('/workflows/abc-123')).toEqual(EDITOR_TOUR_STEPS);
+    it('should transition into the editor right after the orientation steps', () => {
+      expect(FIRST_ACCESS_EDITOR_START).toBe(ORIENTATION_STEPS.length);
     });
 
-    it('should return an empty array for routes without a tour (e.g. /settings)', () => {
-      expect(getTourSteps('/settings')).toEqual([]);
-    });
-
-    it('should return an empty array for the bare /workflows index (no canvas yet)', () => {
-      expect(getTourSteps('/workflows')).toEqual([]);
-    });
-  });
-
-  describe('hasTourForRoute', () => {
-    it('should be true for routes that have a tour', () => {
-      expect(hasTourForRoute('/dashboard')).toBe(true);
-      expect(hasTourForRoute('/workflows/x')).toBe(true);
-    });
-
-    it('should be false for routes without a tour', () => {
-      expect(hasTourForRoute('/settings')).toBe(false);
-      expect(hasTourForRoute('/workflows')).toBe(false);
+    it('orientation steps should anchor on the always-mounted sidebar nav', () => {
+      expect(ORIENTATION_STEPS[0].target).toBe(tourSelector(TOUR_TARGET.sidebar));
     });
   });
 });
