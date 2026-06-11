@@ -114,14 +114,58 @@ export class BillingService {
   }
 
   /**
+   * Record a Stripe event id in the idempotency ledger. Returns `false` when the
+   * id was already recorded (a retried/duplicate delivery), so the caller can
+   * short-circuit and acknowledge without re-running the handler. Relies on the
+   * unique constraint on `event_id` to win the race (W5.17).
+   */
+  async recordStripeEvent(eventId: string, type?: string | null): Promise<boolean> {
+    try {
+      await this.prisma.processedStripeEvent.create({ data: { eventId, type: type ?? null } });
+      return true;
+    } catch (err) {
+      if (this.isUniqueViolation(err)) return false;
+      throw err;
+    }
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002';
+  }
+
+  /**
+   * Guard against out-of-order webhook delivery. Returns `true` when an event
+   * stamped `eventCreatedAt` should be applied — i.e. it is at least as new as the
+   * subscription's stored high-water mark. A strictly older event is skipped so a
+   * retried/out-of-order update can't undo a newer state change (W5.17).
+   */
+  private async isNotStale(orgId: string, eventCreatedAt: Date): Promise<boolean> {
+    const row = await this.prisma.subscription.findUnique({
+      where: { organizationId: orgId },
+      select: { lastStripeEventAt: true },
+    });
+    const last = row?.lastStripeEventAt ?? null;
+    return last === null || eventCreatedAt.getTime() >= last.getTime();
+  }
+
+  /**
    * Idempotently reconcile a workspace's subscription row from a Stripe
    * Subscription object (webhook-driven). Keyed by metadata.organizationId, with a
-   * fallback to the stored stripeCustomerId.
+   * fallback to the stored stripeCustomerId. `eventCreatedAt` is the Stripe event's
+   * `created` timestamp — used as a high-water mark to drop out-of-order events.
    */
-  async syncFromStripeSubscription(sub: Stripe.Subscription): Promise<void> {
+  async syncFromStripeSubscription(sub: Stripe.Subscription, eventCreatedAt: Date): Promise<void> {
     const orgId = await this.resolveOrgId(sub);
     if (!orgId) {
       this.log.warn({ subscriptionId: sub.id }, 'Stripe subscription has no resolvable workspace');
+      return;
+    }
+
+    if (!(await this.isNotStale(orgId, eventCreatedAt))) {
+      this.log.warn(
+        { subscriptionId: sub.id, orgId },
+        'Skipping stale (out-of-order) Stripe subscription event',
+      );
       return;
     }
 
@@ -152,14 +196,24 @@ export class BillingService {
           ? new Date(period.current_period_end * 1000)
           : null,
         cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
+        lastStripeEventAt: eventCreatedAt,
       },
     });
   }
 
   /** A subscription was deleted/ended at Stripe — drop the workspace back to FREE. */
-  async markSubscriptionDeleted(sub: Stripe.Subscription): Promise<void> {
+  async markSubscriptionDeleted(sub: Stripe.Subscription, eventCreatedAt: Date): Promise<void> {
     const orgId = await this.resolveOrgId(sub);
     if (!orgId) return;
+
+    if (!(await this.isNotStale(orgId, eventCreatedAt))) {
+      this.log.warn(
+        { subscriptionId: sub.id, orgId },
+        'Skipping stale (out-of-order) Stripe subscription delete event',
+      );
+      return;
+    }
+
     await this.prisma.subscription.update({
       where: { organizationId: orgId },
       data: {
@@ -172,6 +226,7 @@ export class BillingService {
         cancelAtPeriodEnd: false,
         currentPeriodStart: null,
         currentPeriodEnd: null,
+        lastStripeEventAt: eventCreatedAt,
       },
     });
   }

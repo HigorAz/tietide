@@ -65,27 +65,45 @@ export class BillingWebhookController {
       throw new BadRequestException('Invalid Stripe signature');
     }
 
+    // Idempotency ledger: record the event id before processing. A retried
+    // delivery (Stripe re-sends until it sees a 2xx) loses the unique-constraint
+    // race and is acknowledged without re-running the handler (W5.17).
+    const fresh = await this.billing.recordStripeEvent(event.id, event.type);
+    if (!fresh) {
+      this.log.debug({ eventId: event.id }, 'Duplicate Stripe event ignored (already processed)');
+      return { received: true };
+    }
+
     await this.dispatch(event);
     return { received: true };
   }
 
   private async dispatch(event: Stripe.Event): Promise<void> {
+    // Stripe stamps `created` in seconds — used as a high-water mark so the
+    // subscription handlers can drop out-of-order deliveries (W5.17).
+    const eventAt = new Date(event.created * 1000);
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         if (typeof session.subscription === 'string') {
           const sub = await this.stripe.retrieveSubscription(session.subscription);
-          await this.billing.syncFromStripeSubscription(sub);
+          await this.billing.syncFromStripeSubscription(sub, eventAt);
         }
         return;
       }
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
-        await this.billing.syncFromStripeSubscription(event.data.object as Stripe.Subscription);
+        await this.billing.syncFromStripeSubscription(
+          event.data.object as Stripe.Subscription,
+          eventAt,
+        );
         return;
       }
       case 'customer.subscription.deleted': {
-        await this.billing.markSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        await this.billing.markSubscriptionDeleted(
+          event.data.object as Stripe.Subscription,
+          eventAt,
+        );
         return;
       }
       case 'invoice.paid':
@@ -93,7 +111,7 @@ export class BillingWebhookController {
         const invoice = event.data.object as Stripe.Invoice & { subscription?: string | null };
         if (typeof invoice.subscription === 'string') {
           const sub = await this.stripe.retrieveSubscription(invoice.subscription);
-          await this.billing.syncFromStripeSubscription(sub);
+          await this.billing.syncFromStripeSubscription(sub, eventAt);
         }
         return;
       }
