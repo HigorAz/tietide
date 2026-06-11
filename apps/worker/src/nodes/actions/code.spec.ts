@@ -265,6 +265,58 @@ describe('CodeAction', () => {
     });
   });
 
+  describe('execute — host realm escape (W5.1)', () => {
+    // Each of these escapes reaches the host `process` via a host-realm Function
+    // constructor leaked through an injected intrinsic, injected DATA, a timer, or
+    // an async function. A correct sandbox must give user code NO path to the host
+    // realm: either the node fails, or `process` is genuinely unreachable.
+    const expectNoHostProcess = async (code: string): Promise<void> => {
+      const action = new CodeAction();
+      let escaped = false;
+      try {
+        const result = await action.execute(makeInput({ code }), makeContext());
+        // If it resolved, the only acceptable outcome is that no host process /
+        // its secrets leaked through (e.g. result is null/undefined/empty).
+        const value = result.data.result;
+        if (value && typeof value === 'object') {
+          // A leaked host `process` would carry env / pid / platform.
+          const obj = value as Record<string, unknown>;
+          if ('env' in obj || 'pid' in obj || 'platform' in obj || 'version' in obj) {
+            escaped = true;
+          }
+        }
+        // A stringified host process also counts as a leak.
+        if (typeof value === 'string' && /process|nodejs|platform|pid/i.test(value)) {
+          escaped = true;
+        }
+      } catch {
+        // Throwing is an acceptable, secure outcome.
+        escaped = false;
+      }
+      expect(escaped).toBe(false);
+    };
+
+    it('blocks Object.constructor escape to host process', async () => {
+      await expectNoHostProcess(`return Object.constructor('return process')();`);
+    });
+
+    it('blocks input.constructor.constructor escape to host process', async () => {
+      await expectNoHostProcess(`return input.constructor.constructor('return process')();`);
+    });
+
+    it('blocks setTimeout.constructor escape to host process', async () => {
+      await expectNoHostProcess(`return setTimeout.constructor('return process')();`);
+    });
+
+    it('blocks async-function constructor escape to host process', async () => {
+      await expectNoHostProcess(`return (async()=>{}).constructor('return process')();`);
+    });
+
+    it('blocks this.constructor.constructor escape to host process', async () => {
+      await expectNoHostProcess(`return this.constructor.constructor('return process')();`);
+    });
+  });
+
   describe('execute — dry-run', () => {
     it('should not run user code on dry-run; returns a mock preview', async () => {
       const action = new CodeAction();
