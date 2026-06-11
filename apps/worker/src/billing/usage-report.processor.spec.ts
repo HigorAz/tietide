@@ -61,6 +61,70 @@ describe('UsageReportProcessor', () => {
     );
   });
 
+  it('clamps the counting window to the month containing now when currentPeriodStart is stale', async () => {
+    // Stripe rolled into a new period but the sync webhook is lagging, so the
+    // stored currentPeriodStart still points at the PREVIOUS period. Counting from
+    // that stale start would leak prior-period runs into the new Stripe period and
+    // over-bill via action:'set'.
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-03T06:00:00Z'));
+    try {
+      prisma.subscription.findMany.mockResolvedValue([
+        {
+          organizationId: 'org-1',
+          meteredSubItemId: 'si_m',
+          currentPeriodStart: new Date('2026-06-01T00:00:00Z'),
+        },
+      ]);
+      prisma.workflowExecution.count.mockResolvedValue(42);
+
+      await processor.process(job());
+
+      expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
+        where: {
+          workflow: { organizationId: 'org-1' },
+          isDryRun: false,
+          createdAt: { gte: new Date('2026-07-01T00:00:00Z') },
+        },
+      });
+      expect(usage.reportUsage).toHaveBeenCalledWith(
+        'si_m',
+        42,
+        expect.any(Number),
+        expect.stringContaining('usage-si_m-2026-07-01T00:00:00.000Z-'),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps a current (non-stale) currentPeriodStart as the counting window', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T06:00:00Z'));
+    try {
+      prisma.subscription.findMany.mockResolvedValue([
+        {
+          organizationId: 'org-1',
+          meteredSubItemId: 'si_m',
+          // Mid-month period start (e.g. anniversary billing) — newer than the
+          // start of the month, so it must NOT be clamped away.
+          currentPeriodStart: new Date('2026-06-10T00:00:00Z'),
+        },
+      ]);
+      prisma.workflowExecution.count.mockResolvedValue(7);
+
+      await processor.process(job());
+
+      expect(prisma.workflowExecution.count).toHaveBeenCalledWith({
+        where: {
+          workflow: { organizationId: 'org-1' },
+          isDryRun: false,
+          createdAt: { gte: new Date('2026-06-10T00:00:00Z') },
+        },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('continues to the next subscription when one report fails', async () => {
     prisma.subscription.findMany.mockResolvedValue([
       { organizationId: 'org-1', meteredSubItemId: 'si_a', currentPeriodStart: null },
