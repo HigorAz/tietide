@@ -164,6 +164,74 @@ describe('useTestNode', () => {
     expect(result.current.blockedReason).toBe('Fix the red data pills on this node first.');
   });
 
+  it('does not write a pill sample to the OLD node nor setState when nodeId switches mid-poll', async () => {
+    vi.useFakeTimers();
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({ updateNodeConfig });
+
+    // Keep the execution non-terminal so the loop must poll (and sleep) at least
+    // once — that gives us a window to switch nodes mid-flight.
+    mockedTestNode.mockResolvedValue({ id: 'exec-switch', status: 'PENDING' } as never);
+    mockedGetExecution.mockResolvedValue({ id: 'exec-switch', status: 'SUCCESS' } as never);
+    mockedListSteps.mockResolvedValue([{ nodeId: NODE_ID, outputData: { id: 7 } }] as never);
+
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useTestNode(id), {
+      initialProps: { id: NODE_ID },
+    });
+
+    let runPromise!: Promise<void>;
+    act(() => {
+      runPromise = result.current.run();
+    });
+    // Let testNode() resolve, entering the poll loop's first sleep.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // User selects a different node while the loop is still polling.
+    rerender({ id: 'other-node' });
+
+    // Drain the sleep timer + remaining awaits.
+    await act(async () => {
+      await vi.runAllTimersAsync();
+      await runPromise;
+    });
+
+    // The stale run must NOT have captured a sample onto the old node.
+    expect(updateNodeConfig).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('does not setState after the hook unmounts mid-poll', async () => {
+    vi.useFakeTimers();
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({ updateNodeConfig });
+
+    mockedTestNode.mockResolvedValue({ id: 'exec-unmount', status: 'PENDING' } as never);
+    mockedGetExecution.mockResolvedValue({ id: 'exec-unmount', status: 'SUCCESS' } as never);
+    mockedListSteps.mockResolvedValue([{ nodeId: NODE_ID, outputData: { id: 9 } }] as never);
+
+    const { result, unmount } = renderHook(() => useTestNode(NODE_ID));
+
+    let runPromise!: Promise<void>;
+    act(() => {
+      runPromise = result.current.run();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Panel closes mid-poll. No errors / no "setState on unmounted" warnings.
+    unmount();
+    await act(async () => {
+      await vi.runAllTimersAsync();
+      await runPromise;
+    });
+
+    expect(updateNodeConfig).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it('reset() returns to idle and clears the result', async () => {
     mockedTestNode.mockResolvedValue({ id: 'exec-5', status: 'PENDING' } as never);
     mockedGetExecution.mockResolvedValue({ id: 'exec-5', status: 'SUCCESS' } as never);
