@@ -2,8 +2,8 @@ import { useCallback, useMemo, useRef, useState, type ComponentType } from 'reac
 import { useEditorStore } from '@/stores/editorStore';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { NodeConfigFormProps } from '../config/formRegistry';
-import { TestNodeButton } from '../config/TestNodeButton';
 import { NodePreviewPanel } from '../preview/NodePreviewPanel';
+import { TestStep } from './TestStep';
 import {
   StepLayoutProvider,
   type ConnectionStepMeta,
@@ -50,8 +50,9 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
   const [connectionMeta, setConnectionMeta] = useState<ConnectionStepMeta | null>(null);
   const [slotEl, setSlotEl] = useState<HTMLElement | null>(null);
   const [configureValid, setConfigureValid] = useState(true);
-  // Plan 02-03 wires `tested` from the TestNodeButton flow; here it is always false.
-  const tested = false;
+  // `tested` + its summary are driven by a successful live run from the Test step.
+  const [tested, setTested] = useState(false);
+  const [testSummary, setTestSummary] = useState<string | null>(null);
 
   // Reset owned state when the active node changes (never on a transient collapse —
   // keepMounted means there is no transient unmount).
@@ -60,7 +61,14 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
     prevNodeId.current = nodeId;
     setConnectionMeta(null);
     setConfigureValid(true);
+    setTested(false);
+    setTestSummary(null);
   }
+
+  const handleTestResult = useCallback((r: { ok: boolean; summary: string }) => {
+    setTested(r.ok);
+    setTestSummary(r.ok ? r.summary : null);
+  }, []);
 
   const registerConnection = useCallback((meta: ConnectionStepMeta) => setConnectionMeta(meta), []);
   const unregisterConnection = useCallback(() => setConnectionMeta(null), []);
@@ -121,7 +129,13 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
           </div>
         );
       case 'test':
-        return <TestNodeButton nodeId={nodeId} />;
+        return (
+          <TestStep
+            nodeId={nodeId}
+            onFixInConfigure={() => openStep('configure')}
+            onResult={handleTestResult}
+          />
+        );
     }
   };
 
@@ -142,6 +156,7 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
     if (step.id === 'configure') return configureSummary(config);
     if (step.id === 'test') {
       if (step.status === 'locked') return `Finish step ${configureIndex} first`;
+      if (tested && testSummary) return `✓ tested · ${testSummary}`;
       return 'Run a live test to capture sample output';
     }
     return undefined;
