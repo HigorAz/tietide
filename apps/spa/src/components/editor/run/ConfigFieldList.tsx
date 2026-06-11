@@ -3,6 +3,9 @@ import { ConnectionStatus } from '@tietide/shared';
 import { splitSegments } from '@/lib/dataPillToken';
 import { useConnectionsStore } from '@/stores/connectionsStore';
 
+/** Inline-JSON display cap for non-string config values (parallels DataTable's CELL_MAX). */
+const CONFIG_VALUE_MAX = 80;
+
 export interface ConfigFieldListProps {
   config: Record<string, unknown>;
   testId?: string;
@@ -47,7 +50,7 @@ function renderValue(value: unknown): JSX.Element | string {
   if (typeof value === 'number') return String(value);
   if (value === null || value === undefined) return 'null';
   const json = JSON.stringify(value);
-  return json.length > 80 ? `${json.slice(0, 80)}…` : json;
+  return json.length > CONFIG_VALUE_MAX ? `${json.slice(0, CONFIG_VALUE_MAX)}…` : json;
 }
 
 interface ConnectionValueProps {
@@ -88,13 +91,16 @@ export function ConfigFieldList({
   const status = useConnectionsStore((s) => s.status);
   const fetch = useConnectionsStore((s) => s.fetch);
   const entries = useMemo(() => Object.entries(config), [config]);
+  // Only nodes with a `connectionId` field need the connection registry; gating
+  // the fetch avoids a needless network call for connection-less nodes (IN-05).
+  const needsConnections = useMemo(() => entries.some(([k]) => k === 'connectionId'), [entries]);
 
   // Resolve connection names lazily, mirroring ConnectionPicker's fetch-on-idle.
   useEffect(() => {
-    if (status === 'idle') {
+    if (needsConnections && status === 'idle') {
       void fetch();
     }
-  }, [status, fetch]);
+  }, [needsConnections, status, fetch]);
 
   if (entries.length === 0) {
     return (

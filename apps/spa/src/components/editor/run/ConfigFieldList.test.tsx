@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ConnectionStatus, ConnectionType } from '@tietide/shared';
 import { ConfigFieldList, humanizeKey } from './ConfigFieldList';
@@ -72,5 +72,19 @@ describe('ConfigFieldList', () => {
     useConnectionsStore.setState({ status: 'ready' });
     render(<ConfigFieldList config={{}} />);
     expect(screen.getByText('No configuration')).toBeInTheDocument();
+  });
+
+  it('should NOT fetch connections when no connectionId field is present (IN-05)', () => {
+    const fetch = vi.fn();
+    useConnectionsStore.setState({ status: 'idle', fetch });
+    render(<ConfigFieldList config={{ maxResults: 10 }} />);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('should fetch connections when a connectionId field IS present and status is idle', () => {
+    const fetch = vi.fn();
+    useConnectionsStore.setState({ status: 'idle', fetch });
+    render(<ConfigFieldList config={{ connectionId: 'c1' }} />);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
