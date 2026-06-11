@@ -13,6 +13,7 @@ const MAX_POLLS = 40;
 export const MAX_SAMPLE_BYTES = 32_000;
 
 const GENERIC_FAILURE = 'Node test did not succeed. Check the run for details.';
+const TIMEOUT_FAILURE = 'Test timed out — the node is still running. Check the run for the result.';
 const BLOCKED_REASON = 'Fix the red data pills on this node first.';
 
 export type TestNodeStatus = 'idle' | 'running' | 'success' | 'error';
@@ -146,6 +147,13 @@ export function useTestNode(nodeId: string): UseTestNodeResult {
       }
 
       if (execStatus !== 'SUCCESS') {
+        // The loop exhausted MAX_POLLS while the execution was still non-terminal:
+        // the node is slow/hung, not failed. Surface a distinct timeout message so
+        // a slow connector is distinguishable from a real failure (IN-06).
+        if (!TERMINAL.has(execStatus)) {
+          fail(TIMEOUT_FAILURE, null);
+          return;
+        }
         // Enrich with the failing step's error text when the API exposes it.
         let message = GENERIC_FAILURE;
         try {

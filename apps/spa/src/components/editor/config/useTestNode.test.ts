@@ -136,6 +136,38 @@ describe('useTestNode', () => {
     expect(updateNodeConfig).not.toHaveBeenCalled();
   });
 
+  it('surfaces a distinct timeout message when polling exhausts without a terminal status', async () => {
+    vi.useFakeTimers();
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({ updateNodeConfig });
+
+    // The execution never reaches a terminal status, so the poll loop runs out
+    // its MAX_POLLS budget — the hung/slow path, distinct from a real failure.
+    mockedTestNode.mockResolvedValue({ id: 'exec-timeout', status: 'PENDING' } as never);
+    mockedGetExecution.mockResolvedValue({ id: 'exec-timeout', status: 'RUNNING' } as never);
+
+    const { result } = renderHook(() => useTestNode(NODE_ID));
+
+    let runPromise!: Promise<void>;
+    act(() => {
+      runPromise = result.current.run();
+    });
+    await act(async () => {
+      await vi.runAllTimersAsync();
+      await runPromise;
+    });
+
+    expect(result.current.status).toBe('error');
+    expect(result.current.result.error?.message).toBe(
+      'Test timed out — the node is still running. Check the run for the result.',
+    );
+    expect(result.current.result.error?.code).toBeNull();
+    // No step lookup is needed on timeout; nothing is captured.
+    expect(mockedListSteps).not.toHaveBeenCalled();
+    expect(updateNodeConfig).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
   it('canRun is false when the workflow id is missing', () => {
     useEditorStore.setState({ workflowId: null });
     const { result } = renderHook(() => useTestNode(NODE_ID));
