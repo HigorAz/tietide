@@ -98,6 +98,23 @@ describe('JsonTree', () => {
     expect(screen.getByLabelText('Copy value')).toBeInTheDocument();
   });
 
+  it('caps a large branch and reveals the rest via "show more"', async () => {
+    const user = userEvent.setup();
+    // 150 top-level rows → first 100 render, 50 are behind the show-more control.
+    const big: Record<string, number> = {};
+    for (let i = 0; i < 150; i += 1) big[`field${i}`] = i;
+    render(<JsonTree value={big} />);
+
+    expect(screen.getByText('field0')).toBeInTheDocument();
+    expect(screen.queryByText('field149')).not.toBeInTheDocument();
+    const more = screen.getByTestId('json-tree-show-more');
+    expect(more).toHaveTextContent(/show 50 more/i);
+
+    await user.click(more);
+    expect(screen.getByText('field149')).toBeInTheDocument();
+    expect(screen.queryByTestId('json-tree-show-more')).toBeNull();
+  });
+
   it('flattens to matching path:value rows while searching and restores after clearing', () => {
     const { rerender } = render(<JsonTree value={demo} pillRef="steps.x" searchQuery="id" />);
     expect(screen.getByText('messages[0].id')).toBeInTheDocument();

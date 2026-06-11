@@ -1,5 +1,5 @@
 import { ChevronRight } from 'lucide-react';
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import {
   branchBadge,
   buildPillPath,
@@ -85,6 +85,62 @@ function CopyActions({
 
 const ROW_CLASS = 'group flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white/5';
 
+/**
+ * Cap how many children of a single branch render eagerly. A large
+ * array-of-objects (e.g. Gmail `{ messages: [hundreds] }`) would otherwise
+ * instantiate every descendant `TreeRow` in one synchronous pass and jank the
+ * pane (WR-03). Past the cap we render the first N and a "… show N more"
+ * affordance that reveals the rest on demand — no virtualization dependency.
+ */
+const BRANCH_RENDER_CAP = 100;
+
+type Entry = [string, unknown, string | number];
+
+/** Renders a branch's child entries with a bounded eager cap + show-more control. */
+function BranchChildren({
+  entries,
+  path,
+  depth,
+  pillRef,
+  copy,
+}: {
+  entries: Entry[];
+  path: string;
+  depth: number;
+  pillRef?: string;
+  copy: CopyFn;
+}): JSX.Element {
+  const [limit, setLimit] = useState(BRANCH_RENDER_CAP);
+  const shown = entries.length > limit ? entries.slice(0, limit) : entries;
+  const remaining = entries.length - shown.length;
+  return (
+    <>
+      {shown.map(([childName, childValue, key]) => (
+        <TreeRow
+          key={path + '/' + childName}
+          name={childName}
+          value={childValue}
+          path={childPath(path, key)}
+          depth={depth + 1}
+          pillRef={pillRef}
+          copy={copy}
+        />
+      ))}
+      {remaining > 0 && (
+        <button
+          type="button"
+          data-testid="json-tree-show-more"
+          onClick={() => setLimit((l) => l + BRANCH_RENDER_CAP)}
+          style={{ paddingLeft: (depth + 1) * 14 + 16 }}
+          className="block py-0.5 text-left text-[11px] text-text-secondary transition hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+        >
+          … show {Math.min(remaining, BRANCH_RENDER_CAP)} more ({remaining} hidden)
+        </button>
+      )}
+    </>
+  );
+}
+
 const TreeRow = memo(function TreeRow({
   name,
   value,
@@ -111,7 +167,7 @@ const TreeRow = memo(function TreeRow({
     );
   }
 
-  const entries: Array<[string, unknown, string | number]> = Array.isArray(value)
+  const entries: Entry[] = Array.isArray(value)
     ? value.map((v, i) => [String(i), v, i])
     : Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, v, k]);
 
@@ -131,35 +187,74 @@ const TreeRow = memo(function TreeRow({
         {badge !== null && <span className="text-[10px] text-text-muted">{badge}</span>}
         <CopyActions value={value} path={path} pillRef={pillRef} copy={copy} />
       </div>
-      {open &&
-        entries.map(([childName, childValue, key]) => (
-          <TreeRow
-            key={path + '/' + childName}
-            name={childName}
-            value={childValue}
-            path={childPath(path, key)}
-            depth={depth + 1}
-            pillRef={pillRef}
-            copy={copy}
-          />
-        ))}
+      {open && (
+        <BranchChildren entries={entries} path={path} depth={depth} pillRef={pillRef} copy={copy} />
+      )}
     </div>
   );
 });
+
+/** Depth-0 entry list with the same bounded eager cap as nested branches (WR-03). */
+function RootRows({
+  rootEntries,
+  pillRef,
+  copy,
+}: {
+  rootEntries: Entry[];
+  pillRef?: string;
+  copy: CopyFn;
+}): JSX.Element {
+  const [limit, setLimit] = useState(BRANCH_RENDER_CAP);
+  const shown = rootEntries.length > limit ? rootEntries.slice(0, limit) : rootEntries;
+  const remaining = rootEntries.length - shown.length;
+  return (
+    <>
+      {shown.map(([name, childValue, key]) => (
+        <TreeRow
+          key={String(key)}
+          name={name}
+          value={childValue}
+          path={childPath('', key)}
+          depth={0}
+          pillRef={pillRef}
+          copy={copy}
+        />
+      ))}
+      {remaining > 0 && (
+        <button
+          type="button"
+          data-testid="json-tree-show-more"
+          onClick={() => setLimit((l) => l + BRANCH_RENDER_CAP)}
+          style={{ paddingLeft: 16 }}
+          className="block py-0.5 text-left text-[11px] text-text-secondary transition hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+        >
+          … show {Math.min(remaining, BRANCH_RENDER_CAP)} more ({remaining} hidden)
+        </button>
+      )}
+    </>
+  );
+}
 
 /** Collapsible JSON tree with hover copy actions + a flat search mode. */
 export function JsonTree({ value, pillRef, searchQuery, testId }: JsonTreeProps): JSX.Element {
   const copy = useCopy();
   const query = (searchQuery ?? '').trim();
 
+  // Memoize the full depth-first flatten on `value` alone so it isn't recomputed
+  // on every keystroke; the query-dependent filter is a separate memo (WR-02).
+  const leaves = useMemo(() => flattenLeaves(value), [value]);
+  const searchRows = useMemo(
+    () => (query.length > 0 ? leaves.filter((leaf) => matchesSearch(leaf, query)) : []),
+    [leaves, query],
+  );
+
   if (query.length > 0) {
-    const rows = flattenLeaves(value).filter((leaf) => matchesSearch(leaf, query));
     return (
       <div className="font-mono text-[11.5px]" data-testid={testId ?? 'json-tree'}>
-        {rows.length === 0 ? (
+        {searchRows.length === 0 ? (
           <div className="px-1.5 py-1 text-text-muted">No matching fields</div>
         ) : (
-          rows.map((leaf) => (
+          searchRows.map((leaf) => (
             <div key={leaf.path} className={ROW_CLASS} data-testid="json-row">
               <span className="text-data-key">{leaf.path}</span>
               <span className="text-text-muted">:</span>
@@ -177,7 +272,7 @@ export function JsonTree({ value, pillRef, searchQuery, testId }: JsonTreeProps)
   // Top-level entries render directly as depth-0 rows (first level expanded by
   // default per the locked design). A scalar/null root collapses to one leaf row.
   const kind = classifyValue(value);
-  const rootEntries: Array<[string, unknown, string | number]> | null =
+  const rootEntries: Entry[] | null =
     kind === 'array'
       ? (value as unknown[]).map((v, i) => [String(i), v, i])
       : kind === 'object'
@@ -189,17 +284,7 @@ export function JsonTree({ value, pillRef, searchQuery, testId }: JsonTreeProps)
       {rootEntries === null ? (
         <TreeRow name="" value={value} path="" depth={0} pillRef={pillRef} copy={copy} />
       ) : (
-        rootEntries.map(([name, childValue, key]) => (
-          <TreeRow
-            key={String(key)}
-            name={name}
-            value={childValue}
-            path={childPath('', key)}
-            depth={0}
-            pillRef={pillRef}
-            copy={copy}
-          />
-        ))
+        <RootRows rootEntries={rootEntries} pillRef={pillRef} copy={copy} />
       )}
     </div>
   );
