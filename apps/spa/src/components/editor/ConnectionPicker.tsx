@@ -87,16 +87,32 @@ export function ConnectionPicker({
   const registerConnection = layout?.registerConnection;
   const unregisterRef = useRef(layout?.unregisterConnection);
   unregisterRef.current = layout?.unregisterConnection;
+  // Depend on the PRIMITIVE fields the meta is derived from, not the memoized
+  // `selected` object. The connections store hands out a new `selected`
+  // reference on every refetch even when name/status are unchanged; keying the
+  // effect on primitives stops the redundant re-registration (and the parent's
+  // resulting useConfigSteps recompute) when nothing meaningful changed (IN-01).
+  const selectedName = selected?.name ?? null;
+  const selectedStatus = selected?.status ?? null;
+  const hasSelection = selected !== null;
   useEffect(() => {
     registerConnection?.({
       provider,
       optional: allowClear,
-      selectedName: selected?.name ?? null,
-      selectedStatus: selected?.status ?? null,
-      hasSelection: selected !== null,
+      selectedName,
+      selectedStatus,
+      hasSelection,
       stale: isStale,
     });
-  }, [registerConnection, provider, allowClear, selected, isStale]);
+  }, [
+    registerConnection,
+    provider,
+    allowClear,
+    selectedName,
+    selectedStatus,
+    hasSelection,
+    isStale,
+  ]);
   useEffect(() => () => unregisterRef.current?.(), []);
 
   const addHref = `/connections?provider=${encodeURIComponent(provider)}&connect=true`;

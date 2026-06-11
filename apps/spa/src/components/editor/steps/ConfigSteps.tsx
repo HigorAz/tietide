@@ -29,6 +29,15 @@ const STEP_TITLES: Record<StepId, string> = {
 const ERROR_HANDLER_DESCRIPTION =
   'Reveals a red output handle. Connect it to route execution down an error path when this node fails.';
 
+/** Shallow field equality for ConnectionStepMeta — avoids re-registration churn. */
+const connectionMetaEqual = (a: ConnectionStepMeta, b: ConnectionStepMeta): boolean =>
+  a.provider === b.provider &&
+  a.optional === b.optional &&
+  a.selectedName === b.selectedName &&
+  a.selectedStatus === b.selectedStatus &&
+  a.hasSelection === b.hasSelection &&
+  a.stale === b.stale;
+
 /**
  * The stepped Configure view (sketch 003-D). Owns the StepLayoutValue — the
  * connection slot element, the connection meta a ConnectionPicker registers, and
@@ -70,7 +79,14 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
     setTestSummary(r.ok ? r.summary : null);
   }, []);
 
-  const registerConnection = useCallback((meta: ConnectionStepMeta) => setConnectionMeta(meta), []);
+  // Guard against churn: the picker registers primitive-derived meta, but a
+  // shallow-equal-but-new object still triggers a useConfigSteps recompute via
+  // setState. Skip the update when every field is unchanged (IN-01).
+  const registerConnection = useCallback(
+    (meta: ConnectionStepMeta) =>
+      setConnectionMeta((prev) => (prev && connectionMetaEqual(prev, meta) ? prev : meta)),
+    [],
+  );
   const unregisterConnection = useCallback(() => setConnectionMeta(null), []);
   const reportValidity = useCallback((valid: boolean) => setConfigureValid(valid), []);
 
