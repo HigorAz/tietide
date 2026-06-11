@@ -194,6 +194,52 @@ describe('HttpRequestForm', () => {
     expect(screen.getByTestId('pill-sample-field')).toBeInTheDocument();
   });
 
+  it('should resync the body textarea when config.body changes externally (undo/redo)', () => {
+    const { rerender } = render(
+      <HttpRequestForm
+        nodeId={NODE_ID}
+        config={{ method: 'POST', url: 'https://x.com', body: { a: 1 } }}
+      />,
+    );
+
+    const textarea = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+    expect(textarea.value).toBe(JSON.stringify({ a: 1 }, null, 2));
+
+    // Same nodeId (no remount), but the store body changed out from under us —
+    // e.g. an undo. The buffer must reflect the new external value.
+    rerender(
+      <HttpRequestForm
+        nodeId={NODE_ID}
+        config={{ method: 'POST', url: 'https://x.com', body: { b: 2 } }}
+      />,
+    );
+
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toBe(
+      JSON.stringify({ b: 2 }, null, 2),
+    );
+  });
+
+  it('should not clobber an in-progress invalid-JSON buffer on re-render', () => {
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({ updateNodeConfig });
+
+    const { rerender } = render(
+      <HttpRequestForm nodeId={NODE_ID} config={{ method: 'POST', url: 'https://x.com' }} />,
+    );
+
+    const textarea = screen.getByLabelText(/body/i) as HTMLTextAreaElement;
+    // User starts typing JSON that is not yet valid; the store is NOT updated.
+    fireEvent.change(textarea, { target: { value: '{ "partial":' } });
+    expect(screen.getByTestId('http-body-error')).toBeInTheDocument();
+
+    // A re-render with the SAME (unchanged) config must keep the buffer intact.
+    rerender(
+      <HttpRequestForm nodeId={NODE_ID} config={{ method: 'POST', url: 'https://x.com' }} />,
+    );
+
+    expect((screen.getByLabelText(/body/i) as HTMLTextAreaElement).value).toBe('{ "partial":');
+  });
+
   describe('optional HTTP connection', () => {
     it('should render an HTTP connection picker that lists http connections', async () => {
       const user = userEvent.setup();
