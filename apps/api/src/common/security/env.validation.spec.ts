@@ -9,6 +9,7 @@ const prodBase = {
   JWT_SECRET: STRONG_LONG,
   WEBHOOK_HMAC_SECRET: STRONG_LONG,
   ENCRYPTION_MASTER_KEY: STRONG_LONG,
+  METRICS_TOKEN: STRONG_LONG,
 };
 
 describe('validateEnv', () => {
@@ -58,6 +59,24 @@ describe('validateEnv', () => {
     const env: Record<string, unknown> = { ...prodBase };
     delete env.JWT_SECRET;
     expect(() => validateEnv(env)).toThrow(/JWT_SECRET/);
+  });
+
+  it('rejects a missing METRICS_TOKEN in production (default-closed metrics)', () => {
+    const env: Record<string, unknown> = { ...prodBase };
+    delete env.METRICS_TOKEN;
+    expect(() => validateEnv(env)).toThrow(/METRICS_TOKEN/);
+  });
+
+  it('rejects an empty METRICS_TOKEN in production', () => {
+    expect(() => validateEnv({ ...prodBase, METRICS_TOKEN: '   ' })).toThrow(/METRICS_TOKEN/);
+  });
+
+  it('accepts a present METRICS_TOKEN in production', () => {
+    expect(() => validateEnv({ ...prodBase, METRICS_TOKEN: 'a-real-metrics-token' })).not.toThrow();
+  });
+
+  it('does not require METRICS_TOKEN outside production', () => {
+    expect(() => validateEnv({ NODE_ENV: 'development', JWT_SECRET: 'x' })).not.toThrow();
   });
 
   it('aggregates every failing secret into one error', () => {

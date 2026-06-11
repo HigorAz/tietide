@@ -1,18 +1,31 @@
 import { Controller, Get, Header, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import { ApiExcludeController } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { register as defaultRegister } from 'prom-client';
 import { MetricsService } from './metrics.service';
 import { isMetricsAuthorized } from './metrics-auth';
+import {
+  DEFAULT_METRICS_THROTTLE_LIMIT,
+  DEFAULT_METRICS_THROTTLE_TTL_MS,
+  IP_THROTTLER_NAME,
+} from '../common/throttler/throttler.config';
 
 /**
- * Prometheus scrape endpoint (W3.6). Public by default; gated by `METRICS_TOKEN`
- * when set. Excluded from Swagger and from the JwtAuthGuard (it carries no
- * controller guard). Frequent scrapes must not be rate-limited.
+ * Prometheus scrape endpoint (W3.6). Gated by `METRICS_TOKEN` when set — and
+ * required in production (W5.36), so metrics are default-closed on real deploys.
+ * Excluded from Swagger and from the JwtAuthGuard (it carries no controller
+ * guard). Previously @SkipThrottle() (never limited): replaced with a modest
+ * per-IP cap via the `ip` named throttler so an anonymous scrape flood can't run
+ * unbounded, while a normal Prometheus scrape interval stays well under the cap.
  */
-@SkipThrottle()
+@Throttle({
+  [IP_THROTTLER_NAME]: {
+    ttl: DEFAULT_METRICS_THROTTLE_TTL_MS,
+    limit: DEFAULT_METRICS_THROTTLE_LIMIT,
+  },
+})
 @ApiExcludeController()
 @Controller('metrics')
 export class MetricsController {

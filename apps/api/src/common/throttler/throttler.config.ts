@@ -54,6 +54,14 @@ export const DEFAULT_AI_GENERATE_THROTTLE_LIMIT = 3;
 // throttler) — there is no authenticated identity to bucket on here.
 export const DEFAULT_WEBHOOK_THROTTLE_TTL_MS = 60_000;
 export const DEFAULT_WEBHOOK_THROTTLE_LIMIT = 300;
+// Prometheus /metrics scrape (W5.36). Previously @SkipThrottle() (never limited)
+// and reachable without a token when METRICS_TOKEN is unset, so an
+// internet-exposed deploy that forgets the token served operational telemetry
+// to anyone, unthrottled. Production now requires METRICS_TOKEN (default-closed),
+// and this modest per-IP cap bounds an anonymous scrape flood while leaving a
+// normal Prometheus scrape interval (typically 4-12/min) far below the ceiling.
+export const DEFAULT_METRICS_THROTTLE_TTL_MS = 60_000;
+export const DEFAULT_METRICS_THROTTLE_LIMIT = 60;
 
 export interface ThrottleSettings {
   ttl: number;
