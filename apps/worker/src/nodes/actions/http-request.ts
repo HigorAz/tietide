@@ -1,7 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
 import { httpRequestOutputSchema, type HttpConnectionConfig } from '@tietide/shared';
-import { assertUrlAllowed, type LookupFn } from './ssrf-guard';
+import { assertUrlAllowed, SsrfBlockedError, type LookupFn } from './ssrf-guard';
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -9,6 +9,18 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 // Cap the response we buffer + persist to ExecutionStep.outputData. Prevents a
 // large/malicious endpoint from OOMing the worker or bloating Postgres JSONB.
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MiB
+// Bound the number of redirects we follow manually. undici would follow up to 20
+// automatically, but we must re-run the SSRF guard on EVERY hop, so we drive the
+// loop ourselves and refuse to chase more than this many redirects.
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+class TooManyRedirectsError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TooManyRedirectsError';
+  }
+}
 
 interface ParsedParams {
   method: string;
@@ -72,7 +84,8 @@ export class HttpRequestAction implements INodeExecutor {
     }
 
     // SSRF guard: validate scheme + reject private/loopback/link-local/metadata
-    // targets BEFORE connecting. Runs on the post-template-resolution URL.
+    // targets BEFORE connecting. Runs on the post-template-resolution URL. Each
+    // redirect hop is re-validated inside fetchFollowingRedirects.
     await assertUrlAllowed(params.url, this.lookupFn);
 
     const controller = new AbortController();
@@ -81,14 +94,19 @@ export class HttpRequestAction implements INodeExecutor {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(params.url, {
-        method: params.method,
-        headers,
-        body,
-        signal: controller.signal,
-      });
+      response = await this.fetchFollowingRedirects(
+        params.url,
+        { method: params.method, headers, body, signal: controller.signal },
+        authHeaders,
+      );
     } catch (err) {
       const error = err as Error;
+      // SSRF rejections (initial guard already ran; this is a redirect hop) and
+      // the redirect-cap error are surfaced verbatim — they are the security
+      // signal, not a transport failure.
+      if (error.name === 'SsrfBlockedError' || error.name === 'TooManyRedirectsError') {
+        throw error;
+      }
       if (error.name === 'AbortError') {
         throw new Error(`HTTP request timed out after ${params.timeoutMs}ms`);
       }
@@ -196,6 +214,73 @@ export class HttpRequestAction implements INodeExecutor {
       default:
         return {};
     }
+  }
+
+  // Manual redirect loop. undici (and the WHATWG fetch default) would follow up
+  // to 20 redirects WITHOUT re-running the SSRF guard, so a public attacker host
+  // could 302 the worker to http://169.254.169.254/ or an internal service and
+  // the internal response would be persisted. Instead we pass `redirect: manual`
+  // and drive the hops ourselves: re-validate every Location with
+  // assertUrlAllowed before re-fetching, and strip the Authorization header (and
+  // any connection-injected auth) when a redirect crosses origin so credentials
+  // never leak to a different host.
+  private async fetchFollowingRedirects(
+    initialUrl: string,
+    init: RequestInit & { headers: Record<string, string> },
+    authHeaders: Record<string, string>,
+  ): Promise<Response> {
+    let currentUrl = initialUrl;
+    let headers = init.headers;
+
+    for (let hop = 0; ; hop += 1) {
+      const response = await this.fetchImpl(currentUrl, {
+        ...init,
+        headers,
+        redirect: 'manual',
+      });
+
+      const location = response.headers.get('location');
+      if (!REDIRECT_STATUSES.has(response.status) || !location) {
+        return response;
+      }
+
+      if (hop >= MAX_REDIRECTS) {
+        throw new TooManyRedirectsError(`HTTP request exceeded ${MAX_REDIRECTS} redirects`);
+      }
+
+      let nextUrl: URL;
+      try {
+        nextUrl = new URL(location, currentUrl);
+      } catch {
+        throw new SsrfBlockedError('Invalid redirect Location');
+      }
+
+      // Re-run the full SSRF guard on the resolved target BEFORE re-fetching.
+      await assertUrlAllowed(nextUrl.toString(), this.lookupFn);
+
+      // Drop the Authorization header and any connection-injected auth header
+      // when the redirect crosses origin (scheme + host + port).
+      if (nextUrl.origin !== new URL(currentUrl).origin) {
+        headers = this.stripAuthHeaders(headers, authHeaders);
+      }
+
+      currentUrl = nextUrl.toString();
+    }
+  }
+
+  // Returns a copy of `headers` with the Authorization header and every
+  // connection-injected auth header removed, so cross-origin redirects don't
+  // leak credentials to an attacker-controlled host.
+  private stripAuthHeaders(
+    headers: Record<string, string>,
+    authHeaders: Record<string, string>,
+  ): Record<string, string> {
+    const stripped = { ...headers };
+    delete stripped['authorization'];
+    for (const key of Object.keys(authHeaders)) {
+      delete stripped[key.toLowerCase()];
+    }
+    return stripped;
   }
 
   // Masks the value of any header that was injected from a connection so the

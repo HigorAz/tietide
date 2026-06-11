@@ -14,18 +14,28 @@ describe('ssrf-guard', () => {
       '0.0.0.0',
       '::1',
       '::ffff:10.0.0.1', // IPv4-mapped private
+      '::ffff:7f00:1', // IPv4-mapped loopback in HEX form (127.0.0.1)
+      '::ffff:a00:1', // IPv4-mapped private in HEX form (10.0.0.1)
+      '::ffff:a9fe:a9fe', // IPv4-mapped cloud metadata in HEX form (169.254.169.254)
+      '64:ff9b::7f00:1', // NAT64 wrapping loopback (127.0.0.1)
+      '64:ff9b::a9fe:a9fe', // NAT64 wrapping cloud metadata (169.254.169.254)
       'fd00:ec2::254', // AWS IPv6 metadata (fc00::/7)
       'fe80::1', // link-local
     ])('blocks %s', (ip) => {
       expect(isBlockedAddress(ip)).toBe(true);
     });
 
-    it.each(['8.8.8.8', '1.1.1.1', '93.184.216.34', '172.32.0.1', '2606:4700:4700::1111'])(
-      'allows public %s',
-      (ip) => {
-        expect(isBlockedAddress(ip)).toBe(false);
-      },
-    );
+    it.each([
+      '8.8.8.8',
+      '1.1.1.1',
+      '93.184.216.34',
+      '172.32.0.1',
+      '2606:4700:4700::1111',
+      '::ffff:808:808', // IPv4-mapped public in HEX form (8.8.8.8)
+      '64:ff9b::808:808', // NAT64 wrapping public (8.8.8.8)
+    ])('allows public %s', (ip) => {
+      expect(isBlockedAddress(ip)).toBe(false);
+    });
   });
 
   describe('assertUrlAllowed', () => {
@@ -64,6 +74,21 @@ describe('ssrf-guard', () => {
     it('allows a hostname that resolves only to public addresses', async () => {
       const url = await assertUrlAllowed('https://api.example.com/path', publicLookup);
       expect(url.hostname).toBe('api.example.com');
+    });
+
+    it('rejects a hostname that resolves to a hex IPv4-mapped loopback', async () => {
+      // WHATWG URL normalizes [::ffff:127.0.0.1] to the hex form ::ffff:7f00:1.
+      const lookup: LookupFn = async () => [{ address: '::ffff:7f00:1', family: 6 }];
+      await expect(assertUrlAllowed('https://rebind.example.com/', lookup)).rejects.toBeInstanceOf(
+        SsrfBlockedError,
+      );
+    });
+
+    it('rejects a hostname that resolves to a NAT64-wrapped metadata address', async () => {
+      const lookup: LookupFn = async () => [{ address: '64:ff9b::a9fe:a9fe', family: 6 }];
+      await expect(assertUrlAllowed('https://rebind.example.com/', lookup)).rejects.toBeInstanceOf(
+        SsrfBlockedError,
+      );
     });
 
     it('rejects when the host does not resolve', async () => {

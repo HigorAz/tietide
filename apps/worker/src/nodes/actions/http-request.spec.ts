@@ -51,6 +51,12 @@ const makeInput = (
   params,
 });
 
+const connInputAuth = (params: Record<string, unknown>, connectionId: string): NodeInput => ({
+  data: {},
+  params,
+  connectionId,
+});
+
 const jsonResponse = (
   status: number,
   body: unknown,
@@ -570,6 +576,156 @@ describe('HttpRequestAction', () => {
         .wouldHaveSent;
       expect(sent.headers.authorization).not.toContain('super-secret-jwt');
       expect(sent.headers.authorization).toMatch(/Bearer \*+/);
+    });
+  });
+
+  describe('redirect handling (SSRF re-validation)', () => {
+    const redirectResponse = (location: string, status = 302): Response =>
+      new Response(null, { status, headers: { location } });
+
+    it('blocks a 302 whose Location is a private/metadata IP and never returns the internal body', async () => {
+      // First hop: public host returns a 302 -> cloud metadata. Second fetch
+      // would expose the internal body if the redirect were auto-followed.
+      const fetchMock = mockFetch(async (url) => {
+        if (url === 'https://api.test/redirect') {
+          return redirectResponse('http://169.254.169.254/latest/meta-data/');
+        }
+        // This must NEVER be reached — the SSRF guard must block before re-fetch.
+        return jsonResponse(200, { secret: 'instance-credentials' });
+      });
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      const result = await action
+        .execute(makeInput({ method: 'GET', url: 'https://api.test/redirect' }), makeContext())
+        .catch((e: unknown) => e as Error);
+
+      expect(result).toBeInstanceOf(Error);
+      expect((result as Error).message).toMatch(/private or internal/i);
+      // The internal metadata endpoint must never have been requested.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://api.test/redirect');
+    });
+
+    it('passes redirect: manual to fetch so undici does not auto-follow', async () => {
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/items' }),
+        makeContext(),
+      );
+
+      const init = fetchMock.mock.calls[0][1];
+      expect(init?.redirect).toBe('manual');
+    });
+
+    it('follows a 302 to an allowed public URL and returns the final body (fetch called twice)', async () => {
+      const fetchMock = mockFetch(async (url) => {
+        if (url === 'https://api.test/start') {
+          return redirectResponse('https://api.test/final');
+        }
+        return jsonResponse(200, { landed: true });
+      });
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      const result = await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/start' }),
+        makeContext(),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[1][0]).toBe('https://api.test/final');
+      expect(result.data.statusCode).toBe(200);
+      expect(result.data.body).toEqual({ landed: true });
+    });
+
+    it('resolves a relative Location against the current URL and re-validates it', async () => {
+      const fetchMock = mockFetch(async (url) => {
+        if (url === 'https://api.test/a/b') {
+          return redirectResponse('/c/d');
+        }
+        return jsonResponse(200, { at: url });
+      });
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      const result = await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/a/b' }),
+        makeContext(),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[1][0]).toBe('https://api.test/c/d');
+      expect(result.data.body).toEqual({ at: 'https://api.test/c/d' });
+    });
+
+    it('rejects when the redirect hop cap is exceeded', async () => {
+      // Always redirect to a fresh public URL — guard passes each hop but the
+      // bounded loop must give up after the cap.
+      let n = 0;
+      const fetchMock = mockFetch(async () => {
+        n += 1;
+        return redirectResponse(`https://api.test/hop-${n}`);
+      });
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await expect(
+        action.execute(makeInput({ method: 'GET', url: 'https://api.test/loop' }), makeContext()),
+      ).rejects.toThrow(/redirect/i);
+    });
+
+    it('drops the Authorization header when the redirect crosses origin', async () => {
+      const publicLookup: LookupFn = async () => [{ address: '93.184.216.34', family: 4 }];
+      const fetchMock = mockFetch(async (url) => {
+        if (url === 'https://api.test/login') {
+          return redirectResponse('https://other.test/landing');
+        }
+        return jsonResponse(200, { ok: true });
+      });
+      const action = new HttpRequestAction(fetchMock, publicLookup);
+
+      await action.execute(
+        connInputAuth({ method: 'GET', url: 'https://api.test/login' }, 'conn-1'),
+        makeContext({
+          getConnection: (async () => ({
+            id: 'conn-1',
+            type: 'CUSTOM',
+            provider: 'http',
+            config: { authType: 'bearer', token: 'super-secret' },
+          })) as unknown as ExecutionContext['getConnection'],
+        }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const firstHeaders = fetchMock.mock.calls[0][1]?.headers as Record<string, string>;
+      const secondHeaders = fetchMock.mock.calls[1][1]?.headers as Record<string, string>;
+      expect(firstHeaders.authorization).toBe('Bearer super-secret');
+      expect(secondHeaders.authorization).toBeUndefined();
+    });
+
+    it('keeps the Authorization header on a same-origin redirect', async () => {
+      const fetchMock = mockFetch(async (url) => {
+        if (url === 'https://api.test/login') {
+          return redirectResponse('https://api.test/landing');
+        }
+        return jsonResponse(200, { ok: true });
+      });
+      const action = new HttpRequestAction(fetchMock, stubLookup);
+
+      await action.execute(
+        connInputAuth({ method: 'GET', url: 'https://api.test/login' }, 'conn-1'),
+        makeContext({
+          getConnection: (async () => ({
+            id: 'conn-1',
+            type: 'CUSTOM',
+            provider: 'http',
+            config: { authType: 'bearer', token: 'super-secret' },
+          })) as unknown as ExecutionContext['getConnection'],
+        }),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const secondHeaders = fetchMock.mock.calls[1][1]?.headers as Record<string, string>;
+      expect(secondHeaders.authorization).toBe('Bearer super-secret');
     });
   });
 
