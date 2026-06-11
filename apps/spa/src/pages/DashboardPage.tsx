@@ -93,6 +93,7 @@ export function DashboardPage(): JSX.Element {
           <Tabs.Root value={range} onValueChange={handleRange}>
             <Tabs.List
               aria-label="Time range"
+              data-tour="dashboard-range"
               className="inline-flex items-center gap-1 rounded-md border border-white/5 bg-elevated p-1"
             >
               {RANGE_OPTIONS.map((option) => (
@@ -138,6 +139,7 @@ export function DashboardPage(): JSX.Element {
           <>
             <section
               aria-label="Summary metrics"
+              data-tour="dashboard-summary"
               className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
             >
               <StatCard
@@ -166,7 +168,11 @@ export function DashboardPage(): JSX.Element {
               />
             </section>
 
-            <section aria-label="Run trends" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section
+              aria-label="Run trends"
+              data-tour="dashboard-charts"
+              className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+            >
               <RunsPerDayChart data={summary.runsPerDay} />
               <ErrorRateChart data={summary.runsPerDay} />
             </section>
@@ -188,7 +194,11 @@ export function DashboardPage(): JSX.Element {
 
             <BusiestHoursChart data={summary.busiestHours} />
 
-            <section aria-label="Triage" className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <section
+              aria-label="Triage"
+              data-tour="dashboard-connection-health"
+              className="grid grid-cols-1 gap-6 lg:grid-cols-2"
+            >
               <RecentFailuresList items={summary.recentFailures} />
               <ConnectionHealthCard items={summary.connectionHealth} />
             </section>

@@ -228,6 +228,7 @@ export function NodeLibrary({ onPickNode }: NodeLibraryProps = {}) {
     return (
       <aside
         data-testid="node-library"
+        data-tour="editor-node-library"
         data-collapsed="true"
         className="flex h-full w-10 shrink-0 flex-col items-center gap-2 border-r border-white/5 bg-surface py-3"
       >
@@ -249,6 +250,7 @@ export function NodeLibrary({ onPickNode }: NodeLibraryProps = {}) {
     <TooltipProvider delayDuration={150}>
       <aside
         data-testid="node-library"
+        data-tour="editor-node-library"
         data-collapsed="false"
         className={cn(
           'flex h-full flex-col gap-4 bg-surface p-4',

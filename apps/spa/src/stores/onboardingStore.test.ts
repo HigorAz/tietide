@@ -7,10 +7,10 @@ describe('onboardingStore', () => {
   });
 
   describe('initial state', () => {
-    it('should start with the tour not running and no scope', () => {
+    it('should start with the tour not running and no active tour', () => {
       const state = useOnboardingStore.getState();
       expect(state.tourRun).toBe(false);
-      expect(state.tourScope).toBeNull();
+      expect(state.activeTourId).toBeNull();
       expect(state.tourStepIndex).toBe(0);
     });
 
@@ -19,31 +19,44 @@ describe('onboardingStore', () => {
       expect(state.helpDrawerOpen).toBe(false);
       expect(state.cheatSheetOpen).toBe(false);
     });
+
+    it('should start with the welcome modal closed', () => {
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(false);
+    });
+  });
+
+  describe('welcome modal', () => {
+    it('should open and close the welcome modal', () => {
+      useOnboardingStore.getState().openWelcome();
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(true);
+      useOnboardingStore.getState().closeWelcome();
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(false);
+    });
   });
 
   describe('startTour', () => {
-    it('should set tourRun=true with the requested scope and reset stepIndex', () => {
+    it('should set tourRun=true with the requested tourId and reset stepIndex', () => {
       useOnboardingStore.setState({ tourStepIndex: 4 });
-      useOnboardingStore.getState().startTour({ scope: 'firstAccess' });
+      useOnboardingStore.getState().startTour({ tourId: 'firstAccess' });
       const state = useOnboardingStore.getState();
       expect(state.tourRun).toBe(true);
-      expect(state.tourScope).toBe('firstAccess');
+      expect(state.activeTourId).toBe('firstAccess');
       expect(state.tourStepIndex).toBe(0);
     });
 
-    it('should support a currentPage scope (used by HelpDrawer "Take the tour")', () => {
-      useOnboardingStore.getState().startTour({ scope: 'currentPage' });
-      expect(useOnboardingStore.getState().tourScope).toBe('currentPage');
+    it('should start a named per-route tour (used by HelpDrawer "Take the tour")', () => {
+      useOnboardingStore.getState().startTour({ tourId: 'editor' });
+      expect(useOnboardingStore.getState().activeTourId).toBe('editor');
     });
   });
 
   describe('finishTour', () => {
-    it('should clear run/scope and reset stepIndex (tour is over either way)', () => {
-      useOnboardingStore.setState({ tourRun: true, tourScope: 'firstAccess', tourStepIndex: 3 });
+    it('should clear run/activeTourId and reset stepIndex (tour is over either way)', () => {
+      useOnboardingStore.setState({ tourRun: true, activeTourId: 'firstAccess', tourStepIndex: 3 });
       useOnboardingStore.getState().finishTour();
       const state = useOnboardingStore.getState();
       expect(state.tourRun).toBe(false);
-      expect(state.tourScope).toBeNull();
+      expect(state.activeTourId).toBeNull();
       expect(state.tourStepIndex).toBe(0);
     });
   });

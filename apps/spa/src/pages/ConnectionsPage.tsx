@@ -266,7 +266,7 @@ export function ConnectionsPage(): JSX.Element {
       </header>
 
       <Tabs defaultValue="mine">
-        <TabsList>
+        <TabsList data-tour="connections-tabs">
           <TabsTrigger value="mine">My Connections</TabsTrigger>
           <TabsTrigger value="available">Available Connections</TabsTrigger>
         </TabsList>

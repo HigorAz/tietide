@@ -1,12 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Joyride, { STATUS, EVENTS, ACTIONS, type CallBackProps, type Step } from 'react-joyride';
 import { NodeType, type WorkflowDefinition } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
-import { useOnboardingStore } from '@/stores/onboardingStore';
-import { isTourCompleted, markTourCompleted } from '@/utils/tourStorage';
-import { DASHBOARD_TOUR_STEPS, FIRST_ACCESS_STEPS, getTourSteps, type TourStep } from './tours';
+import { useOnboardingStore, FIRST_ACCESS_TOUR_ID } from '@/stores/onboardingStore';
+import { isTourCompleted, markTourCompleted, isTourSeen, markTourSeen } from '@/utils/tourStorage';
+import {
+  FIRST_ACCESS_STEPS,
+  FIRST_ACCESS_EDITOR_START,
+  getTour,
+  getTourIdForRoute,
+  type TourId,
+  type TourStep,
+} from './tours';
 
 const DEMO_WORKFLOW_DEFINITION: WorkflowDefinition = {
   nodes: [
@@ -37,43 +44,57 @@ const JOYRIDE_STYLES = {
   },
 };
 
-const LAST_DASHBOARD_INDEX = DASHBOARD_TOUR_STEPS.length - 1;
+// Tours already covered by the first-access sequence — don't auto-replay them
+// the next time the user lands on those routes.
+const FIRST_ACCESS_COVERS: TourId[] = ['editor', 'home'];
 
 export function AppTour(): JSX.Element | null {
   const userId = useAuthStore((s) => s.user?.id);
   const tourRun = useOnboardingStore((s) => s.tourRun);
-  const tourScope = useOnboardingStore((s) => s.tourScope);
+  const activeTourId = useOnboardingStore((s) => s.activeTourId);
   const stepIndex = useOnboardingStore((s) => s.tourStepIndex);
+  const welcomeOpen = useOnboardingStore((s) => s.welcomeOpen);
   const startTour = useOnboardingStore((s) => s.startTour);
   const finishTour = useOnboardingStore((s) => s.finishTour);
   const setStepIndex = useOnboardingStore((s) => s.setStepIndex);
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-  // Auto-start the first-access tour on first login. Once per mount: if the
-  // tour ends (finished, skipped, or demo-seed failed), we do NOT re-start
-  // — that's what would otherwise happen because finishTour() flips tourRun
-  // back to false and would re-trigger this effect.
-  const autoStartAttempted = useRef(false);
+  // The first-access tour is launched from the WelcomeModal's "Take the tour"
+  // CTA (not auto-started here), so a brand-new user is greeted by the welcome
+  // screen first and opts in rather than being dropped straight into a tour.
+
+  // For returning users (first-access already done), auto-start a route's tour
+  // the first time they visit it. Persisted per-tour so it only fires once.
+  const routeTourId = getTourIdForRoute(pathname);
   useEffect(() => {
     if (!userId) return;
-    if (autoStartAttempted.current) return;
-    if (isTourCompleted(userId)) return;
-    autoStartAttempted.current = true;
-    startTour({ scope: 'firstAccess' });
-  }, [userId, startTour]);
+    if (!isTourCompleted(userId)) return; // first-access takes priority
+    if (welcomeOpen || tourRun || activeTourId) return;
+    if (!routeTourId) return;
+    if (isTourSeen(userId, routeTourId)) return;
+    markTourSeen(userId, routeTourId);
+    startTour({ tourId: routeTourId });
+  }, [userId, routeTourId, welcomeOpen, tourRun, activeTourId, startTour]);
 
   if (!userId) return null;
 
-  const steps: TourStep[] =
-    tourScope === 'firstAccess' ? FIRST_ACCESS_STEPS : getTourSteps(pathname);
+  const isFirstAccess = activeTourId === FIRST_ACCESS_TOUR_ID;
+  const steps: TourStep[] = isFirstAccess
+    ? FIRST_ACCESS_STEPS
+    : activeTourId
+      ? (getTour(activeTourId as TourId)?.steps ?? [])
+      : [];
 
   const completeTour = (): void => {
-    markTourCompleted(userId);
+    if (isFirstAccess) {
+      markTourCompleted(userId);
+      FIRST_ACCESS_COVERS.forEach((id) => markTourSeen(userId, id));
+    }
     finishTour();
   };
 
-  const handleDashboardToEditorTransition = async (): Promise<void> => {
+  const handleTransitionToEditor = async (): Promise<void> => {
     const store = useWorkflowsStore.getState();
     try {
       let target = store.workflows[0];
@@ -81,10 +102,10 @@ export function AppTour(): JSX.Element | null {
         target = await store.create(DEMO_WORKFLOW_BODY);
       }
       navigate(`/workflows/${target.id}`);
-      setStepIndex(DASHBOARD_TOUR_STEPS.length);
+      setStepIndex(FIRST_ACCESS_EDITOR_START);
     } catch {
-      // Demo seeding failed — abort the tour but DO NOT persist the
-      // completion flag, so the user gets another chance next session.
+      // Demo seeding failed — abort the tour but DO NOT persist the completion
+      // flag, so the user gets another chance next session.
       finishTour();
     }
   };
@@ -98,12 +119,12 @@ export function AppTour(): JSX.Element | null {
     }
 
     if (
-      tourScope === 'firstAccess' &&
+      isFirstAccess &&
       type === EVENTS.STEP_AFTER &&
       action === ACTIONS.NEXT &&
-      index === LAST_DASHBOARD_INDEX
+      index === FIRST_ACCESS_EDITOR_START - 1
     ) {
-      void handleDashboardToEditorTransition();
+      void handleTransitionToEditor();
       return;
     }
 

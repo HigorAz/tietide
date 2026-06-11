@@ -218,6 +218,7 @@ export function FolderTree({
   return (
     <aside
       aria-label="Folders"
+      data-tour="workflows-folders"
       className="flex w-full flex-col gap-1 border-b border-white/5 bg-surface/40 p-3 md:w-60 md:shrink-0 md:border-b-0 md:border-r"
     >
       <DroppablePin
