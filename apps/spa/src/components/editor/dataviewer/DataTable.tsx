@@ -58,6 +58,13 @@ function renderCell(value: unknown): string {
   return formatScalar(value);
 }
 
+/** Stable React key for a row: a string/number `id` field when present, else the index. */
+function rowKey(row: Record<string, unknown>, index: number): string | number {
+  const id = row.id;
+  if (typeof id === 'string' || typeof id === 'number') return id;
+  return index;
+}
+
 interface RowProps {
   index: number;
   row: Record<string, unknown>;
@@ -120,7 +127,10 @@ export function DataTable({ value, testId }: DataTableProps): JSX.Element {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <Row key={i} index={i} row={row} columns={columns} />
+            // Prefer a stable per-row id when the data carries one; otherwise fall
+            // back to the array index — safe here because run output is rendered
+            // read-only and rows are never reordered or inserted (IN-01).
+            <Row key={rowKey(row, i)} index={i} row={row} columns={columns} />
           ))}
         </tbody>
       </table>
