@@ -3,6 +3,8 @@ import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PaymentRequiredException } from '../billing/payment-required.exception';
 import { LibraryService } from './library.service';
 import { LIBRARY_TEMPLATES } from './templates';
 
@@ -20,6 +22,7 @@ describe('LibraryService', () => {
     webhook: { create: jest.Mock };
   };
   let audit: { log: jest.Mock };
+  let entitlements: { assertCanCreateWorkflow: jest.Mock };
 
   const orgId = 'org-uuid-1';
   const userId = 'user-uuid-1';
@@ -30,17 +33,20 @@ describe('LibraryService', () => {
       webhook: { create: jest.fn() },
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    entitlements = { assertCanCreateWorkflow: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         LibraryService,
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogService, useValue: audit },
+        { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
     service = module.get<LibraryService>(LibraryService);
     jest.clearAllMocks();
+    entitlements.assertCanCreateWorkflow.mockResolvedValue(undefined);
   });
 
   describe('list', () => {
@@ -125,6 +131,24 @@ describe('LibraryService', () => {
         }),
       );
       expect(call.data.definition).toBeDefined();
+    });
+
+    it('should enforce the workflow entitlement before persisting (W5.24)', async () => {
+      await service.instantiate(orgId, userId, NO_WEBHOOK_SLUG);
+
+      expect(entitlements.assertCanCreateWorkflow).toHaveBeenCalledWith(orgId);
+    });
+
+    it('should throw 402 (reason "workflows") and not persist when at the workflow cap (W5.24)', async () => {
+      entitlements.assertCanCreateWorkflow.mockRejectedValueOnce(
+        new PaymentRequiredException('workflows', 'cap reached'),
+      );
+
+      await expect(service.instantiate(orgId, userId, NO_WEBHOOK_SLUG)).rejects.toBeInstanceOf(
+        PaymentRequiredException,
+      );
+      expect(prisma.workflow.create).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
     });
 
     it('should always default isActive to false (security)', async () => {

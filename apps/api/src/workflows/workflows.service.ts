@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { ActivationService } from '../provider-triggers/activation.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import type { WorkflowResponseDto } from './dto/workflow-response.dto';
@@ -97,6 +98,7 @@ export class WorkflowsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
     private readonly activation: ActivationService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async create(
@@ -104,6 +106,7 @@ export class WorkflowsService {
     userId: string,
     dto: CreateWorkflowDto,
   ): Promise<WorkflowResponseDto> {
+    await this.entitlements.assertCanCreateWorkflow(organizationId);
     assertExecutableDefinition(dto.definition);
 
     const row = await this.prisma.$transaction(async (tx) => {

@@ -114,6 +114,46 @@ describe('EntitlementsService', () => {
     });
   });
 
+  describe('assertCanCreateWorkflow', () => {
+    it('throws 402 with reason "workflows" once a FREE workspace reaches its workflow cap', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({ plan: 'FREE' });
+      prisma.workflow.count.mockResolvedValue(PLAN_LIMITS.FREE.maxWorkflows);
+
+      const promise = service.assertCanCreateWorkflow(ORG);
+      await expect(promise).rejects.toBeInstanceOf(PaymentRequiredException);
+      await expect(promise).rejects.toMatchObject({
+        getResponse: expect.any(Function),
+      });
+      try {
+        await service.assertCanCreateWorkflow(ORG);
+      } catch (err) {
+        expect((err as PaymentRequiredException).getResponse()).toMatchObject({
+          reason: 'workflows',
+        });
+      }
+    });
+
+    it('allows creation below the workflow cap', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({ plan: 'FREE' });
+      prisma.workflow.count.mockResolvedValue(0);
+      await expect(service.assertCanCreateWorkflow(ORG)).resolves.toBeUndefined();
+    });
+
+    it('never blocks on a plan with unlimited workflows and does not count', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({ plan: 'BUSINESS' });
+      await expect(service.assertCanCreateWorkflow(ORG)).resolves.toBeUndefined();
+      expect(prisma.workflow.count).not.toHaveBeenCalled();
+    });
+
+    it('treats a missing subscription row as FREE', async () => {
+      prisma.subscription.findUnique.mockResolvedValue(null);
+      prisma.workflow.count.mockResolvedValue(PLAN_LIMITS.FREE.maxWorkflows);
+      await expect(service.assertCanCreateWorkflow(ORG)).rejects.toBeInstanceOf(
+        PaymentRequiredException,
+      );
+    });
+  });
+
   describe('assertCanRun', () => {
     it('throws 402 once a FREE workspace reaches its hard run cap', async () => {
       prisma.subscription.findUnique.mockResolvedValue({ plan: 'FREE', currentPeriodStart: null });

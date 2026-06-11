@@ -113,6 +113,25 @@ export class EntitlementsService {
     }
   }
 
+  /**
+   * Workflow-count guard. FREE caps the number of workflows a workspace may hold
+   * (`maxWorkflows`); paid plans are unlimited (`null`) and never block. Mirrors
+   * `assertCanAddSeat`: resolve the plan, short-circuit when unlimited, else count
+   * live workflows and throw 402 at the cap.
+   */
+  async assertCanCreateWorkflow(orgId: string): Promise<void> {
+    const plan = await this.planOf(orgId);
+    const { maxWorkflows } = this.limitsFor(plan);
+    if (maxWorkflows === null) return;
+    const used = await this.prisma.workflow.count({ where: { organizationId: orgId } });
+    if (used >= maxWorkflows) {
+      throw new PaymentRequiredException(
+        'workflows',
+        'This workspace has reached its workflow limit. Upgrade the plan to create more.',
+      );
+    }
+  }
+
   /** Hard run cap on FREE only; paid plans meter overage and never block. */
   async assertCanRun(orgId: string): Promise<void> {
     const sub = await this.prisma.subscription.findUnique({
