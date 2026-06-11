@@ -86,7 +86,15 @@ export function ConnectionCard({
           <ChevronDown aria-hidden size={12} className={cn('transition', open && 'rotate-180')} />
         </button>
       </div>
-      <div className={open ? undefined : 'sr-only'}>{children}</div>
+      {/*
+        Keep the picker MOUNTED across collapse (the keepMounted contract — the
+        ConnectionPicker registers the Connection step and must not unmount), but
+        use `hidden` (display:none) rather than `sr-only` when collapsed. `sr-only`
+        only hides visually: the Radix Select trigger stays focusable and is still
+        announced, producing a confusing double tab-stop / phantom combobox. `hidden`
+        fully removes it from the tab + a11y tree while leaving it mounted (IN-05).
+      */}
+      <div hidden={!open}>{children}</div>
     </div>
   );
 }

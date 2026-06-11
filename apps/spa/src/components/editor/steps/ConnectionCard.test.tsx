@@ -36,7 +36,12 @@ describe('ConnectionCard', () => {
       </ConnectionCard>,
     );
 
-    expect(screen.getByRole('button', { name: 'the-underlying-picker' })).toBeInTheDocument();
+    // Mounted (the card wraps, never replaces the picker) but `hidden` while
+    // collapsed — so it is excluded from the accessibility tree by default and
+    // must be queried with { hidden: true }.
+    expect(
+      screen.getByRole('button', { name: 'the-underlying-picker', hidden: true }),
+    ).toBeInTheDocument();
   });
 
   it('renders a muted "No authentication" state for an optional connection with no selection', () => {
@@ -115,5 +120,32 @@ describe('ConnectionCard', () => {
     // Clicking change must not throw and keeps the picker reachable.
     await user.click(screen.getByTestId('connection-card-change'));
     expect(screen.getByTestId('wrapped-picker')).toBeInTheDocument();
+  });
+
+  it('hides the collapsed picker from the tab/a11y tree but keeps it mounted', async () => {
+    const user = userEvent.setup();
+    render(
+      <ConnectionCard
+        providerIcon={<span />}
+        name="My Google"
+        status="ACTIVE"
+        optional={false}
+        stale={false}
+      >
+        <button type="button" data-testid="wrapped-picker">
+          picker
+        </button>
+      </ConnectionCard>,
+    );
+
+    const picker = screen.getByTestId('wrapped-picker');
+    // Collapsed by default: still in the DOM (keepMounted) but `hidden`, so it
+    // is removed from the tab order and a11y tree — no double tab-stop.
+    expect(picker).toBeInTheDocument();
+    expect(picker).not.toBeVisible();
+
+    // Expanding reveals it again.
+    await user.click(screen.getByTestId('connection-card-change'));
+    expect(screen.getByTestId('wrapped-picker')).toBeVisible();
   });
 });
