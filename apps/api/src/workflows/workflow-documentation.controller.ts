@@ -26,14 +26,15 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
 import {
   DEFAULT_AI_GENERATE_THROTTLE_LIMIT,
   DEFAULT_AI_GENERATE_THROTTLE_TTL_MS,
   DEFAULT_THROTTLER_NAME,
 } from '../common/throttler/throttler.config';
-import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
 import {
   DocumentationRegenerationAcceptedDto,
@@ -50,7 +51,7 @@ const AI_DOCS_THROTTLE = {
 @ApiTags('workflows')
 @ApiBearerAuth()
 @ApiUnauthorizedResponse({ description: 'Missing or invalid token' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, OrgContextGuard)
 @Controller('workflows/:id')
 export class WorkflowDocumentationController {
   constructor(private readonly docs: WorkflowDocumentationService) {}
@@ -68,13 +69,13 @@ export class WorkflowDocumentationController {
   @ApiNotFoundResponse({ description: 'Workflow or documentation not found' })
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   async getDocumentation(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Headers('if-none-match') ifNoneMatch: string | undefined,
     @Headers('if-modified-since') ifModifiedSince: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ): Promise<WorkflowDocumentationResponseDto | undefined> {
-    const existing = await this.docs.findExisting(user.id, id);
+    const existing = await this.docs.findExisting(org.id, id);
     if (!existing) {
       throw new NotFoundException('Documentation not found');
     }
@@ -125,10 +126,10 @@ export class WorkflowDocumentationController {
   @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
   @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   async regenerate(
-    @CurrentUser() user: AuthenticatedUser,
+    @CurrentOrg() org: OrgContext,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<DocumentationRegenerationAcceptedDto> {
-    return this.docs.startRegeneration(user.id, id);
+    return this.docs.startRegeneration(org.id, id);
   }
 
   private matchesEtag(ifNoneMatch: string, etag: string): boolean {
