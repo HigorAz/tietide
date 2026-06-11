@@ -77,6 +77,14 @@ const fireCallback = (data: Record<string, unknown>): void => {
   });
 };
 
+// The first-access tour is launched by the WelcomeModal, not auto-started by
+// AppTour — tests start it explicitly to exercise the running/transition logic.
+const startFirstAccess = (): void => {
+  act(() => {
+    useOnboardingStore.getState().startTour({ tourId: 'firstAccess' });
+  });
+};
+
 describe('AppTour', () => {
   beforeEach(() => {
     lastJoyrideProps = null;
@@ -106,10 +114,11 @@ describe('AppTour', () => {
     });
   });
 
-  describe('first-access auto-start', () => {
-    it('should fire the first-access tour on first login (no flag in localStorage)', async () => {
+  describe('first-access tour (launched from WelcomeModal)', () => {
+    it('should run FIRST_ACCESS_STEPS once started', async () => {
       mockUser('u-1');
       renderAt();
+      startFirstAccess();
       await waitFor(() => {
         expect(lastJoyrideProps?.run).toBe(true);
       });
@@ -117,11 +126,9 @@ describe('AppTour', () => {
       expect(lastJoyrideProps?.steps).toEqual(FIRST_ACCESS_STEPS);
     });
 
-    it('should NOT re-fire the first-access tour on subsequent logins (flag persisted)', async () => {
-      localStorage.setItem(tourCompletedKey('u-1'), '1');
-      mockUser('u-1');
-      // A route with no tour, so the per-route auto-start cannot fire either —
-      // isolating the first-access "never again" guarantee.
+    it('should NOT auto-start any tour on its own (entry is the welcome modal)', async () => {
+      mockUser('u-1'); // no completion flag, fresh user
+      // A route with no tour, so per-route auto-start cannot fire either.
       renderAt('/settings');
       await act(async () => {
         await Promise.resolve();
@@ -130,7 +137,7 @@ describe('AppTour', () => {
       expect(useOnboardingStore.getState().tourRun).toBe(false);
     });
 
-    it('should not start the tour if no user is loaded yet (auth not hydrated)', async () => {
+    it('should not run when no user is loaded yet (auth not hydrated)', async () => {
       renderAt();
       await act(async () => {
         await Promise.resolve();
@@ -143,6 +150,7 @@ describe('AppTour', () => {
     it('should persist the flag under exactly `tietide-tour-completed-{userId}` when finished', async () => {
       mockUser('u-1');
       renderAt();
+      startFirstAccess();
       await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
       fireCallback({ status: 'finished', type: 'tour:end', action: 'next', index: 4 });
       expect(localStorage.getItem('tietide-tour-completed-u-1')).not.toBeNull();
@@ -152,6 +160,7 @@ describe('AppTour', () => {
     it('should mark the editor tour seen so it does not auto-replay after onboarding', async () => {
       mockUser('u-1');
       renderAt();
+      startFirstAccess();
       await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
       fireCallback({ status: 'finished', type: 'tour:end', action: 'next', index: 4 });
       expect(isTourSeen('u-1', 'editor')).toBe(true);
@@ -160,6 +169,7 @@ describe('AppTour', () => {
     it('should persist the flag when the tour is dismissed mid-way (skipped)', async () => {
       mockUser('u-1');
       renderAt();
+      startFirstAccess();
       await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
       fireCallback({ status: 'skipped', type: 'tour:end', action: 'skip', index: 1 });
       expect(localStorage.getItem('tietide-tour-completed-u-1')).not.toBeNull();
@@ -174,6 +184,7 @@ describe('AppTour', () => {
       mockUser('u-1');
       const create = useWorkflowsStore.getState().create as ReturnType<typeof vi.fn>;
       renderAt();
+      startFirstAccess();
       await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
 
       fireCallback({
@@ -212,6 +223,7 @@ describe('AppTour', () => {
       });
 
       renderAt();
+      startFirstAccess();
       await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
       fireCallback({
         status: 'running',
@@ -233,6 +245,7 @@ describe('AppTour', () => {
       });
 
       renderAt();
+      startFirstAccess();
       await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
       fireCallback({
         status: 'running',
@@ -305,10 +318,13 @@ describe('AppTour', () => {
       expect(useOnboardingStore.getState().tourRun).toBe(false);
     });
 
-    it('should NOT auto-start before first-access onboarding is completed', async () => {
-      mockUser('u-1'); // no completion flag → first-access owns the experience
+    it('should NOT auto-start a route tour before onboarding is completed', async () => {
+      mockUser('u-1'); // no completion flag → welcome modal owns the experience
       renderAt('/connections');
-      await waitFor(() => expect(useOnboardingStore.getState().activeTourId).toBe('firstAccess'));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(useOnboardingStore.getState().tourRun).toBe(false);
       expect(isTourSeen('u-1', 'connections')).toBe(false);
     });
   });

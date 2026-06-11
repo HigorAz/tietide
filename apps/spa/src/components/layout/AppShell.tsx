@@ -5,6 +5,7 @@ import { MobileTopBar } from './MobileTopBar';
 import { MobileNavDrawer } from './MobileNavDrawer';
 import { HelpDrawer } from './HelpDrawer';
 import { AppTour } from '@/components/onboarding/AppTour';
+import { WelcomeModal } from '@/components/onboarding/WelcomeModal';
 import { CheatSheet } from '@/components/help/CheatSheet';
 import { useGlobalShortcuts } from '@/hooks/useGlobalShortcuts';
 
@@ -52,6 +53,7 @@ export function AppShell(): JSX.Element {
         <Outlet />
       </main>
       <MobileNavDrawer open={navOpen} onClose={() => setNavOpen(false)} />
+      <WelcomeModal />
       <AppTour />
       <HelpDrawer />
       <CheatSheet />

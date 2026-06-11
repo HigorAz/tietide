@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Joyride, { STATUS, EVENTS, ACTIONS, type CallBackProps, type Step } from 'react-joyride';
 import { NodeType, type WorkflowDefinition } from '@tietide/shared';
@@ -60,17 +60,9 @@ export function AppTour(): JSX.Element | null {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-  // Auto-start the first-access tour on first login. Once per mount: if the
-  // tour ends (finished, skipped, or demo-seed failed), we do NOT re-start —
-  // finishTour() flips tourRun back to false and would otherwise re-trigger.
-  const autoStartAttempted = useRef(false);
-  useEffect(() => {
-    if (!userId) return;
-    if (autoStartAttempted.current) return;
-    if (isTourCompleted(userId)) return;
-    autoStartAttempted.current = true;
-    startTour({ tourId: FIRST_ACCESS_TOUR_ID });
-  }, [userId, startTour]);
+  // The first-access tour is launched from the WelcomeModal's "Take the tour"
+  // CTA (not auto-started here), so a brand-new user is greeted by the welcome
+  // screen first and opts in rather than being dropped straight into a tour.
 
   // For returning users (first-access already done), auto-start a route's tour
   // the first time they visit it. Persisted per-tour so it only fires once.
