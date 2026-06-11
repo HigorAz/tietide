@@ -20,3 +20,45 @@ export const markTourCompleted = (userId: string): void => {
     // pattern used in Sidebar's collapse persistence.
   }
 };
+
+// Generic per-user onboarding flags. Namespaced separately from the legacy
+// `tietide-tour-completed-` prefix so the original first-access flag keeps its
+// exact key shape (back-compat) while new flags share one read/write helper.
+export const ONBOARDING_FLAG_PREFIX = 'tietide-onboarding-';
+
+const flagKey = (flag: string, userId: string): string =>
+  `${ONBOARDING_FLAG_PREFIX}${flag}-${userId}`;
+
+const readFlag = (flag: string, userId: string): boolean => {
+  if (!userId) return false;
+  try {
+    return localStorage.getItem(flagKey(flag, userId)) !== null;
+  } catch {
+    return false;
+  }
+};
+
+const writeFlag = (flag: string, userId: string): void => {
+  if (!userId) return;
+  try {
+    localStorage.setItem(flagKey(flag, userId), '1');
+  } catch {
+    // Storage unavailable / quota exhausted — degrade silently.
+  }
+};
+
+export const isWelcomeSeen = (userId: string): boolean => readFlag('welcome-seen', userId);
+export const markWelcomeSeen = (userId: string): void => writeFlag('welcome-seen', userId);
+
+export const isTourSeen = (userId: string, tourId: string): boolean =>
+  readFlag(`tour-seen-${tourId}`, userId);
+export const markTourSeen = (userId: string, tourId: string): void =>
+  writeFlag(`tour-seen-${tourId}`, userId);
+
+export const isChecklistDismissed = (userId: string): boolean =>
+  readFlag('checklist-dismissed', userId);
+export const markChecklistDismissed = (userId: string): void =>
+  writeFlag('checklist-dismissed', userId);
+
+export const isLibraryVisited = (userId: string): boolean => readFlag('library-visited', userId);
+export const markLibraryVisited = (userId: string): void => writeFlag('library-visited', userId);
