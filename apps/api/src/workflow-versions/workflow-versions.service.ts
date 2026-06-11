@@ -30,11 +30,11 @@ export class WorkflowVersionsService {
   ) {}
 
   async list(
-    userId: string,
+    organizationId: string,
     workflowId: string,
     options: ListOptions,
   ): Promise<WorkflowVersionListResponseDto> {
-    await this.assertWorkflowAccess(userId, workflowId);
+    await this.assertWorkflowAccess(organizationId, workflowId);
 
     const limit = this.resolveLimit(options.limit);
     const cursor = options.cursor ? decodeVersionCursor(options.cursor) : null;
@@ -70,11 +70,11 @@ export class WorkflowVersionsService {
   }
 
   async getOne(
-    userId: string,
+    organizationId: string,
     workflowId: string,
     version: number,
   ): Promise<WorkflowVersionResponseDto> {
-    await this.assertWorkflowAccess(userId, workflowId);
+    await this.assertWorkflowAccess(organizationId, workflowId);
 
     const row = await this.prisma.workflowVersion.findUnique({
       where: { workflowId_version: { workflowId, version } },
@@ -97,11 +97,12 @@ export class WorkflowVersionsService {
   }
 
   async restore(
+    organizationId: string,
     userId: string,
     workflowId: string,
     version: number,
   ): Promise<WorkflowVersionRestoreResponseDto> {
-    await this.assertWorkflowAccess(userId, workflowId);
+    await this.assertWorkflowAccess(organizationId, workflowId);
 
     const row = await this.prisma.workflowVersion.findUnique({
       where: { workflowId_version: { workflowId, version } },
@@ -126,15 +127,15 @@ export class WorkflowVersionsService {
     };
   }
 
-  private async assertWorkflowAccess(userId: string, workflowId: string): Promise<void> {
+  private async assertWorkflowAccess(organizationId: string, workflowId: string): Promise<void> {
     const workflow = await this.prisma.workflow.findUnique({
       where: { id: workflowId },
-      select: { userId: true },
+      select: { organizationId: true },
     });
     if (!workflow) {
       throw new NotFoundException('Workflow not found');
     }
-    if (workflow.userId !== userId) {
+    if (workflow.organizationId !== organizationId) {
       throw new ForbiddenException('You do not have access to this workflow');
     }
   }

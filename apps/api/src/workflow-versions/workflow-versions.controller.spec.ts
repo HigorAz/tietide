@@ -9,6 +9,8 @@ import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OrgContextGuard } from '../common/guards/org-context.guard';
+import type { OrgContext } from '../common/org-context/org-context.types';
 import { WorkflowVersionsController } from './workflow-versions.controller';
 import { WorkflowVersionsService } from './workflow-versions.service';
 
@@ -22,7 +24,9 @@ describe('WorkflowVersionsController (integration)', () => {
     restore: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
+  let activeOrg: OrgContext | null;
 
+  const orgId = 'org-uuid-1';
   const workflowUuid = '550e8400-e29b-41d4-a716-446655440000';
   const baseDefinition = {
     nodes: [
@@ -37,7 +41,8 @@ describe('WorkflowVersionsController (integration)', () => {
       getOne: jest.fn(),
       restore: jest.fn(),
     };
-    authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
+    authedUser = { id: 'member-uuid', email: 'member@example.com', role: 'USER' };
+    activeOrg = { id: orgId, role: 'MEMBER' };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WorkflowVersionsController],
@@ -51,6 +56,17 @@ describe('WorkflowVersionsController (integration)', () => {
           }
           const req = ctx.switchToHttp().getRequest<{ user: unknown }>();
           req.user = authedUser;
+          return true;
+        },
+      })
+      .overrideGuard(OrgContextGuard)
+      .useValue({
+        canActivate: (ctx: ExecutionContext) => {
+          if (!activeOrg) {
+            throw new ForbiddenException('No organization context');
+          }
+          const req = ctx.switchToHttp().getRequest<{ org: OrgContext }>();
+          req.org = activeOrg;
           return true;
         },
       })
@@ -68,7 +84,7 @@ describe('WorkflowVersionsController (integration)', () => {
   });
 
   describe('GET /workflows/:id/versions', () => {
-    it('should return 200 with the list payload', async () => {
+    it('should return 200 with the list payload and authorize by active org id', async () => {
       service.list.mockResolvedValue({
         items: [
           {
@@ -76,7 +92,7 @@ describe('WorkflowVersionsController (integration)', () => {
             version: 3,
             message: 'tweak',
             createdAt: new Date('2026-05-06T10:00:00Z').toISOString(),
-            createdBy: { id: 'owner-uuid', email: 'owner@example.com' },
+            createdBy: { id: 'author-uuid', email: 'author@example.com' },
           },
         ],
         nextCursor: null,
@@ -88,7 +104,7 @@ describe('WorkflowVersionsController (integration)', () => {
 
       expect(res.body.items).toHaveLength(1);
       expect(res.body.nextCursor).toBeNull();
-      expect(service.list).toHaveBeenCalledWith('owner-uuid', workflowUuid, {
+      expect(service.list).toHaveBeenCalledWith(orgId, workflowUuid, {
         cursor: undefined,
         limit: undefined,
       });
@@ -101,7 +117,7 @@ describe('WorkflowVersionsController (integration)', () => {
         .get(`/workflows/${workflowUuid}/versions?limit=5&cursor=abc`)
         .expect(200);
 
-      expect(service.list).toHaveBeenCalledWith('owner-uuid', workflowUuid, {
+      expect(service.list).toHaveBeenCalledWith(orgId, workflowUuid, {
         cursor: 'abc',
         limit: 5,
       });
@@ -113,7 +129,7 @@ describe('WorkflowVersionsController (integration)', () => {
       await request(app.getHttpServer()).get(`/workflows/${workflowUuid}/versions`).expect(401);
     });
 
-    it('should return 403 when service throws ForbiddenException (IDOR)', async () => {
+    it('should return 403 when the active org does not own the workflow (IDOR)', async () => {
       service.list.mockRejectedValue(new ForbiddenException());
 
       await request(app.getHttpServer()).get(`/workflows/${workflowUuid}/versions`).expect(403);
@@ -131,7 +147,7 @@ describe('WorkflowVersionsController (integration)', () => {
   });
 
   describe('GET /workflows/:id/versions/:version', () => {
-    it('should return 200 with the version payload', async () => {
+    it('should return 200 with the version payload and authorize by active org id', async () => {
       service.getOne.mockResolvedValue({
         id: 'v2',
         workflowId: workflowUuid,
@@ -139,7 +155,7 @@ describe('WorkflowVersionsController (integration)', () => {
         definition: baseDefinition,
         message: null,
         createdAt: new Date('2026-05-06T09:00:00Z').toISOString(),
-        createdBy: { id: 'owner-uuid', email: 'owner@example.com' },
+        createdBy: { id: 'author-uuid', email: 'author@example.com' },
       });
 
       const res = await request(app.getHttpServer())
@@ -148,7 +164,7 @@ describe('WorkflowVersionsController (integration)', () => {
 
       expect(res.body.version).toBe(2);
       expect(res.body.definition).toEqual(baseDefinition);
-      expect(service.getOne).toHaveBeenCalledWith('owner-uuid', workflowUuid, 2);
+      expect(service.getOne).toHaveBeenCalledWith(orgId, workflowUuid, 2);
     });
 
     it('should return 400 when version is not an integer', async () => {
@@ -163,7 +179,7 @@ describe('WorkflowVersionsController (integration)', () => {
   });
 
   describe('POST /workflows/:id/versions/:version/restore', () => {
-    it('should return 200 with { version, definition } and not mutate the workflow', async () => {
+    it('should return 200 with { version, definition } and pass org id + acting user id', async () => {
       service.restore.mockResolvedValue({ version: 2, definition: baseDefinition });
 
       const res = await request(app.getHttpServer())
@@ -171,10 +187,10 @@ describe('WorkflowVersionsController (integration)', () => {
         .expect(200);
 
       expect(res.body).toEqual({ version: 2, definition: baseDefinition });
-      expect(service.restore).toHaveBeenCalledWith('owner-uuid', workflowUuid, 2);
+      expect(service.restore).toHaveBeenCalledWith(orgId, 'member-uuid', workflowUuid, 2);
     });
 
-    it('should return 403 when caller does not own the workflow (IDOR)', async () => {
+    it('should return 403 when the active org does not own the workflow (IDOR)', async () => {
       service.restore.mockRejectedValue(new ForbiddenException());
 
       await request(app.getHttpServer())
