@@ -1,14 +1,6 @@
 import { Copy } from 'lucide-react';
 import { useCopy } from '@/components/editor/dataviewer/useCopy';
-
-const stringify = (value: unknown): string => {
-  if (value === undefined) return 'null';
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
+import { safeStringify } from '@/components/editor/dataviewer/valueFormat';
 
 export interface CopyJsonButtonProps {
   value: unknown;
@@ -29,7 +21,7 @@ export function CopyJsonButton({ value }: CopyJsonButtonProps): JSX.Element {
       aria-label="Copy JSON"
       onClick={(e) => {
         e.stopPropagation();
-        void copy(stringify(value), 'JSON');
+        void copy(safeStringify(value), 'JSON');
       }}
       className="rounded p-1 text-text-secondary transition hover:bg-white/5 hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
     >

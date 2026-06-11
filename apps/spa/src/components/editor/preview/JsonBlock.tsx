@@ -1,15 +1,7 @@
 import { Copy } from 'lucide-react';
 import { useCopy } from '../dataviewer/useCopy';
 import { RawJson } from '../dataviewer/RawJson';
-
-const stringify = (value: unknown): string => {
-  if (value === undefined) return 'null';
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-};
+import { safeStringify } from '../dataviewer/valueFormat';
 
 export interface JsonBlockProps {
   label: string;
@@ -32,7 +24,7 @@ export function JsonBlock({ label, testId, value }: JsonBlockProps): JSX.Element
         <span>{label}</span>
         <button
           type="button"
-          onClick={() => void copy(stringify(value), `${label} JSON`)}
+          onClick={() => void copy(safeStringify(value), `${label} JSON`)}
           aria-label={`Copy ${label} JSON`}
           className="rounded p-1 text-text-secondary transition hover:bg-white/5 hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
         >

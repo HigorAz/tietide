@@ -7,6 +7,7 @@ import {
   flattenLeaves,
   formatScalar,
   matchesSearch,
+  safeStringify,
 } from './valueFormat';
 
 describe('valueFormat', () => {
@@ -126,6 +127,30 @@ describe('valueFormat', () => {
 
     it('returns false when neither path nor value matches', () => {
       expect(matchesSearch({ path: 'messages[0].id', value: 'abc' }, 'zz')).toBe(false);
+    });
+
+    it('matches a string leaf against its RAW value past the 160-char display horizon', () => {
+      const needle = 'find-me';
+      const long = `${'x'.repeat(200)}${needle}`;
+      // formatScalar truncates at 160 chars, so a formatted-value search would miss this.
+      expect(formatScalar(long).includes(needle)).toBe(false);
+      expect(matchesSearch({ path: 'p', value: long }, needle)).toBe(true);
+    });
+  });
+
+  describe('safeStringify', () => {
+    it('pretty-prints values with 2-space indent', () => {
+      expect(safeStringify({ a: 1 })).toBe('{\n  "a": 1\n}');
+    });
+
+    it('degrades undefined to the literal "null"', () => {
+      expect(safeStringify(undefined)).toBe('null');
+    });
+
+    it('falls back to String(value) on a circular structure', () => {
+      const circular: Record<string, unknown> = {};
+      circular.self = circular;
+      expect(safeStringify(circular)).toBe('[object Object]');
     });
   });
 });

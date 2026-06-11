@@ -22,6 +22,21 @@ export interface Leaf {
   value: unknown;
 }
 
+/**
+ * Pretty-print a value for copy/raw display, degrading gracefully: undefined →
+ * 'null' (so the raw pane never shows a literal "undefined") and circular/throwing
+ * values fall back to `String(value)`. Single source of truth shared by JsonBlock,
+ * CopyJsonButton, and RawJson (was duplicated verbatim in all three — IN-02).
+ */
+export function safeStringify(value: unknown): string {
+  if (value === undefined) return 'null';
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 /** Classify a JSON value into one of the viewer's display kinds (undefined → 'null'). */
 export function classifyValue(value: unknown): ValueKind {
   if (value === null || value === undefined) return 'null';
@@ -98,9 +113,16 @@ export function flattenLeaves(value: unknown, parent = ''): Leaf[] {
   return [{ path: parent, value }];
 }
 
-/** Case-insensitive substring match against a leaf's path or its formatted value. */
+/**
+ * Case-insensitive substring match against a leaf's path or its value. String
+ * leaves are matched against the RAW string (not the 160-char-truncated
+ * `formatScalar` output) so a search term that only appears past the display
+ * horizon still matches the row the user can copy in full (IN-04). Non-string
+ * scalars match against their formatted form.
+ */
 export function matchesSearch(leaf: Leaf, query: string): boolean {
   const q = query.toLowerCase();
   if (leaf.path.toLowerCase().includes(q)) return true;
-  return formatScalar(leaf.value).toLowerCase().includes(q);
+  const haystack = typeof leaf.value === 'string' ? leaf.value : formatScalar(leaf.value);
+  return haystack.toLowerCase().includes(q);
 }
