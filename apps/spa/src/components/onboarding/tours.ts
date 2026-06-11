@@ -137,10 +137,10 @@ export const EDITOR_TOUR_STEPS: TourStep[] = [
     content:
       'Step 3 “Test” runs just that node with your real connection and shows the result inline as a tree or table — so you can confirm one step works before running the whole flow.',
   }),
-  anchor(TOUR_TARGET.editorViewTabs, {
+  concept({
     title: 'Configure vs Result',
-    content: 'Toggle between editing your workflow and inspecting the data from a run.',
-    placement: 'bottom',
+    content:
+      'Once a run is loaded, a Configure / Result switch appears in the toolbar — flip to “Result” to inspect the data each node produced, then back to “Configure” to keep editing.',
   }),
   anchor(TOUR_TARGET.editorSave, {
     title: 'Save your work',
@@ -174,11 +174,10 @@ export const CONNECTIONS_TOUR_STEPS: TourStep[] = [
     placement: 'bottom',
     disableBeacon: true,
   }),
-  anchor(TOUR_TARGET.connectionsProviderPicker, {
+  concept({
     title: 'Connect an app',
     content:
-      'Pick a provider to connect. Some use a one-click OAuth sign-in (Google, Slack, GitHub…); others ask for an API key. Credentials are encrypted at rest — never shown again.',
-    placement: 'top',
+      'Open “Available” and pick a provider. Some use a one-click OAuth sign-in (Google, Slack, GitHub…); others ask for an API key. Credentials are encrypted at rest — never shown again.',
   }),
 ];
 

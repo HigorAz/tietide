@@ -204,6 +204,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           onClick={handleDocs}
           disabled={docsDisabled}
           title="Generate AI documentation for this workflow"
+          dataTour="editor-docs"
           icon={
             docStatus === 'loading' ? (
               <Spinner size="sm" label="Generating" />
@@ -260,6 +261,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           onClick={handleSave}
           disabled={saveDisabled}
           primary
+          dataTour="editor-save"
           icon={
             isSaving ? (
               <Spinner size="sm" label="Saving" />

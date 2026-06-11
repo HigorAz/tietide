@@ -146,6 +146,7 @@ export function InspectorDock(): JSX.Element {
   return (
     <div
       data-testid="inspector-dock"
+      data-tour="editor-inspector"
       data-collapsed={collapsed ? 'true' : 'false'}
       onPointerDown={stopPointerPropagation}
       onWheel={(e) => e.stopPropagation()}

@@ -108,7 +108,7 @@ export function LibraryPage(): JSX.Element {
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-6 py-8">
-        <div className="mb-6">
+        <div data-tour="library-search" className="mb-6">
           <label className="relative flex items-center">
             <Search
               aria-hidden="true"
@@ -158,7 +158,7 @@ export function LibraryPage(): JSX.Element {
         )}
 
         {groups.length > 0 && (
-          <div className="flex flex-col gap-10">
+          <div data-tour="library-grid" className="flex flex-col gap-10">
             {groups.map((group) => (
               <section key={group.category} aria-label={group.category}>
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
