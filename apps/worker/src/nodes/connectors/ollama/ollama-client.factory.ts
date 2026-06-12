@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DecryptedConnection } from '@tietide/sdk';
 import type { OllamaConfig } from '@tietide/shared';
+import { assertUrlAllowed, type LookupFn } from '../../actions/ssrf-guard';
 
 export interface OllamaGenerateRequest {
   model: string;
@@ -50,6 +51,17 @@ export class OllamaHttpError extends Error {
 
 @Injectable()
 export class OllamaClientFactory {
+  // The Ollama baseUrl is fully user-controlled (per-workspace, self-hosted
+  // pointer). Without an SSRF guard a workflow author could point it at
+  // 169.254.169.254 / RFC1918 / loopback and use the worker as an SSRF proxy.
+  // We resolve+validate the URL before every request, matching the http-request
+  // node. `lookupFn` is injectable so tests can simulate DNS-based SSRF.
+  private readonly lookupFn?: LookupFn;
+
+  constructor(lookupFn?: LookupFn) {
+    this.lookupFn = lookupFn;
+  }
+
   baseUrl(connection: DecryptedConnection<OllamaConfig>): string {
     return connection.config.baseUrl.replace(/\/+$/, '');
   }
@@ -59,6 +71,7 @@ export class OllamaClientFactory {
     request: OllamaGenerateRequest,
   ): Promise<OllamaGenerateResult> {
     const url = `${this.baseUrl(connection)}/api/generate`;
+    await this.assertAllowed(url);
     const body = {
       model: request.model,
       prompt: request.prompt,
@@ -96,6 +109,7 @@ export class OllamaClientFactory {
     request: OllamaEmbeddingsRequest,
   ): Promise<OllamaEmbeddingsResult> {
     const url = `${this.baseUrl(connection)}/api/embeddings`;
+    await this.assertAllowed(url);
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
@@ -115,5 +129,9 @@ export class OllamaClientFactory {
 
     const embedding = parsed?.embedding ?? [];
     return { embedding, dimensions: embedding.length, model: request.model };
+  }
+
+  private async assertAllowed(url: string): Promise<void> {
+    await assertUrlAllowed(url, this.lookupFn);
   }
 }
