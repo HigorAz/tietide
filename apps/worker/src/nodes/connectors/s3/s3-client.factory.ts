@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
@@ -66,7 +66,7 @@ export class S3ClientFactory {
   // in that path. `lookupFn` is injectable so tests can simulate DNS-based SSRF.
   private readonly lookupFn?: LookupFn;
 
-  constructor(lookupFn?: LookupFn) {
+  constructor(@Optional() lookupFn?: LookupFn) {
     this.lookupFn = lookupFn;
   }
 
