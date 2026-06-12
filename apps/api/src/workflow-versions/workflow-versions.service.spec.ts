@@ -228,6 +228,15 @@ describe('WorkflowVersionsService', () => {
       );
     });
 
+    it('should scope the restore audit entry to the owning organization', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ organizationId });
+      prisma.workflowVersion.findUnique.mockResolvedValue(versionRow(2, '2026-05-06T09:00:00Z'));
+
+      await service.restore(organizationId, userId, workflowId, 2);
+
+      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ organizationId }));
+    });
+
     it('should throw NotFoundException when the version does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ organizationId });
       prisma.workflowVersion.findUnique.mockResolvedValue(null);
