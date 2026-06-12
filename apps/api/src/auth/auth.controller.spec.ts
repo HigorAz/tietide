@@ -88,7 +88,7 @@ describe('AuthController (integration)', () => {
   describe('POST /auth/register', () => {
     const validBody = {
       email: 'test@example.com',
-      password: 'password123',
+      password: 'Str0ngP@ssphrase',
       name: 'Test User',
     };
 
@@ -165,7 +165,7 @@ describe('AuthController (integration)', () => {
 
       await request(app.getHttpServer())
         .post('/auth/register')
-        .send({ email: '  TEST@Example.COM  ', password: 'password123', name: 'T' })
+        .send({ email: '  TEST@Example.COM  ', password: 'Str0ngP@ssphrase', name: 'T' })
         .expect(202);
 
       expect(authService.register).toHaveBeenCalledWith(

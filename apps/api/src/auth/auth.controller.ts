@@ -216,11 +216,22 @@ export class AuthController {
 
   @Patch('password')
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    // W5.50: changePassword runs an online bcrypt.compare against the current
+    // password, so a stolen session could brute-force it. Opt into the same
+    // env-tunable auth-tier cap (THROTTLE_AUTH_*) as every other credential route
+    // instead of falling back to the 100/min global default.
+    [AUTH_THROTTLER_NAME]: {
+      ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
+      limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change password — revokes every other session and re-issues this one',
   })
   @ApiOkResponse({ type: LoginResponseDto })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid token or wrong current password' })
   async changePassword(
     @CurrentUser() user: AuthenticatedUser,
