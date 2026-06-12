@@ -63,34 +63,34 @@ export function ErrorCard({
       data-testid={testId}
       className="rounded-md border border-status-failed/30 bg-status-failed/10"
     >
-      <div className="flex items-center justify-between gap-2 px-3 py-2">
+      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-status-failed">
           <AlertTriangle size={14} className="text-status-failed" />
           Node failed
         </span>
         {error.code && (
-          <span className="text-[10px] uppercase tracking-wide text-status-failed/80">
+          <span className="text-xs uppercase tracking-wide text-status-failed/80">
             {error.code}
           </span>
         )}
       </div>
 
-      <pre className="m-3 mt-0 whitespace-pre-wrap break-words rounded bg-deep-blue/40 p-2 font-mono text-[11.5px] leading-snug text-text-primary select-text">
+      <pre className="m-3.5 mt-0 whitespace-pre-wrap break-words rounded bg-deep-blue/40 p-2 font-mono text-[11.5px] leading-snug text-text-primary select-text">
         {renderMessage(error.message)}
       </pre>
 
       {hint && (
-        <p className="px-3 pb-2 text-xs leading-snug text-text-secondary">
+        <p className="px-3.5 pb-2.5 text-xs leading-snug text-text-secondary">
           <span className="font-medium text-text-primary">Hint:</span> {hint}
         </p>
       )}
 
-      <div className="flex items-center gap-2 px-3 pb-3">
+      <div className="flex items-center gap-2 px-3.5 pb-3.5">
         {onFixInConfigure && (
           <button
             type="button"
             onClick={onFixInConfigure}
-            className="rounded bg-accent-teal/15 px-2 py-1 text-xs font-medium text-accent-teal transition hover:bg-accent-teal/25 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+            className="rounded-md bg-accent-teal px-3 py-1.5 text-xs font-semibold text-deep-blue transition hover:bg-accent-teal-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
           >
             Fix in Configure
           </button>

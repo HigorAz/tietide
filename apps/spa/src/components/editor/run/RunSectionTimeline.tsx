@@ -80,14 +80,14 @@ export function RunSectionTimeline({
         </button>
       </div>
 
-      <div className="relative space-y-2 pl-[18px] before:absolute before:bottom-2 before:left-[5px] before:top-2 before:w-px before:bg-white/10 before:content-['']">
+      <div className="relative space-y-3 pl-[18px] before:absolute before:bottom-2 before:left-[5px] before:top-2 before:w-px before:bg-white/10 before:content-['']">
         {sections.map((section) => {
           const isOpen = open[section.id] ?? section.defaultOpen;
           return (
             <div
               key={section.id}
               data-testid={`run-section-card-${section.id}`}
-              className="relative rounded-md border border-white/5 bg-deep-blue/40"
+              className="relative rounded-md border border-white/5 bg-elevated"
             >
               <span
                 data-testid={`run-section-dot-${section.id}`}
@@ -101,7 +101,7 @@ export function RunSectionTimeline({
                   type="button"
                   onClick={() => toggle(section.id)}
                   aria-expanded={isOpen}
-                  className="flex flex-1 items-center gap-2 px-3 py-2 text-left text-xs uppercase tracking-wide text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+                  className="flex flex-1 items-center gap-2 px-3.5 py-2.5 text-left text-xs uppercase tracking-wide text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
                 >
                   <ChevronRight
                     size={12}
@@ -110,7 +110,7 @@ export function RunSectionTimeline({
                   />
                   <span>{section.title}</span>
                   {section.badge && (
-                    <span className="text-[10px] normal-case text-text-muted">{section.badge}</span>
+                    <span className="text-xs normal-case text-text-muted">{section.badge}</span>
                   )}
                 </button>
                 {section.headerActions && (
@@ -119,7 +119,7 @@ export function RunSectionTimeline({
                   </span>
                 )}
               </div>
-              {isOpen && <div className="border-t border-white/5 p-3">{section.children}</div>}
+              {isOpen && <div className="border-t border-white/5 p-3.5">{section.children}</div>}
             </div>
           );
         })}

@@ -61,7 +61,7 @@ export function StepSection({
       >
         <span
           className={cn(
-            'flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold',
+            'flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold',
             bubbleClass[status],
           )}
         >
@@ -74,9 +74,9 @@ export function StepSection({
       </button>
 
       {keepMounted ? (
-        <div className={open ? 'mt-2 pl-[34px]' : 'hidden'}>{children}</div>
+        <div className={open ? 'mt-2.5 pl-9' : 'hidden'}>{children}</div>
       ) : (
-        open && <div className="mt-2 pl-[34px]">{children}</div>
+        open && <div className="mt-2.5 pl-9">{children}</div>
       )}
     </section>
   );
