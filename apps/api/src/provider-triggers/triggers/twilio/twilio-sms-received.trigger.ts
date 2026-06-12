@@ -54,6 +54,21 @@ export class TwilioSmsReceivedTrigger extends BasePushTrigger {
   // Twilio signature algorithm (sync): HMAC-SHA1(authToken).update(URL + sortedFormPairs)
   // where sortedFormPairs is the alphabetical concatenation of form keys+values.
   // See https://www.twilio.com/docs/usage/webhooks/webhooks-security
+  //
+  // Replay protection (W5.31): Twilio's signature carries no timestamp or nonce,
+  // so a captured, validly-signed request stays forever-valid and is replayable
+  // by anyone who observed it (forgery, however, is impossible without the auth
+  // token). The platform's only replay defense is the per-event idempotency key,
+  // which the provider-webhooks pipeline derives from MessageSid/SmsSid and dedupes
+  // per workflow via @@unique([workflowId, idempotencyKey]). Real Twilio inbound
+  // SMS always carries MessageSid, so we make that anchor MANDATORY here: a signed
+  // request lacking both MessageSid and SmsSid would otherwise fall back to a body
+  // hash whose dedup window is bounded by the WorkflowExecution retention sweep
+  // (EXECUTION_RETENTION_DAYS) — after which the captured request replays anew.
+  // Rejecting anchorless requests at verification time guarantees the dedup layer
+  // always has its strongest natural key. (A dedicated, retention-independent seen-
+  // MessageSid store would close the residual window fully but requires a schema
+  // change; tracked separately.)
   verifySignature(input: SignatureInput): boolean {
     const decoded = decodeTwilioSigningSecret(input.signingSecret);
     if (!decoded) return false;
@@ -78,7 +93,17 @@ export class TwilioSmsReceivedTrigger extends BasePushTrigger {
       return false;
     }
     if (providedBuf.length !== expected.length) return false;
-    return timingSafeEqual(providedBuf, expected);
+    if (!timingSafeEqual(providedBuf, expected)) return false;
+
+    // Require the replay anchor used by the idempotency layer. Authentic Twilio
+    // inbound SMS always carries MessageSid (SmsSid is the legacy alias); a signed
+    // request missing both has no durable dedup anchor and is rejected.
+    return this.hasReplayAnchor(params);
+  }
+
+  private hasReplayAnchor(params: Record<string, string>): boolean {
+    const nonEmpty = (v: string | undefined): boolean => typeof v === 'string' && v.length > 0;
+    return nonEmpty(params.MessageSid) || nonEmpty(params.SmsSid);
   }
 
   async onActivate(ctx: ActivationContext): Promise<ActivationResult> {
