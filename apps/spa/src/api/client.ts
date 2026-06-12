@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore, ACTIVE_ORG_STORAGE_KEY } from '@/stores/authStore';
 import { useToastStore } from '@/stores/toastStore';
+import { readToken } from '@/api/tokenStorage';
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/v1',
@@ -12,7 +13,10 @@ export const api = axios.create({
 export function attachRequestHeaders(
   config: InternalAxiosRequestConfig,
 ): InternalAxiosRequestConfig {
-  const token = localStorage.getItem('tietide-token');
+  // Read the bearer token from tokenStorage (sessionStorage, W5.43) — keeping it
+  // out of the cross-tab / cross-session localStorage plane shrinks the blast
+  // radius of any future XSS.
+  const token = readToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
