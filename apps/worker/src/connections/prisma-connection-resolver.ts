@@ -15,11 +15,34 @@ interface ConnectionRow {
   id: string;
   type: string;
   provider: string;
+  status: string;
+  refreshFailureCount: number;
+  updatedAt: Date;
   configEncrypted: string;
   configNonce: string;
   refreshTokenEncrypted: string | null;
   refreshTokenNonce: string | null;
 }
+
+/**
+ * Maximum number of consecutive inline OAuth refresh failures before the
+ * resolver stops calling the provider's token endpoint (W5.12). A connection
+ * whose `refreshFailureCount` has reached this cap holds a credential the
+ * provider has already rejected repeatedly — retrying only hammers the
+ * provider with a known-bad refresh token and risks a token-endpoint ban. The
+ * connection must be reconnected manually (the OAuth refresh-scan / reconnect
+ * flow resets the counter).
+ */
+export const MAX_INLINE_REFRESH_FAILURES = 5;
+
+/**
+ * Minimum wait, in milliseconds, between two inline refresh attempts for the
+ * same connection once it has at least one recorded failure (W5.12). Gated on
+ * the row's `updatedAt`, which is bumped whenever the refresh-failure counter
+ * is written. Prevents a tight bad-token loop within a single execution / a
+ * burst of executions from spamming the provider.
+ */
+export const INLINE_REFRESH_BACKOFF_MS = 60_000;
 
 @Injectable()
 export class PrismaConnectionResolver implements ConnectionResolver {
@@ -49,6 +72,18 @@ export class PrismaConnectionResolver implements ConnectionResolver {
 
     if (!row) {
       throw new ConnectionNotFoundError(connectionId);
+    }
+
+    // W5.12: never hand a known-bad credential to a node. A non-ACTIVE
+    // connection (EXPIRED after a failed refresh, or ERROR) has been rejected
+    // by the provider already — running the node with it would throw a 401/403
+    // and re-enter the refresh-and-retry loop against the provider on every
+    // execution. Fail fast and direct the user to reconnect instead. Decrypt
+    // is intentionally skipped so we don't touch dead credential material.
+    if (row.status !== 'ACTIVE') {
+      throw new Error(
+        `Connection "${connectionId}" is ${row.status} — reconnect it before this workflow can use it`,
+      );
     }
 
     const decrypted = this.decrypt<TConfig>(row);
@@ -108,6 +143,43 @@ export class PrismaConnectionResolver implements ConnectionResolver {
         'connection.refresh.no_token',
       );
       throw new Error(`Connection "${connectionId}" has no stored refresh token`);
+    }
+
+    // W5.12: honor the lockout counter. Once a connection has failed to refresh
+    // `MAX_INLINE_REFRESH_FAILURES` times, stop calling the provider's token
+    // endpoint — the stored refresh_token is bad and only a manual reconnect
+    // will fix it. Retrying just spams the provider with a known-bad token.
+    if (row.refreshFailureCount >= MAX_INLINE_REFRESH_FAILURES) {
+      this.log.warn(
+        { executionId, connectionId, provider: row.provider, failures: row.refreshFailureCount },
+        'connection.refresh.locked_out',
+      );
+      throw new Error(
+        `Connection "${connectionId}" has failed to refresh too many times (${row.refreshFailureCount}); reconnect it before retrying`,
+      );
+    }
+
+    // W5.12: backoff gate. After at least one recorded failure, require a
+    // minimum wait before the next provider call so a burst of executions
+    // can't tight-loop against the token endpoint. `updatedAt` is bumped on
+    // every failure write (markForRefresh) and on success.
+    if (row.refreshFailureCount > 0) {
+      const sinceLastWriteMs = Date.now() - new Date(row.updatedAt).getTime();
+      if (sinceLastWriteMs < INLINE_REFRESH_BACKOFF_MS) {
+        this.log.warn(
+          {
+            executionId,
+            connectionId,
+            provider: row.provider,
+            sinceLastWriteMs,
+            backoffMs: INLINE_REFRESH_BACKOFF_MS,
+          },
+          'connection.refresh.backoff',
+        );
+        throw new Error(
+          `Connection "${connectionId}" was refreshed too soon after a recent failure; backoff in effect, wait before retrying`,
+        );
+      }
     }
 
     const currentConfigJson = this.crypto.decrypt(row.configEncrypted, row.configNonce);
