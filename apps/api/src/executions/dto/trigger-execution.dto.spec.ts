@@ -35,5 +35,23 @@ describe('TriggerExecutionDto', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].constraints).toHaveProperty('maxSerializedBytes');
     });
+
+    it('rejects a triggerData carrying a prototype-pollution key (W5.46)', async () => {
+      // Assign directly: class-transformer's plainToInstance drops a raw
+      // `__proto__` own key (it never reaches the instance), so build the unsafe
+      // value on the instance to exercise the @IsSafeNodeConfig walker the way it
+      // guards a payload that survives transform.
+      const dto = new TriggerExecutionDto();
+      dto.triggerData = JSON.parse('{"__proto__": {"polluted": true}}') as Record<string, unknown>;
+      const errors = await validate(dto);
+      expect(errors.some((e) => e.constraints?.isSafeNodeConfig != null)).toBe(true);
+    });
+
+    it('rejects a triggerData with a nested constructor key (W5.46)', async () => {
+      const dto = new TriggerExecutionDto();
+      dto.triggerData = { a: { constructor: { evil: true } } };
+      const errors = await validate(dto);
+      expect(errors.some((e) => e.constraints?.isSafeNodeConfig != null)).toBe(true);
+    });
   });
 });

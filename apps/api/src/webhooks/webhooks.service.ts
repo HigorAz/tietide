@@ -1,8 +1,15 @@
-import { Injectable, Logger, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
+import { findUnsafeConfigIssue } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
@@ -159,6 +166,16 @@ export class WebhooksService {
       throw new PayloadTooLargeException(
         `Webhook payload exceeds the maximum size of ${DEFAULT_TRIGGER_DATA_MAX_BYTES} bytes`,
       );
+    }
+
+    // Defense-in-depth (W5.46): JSON.parse keeps `__proto__`/`constructor`/
+    // `prototype` as inert own keys. They are harmless to this process, but
+    // must not round-trip into the JSONB column or be forwarded to the worker,
+    // where any future deep-merge/walk consumer could be poisoned. Reject with
+    // the same shared walker the node-config save boundary uses.
+    const issue = findUnsafeConfigIssue(triggerData);
+    if (issue) {
+      throw new BadRequestException(`Webhook payload contains an unsafe value: ${issue.message}`);
     }
 
     return triggerData;

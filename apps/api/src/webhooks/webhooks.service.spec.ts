@@ -1,4 +1,9 @@
-import { NotFoundException, PayloadTooLargeException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  PayloadTooLargeException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -349,6 +354,36 @@ describe('WebhooksService', () => {
       const result = await service.trigger({ path, rawBody, signature, timestamp: ts });
       expect(result).toEqual({ executionId, status: 'PENDING' });
       expect(queue.add).toHaveBeenCalled();
+    });
+
+    it('should reject a parsed body carrying a prototype-pollution key before persisting or enqueuing (W5.46)', async () => {
+      const ts = Math.floor(fixedNowMs / 1000).toString();
+      // JSON.parse keeps `__proto__` as an inert own key — but it must not be
+      // round-tripped into the JSONB column or forwarded to the worker.
+      const rawBody = Buffer.from('{"__proto__": {"polluted": true}}');
+      const signature = sign(rawBody, ts);
+
+      prisma.webhook.findUnique.mockResolvedValue(activeWebhook());
+
+      await expect(service.trigger({ path, rawBody, signature, timestamp: ts })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
+    it('should reject a parsed body with a nested constructor key (W5.46)', async () => {
+      const ts = Math.floor(fixedNowMs / 1000).toString();
+      const rawBody = Buffer.from(JSON.stringify({ a: { constructor: { evil: true } } }));
+      const signature = sign(rawBody, ts);
+
+      prisma.webhook.findUnique.mockResolvedValue(activeWebhook());
+
+      await expect(service.trigger({ path, rawBody, signature, timestamp: ts })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
     });
 
     it('should reject signatures of mismatched length without throwing a non-401 error', async () => {
