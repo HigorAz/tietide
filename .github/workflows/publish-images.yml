@@ -70,11 +70,18 @@ jobs:
         with:
           context: .
           file: apps/${{ matrix.app }}/Dockerfile
+          # Build the lean runtime stage explicitly: without a target, BuildKit
+          # builds the LAST stage, which for the API is `migrate` (carries a
+          # vendored prisma CLI with its own vulnerable transitive deps). The
+          # runtime stage is what should ship and what must be scanned.
+          target: runtime
           push: false
           load: true
           tags: tietide-${{ matrix.app }}:scan
-          cache-from: type=gha,scope=${{ matrix.app }}
-          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+          # Bump the cache scope (-v2) to drop stale layers that still carried
+          # already-fixed dependency versions from older builds.
+          cache-from: type=gha,scope=${{ matrix.app }}-v2
+          cache-to: type=gha,scope=${{ matrix.app }}-v2,mode=max
 
       # Run Trivy from its Docker Hub image instead of aquasecurity/trivy-action:
       # the action installs the binary from GitHub Releases, but Aqua keeps release
@@ -100,11 +107,13 @@ jobs:
         with:
           context: .
           file: apps/${{ matrix.app }}/Dockerfile
+          # Push the same runtime stage that was just scanned (see note above).
+          target: runtime
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.app }}
-          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+          cache-from: type=gha,scope=${{ matrix.app }}-v2
+          cache-to: type=gha,scope=${{ matrix.app }}-v2,mode=max
           provenance: mode=max # SLSA build provenance attestation
           sbom: true # generate + attach an SBOM attestation
 

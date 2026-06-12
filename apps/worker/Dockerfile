@@ -39,7 +39,11 @@ FROM node:20-alpine AS runtime
 
 ENV NODE_ENV=production
 
-RUN apk add --no-cache openssl libc6-compat tini \
+# Patch OS packages to the latest Alpine security releases (e.g. libcrypto3)
+# before installing runtime deps, so the published image carries no known
+# fixable HIGH/CRITICAL OS CVEs.
+RUN apk upgrade --no-cache \
+    && apk add --no-cache openssl libc6-compat tini \
     && addgroup -S tietide \
     && adduser -S -G tietide -u 1001 tietide
 
