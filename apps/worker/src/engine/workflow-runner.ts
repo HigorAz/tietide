@@ -44,6 +44,19 @@ export class RecursionDepthExceededError extends Error {
   }
 }
 
+// Redact an upstream provider error `response` before it reaches the logs (W5.35).
+// A provider's raw error response object carries request/response headers (bearer/
+// refresh tokens, API keys) and frequently echoes token material in the body, so
+// we retain ONLY the HTTP status — mirroring the connection resolver's redaction
+// (PrismaConnectionResolver logs `errStatus`, never the raw `e.response`).
+function redactErrorResponse(response: unknown): { status: number | null } | null {
+  if (response === null || typeof response !== 'object') {
+    return null;
+  }
+  const status = (response as { status?: unknown }).status;
+  return { status: typeof status === 'number' ? status : null };
+}
+
 export interface RunArgs {
   executionId: string;
   workflowId: string;
@@ -509,7 +522,7 @@ export class WorkflowRunner {
               e.cause instanceof Error
                 ? { name: e.cause.name, message: e.cause.message }
                 : (e.cause ?? null),
-            errResponse: e.response ?? null,
+            errResponse: redactErrorResponse(e.response),
           },
           `Node failed: ${message}`,
         );
