@@ -6,6 +6,10 @@ import { assertUrlAllowed, SsrfBlockedError, type LookupFn } from './ssrf-guard'
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+// Hard upper bound on the per-call timeout, mirroring httpRequestConfigSchema's
+// .max(30000). Concurrency is 5, so an unbounded timeout could hold a shared
+// worker slot for hours; clamp here since node config bypasses the Zod schema.
+const MAX_TIMEOUT_MS = 30_000;
 // Cap the response we buffer + persist to ExecutionStep.outputData. Prevents a
 // large/malicious endpoint from OOMing the worker or bloating Postgres JSONB.
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MiB
@@ -159,10 +163,14 @@ export class HttpRequestAction implements INodeExecutor {
       }
     }
 
-    const timeoutMs =
+    // Clamp to MAX_TIMEOUT_MS (mirrors httpRequestConfigSchema's .max()). The
+    // node config reaches us as z.record(z.unknown()), so a definition saved via
+    // PATCH that bypasses the SPA could otherwise pin a worker slot indefinitely.
+    const rawTimeout =
       typeof raw.timeout === 'number' && Number.isFinite(raw.timeout) && raw.timeout > 0
         ? raw.timeout
         : DEFAULT_TIMEOUT_MS;
+    const timeoutMs = Math.min(rawTimeout, MAX_TIMEOUT_MS);
 
     const mockOnDryRun = raw.mockOnDryRun === true;
 

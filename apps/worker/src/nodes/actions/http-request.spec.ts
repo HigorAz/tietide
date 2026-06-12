@@ -236,6 +236,37 @@ describe('HttpRequestAction', () => {
       ).rejects.toThrow(/timed out/i);
     });
 
+    it('should clamp an oversized timeout to the 30-second cap', async () => {
+      jest.useFakeTimers();
+      try {
+        const fetchMock = slowFetch();
+        const action = new HttpRequestAction(fetchMock, stubLookup);
+
+        const promise = action
+          .execute(
+            makeInput({ method: 'GET', url: 'https://api.test/slow', timeout: 3_600_000 }),
+            makeContext(),
+          )
+          .catch((e: unknown) => e as Error);
+
+        // advanceTimersByTimeAsync flushes the SSRF DNS-lookup microtask first,
+        // so the abort timer is scheduled before we advance past it.
+        await jest.advanceTimersByTimeAsync(29_999);
+        let settled = false;
+        void promise.then(() => (settled = true));
+        await Promise.resolve();
+        expect(settled).toBe(false);
+
+        // Past the 30s cap the request must abort — the raw 3.6M ms is ignored.
+        await jest.advanceTimersByTimeAsync(2);
+        const result = await promise;
+        expect(result).toBeInstanceOf(Error);
+        expect((result as Error).message).toMatch(/timed out after 30000ms/i);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('should use a 30-second default timeout when none is provided', async () => {
       jest.useFakeTimers();
       try {
