@@ -22,6 +22,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { buildExportPayload, exportFilename, serializeExport } from '@/lib/workflowExport';
 import { downloadJson } from '@/lib/downloadFile';
+import { DocumentationModal } from '@/components/documentation/DocumentationModal';
 import { EditorViewTabs } from './EditorViewTabs';
 import { saveWorkflow } from './saveWorkflow';
 import { toWorkflowDefinition } from './serialization';
@@ -41,7 +42,14 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const docStatus = useDocumentationStore((s) => s.status);
+  const docs = useDocumentationStore((s) => s.docs);
+  const docError = useDocumentationStore((s) => s.error);
   const regenerateDocs = useDocumentationStore((s) => s.regenerate);
+  const fetchDocs = useDocumentationStore((s) => s.fetch);
+  const saveDocs = useDocumentationStore((s) => s.save);
+  const workflowName = useWorkflowsStore(
+    (s) => s.workflows.find((w) => w.id === workflowId)?.name ?? 'Workflow',
+  );
   const toast = useToastStore((s) => s.show);
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
@@ -49,6 +57,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [docsOpen, setDocsOpen] = useState(false);
 
   const handleSave = useCallback(async () => {
     if (isSaving) return;
@@ -114,17 +123,15 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
     }
   }, [isSaving, isTesting, setSearchParams, toast, workflowId]);
 
-  const handleDocs = useCallback(async () => {
-    if (useDocumentationStore.getState().status === 'loading') return;
-    toast({ tone: 'info', message: 'Generating documentation…' });
-    await regenerateDocs(workflowId);
+  const handleDocs = useCallback(() => {
+    setDocsOpen(true);
+    // Lazily hydrate the cached doc; the modal's Regenerate button handles the
+    // slow AI path. Never auto-regenerate just from opening.
     const s = useDocumentationStore.getState();
-    if (s.status === 'error') {
-      toast({ tone: 'error', message: s.error ?? 'Could not generate documentation' });
-    } else {
-      toast({ tone: 'success', message: 'Documentation generated — see the Docs tab' });
+    if (s.status === 'idle' && !s.docs) {
+      void fetchDocs(workflowId);
     }
-  }, [regenerateDocs, toast, workflowId]);
+  }, [fetchDocs, workflowId]);
 
   // Block save/run/test while any data pill points at a deleted/invalid node —
   // the red pills must be fixed first (referential integrity).
@@ -132,7 +139,6 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const hasInvalid = invalidCount > 0;
   const invalidMessage = `${invalidCount} data-pill reference${invalidCount > 1 ? 's' : ''} point to a deleted/invalid node — fix the red pills to save or run.`;
 
-  const docsDisabled = docStatus === 'loading';
   const saveDisabled = !isDirty || isSaving || hasInvalid;
   const runDisabled = isRunning || isSaving || hasInvalid;
   const testDisabled = isTesting || isSaving || nodeCount === 0 || hasInvalid;
@@ -200,10 +206,9 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           icon={<Download size={16} aria-hidden />}
         />
         <ToolbarButton
-          label={docStatus === 'loading' ? 'Generating…' : 'AI Docs'}
+          label="AI Docs"
           onClick={handleDocs}
-          disabled={docsDisabled}
-          title="Generate AI documentation for this workflow"
+          title="View, edit, and download the AI documentation for this workflow"
           dataTour="editor-docs"
           icon={
             docStatus === 'loading' ? (
@@ -279,6 +284,20 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
           }
         />
       </div>
+
+      {docsOpen && (
+        <div className="pointer-events-auto">
+          <DocumentationModal
+            workflowName={workflowName}
+            status={docStatus}
+            docs={docs}
+            error={docError}
+            onRegenerate={() => void regenerateDocs(workflowId)}
+            onSave={(documentation) => saveDocs(workflowId, documentation)}
+            onClose={() => setDocsOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -320,8 +339,10 @@ function ToolbarButton({
     >
       {icon}
       {/* Icon-only below `sm` to fit narrow phones; `sr-only` keeps the label in
-          the accessibility tree so the button stays named for screen readers. */}
-      <span className="sr-only sm:not-sr-only">{label}</span>
+          the accessibility tree so the button stays named for screen readers.
+          `whitespace-nowrap` stops multi-word labels (e.g. "AI Docs") breaking
+          mid-text when the toolbar wraps. */}
+      <span className="whitespace-nowrap sr-only sm:not-sr-only">{label}</span>
     </button>
   );
 }

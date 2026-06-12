@@ -21,6 +21,7 @@ vi.mock('@/api/workflows', () => ({
 vi.mock('@/api/ai', () => ({
   getWorkflowDocs: vi.fn(),
   startWorkflowDocsRegeneration: vi.fn(),
+  saveWorkflowDocs: vi.fn(),
 }));
 
 vi.mock('@/api/folders', () => ({
@@ -374,18 +375,12 @@ describe('WorkflowsPage', () => {
     });
   });
 
-  describe('inline AI docs lifecycle (issue #111)', () => {
+  describe('AI docs modal (issue #111)', () => {
     const docsResponse = {
       workflowId: 'a',
       version: 1,
-      documentation: '# Alpha docs\n\n## Objective\n\nSome objective text.',
-      sections: {
-        objective: 'Some objective text.',
-        triggers: '',
-        actions: '',
-        dataFlow: '',
-        decisions: '',
-      },
+      documentation: '# Alpha docs\n\nSome objective text.',
+      sections: {},
       model: 'llama3.1:8b',
       generatedAt: '2026-05-04T11:00:00Z',
     };
@@ -398,11 +393,11 @@ describe('WorkflowsPage', () => {
       renderWorkflows();
 
       expect(
-        await screen.findByRole('button', { name: /generate docs for alpha/i }),
+        await screen.findByRole('button', { name: /generate documentation for alpha/i }),
       ).toBeInTheDocument();
     });
 
-    it('shows "Update docs" with relative timestamp when documentation exists', async () => {
+    it('shows "View docs" when documentation already exists', async () => {
       const generatedAt = new Date(Date.now() - 3 * 60 * 60 * 1000); // 3h ago
       mockedList.mockResolvedValueOnce([
         makeWorkflow({
@@ -414,30 +409,12 @@ describe('WorkflowsPage', () => {
 
       renderWorkflows();
 
-      const button = await screen.findByRole('button', { name: /update docs for alpha/i });
-      expect(button).toHaveTextContent(/update docs/i);
-      expect(button).toHaveTextContent(/ago/i);
+      expect(
+        await screen.findByRole('button', { name: /view documentation for alpha/i }),
+      ).toBeInTheDocument();
     });
 
-    it('starts regeneration (POST) then polls GET and auto-expands when Generate docs is clicked', async () => {
-      const user = userEvent.setup();
-      mockedList.mockResolvedValueOnce([
-        makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
-      ]);
-      // POST kicks off generation; the doc arrives via the first poll.
-      mockedGetDocs.mockResolvedValue(docsResponse);
-
-      renderWorkflows();
-
-      await user.click(await screen.findByRole('button', { name: /generate docs for alpha/i }));
-
-      await waitFor(() => expect(mockedStartDocs).toHaveBeenCalledWith('a'));
-      await waitFor(() => expect(mockedGetDocs).toHaveBeenCalledWith('a'));
-      expect(await screen.findByText(/alpha docs/i)).toBeInTheDocument();
-      expect(screen.getByText(/some objective text/i)).toBeInTheDocument();
-    });
-
-    it('calls getWorkflowDocs (GET) on first expand of the View docs toggle, never the regenerate POST', async () => {
+    it('opens the modal and loads the cached doc via GET (never POST) for an existing doc', async () => {
       const user = userEvent.setup();
       const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
       mockedList.mockResolvedValueOnce([
@@ -451,17 +428,41 @@ describe('WorkflowsPage', () => {
 
       renderWorkflows();
 
-      await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
+      await user.click(
+        await screen.findByRole('button', { name: /view documentation for alpha/i }),
+      );
 
       await waitFor(() => expect(mockedGetDocs).toHaveBeenCalledWith('a'));
       expect(mockedStartDocs).not.toHaveBeenCalled();
-      expect(await screen.findByText(/alpha docs/i)).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: /alpha docs/i })).toBeInTheDocument();
 
-      await user.click(await screen.findByRole('button', { name: /hide docs for alpha/i }));
-      expect(screen.queryByText(/alpha docs/i)).not.toBeInTheDocument();
+      // Closing the pop-up removes the doc from the screen.
+      await user.click(screen.getByRole('button', { name: /close documentation/i }));
+      await waitFor(() =>
+        expect(screen.queryByRole('heading', { name: /alpha docs/i })).not.toBeInTheDocument(),
+      );
     });
 
-    it('renders an inline empty-state hint when GET returns null (no docs yet) without firing regenerate', async () => {
+    it('generates docs from inside the modal (POST → poll GET) when none exist yet', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([
+        makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
+      ]);
+      mockedGetDocs.mockResolvedValue(docsResponse);
+
+      renderWorkflows();
+
+      await user.click(
+        await screen.findByRole('button', { name: /generate documentation for alpha/i }),
+      );
+      // Modal opens on its empty state; generation is triggered from inside it.
+      await user.click(await screen.findByRole('button', { name: /^generate documentation$/i }));
+
+      await waitFor(() => expect(mockedStartDocs).toHaveBeenCalledWith('a'));
+      expect(await screen.findByRole('heading', { name: /alpha docs/i })).toBeInTheDocument();
+    });
+
+    it('shows the not-available message in the modal when GET returns null (no POST)', async () => {
       const user = userEvent.setup();
       const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
       mockedList.mockResolvedValueOnce([
@@ -475,39 +476,15 @@ describe('WorkflowsPage', () => {
 
       renderWorkflows();
 
-      await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
+      await user.click(
+        await screen.findByRole('button', { name: /view documentation for alpha/i }),
+      );
 
       expect(await screen.findByText(/not available yet/i)).toBeInTheDocument();
       expect(mockedStartDocs).not.toHaveBeenCalled();
     });
 
-    it('does not interrupt an in-flight regeneration when View docs is clicked (no stale refetch)', async () => {
-      const user = userEvent.setup();
-      const generatedAt = new Date(Date.now() - 60 * 60 * 1000);
-      mockedList.mockResolvedValueOnce([
-        makeWorkflow({
-          id: 'a',
-          name: 'Alpha',
-          documentation: { generatedAt, version: 1 },
-        }),
-      ]);
-      // Regeneration stays in flight (POST is pending for the test window).
-      mockedStartDocs.mockReturnValueOnce(new Promise<never>(() => {}));
-
-      renderWorkflows();
-
-      await user.click(await screen.findByRole('button', { name: /update docs for alpha/i }));
-      await waitFor(() => expect(mockedStartDocs).toHaveBeenCalledWith('a'));
-
-      // Expanding the panel mid-generation must show the live generating state,
-      // not fire a competing GET that blanks the spinner with the stale doc.
-      await user.click(await screen.findByRole('button', { name: /view docs for alpha/i }));
-
-      expect(await screen.findByText(/generating documentation/i)).toBeInTheDocument();
-      expect(mockedGetDocs).not.toHaveBeenCalled();
-    });
-
-    it('shows an inline error with retry when regeneration fails (no toast spam)', async () => {
+    it('shows an error with retry in the modal when regeneration fails (no toast spam)', async () => {
       const user = userEvent.setup();
       mockedList.mockResolvedValueOnce([
         makeWorkflow({ id: 'a', name: 'Alpha', documentation: null }),
@@ -516,13 +493,14 @@ describe('WorkflowsPage', () => {
 
       renderWorkflows();
 
-      await user.click(await screen.findByRole('button', { name: /generate docs for alpha/i }));
+      await user.click(
+        await screen.findByRole('button', { name: /generate documentation for alpha/i }),
+      );
+      await user.click(await screen.findByRole('button', { name: /^generate documentation$/i }));
 
       expect(await screen.findByText(/ollama unreachable/i)).toBeInTheDocument();
-      expect(
-        screen.getByRole('button', { name: /retry generating docs for alpha/i }),
-      ).toBeInTheDocument();
-      // Generation errors stay inline; do not toast.
+      expect(screen.getByRole('button', { name: /^retry$/i })).toBeInTheDocument();
+      // Generation errors stay in the modal; do not toast.
       expect(useToastStore.getState().toasts).toHaveLength(0);
     });
   });

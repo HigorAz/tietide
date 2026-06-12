@@ -5,9 +5,10 @@ import type { WorkflowDocumentationResponse } from '@/api/ai';
 vi.mock('@/api/ai', () => ({
   getWorkflowDocs: vi.fn(),
   startWorkflowDocsRegeneration: vi.fn(),
+  saveWorkflowDocs: vi.fn(),
 }));
 
-import { getWorkflowDocs, startWorkflowDocsRegeneration } from '@/api/ai';
+import { getWorkflowDocs, saveWorkflowDocs, startWorkflowDocsRegeneration } from '@/api/ai';
 import {
   DOC_POLL_INTERVAL_MS,
   DOC_POLL_MAX_ATTEMPTS,
@@ -16,6 +17,7 @@ import {
 
 const mockedGet = vi.mocked(getWorkflowDocs);
 const mockedStart = vi.mocked(startWorkflowDocsRegeneration);
+const mockedSave = vi.mocked(saveWorkflowDocs);
 
 const doc = (generatedAt = '2026-04-26T01:00:00Z'): WorkflowDocumentationResponse => ({
   workflowId: 'wf-1',
@@ -31,6 +33,7 @@ describe('documentationStore', () => {
     vi.useFakeTimers();
     mockedGet.mockReset();
     mockedStart.mockReset();
+    mockedSave.mockReset();
     mockedStart.mockResolvedValue({ workflowId: 'wf-1', status: 'pending' });
     useDocumentationStore.setState({ status: 'idle', docs: null, error: null });
   });
@@ -47,6 +50,29 @@ describe('documentationStore', () => {
       expect(state.status).toBe('idle');
       expect(state.docs).toBeNull();
       expect(state.error).toBeNull();
+    });
+  });
+
+  describe('save', () => {
+    it('persists the edited body and sets status ready with the saved doc', async () => {
+      const saved = { ...doc(), documentation: '# Edited', model: 'manual' };
+      mockedSave.mockResolvedValueOnce(saved);
+
+      await useDocumentationStore.getState().save('wf-1', '# Edited');
+
+      expect(mockedSave).toHaveBeenCalledWith('wf-1', '# Edited');
+      const state = useDocumentationStore.getState();
+      expect(state.status).toBe('ready');
+      expect(state.docs).toEqual(saved);
+    });
+
+    it('rejects and leaves existing docs untouched when the API fails', async () => {
+      const existing = doc();
+      useDocumentationStore.setState({ status: 'ready', docs: existing, error: null });
+      mockedSave.mockRejectedValueOnce(new AxiosError('Network down'));
+
+      await expect(useDocumentationStore.getState().save('wf-1', '# Edited')).rejects.toThrow();
+      expect(useDocumentationStore.getState().docs).toEqual(existing);
     });
   });
 

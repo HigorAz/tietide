@@ -23,17 +23,12 @@ const makeWorkflow = (overrides: Partial<Workflow> = {}): Workflow => ({
 
 const defaultProps = () => ({
   workflow: makeWorkflow(),
-  isExpanded: false,
-  isGeneratingDocs: false,
-  docsContent: null,
-  docsError: null,
   selected: false,
   availableTags: [],
   onOpen: vi.fn(),
   onToggleActive: vi.fn(),
   onDelete: vi.fn(),
-  onGenerateDocs: vi.fn(),
-  onToggleDocsExpanded: vi.fn(),
+  onOpenDocs: vi.fn(),
   onToggleSelect: vi.fn(),
   onRename: vi.fn().mockResolvedValue(undefined),
   onSetTags: vi.fn().mockResolvedValue(undefined),
@@ -169,19 +164,31 @@ describe('WorkflowRow', () => {
     });
   });
 
-  describe('docs regeneration affordance', () => {
-    it('keeps existing docs visible with an "Updating" indicator while regenerating', () => {
+  describe('docs affordance', () => {
+    it('shows "Generate docs" and opens the docs modal when no docs exist', async () => {
+      const user = userEvent.setup();
+      const props = defaultProps();
+      render(<WorkflowRow {...props} />);
+
+      const button = screen.getByRole('button', { name: /generate documentation for example/i });
+      await user.click(button);
+
+      expect(props.onOpenDocs).toHaveBeenCalledWith('wf-1');
+    });
+
+    it('shows "View docs" when documentation already exists', () => {
       render(
         <WorkflowRow
           {...defaultProps()}
-          isExpanded
-          isGeneratingDocs
-          docsContent={'# Existing docs\n\nbody text'}
+          workflow={makeWorkflow({
+            documentation: { generatedAt: new Date('2026-05-01T00:00:00Z'), version: 2 },
+          })}
         />,
       );
 
-      expect(screen.getByText(/existing docs/i)).toBeInTheDocument();
-      expect(screen.getByText(/updating documentation/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /view documentation for example/i }),
+      ).toBeInTheDocument();
     });
   });
 
