@@ -20,6 +20,7 @@ import { CONNECTION_RESOLVER, type ConnectionResolver } from '../connections/con
 import { CircularDependencyError, topologicalSort } from './topological-sort';
 import { ITERATOR_NODE_TYPE } from '../nodes/logic/iterator';
 import { IteratorExecutor } from './iterator-executor';
+import { resolveNodeTimeoutMs, withNodeTimeout } from './node-timeout';
 import {
   buildInput,
   classifyUnreached,
@@ -315,7 +316,15 @@ export class WorkflowRunner {
           envScope,
           aliasMap,
         );
-        const output = await executor.execute(resolvedInput, ctx);
+        // Engine-enforced per-node wall-clock budget (W5.15): a node that overruns
+        // (e.g. SELECT pg_sleep(3600), whose connector sets no statement timeout) is
+        // abandoned so it cannot hold one of the worker's concurrent slots
+        // indefinitely and starve other tenants. The timeout rejection lands in the
+        // catch below and is recorded as a FAILED (retryable) step.
+        const output = await withNodeTimeout(
+          executor.execute(resolvedInput, ctx),
+          resolveNodeTimeoutMs(),
+        );
         const durationMs = Date.now() - started;
         const finishedAt = new Date();
 
