@@ -1,3 +1,6 @@
+import { createElement } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { downloadBlob } from './downloadFile';
 
 /**
@@ -6,8 +9,10 @@ import { downloadBlob } from './downloadFile';
  *  - Word: render the markdown to semantic HTML and wrap it as an `.doc`
  *    (zero dependency — Word/Google Docs open HTML-flavoured `.doc` files).
  *  - PDF: lay the markdown out with jsPDF (parsed into headings/paragraphs/
- *    bullets). Heavy deps (`react-dom/server`, `jspdf`) are dynamically imported
- *    so they stay out of the main bundle until the user actually downloads.
+ *    bullets). The genuinely heavy, otherwise-unbundled deps (`react-dom/server`,
+ *    `jspdf`) are dynamically imported so they stay out of the main bundle until
+ *    the user actually downloads. React/react-markdown are already bundled, so
+ *    they are imported statically.
  */
 
 /** Build a filesystem-safe base filename from a workflow name. */
@@ -74,15 +79,9 @@ export async function downloadDocAsWord(
   title: string,
   markdown: string,
 ): Promise<void> {
-  const [{ renderToStaticMarkup }, reactMarkdown, remarkGfm, react] = await Promise.all([
-    import('react-dom/server'),
-    import('react-markdown'),
-    import('remark-gfm'),
-    import('react'),
-  ]);
-  const ReactMarkdown = reactMarkdown.default;
+  const { renderToStaticMarkup } = await import('react-dom/server');
   const body = renderToStaticMarkup(
-    react.createElement(ReactMarkdown, { remarkPlugins: [remarkGfm.default] }, markdown),
+    createElement(ReactMarkdown, { remarkPlugins: [remarkGfm] }, markdown),
   );
   const html =
     `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>` +
