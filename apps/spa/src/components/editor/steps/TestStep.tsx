@@ -80,7 +80,7 @@ export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps):
           >
             {`✓ Success · ${durationLabel} · output captured — data pills from this node are now available downstream`}
           </span>
-          <div className="max-h-[280px] overflow-auto rounded border border-white/10 bg-deep-blue/40 p-2">
+          <div className="max-h-[280px] overflow-auto rounded-md border border-white/10 bg-deep-blue/40 p-2">
             <JsonTree value={result.output} testId="test-step-output" />
           </div>
         </div>

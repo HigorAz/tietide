@@ -272,7 +272,7 @@ export function DataPillInput({
   };
 
   const fieldClass = cn(
-    'relative block w-full rounded-md border border-white/5 bg-elevated px-3 py-2 text-sm leading-6',
+    'relative block w-full rounded-md border border-white/10 bg-elevated px-3 py-2 text-sm leading-6',
     'resize-none break-words [overflow-wrap:anywhere] text-transparent caret-text-primary',
     'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
   );

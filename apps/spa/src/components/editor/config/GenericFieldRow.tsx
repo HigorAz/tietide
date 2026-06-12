@@ -6,7 +6,7 @@ import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { FieldSpec } from './GenericConnectorForm';
 
 const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
+  'w-full rounded-md border border-white/10 bg-elevated px-3 py-2',
   'text-sm text-text-primary placeholder:text-text-muted',
   'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
 );

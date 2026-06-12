@@ -53,7 +53,7 @@ export function NodeRunInspection({ nodeId, config }: NodeRunInspectionProps): J
     return (
       <div data-testid="node-run-inspection" className="space-y-3 text-xs">
         <RunSectionTimeline sections={[configSection]} />
-        <div className="rounded border border-dashed border-white/10 bg-deep-blue/30 p-3 text-center text-text-secondary">
+        <div className="rounded-md border border-dashed border-white/10 bg-deep-blue/40 p-3 text-center text-text-secondary">
           This node was not executed in this run.
         </div>
       </div>
@@ -115,7 +115,7 @@ export function NodeRunInspection({ nodeId, config }: NodeRunInspectionProps): J
           data-testid="node-run-status"
           data-status={liveState.status}
           className={cn(
-            'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
             liveState.status === 'running' && 'bg-status-running/15 text-status-running',
             liveState.status === 'success' && 'bg-status-success/15 text-status-success',
             liveState.status === 'failed' && 'bg-status-failed/15 text-status-failed',
