@@ -53,7 +53,7 @@ export function ToggleSwitch({
         <span
           aria-hidden
           className={cn(
-            'absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full transition-transform',
+            'absolute left-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full transition-transform',
             checked ? 'translate-x-[14px] bg-accent-teal' : 'translate-x-0.5 bg-text-secondary',
           )}
         />
