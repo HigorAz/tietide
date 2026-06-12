@@ -505,7 +505,9 @@ model AuditLog {
   metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at")
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // SetNull (not Cascade): deleting a workspace must RETAIN its audit rows for
+  // forensics. The org_id is nulled rather than the row being wiped (W5.20).
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   user         User          @relation(fields: [userId], references: [id])
 
   @@index([organizationId, createdAt(sort: Desc)])

@@ -105,14 +105,18 @@ export class OrganizationsService {
     if (myOrgCount <= 1) {
       throw new BadRequestException('You cannot delete your only workspace');
     }
-    await this.prisma.organization.delete({ where: { id: orgId } });
-    await this.audit.log({
+    // Durable, awaited audit BEFORE the cascade — with the AuditLog→Organization
+    // relation now SetNull, this row survives the delete (its org_id is nulled),
+    // so the workspace deletion can never be silently lost (W5.20). Written first
+    // and awaited so a failed audit write aborts the delete entirely.
+    await this.audit.logSync({
       userId,
       organizationId: orgId,
-      action: 'org.delete',
+      action: 'workspace.deleted',
       resource: 'organization',
       resourceId: orgId,
     });
+    await this.prisma.organization.delete({ where: { id: orgId } });
   }
 
   async listMembers(orgId: string, userId: string): Promise<OrgMemberResponseDto[]> {
