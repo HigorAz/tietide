@@ -18,7 +18,7 @@ export interface ViewToggleProps {
  */
 export function ViewToggle({ view, onChange }: ViewToggleProps): JSX.Element {
   return (
-    <div className="inline-flex overflow-hidden rounded border border-white/10">
+    <div className="inline-flex shrink-0 overflow-hidden rounded border border-white/10">
       {VIEWS.map(({ value, label }) => {
         const active = value === view;
         return (

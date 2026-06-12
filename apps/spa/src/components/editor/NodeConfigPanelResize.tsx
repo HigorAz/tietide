@@ -2,13 +2,17 @@ import { useCallback, useState, type PointerEvent as ReactPointerEvent } from 'r
 import { cn } from '@/utils/cn';
 
 const PANEL_WIDTH_KEY = 'tietide.nodeConfigPanel.width';
-const MIN_PANEL_WIDTH = 320; // matches the previous fixed w-80
+// Min keeps the Configuration form + the run data-viewer toolbar (search +
+// Tree|Table|Raw toggle) from clipping; default opens roomier so neither the
+// stepped form nor the run inspector feels cramped on first open.
+const MIN_PANEL_WIDTH = 380;
+const DEFAULT_PANEL_WIDTH = 440;
 const MAX_PANEL_WIDTH = 760;
 
 function readStoredWidth(): number {
-  if (typeof window === 'undefined') return MIN_PANEL_WIDTH;
+  if (typeof window === 'undefined') return DEFAULT_PANEL_WIDTH;
   const raw = Number(window.localStorage.getItem(PANEL_WIDTH_KEY));
-  if (!Number.isFinite(raw) || raw <= 0) return MIN_PANEL_WIDTH;
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_PANEL_WIDTH;
   return Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, raw));
 }
 
