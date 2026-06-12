@@ -5,6 +5,9 @@
 @tailwind utilities;
 
 :root {
+  /* Dark native widgets (select dropdown lists, date pickers, scrollbars) —
+     without this the browser paints them for a light page. */
+  color-scheme: dark;
   --bg-deep-blue: #0a2540;
   /* Editor canvas base — a notch darker than deep-blue (see tailwind `canvas`). */
   --bg-canvas: #06182e;
@@ -79,6 +82,18 @@ input:-webkit-autofill:focus {
   -webkit-box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
   box-shadow: 0 0 0 1000px var(--bg-elevated) inset;
   transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Number inputs: no native spinner buttons — the design has no styling for
+   them and values are simply typed. Covers all config-form number fields. */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Themed checkboxes & radios, app-wide. The native controls render as a white
