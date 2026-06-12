@@ -26,7 +26,7 @@ describe('readBridgeFromUrl', () => {
       '?status=error&message=' + encodeURIComponent('Your account was hacked, call 1-800-SCAM'),
     );
     expect(outcome).not.toBeNull();
-    expect(outcome as Record<string, unknown>).not.toHaveProperty('message');
+    expect(outcome).not.toHaveProperty('message');
     expect(JSON.stringify(outcome)).not.toContain('SCAM');
   });
 });
