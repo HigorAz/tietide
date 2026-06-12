@@ -158,4 +158,21 @@ describe('useConfigSteps', () => {
     const test = result.current.steps.find((s) => s.id === 'test')!;
     expect(test.status).toBe('done');
   });
+
+  it('opens Configure when every step is complete — the panel is never all-collapsed', () => {
+    const { result } = renderHook(() =>
+      useConfigSteps(
+        input({
+          connection: meta({ hasSelection: true, selectedName: 'My Google' }),
+          configureValid: true,
+          tested: true,
+        }),
+      ),
+    );
+    const { steps } = result.current;
+    expect(openId(steps)).toBe('configure');
+    expect(steps.find((s) => s.id === 'configure')!.status).toBe('active');
+    expect(steps.find((s) => s.id === 'connection')!.status).toBe('done');
+    expect(steps.find((s) => s.id === 'test')!.status).toBe('done');
+  });
 });

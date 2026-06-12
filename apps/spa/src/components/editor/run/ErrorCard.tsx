@@ -61,7 +61,7 @@ export function ErrorCard({
   return (
     <div
       data-testid={testId}
-      className="rounded border border-status-failed/30 bg-status-failed/10"
+      className="rounded-md border border-status-failed/30 bg-status-failed/10"
     >
       <div className="flex items-center justify-between gap-2 px-3 py-2">
         <span className="flex items-center gap-1.5 text-xs font-semibold text-status-failed">
@@ -80,7 +80,7 @@ export function ErrorCard({
       </pre>
 
       {hint && (
-        <p className="px-3 pb-2 text-[11px] leading-snug text-text-secondary">
+        <p className="px-3 pb-2 text-xs leading-snug text-text-secondary">
           <span className="font-medium text-text-primary">Hint:</span> {hint}
         </p>
       )}

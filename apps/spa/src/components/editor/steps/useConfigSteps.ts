@@ -70,13 +70,13 @@ export function useConfigSteps(input: ConfigStepsInput): UseConfigStepsResult {
 
     // Effective open: honor an explicit choice only when that step is unlocked,
     // otherwise fall back to auto = first incomplete unlocked step. When every
-    // step is already complete (e.g. a tested node) no step is auto-opened, so
-    // each collapses to its 'done' state until the user reopens one.
-    let openId: StepId | null;
+    // step is already complete (e.g. a tested node) Configure opens — the panel
+    // is never all-collapsed, and Configure is never locked so this is safe.
+    let openId: StepId;
     if (explicit !== null && !locked[explicit]) {
       openId = explicit;
     } else {
-      openId = order.find((id) => !locked[id] && !complete[id]) ?? null;
+      openId = order.find((id) => !locked[id] && !complete[id]) ?? 'configure';
     }
 
     const steps: StepModel[] = order.map((id, i) => {
