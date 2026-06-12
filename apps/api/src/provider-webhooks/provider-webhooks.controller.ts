@@ -10,13 +10,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import {
-  ApiAcceptedResponse,
-  ApiNotFoundResponse,
-  ApiOperation,
-  ApiTags,
-  ApiUnauthorizedResponse,
-} from '@nestjs/swagger';
+import { ApiAcceptedResponse, ApiNotFoundResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { ProviderWebhooksService } from './provider-webhooks.service';
@@ -72,7 +66,9 @@ export class ProviderWebhooksController {
     summary: 'Receive a signed event from an external provider (public, signature-protected)',
   })
   @ApiAcceptedResponse({ type: ProviderWebhookResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Invalid signature' })
+  // A bad signature returns the same generic 404 as a missing/inactive/
+  // mismatched subscription so the response cannot be used as a
+  // subscription-existence oracle (W5.30). The real reason is logged internally.
   @ApiNotFoundResponse({ description: 'Provider webhook not found' })
   async receive(
     @Param('provider') provider: string,
@@ -110,7 +106,8 @@ export class ProviderWebhooksController {
 
     // Verified handshake (e.g. Discord PING): reply with the PONG body and 200
     // rather than the 202 ack envelope. The signature was already validated, so
-    // bad-signature probes never reach here (they 401 in the service).
+    // bad-signature probes never reach here (they get the uniform 404 in the
+    // service — same response as a missing subscription, no existence oracle).
     if (result.ack) {
       res.status(HttpStatus.OK).type(result.ack.contentType).send(result.ack.body);
       return undefined;

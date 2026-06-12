@@ -1,7 +1,7 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
@@ -152,7 +152,7 @@ describe('ProviderWebhooksService — Microsoft 365 integration', () => {
       expect(result).toEqual({ executionId, status: 'PENDING' });
     });
 
-    it('rejects with 401 when clientState does not match', async () => {
+    it('rejects with the uniform 404 when clientState does not match (no existence oracle)', async () => {
       prisma.providerSubscription.findUnique.mockResolvedValue(activeOutlookSubscription());
       crypto.decrypt.mockReturnValue(outlookSecret);
 
@@ -167,7 +167,7 @@ describe('ProviderWebhooksService — Microsoft 365 integration', () => {
           rawBody: Buffer.from(notificationBody),
           headers: { 'content-type': 'application/json' },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });

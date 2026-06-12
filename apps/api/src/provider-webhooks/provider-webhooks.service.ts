@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { createHash } from 'crypto';
@@ -124,7 +124,16 @@ export class ProviderWebhooksService {
       }),
     );
     if (!verified) {
-      throw new UnauthorizedException('Invalid signature');
+      // Uniform generic response: a bad signature returns the SAME status and
+      // message as a missing/inactive/mismatched subscription so an
+      // unauthenticated caller cannot use the response to distinguish a real
+      // subscription id from a non-existent one (existence oracle, W5.30). The
+      // real reason is kept in internal logs only.
+      this.log.warn(
+        { provider: input.provider, subscriptionId: input.subscriptionId },
+        'Provider webhook signature verification failed',
+      );
+      throw new NotFoundException('Provider webhook not found');
     }
 
     const triggerData = this.parseBody(input.rawBody);

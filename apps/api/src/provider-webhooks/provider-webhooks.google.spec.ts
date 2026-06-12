@@ -1,7 +1,7 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
 import { EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
@@ -142,7 +142,7 @@ describe('ProviderWebhooksService — Google integration', () => {
       expect(result).toEqual({ executionId, status: 'PENDING' });
     });
 
-    it('rejects with 401 when the X-Goog-Channel-Token does not match', async () => {
+    it('rejects with the uniform 404 when the X-Goog-Channel-Token does not match (no existence oracle)', async () => {
       prisma.providerSubscription.findUnique.mockResolvedValue(activeDriveSubscription());
       crypto.decrypt.mockReturnValue(driveSecret);
 
@@ -153,7 +153,7 @@ describe('ProviderWebhooksService — Google integration', () => {
           rawBody: Buffer.from(''),
           headers: { 'x-goog-channel-token': 'wrong-token-of-similar-length-XX' },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
     });
 
@@ -234,7 +234,7 @@ describe('ProviderWebhooksService — Google integration', () => {
       expect(queue.add).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects with 401 when the OIDC verification fails', async () => {
+    it('rejects with the uniform 404 when the OIDC verification fails (no existence oracle)', async () => {
       prisma.providerSubscription.findUnique.mockResolvedValue(activeGmailSubscription());
       crypto.decrypt.mockReturnValue(`${gmailCallback}::oidc`);
       googleFactory.verifyOidcToken.mockRejectedValue(new Error('Invalid signature'));
@@ -246,11 +246,11 @@ describe('ProviderWebhooksService — Google integration', () => {
           rawBody: Buffer.from('{}'),
           headers: { authorization: 'Bearer aaa.bbb.ccc' },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
     });
 
-    it("rejects with 401 when the OIDC email is not Gmail's push service account", async () => {
+    it("rejects with the uniform 404 when the OIDC email is not Gmail's push service account (no existence oracle)", async () => {
       prisma.providerSubscription.findUnique.mockResolvedValue(activeGmailSubscription());
       crypto.decrypt.mockReturnValue(`${gmailCallback}::oidc`);
       googleFactory.verifyOidcToken.mockResolvedValue({
@@ -266,7 +266,7 @@ describe('ProviderWebhooksService — Google integration', () => {
           rawBody: Buffer.from('{}'),
           headers: { authorization: 'Bearer aaa.bbb.ccc' },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 

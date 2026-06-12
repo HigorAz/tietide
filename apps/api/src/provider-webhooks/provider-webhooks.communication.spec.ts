@@ -1,7 +1,7 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bullmq';
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { createHmac, generateKeyPairSync, sign } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
@@ -34,8 +34,8 @@ import { ProviderWebhooksService } from './provider-webhooks.service';
  * Integration test for the four communication push triggers (twilio,
  * telegram, slack, discord-bot). Drives inbound webhooks through the real
  * dispatcher end-to-end, asserts: PENDING execution row created with
- * triggerType='provider:<name>', queue.add called; bad signature → 401;
- * inactive/missing subscription → generic 404.
+ * triggerType='provider:<name>', queue.add called; bad signature → uniform
+ * generic 404 (no existence oracle); inactive/missing subscription → generic 404.
  */
 describe('ProviderWebhooksService — Communication integration', () => {
   let service: ProviderWebhooksService;
@@ -147,7 +147,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
       expect(queue.add).toHaveBeenCalled();
     });
 
-    it('rejects bad X-Twilio-Signature with 401', async () => {
+    it('rejects bad X-Twilio-Signature with the uniform 404 (no existence oracle)', async () => {
       prisma.providerSubscription.findUnique.mockResolvedValue(activeSubscription());
       crypto.decrypt.mockReturnValue(encodeTwilioSigningSecret(AUTH_TOKEN, CALLBACK_URL));
       await expect(
@@ -157,7 +157,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
           rawBody: Buffer.from('From=%2B1&Body=hi'),
           headers: { 'x-twilio-signature': Buffer.from('00').toString('base64') },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
     });
   });
@@ -202,7 +202,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
           rawBody: Buffer.from('{}'),
           headers: { 'x-telegram-bot-api-secret-token': 'wrong-token' },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -263,7 +263,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
             'x-slack-signature': `v0=${sig}`,
           },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 
@@ -377,7 +377,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
     });
 
-    it('rejects a PING carrying an invalid signature (Discord verification probe → 401)', async () => {
+    it('rejects a PING carrying an invalid signature (Discord verification probe → uniform 404)', async () => {
       const { publicKey } = generateKeyPairSync('ed25519');
       const der = publicKey.export({ format: 'der', type: 'spki' });
       const publicKeyHex = der.slice(der.length - 32).toString('hex');
@@ -397,7 +397,7 @@ describe('ProviderWebhooksService — Communication integration', () => {
             'x-signature-timestamp': '1717000000',
           },
         }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
     });
   });
