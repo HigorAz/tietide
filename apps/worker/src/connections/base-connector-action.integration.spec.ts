@@ -260,6 +260,47 @@ describe('BaseConnectorAction (integration)', () => {
       expect(ctx.markConnectionForRefresh).toHaveBeenCalledWith('conn-1');
     });
 
+    it('on a successful refresh whose retry throws a NON-auth error, does NOT mark for refresh and rethrows the underlying error', async () => {
+      // W5.13: a healthy connection must not be disabled (EXPIRED) just because
+      // the post-refresh retry hit a transient provider 5xx. Only auth errors
+      // are evidence the credential is bad.
+      const action = new FakeConnectorAction();
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'old-token' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as ExecutionContext['getConnection'],
+        refreshConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'new-token' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as NonNullable<ExecutionContext['refreshConnection']>,
+      });
+
+      const serverError = new Error('Server boom') as Error & { status: number };
+      serverError.status = 500;
+      let attempt = 0;
+      action.runImpl = async () => {
+        attempt += 1;
+        if (attempt === 1) {
+          const err = new Error('Unauthorized') as Error & { status: number };
+          err.status = 401;
+          throw err;
+        }
+        throw serverError;
+      };
+
+      await expect(
+        action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx),
+      ).rejects.toBe(serverError);
+      expect(ctx.markConnectionForRefresh).not.toHaveBeenCalled();
+    });
+
     it('on refreshConnection throwing, still marks for refresh and surfaces ConnectionAuthError', async () => {
       const action = new FakeConnectorAction();
       const ctx = makeContext({

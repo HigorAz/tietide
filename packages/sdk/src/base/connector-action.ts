@@ -109,10 +109,19 @@ export abstract class BaseConnectorAction<
           });
           // Refresh itself failed, or the retry call also hit an auth error.
           // Fall through to the existing mark-for-refresh path below.
-          if (!this.isAuthError(retryError)) {
-            // Non-auth retry failure: surface the underlying error rather than
-            // masking it behind a generic ConnectionAuthError.
-            await context.markConnectionForRefresh(connectionId);
+          if (refreshedThenFailed && !this.isAuthError(retryError)) {
+            // Non-auth retry failure AFTER a successful refresh (W5.13): the
+            // token refresh SUCCEEDED, so the credential is healthy — a provider
+            // 5xx / timeout / node bug on the retry is NOT evidence the
+            // connection is bad. Do NOT mark it for refresh (which would set
+            // status=EXPIRED and bump the lockout counter, sticky-disabling a
+            // working connection). Surface the underlying error untouched so the
+            // engine treats it as a normal transient failure.
+            //
+            // NOTE: this is gated on `refreshedThenFailed`. If `refreshConnection`
+            // itself threw (refresh FAILED, never set the flag), the credential
+            // genuinely couldn't be refreshed, so we fall through to the
+            // mark-for-refresh path below — that case is a real auth problem.
             throw retryError;
           }
         }
