@@ -10,6 +10,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import type { ForgotPasswordDto } from './dto/forgot-password.dto';
 import type { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto';
 import type { LoginDto } from './dto/login.dto';
@@ -61,6 +62,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly mailer: MailerService,
     private readonly organizations: OrganizationsService,
+    private readonly audit: AuditLogService,
   ) {}
 
   async register(dto: RegisterDto): Promise<RegisterResponseDto> {
@@ -127,16 +129,45 @@ export class AuthService {
     // A soft-deleted (anonymized) account is treated exactly like a non-existent
     // one — generic invalid-credentials, no oracle for the deleted address.
     if (!user || user.deletedAt || !passwordMatches) {
+      // Audit the failed sign-in so credential-stuffing bursts leave a trace. Only
+      // when the email maps to a real user do we have an FK-valid userId to attach;
+      // never record the submitted password (only the email, for traceability). A
+      // missing/soft-deleted account leaves no row — there is no user to reference,
+      // and writing one would itself become an enumeration oracle.
+      if (user) {
+        await this.audit.logSync({
+          userId: user.id,
+          action: 'auth.login-failed',
+          resource: 'user',
+          resourceId: user.id,
+          metadata: { email: dto.email, reason: user.deletedAt ? 'deleted' : 'bad-credentials' },
+        });
+      }
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Only block (and thereby reveal "unverified") AFTER the credentials are
     // confirmed, so this never becomes an enumeration signal for a bad password.
     if (!user.emailVerified) {
+      await this.audit.logSync({
+        userId: user.id,
+        action: 'auth.login-failed',
+        resource: 'user',
+        resourceId: user.id,
+        metadata: { email: dto.email, reason: 'unverified' },
+      });
       throw new ForbiddenException(
         'Please verify your email before signing in. Check your inbox for the verification link.',
       );
     }
+
+    await this.audit.logSync({
+      userId: user.id,
+      action: 'auth.login',
+      resource: 'user',
+      resourceId: user.id,
+      metadata: { email: user.email },
+    });
 
     return this.signSession(user);
   }
@@ -184,6 +215,14 @@ export class AuthService {
       where: { id: record.userId },
       data: { emailVerified: true },
       select: { id: true, email: true, role: true, tokenVersion: true },
+    });
+
+    await this.audit.logSync({
+      userId: user.id,
+      action: 'auth.email-verified',
+      resource: 'user',
+      resourceId: user.id,
+      metadata: { email: user.email },
     });
 
     return this.signSession(user);
@@ -268,6 +307,14 @@ export class AuthService {
       data: { consumedAt: now },
     });
 
+    await this.audit.logSync({
+      userId: user.id,
+      action: 'auth.password-reset',
+      resource: 'user',
+      resourceId: user.id,
+      metadata: { email: user.email },
+    });
+
     return this.signSession(user);
   }
 
@@ -282,6 +329,13 @@ export class AuthService {
       where: { id: userId },
       data: { tokenVersion: { increment: 1 } },
       select: { id: true },
+    });
+
+    await this.audit.logSync({
+      userId,
+      action: 'auth.logout',
+      resource: 'user',
+      resourceId: userId,
     });
   }
 

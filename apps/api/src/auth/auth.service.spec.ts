@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { AuditLogService } from '../audit/audit-log.service';
 
 jest.mock('bcrypt');
 
@@ -24,6 +25,7 @@ describe('AuthService', () => {
     sendPasswordResetEmail: jest.Mock;
   };
   let organizations: { create: jest.Mock };
+  let audit: { logSync: jest.Mock };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
   beforeEach(async () => {
@@ -39,6 +41,7 @@ describe('AuthService', () => {
       sendPasswordResetEmail: jest.fn(async () => undefined),
     };
     organizations = { create: jest.fn(async () => undefined) };
+    audit = { logSync: jest.fn(async () => undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +50,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: jwt },
         { provide: MailerService, useValue: mailer },
         { provide: OrganizationsService, useValue: organizations },
+        { provide: AuditLogService, useValue: audit },
       ],
     }).compile();
 
@@ -168,6 +172,50 @@ describe('AuthService', () => {
       });
     });
 
+    it('writes a durable audit entry on a successful login (W5.21)', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      await service.login(validDto);
+
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: storedUser.id,
+          action: 'auth.login',
+          resource: 'user',
+          resourceId: storedUser.id,
+        }),
+      );
+    });
+
+    it('audits a failed login for a real account (with userId, email metadata, never the password) (W5.21)', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: storedUser.id,
+          action: 'auth.login-failed',
+          resource: 'user',
+          resourceId: storedUser.id,
+        }),
+      );
+      const entry = audit.logSync.mock.calls[0][0];
+      expect(JSON.stringify(entry)).not.toContain(validDto.password);
+    });
+
+    it('does NOT audit (no FK-valid userId) a failed login for an unknown email (W5.21)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+
+      expect(audit.logSync).not.toHaveBeenCalled();
+    });
+
     it('throws ForbiddenException for valid credentials on an unverified account', async () => {
       prisma.user.findUnique.mockResolvedValue({ ...storedUser, emailVerified: false });
       (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
@@ -224,6 +272,14 @@ describe('AuthService', () => {
         expect.objectContaining({ where: { id: 'uuid-1' }, data: { emailVerified: true } }),
       );
       expect(result).toEqual({ accessToken: 'signed.jwt.token', tokenType: 'Bearer' });
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'uuid-1',
+          action: 'auth.email-verified',
+          resource: 'user',
+          resourceId: 'uuid-1',
+        }),
+      );
     });
 
     it('rejects an unknown token', async () => {
@@ -330,6 +386,14 @@ describe('AuthService', () => {
       // The signed session carries the *bumped* version, so it stays valid while
       // the pre-reset sessions do not.
       expect(jwt.sign).toHaveBeenCalledWith(expect.objectContaining({ tokenVersion: 3 }));
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'uuid-1',
+          action: 'auth.password-reset',
+          resource: 'user',
+          resourceId: 'uuid-1',
+        }),
+      );
     });
 
     it('looks the token up by its hash, never by the raw value', async () => {
@@ -420,6 +484,21 @@ describe('AuthService', () => {
         data: { tokenVersion: { increment: 1 } },
         select: { id: true },
       });
+    });
+
+    it('writes a durable audit entry for the session revoke-all (W5.21)', async () => {
+      prisma.user.update.mockResolvedValue({ id: 'uuid-1' });
+
+      await service.logout('uuid-1');
+
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'uuid-1',
+          action: 'auth.logout',
+          resource: 'user',
+          resourceId: 'uuid-1',
+        }),
+      );
     });
   });
 });

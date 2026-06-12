@@ -86,6 +86,16 @@ export class AccountService {
       select: { id: true, email: true, role: true, tokenVersion: true },
     });
 
+    // Durable account-level audit (no organizationId): a password change also
+    // revokes every other session, so it must leave a trace for takeover forensics.
+    await this.audit.logSync({
+      userId,
+      action: 'auth.password-change',
+      resource: 'user',
+      resourceId: userId,
+      metadata: { email: updated.email },
+    });
+
     return this.auth.signSession(updated);
   }
 
