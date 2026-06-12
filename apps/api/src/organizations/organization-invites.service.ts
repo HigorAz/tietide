@@ -143,9 +143,22 @@ export class OrganizationInvitesService {
     }
 
     try {
-      await this.prisma.organizationMember.create({
-        data: { organizationId: invite.organizationId, userId, role: invite.role },
-      });
+      // W5.25: the assertCanAddSeat pre-check above is not atomic with this
+      // create, so concurrent accepts at the seat-cap boundary could all pass and
+      // all insert (overshoot). enforceSeatCapAround runs the membership insert + a
+      // post-create member re-count in one serializable transaction and rolls back
+      // the loser. Skip the wrapper for already-members (no seat consumed).
+      if (alreadyMember) {
+        await this.prisma.organizationMember.create({
+          data: { organizationId: invite.organizationId, userId, role: invite.role },
+        });
+      } else {
+        await this.entitlements.enforceSeatCapAround(invite.organizationId, (tx) =>
+          tx.organizationMember.create({
+            data: { organizationId: invite.organizationId, userId, role: invite.role },
+          }),
+        );
+      }
     } catch (err) {
       // Already a member — accepting is idempotent; keep their existing role.
       if (!this.access.isUniqueViolation(err)) throw err;

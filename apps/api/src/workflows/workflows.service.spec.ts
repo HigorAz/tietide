@@ -9,11 +9,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { ActivationService } from '../provider-triggers/activation.service';
+import { EntitlementsService } from '../billing/entitlements.service';
+import { PaymentRequiredException } from '../billing/payment-required.exception';
 import { WorkflowsService } from './workflows.service';
 
 describe('WorkflowsService', () => {
   let service: WorkflowsService;
   let audit: { log: jest.Mock };
+  let entitlements: { assertCanCreateWorkflow: jest.Mock };
   let prisma: {
     workflow: {
       create: jest.Mock;
@@ -108,6 +111,7 @@ describe('WorkflowsService', () => {
       return undefined;
     });
     audit = { log: jest.fn().mockResolvedValue(undefined) };
+    entitlements = { assertCanCreateWorkflow: jest.fn().mockResolvedValue(undefined) };
 
     const activation = {
       activateForWorkflow: jest.fn().mockResolvedValue(undefined),
@@ -119,6 +123,7 @@ describe('WorkflowsService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: AuditLogService, useValue: audit },
         { provide: ActivationService, useValue: activation },
+        { provide: EntitlementsService, useValue: entitlements },
       ],
     }).compile();
 
@@ -131,6 +136,7 @@ describe('WorkflowsService', () => {
       return undefined;
     });
     prisma.workflowVersion.create.mockResolvedValue({});
+    entitlements.assertCanCreateWorkflow.mockResolvedValue(undefined);
   });
 
   describe('create', () => {
@@ -153,6 +159,27 @@ describe('WorkflowsService', () => {
         }),
       );
       expect(result).toEqual(persistedResponse);
+    });
+
+    it('should enforce the workflow entitlement before persisting (W5.24)', async () => {
+      prisma.workflow.create.mockResolvedValue(persisted);
+
+      await service.create(orgId, userId, dto);
+
+      expect(entitlements.assertCanCreateWorkflow).toHaveBeenCalledWith(orgId);
+    });
+
+    it('should throw 402 (reason "workflows") and not persist when at the workflow cap (W5.24)', async () => {
+      entitlements.assertCanCreateWorkflow.mockRejectedValueOnce(
+        new PaymentRequiredException('workflows', 'cap reached'),
+      );
+
+      await expect(service.create(orgId, userId, dto)).rejects.toBeInstanceOf(
+        PaymentRequiredException,
+      );
+      expect(prisma.workflow.create).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(audit.log).not.toHaveBeenCalled();
     });
 
     it('should accept an optional description', async () => {
@@ -504,6 +531,19 @@ describe('WorkflowsService', () => {
         where: { AND?: unknown[] };
       };
       expect(call.where.AND).toBeDefined();
+    });
+
+    it('should reject a cursor whose decoded value is not a valid date (W5.41)', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+      // A well-formed base64url keyset cursor whose `v` is a non-date string.
+      // Previously this produced `new Date('not-a-date')` → Invalid Date, which
+      // Prisma rejects with a raw 500. It must surface as a 400 instead.
+      const cursor = Buffer.from(JSON.stringify({ v: 'not-a-date', id: 'wf-x' }), 'utf8').toString(
+        'base64url',
+      );
+
+      await expect(service.list(orgId, { cursor })).rejects.toThrow(BadRequestException);
+      expect(prisma.workflow.findMany).not.toHaveBeenCalled();
     });
 
     it('should request the execution count via Prisma _count', async () => {

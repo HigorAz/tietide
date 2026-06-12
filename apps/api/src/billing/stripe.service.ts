@@ -46,6 +46,16 @@ export class StripeService {
     return this.stripe !== null && this.webhookSecret.length > 0;
   }
 
+  /**
+   * Whether the platform Stripe secret key is present, regardless of the webhook
+   * secret. Lets the webhook receiver distinguish a *partial* misconfiguration
+   * (key set, signing secret blank → 503, an operator fault) from a fully
+   * unconfigured environment (no key → 503 too, but expected in dev/self-host).
+   */
+  hasSecretKey(): boolean {
+    return this.stripe !== null;
+  }
+
   private client(): Stripe {
     if (!this.stripe) {
       throw new ServiceUnavailableException('Billing is not configured');

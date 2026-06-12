@@ -1,3 +1,4 @@
+import { Logger as NestLogger } from '@nestjs/common';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
@@ -158,6 +159,58 @@ describe('PrismaEnvVarResolver', () => {
       await resolver.getEnvScope(executionId);
       const scope2 = await resolver.getEnvScope(executionId);
       expect(scope2.get('K')).toBe('dec(C)');
+    });
+  });
+
+  describe('undecryptable rows (W5.33)', () => {
+    it('should skip a single undecryptable row, keep the good ones, and not throw', async () => {
+      setExecution(organizationId);
+      prisma.environmentVariable.findMany.mockResolvedValue([
+        { scope: 'GLOBAL', organizationId: null, key: 'GOOD', valueEnc: 'CG', valueNonce: 'NG' },
+        { scope: 'USER', organizationId, key: 'BAD', valueEnc: 'CB', valueNonce: 'NB' },
+        { scope: 'USER', organizationId, key: 'ALSO_GOOD', valueEnc: 'CA', valueNonce: 'NA' },
+      ]);
+      crypto.decrypt.mockImplementation((c: string) => {
+        if (c === 'CB') {
+          throw new Error('libsodium: decryption failed');
+        }
+        return `dec(${c})`;
+      });
+
+      const scope = await resolver.getEnvScope(executionId);
+
+      expect(scope.get('GOOD')).toBe('dec(CG)');
+      expect(scope.get('ALSO_GOOD')).toBe('dec(CA)');
+      expect(scope.has('BAD')).toBe(false);
+      expect(scope.size).toBe(2);
+    });
+
+    it('should log a warning naming only the offending key (never ciphertext/nonce/value)', async () => {
+      const warnSpy = jest.spyOn(NestLogger.prototype, 'warn').mockImplementation(() => undefined);
+
+      setExecution(organizationId);
+      prisma.environmentVariable.findMany.mockResolvedValue([
+        {
+          scope: 'USER',
+          organizationId,
+          key: 'BAD',
+          valueEnc: 'SECRET_CIPHER',
+          valueNonce: 'SECRET_NONCE',
+        },
+      ]);
+      crypto.decrypt.mockImplementation(() => {
+        throw new Error('boom');
+      });
+
+      await resolver.getEnvScope(executionId);
+
+      expect(warnSpy).toHaveBeenCalled();
+      const logged = JSON.stringify(warnSpy.mock.calls);
+      expect(logged).toContain('BAD');
+      expect(logged).not.toContain('SECRET_CIPHER');
+      expect(logged).not.toContain('SECRET_NONCE');
+
+      warnSpy.mockRestore();
     });
   });
 

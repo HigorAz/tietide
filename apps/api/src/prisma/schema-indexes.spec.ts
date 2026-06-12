@@ -28,4 +28,20 @@ describe('schema.prisma index coverage (W3.4)', () => {
   it('keeps the ExecutionStep (executionId) index that serves its only query', () => {
     expect(modelBlock('ExecutionStep')).toContain('@@index([executionId])');
   });
+
+  it('indexes AuditLog by (action, resource) for the filter-dropdown distinct sweeps (W5.53)', () => {
+    // audit-log.service.listFilterValues: SELECT DISTINCT action / resource over
+    // audit_logs (not org-scoped) — unindexed otherwise → full table scan.
+    expect(modelBlock('AuditLog')).toContain('@@index([action, resource])');
+  });
+
+  it('retains AuditLog rows on workspace deletion via onDelete: SetNull (W5.20)', () => {
+    // Deleting a workspace must NOT cascade-wipe its forensic audit trail. The
+    // organization relation nulls organization_id instead of deleting the row.
+    const block = modelBlock('AuditLog');
+    const relation = block.match(/organization\s+Organization\?\s+@relation\([^)]*\)/);
+    expect(relation).not.toBeNull();
+    expect(relation![0]).toContain('onDelete: SetNull');
+    expect(relation![0]).not.toContain('onDelete: Cascade');
+  });
 });

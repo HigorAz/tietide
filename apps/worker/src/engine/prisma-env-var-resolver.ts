@@ -49,15 +49,25 @@ export class PrismaEnvVarResolver implements EnvVarResolver {
     })) as EnvRow[];
 
     // Insert GLOBAL first so USER values overwrite on key collision.
+    // A single undecryptable row (e.g. key rotation, corrupted ciphertext) must
+    // degrade gracefully: skip that key and continue, never aborting the whole run.
     const map = new Map<string, string>();
+    const decryptRow = (row: EnvRow): void => {
+      try {
+        map.set(row.key, this.crypto.decrypt(row.valueEnc, row.valueNonce));
+      } catch {
+        // Redacted: log the key name only — never the ciphertext, nonce, or value.
+        this.log.warn({ executionId, scope: row.scope, key: row.key }, 'env-vars.decrypt_failed');
+      }
+    };
     for (const row of rows) {
       if (row.scope === 'GLOBAL') {
-        map.set(row.key, this.crypto.decrypt(row.valueEnc, row.valueNonce));
+        decryptRow(row);
       }
     }
     for (const row of rows) {
       if (row.scope === 'USER') {
-        map.set(row.key, this.crypto.decrypt(row.valueEnc, row.valueNonce));
+        decryptRow(row);
       }
     }
 

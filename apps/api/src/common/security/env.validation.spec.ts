@@ -9,6 +9,7 @@ const prodBase = {
   JWT_SECRET: STRONG_LONG,
   WEBHOOK_HMAC_SECRET: STRONG_LONG,
   ENCRYPTION_MASTER_KEY: STRONG_LONG,
+  METRICS_TOKEN: STRONG_LONG,
 };
 
 describe('validateEnv', () => {
@@ -58,6 +59,54 @@ describe('validateEnv', () => {
     const env: Record<string, unknown> = { ...prodBase };
     delete env.JWT_SECRET;
     expect(() => validateEnv(env)).toThrow(/JWT_SECRET/);
+  });
+
+  it('rejects a missing METRICS_TOKEN in production (default-closed metrics)', () => {
+    const env: Record<string, unknown> = { ...prodBase };
+    delete env.METRICS_TOKEN;
+    expect(() => validateEnv(env)).toThrow(/METRICS_TOKEN/);
+  });
+
+  it('rejects an empty METRICS_TOKEN in production', () => {
+    expect(() => validateEnv({ ...prodBase, METRICS_TOKEN: '   ' })).toThrow(/METRICS_TOKEN/);
+  });
+
+  it('accepts a present METRICS_TOKEN in production', () => {
+    expect(() => validateEnv({ ...prodBase, METRICS_TOKEN: 'a-real-metrics-token' })).not.toThrow();
+  });
+
+  it('does not require METRICS_TOKEN outside production', () => {
+    expect(() => validateEnv({ NODE_ENV: 'development', JWT_SECRET: 'x' })).not.toThrow();
+  });
+
+  it('requires STRIPE_WEBHOOK_SECRET when STRIPE_SECRET_KEY is set in production', () => {
+    expect(() => validateEnv({ ...prodBase, STRIPE_SECRET_KEY: 'sk_live_x' })).toThrow(
+      /STRIPE_WEBHOOK_SECRET/,
+    );
+  });
+
+  it('rejects an empty STRIPE_WEBHOOK_SECRET when STRIPE_SECRET_KEY is set in production', () => {
+    expect(() =>
+      validateEnv({ ...prodBase, STRIPE_SECRET_KEY: 'sk_live_x', STRIPE_WEBHOOK_SECRET: '   ' }),
+    ).toThrow(/STRIPE_WEBHOOK_SECRET/);
+  });
+
+  it('accepts both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET set in production', () => {
+    expect(() =>
+      validateEnv({
+        ...prodBase,
+        STRIPE_SECRET_KEY: 'sk_live_x',
+        STRIPE_WEBHOOK_SECRET: 'whsec_real',
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts both STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET unset in production', () => {
+    expect(() => validateEnv(prodBase)).not.toThrow();
+  });
+
+  it('does not require STRIPE_WEBHOOK_SECRET when only the webhook secret is set (no secret key)', () => {
+    expect(() => validateEnv({ ...prodBase, STRIPE_WEBHOOK_SECRET: 'whsec_real' })).not.toThrow();
   });
 
   it('aggregates every failing secret into one error', () => {

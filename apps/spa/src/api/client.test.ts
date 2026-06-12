@@ -16,17 +16,18 @@ describe('client 401 interceptor (onResponseRejected)', () => {
     useAuthStore.setState({ user: null, token: null, hydrated: true });
     useToastStore.setState({ toasts: [] });
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('soft-logs-out and toasts on a 401 for an authenticated session (no hard reload)', async () => {
-    localStorage.setItem('tietide-token', 'jwt-123');
+    sessionStorage.setItem('tietide-token', 'jwt-123');
     useAuthStore.setState({ token: 'jwt-123', user: null, hydrated: true });
 
     await expect(onResponseRejected(make401())).rejects.toBeTruthy();
 
     // Token cleared via the store (ProtectedRoute will then redirect reactively).
     expect(useAuthStore.getState().token).toBeNull();
-    expect(localStorage.getItem('tietide-token')).toBeNull();
+    expect(sessionStorage.getItem('tietide-token')).toBeNull();
     // A session-expired toast was surfaced.
     const toasts = useToastStore.getState().toasts;
     expect(toasts).toHaveLength(1);
@@ -35,7 +36,7 @@ describe('client 401 interceptor (onResponseRejected)', () => {
   });
 
   it('does not logout or toast on a credential-rejection 401 (e.g. wrong current password)', async () => {
-    localStorage.setItem('tietide-token', 'jwt-123');
+    sessionStorage.setItem('tietide-token', 'jwt-123');
     useAuthStore.setState({ token: 'jwt-123', user: null, hydrated: true });
     const err = {
       response: { status: 401, data: { reason: 'invalid_credentials' } },
@@ -46,7 +47,7 @@ describe('client 401 interceptor (onResponseRejected)', () => {
 
     // Session is untouched — the user stays signed in.
     expect(useAuthStore.getState().token).toBe('jwt-123');
-    expect(localStorage.getItem('tietide-token')).toBe('jwt-123');
+    expect(sessionStorage.getItem('tietide-token')).toBe('jwt-123');
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 
@@ -79,10 +80,11 @@ describe('client 401 interceptor (onResponseRejected)', () => {
 describe('client request headers (attachRequestHeaders)', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
   });
 
-  it('attaches the bearer token and X-Org-Id from localStorage', () => {
-    localStorage.setItem('tietide-token', 'jwt-abc');
+  it('attaches the bearer token from sessionStorage and X-Org-Id from localStorage', () => {
+    sessionStorage.setItem('tietide-token', 'jwt-abc');
     localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'org-9');
 
     const config = attachRequestHeaders(emptyConfig());
@@ -91,8 +93,16 @@ describe('client request headers (attachRequestHeaders)', () => {
     expect(config.headers['X-Org-Id']).toBe('org-9');
   });
 
+  it('does not read the bearer token from localStorage (W5.43)', () => {
+    localStorage.setItem('tietide-token', 'legacy-jwt');
+
+    const config = attachRequestHeaders(emptyConfig());
+
+    expect(config.headers.Authorization).toBeUndefined();
+  });
+
   it('omits X-Org-Id when no active workspace is set', () => {
-    localStorage.setItem('tietide-token', 'jwt-abc');
+    sessionStorage.setItem('tietide-token', 'jwt-abc');
 
     const config = attachRequestHeaders(emptyConfig());
 

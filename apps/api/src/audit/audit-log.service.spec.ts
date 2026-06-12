@@ -129,6 +129,104 @@ describe('AuditLogService', () => {
     });
   });
 
+  describe('logSync', () => {
+    it('should await the underlying create so the write is durable before resolving', async () => {
+      let resolveCreate: (value: unknown) => void = () => undefined;
+      const createPromise = new Promise((resolve) => {
+        resolveCreate = resolve;
+      });
+      prisma.auditLog.create.mockReturnValue(createPromise);
+
+      let settled = false;
+      const logPromise = service
+        .logSync({
+          userId,
+          action: 'auth.login',
+          resource: 'user',
+          resourceId: userId,
+        })
+        .then(() => {
+          settled = true;
+        });
+
+      // The DB write has not resolved yet, so logSync must still be pending —
+      // proving it actually awaits the insert (unlike fire-and-forget log()).
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
+      resolveCreate({});
+      await logPromise;
+      expect(settled).toBe(true);
+      expect(prisma.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          userId,
+          action: 'auth.login',
+          resource: 'user',
+          resourceId: userId,
+          metadata: undefined,
+        },
+      });
+    });
+
+    it('should propagate (rethrow) a Prisma failure so the security event cannot be silently dropped', async () => {
+      const dbError = new Error('db is down');
+      prisma.auditLog.create.mockRejectedValue(dbError);
+
+      await expect(
+        service.logSync({
+          userId,
+          action: 'account.delete',
+          resource: 'user',
+          resourceId: userId,
+        }),
+      ).rejects.toBe(dbError);
+    });
+
+    it('should strip sensitive metadata keys before persisting', async () => {
+      prisma.auditLog.create.mockResolvedValue({});
+
+      await service.logSync({
+        userId,
+        action: 'auth.password-change',
+        resource: 'user',
+        resourceId: userId,
+        metadata: { ip: '1.2.3.4', password: 'should-not-leak' },
+      });
+
+      const call = prisma.auditLog.create.mock.calls[0][0] as {
+        data: { metadata: Record<string, unknown> };
+      };
+      expect(call.data.metadata).toEqual({ ip: '1.2.3.4' });
+      expect(call.data.metadata).not.toHaveProperty('password');
+    });
+
+    it('should write through a provided transaction client so the audit row commits atomically with the mutation', async () => {
+      const tx = { auditLog: { create: jest.fn().mockResolvedValue({}) } };
+
+      await service.logSync(
+        {
+          userId,
+          action: 'organization.delete',
+          resource: 'organization',
+          resourceId: 'org-1',
+        },
+        tx as never,
+      );
+
+      expect(tx.auditLog.create).toHaveBeenCalledWith({
+        data: {
+          userId,
+          action: 'organization.delete',
+          resource: 'organization',
+          resourceId: 'org-1',
+          metadata: undefined,
+        },
+      });
+      // The service-level prisma client must NOT be used when a tx client is given.
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('findMany', () => {
     const baseRow = (
       overrides: Partial<Record<string, unknown>> = {},

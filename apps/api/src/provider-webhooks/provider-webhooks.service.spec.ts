@@ -1,4 +1,4 @@
-import { NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
@@ -242,18 +242,48 @@ describe('ProviderWebhooksService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should throw UnauthorizedException when signature verification fails', async () => {
-      prisma.providerSubscription.findUnique.mockResolvedValue(activeSubscription());
-      trigger.verifySignature.mockReturnValue(false);
-
-      await expect(
-        service.trigger({
+    it('returns the same uniform NotFound response on a bad signature as on a missing subscription (no existence oracle)', async () => {
+      // Capture the not-found error for an unknown subscription.
+      prisma.providerSubscription.findUnique.mockResolvedValue(null);
+      let notFoundError: unknown;
+      try {
+        await service.trigger({
           provider: 'stripe',
           subscriptionId,
           rawBody: Buffer.from('{}'),
           headers: {},
-        }),
-      ).rejects.toThrow(UnauthorizedException);
+        });
+      } catch (err) {
+        notFoundError = err;
+      }
+
+      // Now a real, active subscription whose signature fails verification.
+      prisma.providerSubscription.findUnique.mockResolvedValue(activeSubscription());
+      trigger.verifySignature.mockReturnValue(false);
+      let badSigError: unknown;
+      try {
+        await service.trigger({
+          provider: 'stripe',
+          subscriptionId,
+          rawBody: Buffer.from('{}'),
+          headers: {},
+        });
+      } catch (err) {
+        badSigError = err;
+      }
+
+      // Both must be the identical status + message so the response cannot be
+      // used to distinguish a real subscription id from a non-existent one.
+      expect(badSigError).toBeInstanceOf(NotFoundException);
+      expect(notFoundError).toBeInstanceOf(NotFoundException);
+      expect((badSigError as NotFoundException).getStatus()).toBe(
+        (notFoundError as NotFoundException).getStatus(),
+      );
+      expect((badSigError as NotFoundException).message).toBe(
+        (notFoundError as NotFoundException).message,
+      );
+      expect((badSigError as NotFoundException).message).toBe('Provider webhook not found');
+
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
       expect(queue.add).not.toHaveBeenCalled();
     });

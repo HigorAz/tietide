@@ -4,12 +4,14 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { AuditLogService } from '../audit/audit-log.service';
 import type { ForgotPasswordDto } from './dto/forgot-password.dto';
 import type { ForgotPasswordResponseDto } from './dto/forgot-password-response.dto';
 import type { LoginDto } from './dto/login.dto';
@@ -61,6 +63,8 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly mailer: MailerService,
     private readonly organizations: OrganizationsService,
+    private readonly audit: AuditLogService,
+    private readonly logger: Logger,
   ) {}
 
   async register(dto: RegisterDto): Promise<RegisterResponseDto> {
@@ -127,16 +131,45 @@ export class AuthService {
     // A soft-deleted (anonymized) account is treated exactly like a non-existent
     // one — generic invalid-credentials, no oracle for the deleted address.
     if (!user || user.deletedAt || !passwordMatches) {
+      // Audit the failed sign-in so credential-stuffing bursts leave a trace. Only
+      // when the email maps to a real user do we have an FK-valid userId to attach;
+      // never record the submitted password (only the email, for traceability). A
+      // missing/soft-deleted account leaves no row — there is no user to reference,
+      // and writing one would itself become an enumeration oracle.
+      if (user) {
+        await this.audit.logSync({
+          userId: user.id,
+          action: 'auth.login-failed',
+          resource: 'user',
+          resourceId: user.id,
+          metadata: { email: dto.email, reason: user.deletedAt ? 'deleted' : 'bad-credentials' },
+        });
+      }
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Only block (and thereby reveal "unverified") AFTER the credentials are
     // confirmed, so this never becomes an enumeration signal for a bad password.
     if (!user.emailVerified) {
+      await this.audit.logSync({
+        userId: user.id,
+        action: 'auth.login-failed',
+        resource: 'user',
+        resourceId: user.id,
+        metadata: { email: dto.email, reason: 'unverified' },
+      });
       throw new ForbiddenException(
         'Please verify your email before signing in. Check your inbox for the verification link.',
       );
     }
+
+    await this.audit.logSync({
+      userId: user.id,
+      action: 'auth.login',
+      resource: 'user',
+      resourceId: user.id,
+      metadata: { email: user.email },
+    });
 
     return this.signSession(user);
   }
@@ -158,6 +191,18 @@ export class AuthService {
       throw new BadRequestException('This verification link is invalid or has expired.');
     }
 
+    // A soft-deleted (anonymized) account must never have its verification state
+    // flipped or a session minted from a stale token. Reject with the SAME generic
+    // message used for a bad token — before consuming it or signing — so the
+    // tombstoned address is not disclosed.
+    const owner = await this.prisma.user.findUnique({
+      where: { id: record.userId },
+      select: { deletedAt: true },
+    });
+    if (!owner || owner.deletedAt) {
+      throw new BadRequestException('This verification link is invalid or has expired.');
+    }
+
     // Atomically consume — single-use AND not expired. A replayed or stale link
     // flips zero rows and is rejected.
     const consumed = await this.prisma.emailVerificationToken.updateMany({
@@ -172,6 +217,14 @@ export class AuthService {
       where: { id: record.userId },
       data: { emailVerified: true },
       select: { id: true, email: true, role: true, tokenVersion: true },
+    });
+
+    await this.audit.logSync({
+      userId: user.id,
+      action: 'auth.email-verified',
+      resource: 'user',
+      resourceId: user.id,
+      metadata: { email: user.email },
     });
 
     return this.signSession(user);
@@ -189,7 +242,20 @@ export class AuthService {
     });
 
     if (user) {
-      await this.issuePasswordResetToken(user.id, dto.email);
+      // Dispatch the token INSERT + SMTP send in the background rather than
+      // awaiting it. Awaiting it here would make the registered-email path take
+      // substantially longer than the unknown-email path (a full SMTP round-trip
+      // under the SMTP transport), turning response latency into an account-
+      // enumeration oracle that partially defeats the neutral message (W5.27).
+      // issuePasswordResetToken swallows its own delivery failures, so this can
+      // never surface or 500 the request. The .catch() guards the one remaining
+      // path (a DB INSERT failure) from becoming an unhandled rejection.
+      void this.issuePasswordResetToken(user.id, dto.email).catch((err) => {
+        this.logger.error(
+          { err: (err as Error).message },
+          'Background password-reset token issuance failed',
+        );
+      });
     }
 
     return NEUTRAL_FORGOT_RESPONSE;
@@ -209,6 +275,18 @@ export class AuthService {
       select: { id: true, userId: true },
     });
     if (!record) {
+      throw new BadRequestException('This password reset link is invalid or has expired.');
+    }
+
+    // A soft-deleted (anonymized) account must never have its password set, its
+    // verification state flipped, or a session minted from a stale token. Reject
+    // with the SAME generic message used for a bad token — before consuming it or
+    // signing — so the tombstoned address is not disclosed.
+    const owner = await this.prisma.user.findUnique({
+      where: { id: record.userId },
+      select: { deletedAt: true },
+    });
+    if (!owner || owner.deletedAt) {
       throw new BadRequestException('This password reset link is invalid or has expired.');
     }
 
@@ -244,6 +322,14 @@ export class AuthService {
       data: { consumedAt: now },
     });
 
+    await this.audit.logSync({
+      userId: user.id,
+      action: 'auth.password-reset',
+      resource: 'user',
+      resourceId: user.id,
+      metadata: { email: user.email },
+    });
+
     return this.signSession(user);
   }
 
@@ -258,6 +344,13 @@ export class AuthService {
       where: { id: userId },
       data: { tokenVersion: { increment: 1 } },
       select: { id: true },
+    });
+
+    await this.audit.logSync({
+      userId,
+      action: 'auth.logout',
+      resource: 'user',
+      resourceId: userId,
     });
   }
 

@@ -63,6 +63,8 @@ export {
   FORBIDDEN_NODE_TYPES,
   KNOWN_NODE_TYPES,
   MAX_CONFIG_DEPTH,
+  MAX_WORKFLOW_NODES,
+  MAX_WORKFLOW_EDGES,
   findUnsafeConfigIssue,
   type ConfigSafetyIssue,
 } from './schemas/workflow.schema.js';

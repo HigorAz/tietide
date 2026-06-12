@@ -1,4 +1,29 @@
-import { resolveThrottleTracker } from './throttle-tracker';
+import { resolveClientIp, resolveThrottleTracker } from './throttle-tracker';
+
+describe('resolveClientIp (W5.9 — IP-only aggregate bucket)', () => {
+  it('uses req.ip when there is no proxy chain', () => {
+    expect(resolveClientIp({ ip: '203.0.113.5' })).toBe('203.0.113.5');
+  });
+
+  it('prefers the left-most forwarded IP (real client) over the socket IP', () => {
+    expect(resolveClientIp({ ip: '10.0.0.1', ips: ['203.0.113.9', '10.0.0.1'] })).toBe(
+      '203.0.113.9',
+    );
+  });
+
+  it('falls back to "unknown" when no IP is resolvable', () => {
+    expect(resolveClientIp({})).toBe('unknown');
+  });
+
+  it('never folds the email into the key — the bucket is the IP regardless of body', () => {
+    // Core W5.9 property: rotating the email field cannot mint fresh per-IP buckets.
+    const a = resolveClientIp({ ip: '203.0.113.5', body: { email: 'a@x.com' } });
+    const b = resolveClientIp({ ip: '203.0.113.5', body: { email: 'b@x.com' } });
+    expect(a).toBe('203.0.113.5');
+    expect(b).toBe('203.0.113.5');
+    expect(a).toBe(b);
+  });
+});
 
 describe('resolveThrottleTracker', () => {
   it('uses req.ip when there is no proxy chain', () => {

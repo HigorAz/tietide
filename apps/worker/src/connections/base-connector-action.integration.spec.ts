@@ -94,6 +94,29 @@ describe('BaseConnectorAction (integration)', () => {
       expect(output).toEqual({ data: { ok: true } });
     });
 
+    it('throws ConnectorMisconfiguredError and does NOT call run() when the resolved connection provider does not match requiredConnectionType (W5.11 confused-deputy guard)', async () => {
+      // The node requires a `fake` connection but the resolver hands back a
+      // `slack` connection (the workspace author pointed the node at the wrong
+      // connection). The base class MUST reject before run() ever sees the
+      // mismatched, decrypted config of an unrelated provider.
+      const action = new FakeConnectorAction();
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'slack',
+          config: { accessToken: 'tok' },
+        })) as unknown as ExecutionContext['getConnection'],
+      });
+      const runSpy = jest.spyOn(action, 'runImpl');
+
+      const input: NodeInput = { data: {}, params: {}, connectionId: 'conn-1' };
+
+      await expect(action.execute(input, ctx)).rejects.toBeInstanceOf(ConnectorMisconfiguredError);
+      expect(runSpy).not.toHaveBeenCalled();
+      expect(ctx.markConnectionForRefresh).not.toHaveBeenCalled();
+    });
+
     it('throws ConnectorMisconfiguredError when input.connectionId is missing', async () => {
       const action = new FakeConnectorAction();
       const ctx = makeContext();
@@ -258,6 +281,47 @@ describe('BaseConnectorAction (integration)', () => {
         action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx),
       ).rejects.toBeInstanceOf(ConnectionAuthError);
       expect(ctx.markConnectionForRefresh).toHaveBeenCalledWith('conn-1');
+    });
+
+    it('on a successful refresh whose retry throws a NON-auth error, does NOT mark for refresh and rethrows the underlying error', async () => {
+      // W5.13: a healthy connection must not be disabled (EXPIRED) just because
+      // the post-refresh retry hit a transient provider 5xx. Only auth errors
+      // are evidence the credential is bad.
+      const action = new FakeConnectorAction();
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'old-token' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as ExecutionContext['getConnection'],
+        refreshConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'fake',
+          config: { accessToken: 'new-token' },
+          refreshToken: 'rt-xyz',
+        })) as unknown as NonNullable<ExecutionContext['refreshConnection']>,
+      });
+
+      const serverError = new Error('Server boom') as Error & { status: number };
+      serverError.status = 500;
+      let attempt = 0;
+      action.runImpl = async () => {
+        attempt += 1;
+        if (attempt === 1) {
+          const err = new Error('Unauthorized') as Error & { status: number };
+          err.status = 401;
+          throw err;
+        }
+        throw serverError;
+      };
+
+      await expect(
+        action.execute({ data: {}, params: {}, connectionId: 'conn-1' }, ctx),
+      ).rejects.toBe(serverError);
+      expect(ctx.markConnectionForRefresh).not.toHaveBeenCalled();
     });
 
     it('on refreshConnection throwing, still marks for refresh and surfaces ConnectionAuthError', async () => {

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PLAN_LIMITS, type PlanLimits, type PlanTier } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentRequiredException } from './payment-required.exception';
@@ -46,8 +47,12 @@ export class EntitlementsService {
     return { members, pending };
   }
 
-  private countRunsSince(orgId: string, since: Date): Promise<number> {
-    return this.prisma.workflowExecution.count({
+  private countRunsSince(
+    orgId: string,
+    since: Date,
+    client: Pick<PrismaService, 'workflowExecution'> = this.prisma,
+  ): Promise<number> {
+    return client.workflowExecution.count({
       where: { workflow: { organizationId: orgId }, isDryRun: false, createdAt: { gte: since } },
     });
   }
@@ -113,6 +118,25 @@ export class EntitlementsService {
     }
   }
 
+  /**
+   * Workflow-count guard. FREE caps the number of workflows a workspace may hold
+   * (`maxWorkflows`); paid plans are unlimited (`null`) and never block. Mirrors
+   * `assertCanAddSeat`: resolve the plan, short-circuit when unlimited, else count
+   * live workflows and throw 402 at the cap.
+   */
+  async assertCanCreateWorkflow(orgId: string): Promise<void> {
+    const plan = await this.planOf(orgId);
+    const { maxWorkflows } = this.limitsFor(plan);
+    if (maxWorkflows === null) return;
+    const used = await this.prisma.workflow.count({ where: { organizationId: orgId } });
+    if (used >= maxWorkflows) {
+      throw new PaymentRequiredException(
+        'workflows',
+        'This workspace has reached its workflow limit. Upgrade the plan to create more.',
+      );
+    }
+  }
+
   /** Hard run cap on FREE only; paid plans meter overage and never block. */
   async assertCanRun(orgId: string): Promise<void> {
     const sub = await this.prisma.subscription.findUnique({
@@ -132,5 +156,83 @@ export class EntitlementsService {
         'This workspace has used its included runs for the period. Upgrade to keep running workflows.',
       );
     }
+  }
+
+  /**
+   * Atomically create a run-billed row and enforce the FREE hard run cap.
+   *
+   * `assertCanRun` (count-then-create across two statements) leaves a race: N
+   * concurrent triggers can all read `used < cap` and all insert, overshooting by
+   * the concurrency width. This wraps the caller's create AND a post-create
+   * re-count in one SERIALIZABLE transaction. After the insert the period count
+   * includes our own row, so a count strictly greater than the cap means another
+   * writer raced us over — we throw, rolling the whole transaction (our insert)
+   * back. SERIALIZABLE also makes the DB abort one of two truly-concurrent
+   * count+insert pairs (P2034), giving defence in depth. Paid (unlimited) plans
+   * skip the re-count and just run the create.
+   */
+  async enforceRunCapAround<T>(
+    orgId: string,
+    create: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { organizationId: orgId },
+      select: { plan: true, currentPeriodStart: true },
+    });
+    const plan = (sub?.plan ?? 'FREE') as PlanTier;
+    const { hardRunCap } = this.limitsFor(plan);
+    const since = this.periodStart(sub?.currentPeriodStart ?? null, new Date());
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const result = await create(tx);
+        if (hardRunCap !== null) {
+          const used = await this.countRunsSince(orgId, since, tx);
+          if (used > hardRunCap) {
+            throw new PaymentRequiredException(
+              'runs',
+              'This workspace has used its included runs for the period. Upgrade to keep running workflows.',
+            );
+          }
+        }
+        return result;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  /**
+   * Atomically create a membership and enforce the seat cap. Same race as the run
+   * cap: concurrent invite-accepts can each read `members < maxSeats` and all
+   * insert. This wraps the caller's membership create AND a post-create member
+   * re-count in one SERIALIZABLE transaction; a count strictly greater than
+   * `maxSeats` means a racing accept pushed us over, so we throw and roll back.
+   * Unlimited-seat plans skip the re-count.
+   */
+  async enforceSeatCapAround<T>(
+    orgId: string,
+    create: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    const plan = await this.planOf(orgId);
+    const { maxSeats } = this.limitsFor(plan);
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const result = await create(tx);
+        if (maxSeats !== null) {
+          const members = await tx.organizationMember.count({
+            where: { organizationId: orgId },
+          });
+          if (members > maxSeats) {
+            throw new PaymentRequiredException(
+              'seats',
+              'This workspace has no seats left. Upgrade the plan to add more members.',
+            );
+          }
+        }
+        return result;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 }

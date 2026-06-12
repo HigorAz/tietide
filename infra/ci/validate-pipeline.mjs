@@ -43,6 +43,12 @@ if (ci) {
   check('runs typecheck', /\btypecheck\b/.test(ci));
   check('runs tests with coverage', /test:coverage|--coverage/.test(ci));
   check('uploads coverage artifact', /upload-artifact[\s\S]*coverage/i.test(ci));
+  // Supply-chain gate (W5.51): a blocking dependency-vulnerability audit.
+  check(
+    'runs a blocking dependency audit',
+    /pnpm audit[^\n]*--audit-level\s+(high|critical)/.test(ci),
+    'pnpm audit --audit-level high',
+  );
 }
 
 // --- Image publish workflow checks -----------------------------------------
@@ -84,6 +90,31 @@ if (publish) {
     /permissions:[\s\S]*packages:\s*write/.test(publish),
   );
   check('publish step pushes images', /push:\s*true/.test(publish));
+  // Supply-chain hardening (W5.51):
+  check(
+    'publish scans images before push',
+    /trivy-action|grype/i.test(publish),
+    'Trivy/Grype image scan',
+  );
+  check(
+    'publish does not publish a floating :latest tag',
+    !/value=latest/.test(publish),
+    'no type=raw,value=latest',
+  );
+  check(
+    'publish emits build provenance attestation',
+    /provenance:/.test(publish),
+  );
+  check('publish emits an SBOM attestation', /sbom:\s*true/.test(publish));
+  check(
+    'publish signs images with cosign',
+    /cosign sign/.test(publish),
+    'keyless cosign signature',
+  );
+  check(
+    'publish has id-token: write for keyless signing',
+    /permissions:[\s\S]*id-token:\s*write/.test(publish),
+  );
 }
 
 // --- Dockerfiles ------------------------------------------------------------

@@ -46,8 +46,12 @@
       after durable enqueue. File: `apps/worker/src/poll/poll-processor.ts`.
 - [x] **W1.4** (HIGH / qa) Push webhooks no idempotencyKey → duplicate runs — derive per-provider event id,
       set `idempotencyKey`, catch P2002. Files: `provider-webhooks.service.ts`, `webhooks.service.ts`.
-- [x] **W1.5** (HIGH / security) SSRF in HTTP Request node — scheme + private/metadata IP block, DNS-pin,
+- [x] **W1.5** (HIGH / security) SSRF in HTTP Request node — scheme + private/metadata IP block,
       redirect re-validation, response-size cap (post-template URL). File: `apps/worker/src/nodes/actions/http-request.ts`.
+      NOTE: this entry originally claimed "DNS-pin" was delivered — that claim was FALSE. The validated IP was
+      never pinned to the socket; fetch re-resolved at connect time (validate-vs-connect TOCTOU / DNS rebinding).
+      The real socket-IP pin (undici dispatcher with a connect-time `lookup` fixed to the validated addresses)
+      landed under **W5.6** (AUDIT-2026-06-11). Redirect re-validation + response-size cap were genuinely delivered.
 - [x] **W1.6** (HIGH / security) Mailchimp signature broken & forgeable — verify server-reconstructed URL
       secret, stop trusting client headers; fail-fast on missing Trello/HubSpot signing secret.
       Files: `provider-webhooks.controller.ts`, `provider-webhooks.service.ts`, `mailchimp-subscriber-added.trigger.ts`,

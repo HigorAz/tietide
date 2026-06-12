@@ -5,8 +5,11 @@ services:
     # stop`/`compose down`) leaves the DB down permanently — which crash-loops the
     # host-run API into a 502 and never self-heals on the WSL prod box.
     restart: unless-stopped
+    # Bind to loopback ONLY. Host-run apps (and the WSL prod box, which runs the
+    # API on the host against this compose) still reach it on localhost:5432, but
+    # the DB is no longer published on every host interface to the network/internet.
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tietide}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tietide_secret}
@@ -22,12 +25,16 @@ services:
   valkey:
     image: valkey/valkey:8-alpine
     restart: unless-stopped
+    # Bind to loopback ONLY — host-run apps reach it on localhost:6379, but the
+    # queue is never published on a public interface. When REDIS_PASSWORD is set
+    # in .env, require AUTH on the connection too (the host apps pass the same var).
+    command: ['sh', '-c', 'exec valkey-server ${REDIS_PASSWORD:+--requirepass "$REDIS_PASSWORD"}']
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - valkey_data:/data
     healthcheck:
-      test: ['CMD', 'valkey-cli', 'ping']
+      test: ['CMD-SHELL', 'valkey-cli ${REDIS_PASSWORD:+-a "$REDIS_PASSWORD"} ping | grep -q PONG']
       interval: 5s
       timeout: 3s
       retries: 5

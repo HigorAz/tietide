@@ -24,10 +24,16 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { ConnectionType, PROVIDER_CONFIG_SCHEMAS, type ProviderConfigMap } from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { OrgRoles } from '../common/decorators/org-roles.decorator';
+import {
+  DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
+  DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+  EXECUTE_THROTTLER_NAME,
+} from '../common/throttler/throttler.config';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { OrgRolesGuard } from '../common/guards/org-roles.guard';
@@ -40,6 +46,19 @@ import { ConnectionResponseDto } from './dto/connection-response.dto';
 import { TestConnectionResponseDto } from './dto/test-connection-response.dto';
 import { PaginatedConnectionsDto } from './dto/connection-list-response.dto';
 import { PageQueryDto } from '../common/pagination/page-query.dto';
+
+// W5.37: POST :id/test fires an outbound provider HTTP probe (a credential
+// health check), so a cheap inbound request amplifies into a heavier outbound
+// one. Opt into the execute-tier cap (~20/min, env-tunable) — the same budget
+// as workflow execute/test — instead of leaning on the 100/min global default.
+// The guard substitutes the env-resolved limit/ttl at runtime; these values are
+// the opt-in marker + compile-time fallback only.
+const EXECUTE_THROTTLE = {
+  [EXECUTE_THROTTLER_NAME]: {
+    ttl: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+    limit: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
+  },
+} as const;
 
 @ApiTags('connections')
 @ApiBearerAuth()
@@ -128,6 +147,7 @@ export class ConnectionsController {
 
   @Post(':id/test')
   @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
+  @Throttle(EXECUTE_THROTTLE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Run a provider-specific health check against the stored credentials',

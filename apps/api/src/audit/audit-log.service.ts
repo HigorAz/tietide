@@ -89,6 +89,13 @@ function sanitizeMetadata(
   return sanitizeValue(metadata) as Record<string, unknown>;
 }
 
+// Minimal surface needed to persist an audit row. Lets logSync() accept either the
+// service-level PrismaService or an interactive-transaction client (Prisma.TransactionClient),
+// so a security-critical audit row can commit atomically with the mutation it records.
+type AuditWriteClient = {
+  auditLog: { create(args: { data: Prisma.AuditLogUncheckedCreateInput }): Promise<unknown> };
+};
+
 interface AuditRowWithUser {
   id: string;
   userId: string;
@@ -128,6 +135,28 @@ export class AuditLogService {
         );
       });
     return Promise.resolve();
+  }
+
+  // Durable, awaited write for security-critical events (auth, account deletion,
+  // role change, org deletion). Unlike log(), this actually awaits the INSERT and
+  // RETHROWS on failure, so the security event can never be silently dropped — a DB
+  // error surfaces to the caller instead of vanishing in a swallowed .catch().
+  //
+  // Pass a Prisma transaction client (`tx`) to commit the audit row atomically with
+  // the mutation it records, so action + record either both commit or both roll back.
+  async logSync(entry: AuditLogEntry, tx?: AuditWriteClient): Promise<void> {
+    const safeMetadata = sanitizeMetadata(entry.metadata);
+    const client: AuditWriteClient = tx ?? this.prisma;
+    await client.auditLog.create({
+      data: {
+        userId: entry.userId,
+        organizationId: entry.organizationId,
+        action: entry.action,
+        resource: entry.resource,
+        resourceId: entry.resourceId,
+        metadata: safeMetadata as Prisma.InputJsonValue | undefined,
+      },
+    });
   }
 
   async findMany(options: FindManyOptions): Promise<AuditLogListResponseDto> {

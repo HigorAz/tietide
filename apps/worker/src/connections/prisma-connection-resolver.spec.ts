@@ -1,11 +1,15 @@
 import sodium from 'libsodium-wrappers';
 import { CryptoCore } from '@tietide/crypto';
-import { PrismaConnectionResolver } from './prisma-connection-resolver';
+import {
+  PrismaConnectionResolver,
+  MAX_INLINE_REFRESH_FAILURES,
+  INLINE_REFRESH_BACKOFF_MS,
+} from './prisma-connection-resolver';
 import { ConnectionNotFoundError } from './connection-resolver';
 
 interface PrismaMock {
   workflowExecution: { findUnique: jest.Mock };
-  connection: { findFirst: jest.Mock; updateMany: jest.Mock };
+  connection: { findFirst: jest.Mock; updateMany: jest.Mock; update: jest.Mock };
 }
 
 const validGoogleConfig = (overrides: Record<string, unknown> = {}) => ({
@@ -19,8 +23,9 @@ const validGoogleConfig = (overrides: Record<string, unknown> = {}) => ({
 describe('PrismaConnectionResolver', () => {
   let prisma: PrismaMock;
   let crypto: CryptoCore;
-  let cryptoService: { decrypt: jest.Mock };
+  let cryptoService: { decrypt: jest.Mock; encrypt: jest.Mock };
   let resolver: PrismaConnectionResolver;
+  let oauthRefreshStub: { supports: jest.Mock; refresh: jest.Mock };
 
   beforeAll(async () => {
     await sodium.ready;
@@ -32,6 +37,7 @@ describe('PrismaConnectionResolver', () => {
 
     cryptoService = {
       decrypt: jest.fn((ciphertext: string, nonce: string) => crypto.decrypt(ciphertext, nonce)),
+      encrypt: jest.fn((plaintext: string) => crypto.encrypt(plaintext)),
     };
 
     prisma = {
@@ -39,10 +45,11 @@ describe('PrismaConnectionResolver', () => {
       connection: {
         findFirst: jest.fn(),
         updateMany: jest.fn(async () => ({ count: 1 })),
+        update: jest.fn(async () => ({})),
       },
     };
 
-    const oauthRefreshStub = {
+    oauthRefreshStub = {
       supports: jest.fn(() => false),
       refresh: jest.fn(),
     };
@@ -59,6 +66,7 @@ describe('PrismaConnectionResolver', () => {
     provider: string,
     config: Record<string, unknown>,
     refreshTokenPlain?: string,
+    overrides: { status?: string; refreshFailureCount?: number; updatedAt?: Date } = {},
   ) => {
     const { ciphertext, nonce } = crypto.encrypt(JSON.stringify(config));
     const refresh = refreshTokenPlain ? crypto.encrypt(refreshTokenPlain) : null;
@@ -68,7 +76,9 @@ describe('PrismaConnectionResolver', () => {
       type: 'OAUTH2',
       provider,
       name: `conn-${id}`,
-      status: 'ACTIVE',
+      status: overrides.status ?? 'ACTIVE',
+      refreshFailureCount: overrides.refreshFailureCount ?? 0,
+      updatedAt: overrides.updatedAt ?? new Date('2000-01-01T00:00:00Z'),
       configEncrypted: ciphertext,
       configNonce: nonce,
       refreshTokenEncrypted: refresh?.ciphertext ?? null,
@@ -193,6 +203,39 @@ describe('PrismaConnectionResolver', () => {
       await expect(resolver.getConnection('exec-1', 'conn-1')).rejects.toThrow();
     });
 
+    it('rejects an EXPIRED connection without decrypting it (W5.12 — no bad-token loop)', async () => {
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: 'exec-1',
+        workflow: { organizationId: 'org-A' },
+      });
+      prisma.connection.findFirst.mockResolvedValue(
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig(), 'refresh-xyz', {
+          status: 'EXPIRED',
+        }),
+      );
+
+      await expect(resolver.getConnection('exec-1', 'conn-1')).rejects.toThrow(
+        /expired|reconnect/i,
+      );
+      // Must short-circuit before touching the decrypted credential.
+      expect(cryptoService.decrypt).not.toHaveBeenCalled();
+    });
+
+    it('rejects an ERROR connection without decrypting it (W5.12)', async () => {
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: 'exec-1',
+        workflow: { organizationId: 'org-A' },
+      });
+      prisma.connection.findFirst.mockResolvedValue(
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig(), 'refresh-xyz', {
+          status: 'ERROR',
+        }),
+      );
+
+      await expect(resolver.getConnection('exec-1', 'conn-1')).rejects.toThrow();
+      expect(cryptoService.decrypt).not.toHaveBeenCalled();
+    });
+
     it('passes config through unchanged for unknown providers (no schema)', async () => {
       prisma.workflowExecution.findUnique.mockResolvedValue({
         id: 'exec-1',
@@ -253,6 +296,76 @@ describe('PrismaConnectionResolver', () => {
 
       await expect(resolver.markForRefresh('exec-missing', 'conn-1')).rejects.toThrow(/execution/i);
       expect(prisma.connection.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('refreshConnection', () => {
+    it('short-circuits at the failure cap WITHOUT calling the provider (W5.12 lockout)', async () => {
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: 'exec-1',
+        workflow: { organizationId: 'org-A' },
+      });
+      oauthRefreshStub.supports.mockReturnValue(true);
+      prisma.connection.findFirst.mockResolvedValue(
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig(), 'refresh-xyz', {
+          status: 'EXPIRED',
+          refreshFailureCount: MAX_INLINE_REFRESH_FAILURES,
+          // Old timestamp so the backoff gate is NOT the thing tripping here.
+          updatedAt: new Date('2000-01-01T00:00:00Z'),
+        }),
+      );
+
+      await expect(resolver.refreshConnection('exec-1', 'conn-1')).rejects.toThrow(
+        /too many|lock|cap|failure/i,
+      );
+      expect(oauthRefreshStub.refresh).not.toHaveBeenCalled();
+    });
+
+    it('enforces a backoff gate after a recent failure WITHOUT calling the provider (W5.12)', async () => {
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: 'exec-1',
+        workflow: { organizationId: 'org-A' },
+      });
+      oauthRefreshStub.supports.mockReturnValue(true);
+      prisma.connection.findFirst.mockResolvedValue(
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig(), 'refresh-xyz', {
+          status: 'EXPIRED',
+          refreshFailureCount: 1,
+          // Failed just now → still inside the backoff window.
+          updatedAt: new Date(Date.now() - INLINE_REFRESH_BACKOFF_MS / 2),
+        }),
+      );
+
+      await expect(resolver.refreshConnection('exec-1', 'conn-1')).rejects.toThrow(
+        /backoff|wait|too soon/i,
+      );
+      expect(oauthRefreshStub.refresh).not.toHaveBeenCalled();
+    });
+
+    it('proceeds to call the provider once the backoff window has elapsed and under the cap', async () => {
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: 'exec-1',
+        workflow: { organizationId: 'org-A' },
+      });
+      oauthRefreshStub.supports.mockReturnValue(true);
+      oauthRefreshStub.refresh.mockResolvedValue({
+        config: validGoogleConfig({ accessToken: 'fresh' }),
+        refreshToken: 'refresh-new',
+        expiresAt: new Date(Date.now() + 3600_000),
+      });
+      prisma.connection.findFirst.mockResolvedValue(
+        seedConnection('org-A', 'conn-1', 'google', validGoogleConfig(), 'refresh-xyz', {
+          status: 'EXPIRED',
+          refreshFailureCount: 1,
+          // Last failure is well outside the backoff window.
+          updatedAt: new Date(Date.now() - INLINE_REFRESH_BACKOFF_MS * 2),
+        }),
+      );
+
+      const refreshed = await resolver.refreshConnection('exec-1', 'conn-1');
+
+      expect(oauthRefreshStub.refresh).toHaveBeenCalledTimes(1);
+      expect((refreshed.config as { accessToken: string }).accessToken).toBe('fresh');
     });
   });
 

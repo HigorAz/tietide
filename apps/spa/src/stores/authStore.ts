@@ -19,7 +19,12 @@ import {
   listOrganizations as apiListOrganizations,
   type OrganizationSummary,
 } from '@/api/organizations';
+import { readToken, writeToken, clearToken } from '@/api/tokenStorage';
 
+// The session token is persisted via tokenStorage (sessionStorage, W5.43) — NOT
+// localStorage — so a future XSS can't lift a long-lived, cross-tab,
+// cross-session copy of the credential. This key is kept only so existing
+// imports keep resolving; tokenStorage owns the actual storage location.
 export const TOKEN_STORAGE_KEY = 'tietide-token';
 // The workspace the SPA scopes requests to, echoed as the X-Org-Id header by the
 // API client. Persisted so a refresh keeps the same active workspace.
@@ -74,10 +79,7 @@ export interface AuthActions {
 
 export type AuthStore = AuthState & AuthActions;
 
-const readStoredToken = (): string | null => {
-  if (typeof localStorage === 'undefined') return null;
-  return localStorage.getItem(TOKEN_STORAGE_KEY);
-};
+const readStoredToken = (): string | null => readToken();
 
 const readStoredActiveOrgId = (): string | null => {
   if (typeof localStorage === 'undefined') return null;
@@ -99,7 +101,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   login: async (credentials) => {
     const { accessToken } = await apiLogin(credentials);
-    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    writeToken(accessToken);
     set({ token: accessToken });
     const user = await apiGetMe();
     set({ user });
@@ -117,7 +119,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Verifying the emailed token activates the account and returns a session,
     // so persist it and hydrate the user exactly like login() (auto-login).
     const { accessToken } = await apiVerifyEmail(token);
-    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    writeToken(accessToken);
     set({ token: accessToken });
     const user = await apiGetMe();
     set({ user });
@@ -134,7 +136,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     // Consuming the reset token returns a fresh session, so persist it and hydrate
     // the user exactly like login()/verifyEmail() (auto-login after reset).
     const { accessToken } = await apiResetPassword(token, password);
-    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    writeToken(accessToken);
     set({ token: accessToken });
     const user = await apiGetMe();
     set({ user });
@@ -142,7 +144,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   logout: () => {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    clearToken();
     localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
     set({ user: null, token: null, organizations: [], activeOrganization: null });
   },
@@ -156,7 +158,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     const { accessToken } = await apiChangePassword(currentPassword, newPassword);
     // The change revokes every prior session; persist the fresh token so the
     // current device is not logged out by its own password change.
-    localStorage.setItem(TOKEN_STORAGE_KEY, accessToken);
+    writeToken(accessToken);
     set({ token: accessToken });
   },
 
@@ -196,7 +198,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     } catch {
       // The stored token is invalid/expired — drop it so the guard sends the user
       // to /login instead of leaving them in a half-authenticated state.
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      clearToken();
       localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
       set({ user: null, token: null, organizations: [], activeOrganization: null, hydrated: true });
     }

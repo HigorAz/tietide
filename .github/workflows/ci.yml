@@ -45,6 +45,37 @@ jobs:
       - name: Typecheck
         run: pnpm -r --if-present --filter '!@tietide/ai' --filter '!tietide' run typecheck
 
+  audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Blocking supply-chain gate: fail the build on any High or Critical
+      # advisory in the production dependency tree. Dev-only advisories are
+      # surfaced in a separate, non-blocking step below so they stay visible
+      # without breaking PRs on tooling-only issues.
+      - name: Audit production dependencies (fail on high+)
+        run: pnpm audit --prod --audit-level high
+
+      - name: Audit all dependencies (report only)
+        if: always()
+        continue-on-error: true
+        run: pnpm audit --audit-level high
+
   test:
     name: Test (Node) with coverage
     runs-on: ubuntu-latest
@@ -151,7 +182,7 @@ jobs:
   build-images:
     name: Build Docker images
     runs-on: ubuntu-latest
-    needs: [lint-and-typecheck, test]
+    needs: [lint-and-typecheck, test, audit]
     strategy:
       fail-fast: false
       matrix:

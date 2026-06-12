@@ -17,6 +17,7 @@ env:
 permissions:
   contents: read
   packages: write
+  id-token: write # required for keyless cosign signing (OIDC)
 
 jobs:
   publish:
@@ -51,17 +52,42 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.image.outputs.name }}
+          # Immutable, traceable tags only: the commit sha and (for tag
+          # pushes) the semver. The floating :latest tag is intentionally
+          # NOT published — consumers should pin to a sha or semver digest.
           tags: |
-            type=ref,event=branch
             type=ref,event=tag
             type=sha,format=short
-            type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=tietide-${{ matrix.app }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
+      # Build once, load locally, and scan BEFORE pushing so a vulnerable
+      # image never reaches the registry.
+      - name: Build image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: false
+          load: true
+          tags: tietide-${{ matrix.app }}:scan
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+
+      - name: Scan image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: tietide-${{ matrix.app }}:scan
+          format: table
+          exit-code: '1' # fail the job on findings at/above the threshold
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          vuln-type: os,library
+
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -71,3 +97,20 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,scope=${{ matrix.app }},mode=max
+          provenance: mode=max # SLSA build provenance attestation
+          sbom: true # generate + attach an SBOM attestation
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Keyless (OIDC) signature bound to the immutable digest — no long-lived
+      # private key to manage. Verifiable with:
+      #   cosign verify <image>@<digest> \
+      #     --certificate-identity-regexp '.*' \
+      #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
+      - name: Sign image by digest
+        env:
+          COSIGN_YES: 'true'
+          IMAGE_NAME: ${{ steps.image.outputs.name }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign "${IMAGE_NAME}@${IMAGE_DIGEST}"

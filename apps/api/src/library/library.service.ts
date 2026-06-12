@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import { LIBRARY_TEMPLATES, type LibraryTemplate } from './templates';
 import type { WorkflowResponseDto } from '../workflows/dto/workflow-response.dto';
 import type { TemplateResponseDto } from './dto/template-response.dto';
@@ -12,6 +13,7 @@ export class LibraryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   list(): TemplateResponseDto[] {
@@ -27,6 +29,8 @@ export class LibraryService {
     if (!fixture) {
       throw new NotFoundException(`Template '${slug}' not found`);
     }
+
+    await this.entitlements.assertCanCreateWorkflow(organizationId);
 
     // Library instantiation always creates an inactive workflow. This prevents a
     // single click from exposing a publicly callable webhook URL on a forked

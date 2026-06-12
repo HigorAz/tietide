@@ -110,15 +110,21 @@ export class ExecutionsService {
 
     let created: Awaited<ReturnType<typeof this.prisma.workflowExecution.create>>;
     try {
-      created = await this.prisma.workflowExecution.create({
-        data: {
-          workflowId,
-          status: 'PENDING',
-          triggerType: 'manual',
-          triggerData: triggerDataJson,
-          idempotencyKey: options.idempotencyKey ?? null,
-        },
-      });
+      // W5.25: the assertCanRun pre-check above is not atomic with this create, so
+      // concurrent triggers at the FREE run-cap boundary could all pass and all
+      // insert (overshoot). enforceRunCapAround runs the insert + a post-create
+      // re-count in one serializable transaction and rolls back the loser.
+      created = await this.entitlements.enforceRunCapAround(organizationId, (tx) =>
+        tx.workflowExecution.create({
+          data: {
+            workflowId,
+            status: 'PENDING',
+            triggerType: 'manual',
+            triggerData: triggerDataJson,
+            idempotencyKey: options.idempotencyKey ?? null,
+          },
+        }),
+      );
     } catch (err) {
       // The pre-create dedup findFirst above is not atomic with this create: a
       // concurrent trigger carrying the same idempotency key can pass its own

@@ -1,5 +1,10 @@
 import type { ExecutionContext, NodeInput } from '@tietide/sdk';
-import { HttpRequestAction, type FetchLike } from './http-request';
+import {
+  buildPinnedLookup,
+  HttpRequestAction,
+  type DispatcherFactory,
+  type FetchLike,
+} from './http-request';
 import type { LookupFn } from './ssrf-guard';
 
 const mockFetch = (impl: FetchLike) => jest.fn<ReturnType<FetchLike>, Parameters<FetchLike>>(impl);
@@ -234,6 +239,37 @@ describe('HttpRequestAction', () => {
           makeContext(),
         ),
       ).rejects.toThrow(/timed out/i);
+    });
+
+    it('should clamp an oversized timeout to the 30-second cap', async () => {
+      jest.useFakeTimers();
+      try {
+        const fetchMock = slowFetch();
+        const action = new HttpRequestAction(fetchMock, stubLookup);
+
+        const promise = action
+          .execute(
+            makeInput({ method: 'GET', url: 'https://api.test/slow', timeout: 3_600_000 }),
+            makeContext(),
+          )
+          .catch((e: unknown) => e as Error);
+
+        // advanceTimersByTimeAsync flushes the SSRF DNS-lookup microtask first,
+        // so the abort timer is scheduled before we advance past it.
+        await jest.advanceTimersByTimeAsync(29_999);
+        let settled = false;
+        void promise.then(() => (settled = true));
+        await Promise.resolve();
+        expect(settled).toBe(false);
+
+        // Past the 30s cap the request must abort — the raw 3.6M ms is ignored.
+        await jest.advanceTimersByTimeAsync(2);
+        const result = await promise;
+        expect(result).toBeInstanceOf(Error);
+        expect((result as Error).message).toMatch(/timed out after 30000ms/i);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should use a 30-second default timeout when none is provided', async () => {
@@ -726,6 +762,99 @@ describe('HttpRequestAction', () => {
       expect(fetchMock).toHaveBeenCalledTimes(2);
       const secondHeaders = fetchMock.mock.calls[1][1]?.headers as Record<string, string>;
       expect(secondHeaders.authorization).toBe('Bearer super-secret');
+    });
+  });
+
+  describe('DNS-rebinding socket pin (W5.6)', () => {
+    const redirectResponse = (location: string, status = 302): Response =>
+      new Response(null, { status, headers: { location } });
+
+    it('pins the connection to the pre-validated address(es) and never re-resolves the hostname', async () => {
+      // The guard's lookup returns a PUBLIC address at validate time. A pinned
+      // dispatcher must carry ONLY that address; a rebinding lookup that would
+      // hand back a private IP at connect time is never consulted.
+      const validatedLookup: LookupFn = async () => [{ address: '93.184.216.34', family: 4 }];
+      const factory = jest.fn<ReturnType<DispatcherFactory>, Parameters<DispatcherFactory>>(
+        () => ({ dispatcher: 'pinned' }) as unknown as ReturnType<DispatcherFactory>,
+      );
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock, validatedLookup, factory);
+
+      await action.execute(
+        makeInput({ method: 'GET', url: 'https://api.test/items' }),
+        makeContext(),
+      );
+
+      // The dispatcher was built from exactly the validated address set.
+      expect(factory).toHaveBeenCalledTimes(1);
+      expect(factory.mock.calls[0][0].addresses).toEqual(['93.184.216.34']);
+      // SNI/Host preserved as the original hostname.
+      expect(factory.mock.calls[0][0].servername).toBe('api.test');
+      // The dispatcher built from validated addresses is handed to fetch.
+      const init = fetchMock.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+      expect(init.dispatcher).toEqual({ dispatcher: 'pinned' });
+    });
+
+    it('buildPinnedLookup resolves to ONLY the validated address regardless of the hostname queried (all:true)', () => {
+      const lookup = buildPinnedLookup(['93.184.216.34']);
+      const cb = jest.fn();
+      // Even if the attacker rebinds rebind.evil to a private IP, this lookup
+      // ignores the hostname and the real resolver entirely.
+      lookup('rebind.evil', { all: true } as never, cb as never);
+      expect(cb).toHaveBeenCalledWith(null, [{ address: '93.184.216.34', family: 4 }]);
+    });
+
+    it('buildPinnedLookup returns the first address with the correct family for a single-address callback', () => {
+      const lookup = buildPinnedLookup(['2606:2800:220:1::1']);
+      const cb = jest.fn();
+      lookup('rebind.evil', {} as never, cb as never);
+      expect(cb).toHaveBeenCalledWith(null, '2606:2800:220:1::1', 6);
+    });
+
+    it('does NOT build a pinned dispatcher for a literal-IP host (no DNS to rebind)', async () => {
+      const factory = jest.fn<ReturnType<DispatcherFactory>, Parameters<DispatcherFactory>>(
+        () => ({ dispatcher: 'pinned' }) as unknown as ReturnType<DispatcherFactory>,
+      );
+      const fetchMock = mockFetch(async () => jsonResponse(200, { ok: true }));
+      const action = new HttpRequestAction(fetchMock, stubLookup, factory);
+
+      await action.execute(
+        makeInput({ method: 'GET', url: 'https://93.184.216.34/health' }),
+        makeContext(),
+      );
+
+      expect(factory).not.toHaveBeenCalled();
+      const init = fetchMock.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+      expect(init.dispatcher).toBeUndefined();
+    });
+
+    it('rebuilds the pinned dispatcher on every redirect hop from that hop’s validated addresses', async () => {
+      const validatedLookup: LookupFn = async (host: string) =>
+        host === 'start.test'
+          ? [{ address: '93.184.216.34', family: 4 }]
+          : [{ address: '203.0.113.7', family: 4 }];
+      const factory = jest.fn<ReturnType<DispatcherFactory>, Parameters<DispatcherFactory>>(
+        (opts) => ({ pinnedTo: opts.addresses }) as unknown as ReturnType<DispatcherFactory>,
+      );
+      const fetchMock = mockFetch(async (url) => {
+        if (url === 'https://start.test/go') {
+          return redirectResponse('https://final.test/landing');
+        }
+        return jsonResponse(200, { landed: true });
+      });
+      const action = new HttpRequestAction(fetchMock, validatedLookup, factory);
+
+      const result = await action.execute(
+        makeInput({ method: 'GET', url: 'https://start.test/go' }),
+        makeContext(),
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const firstInit = fetchMock.mock.calls[0][1] as RequestInit & { dispatcher?: unknown };
+      const secondInit = fetchMock.mock.calls[1][1] as RequestInit & { dispatcher?: unknown };
+      expect(firstInit.dispatcher).toEqual({ pinnedTo: ['93.184.216.34'] });
+      expect(secondInit.dispatcher).toEqual({ pinnedTo: ['203.0.113.7'] });
+      expect(result.data.body).toEqual({ landed: true });
     });
   });
 
