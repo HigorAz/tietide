@@ -76,6 +76,25 @@ describe('ssrf-guard', () => {
       expect(url.hostname).toBe('api.example.com');
     });
 
+    it('rejects a literal IPv4-mapped loopback URL the WHATWG parser normalizes to hex (no DNS lookup)', async () => {
+      // new URL('http://[::ffff:127.0.0.1]/') normalizes the host to the hex
+      // form [::ffff:7f00:1], which flows through the literal-IP branch (no DNS).
+      // This is the W5.3 bypass class: regression-guard it end-to-end.
+      const lookup = jest.fn();
+      await expect(
+        assertUrlAllowed('http://[::ffff:127.0.0.1]/', lookup as unknown as LookupFn),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('rejects a literal IPv4-mapped cloud-metadata URL in hex-normalized form', async () => {
+      const lookup = jest.fn();
+      await expect(
+        assertUrlAllowed('http://[::ffff:169.254.169.254]/', lookup as unknown as LookupFn),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
     it('rejects a hostname that resolves to a hex IPv4-mapped loopback', async () => {
       // WHATWG URL normalizes [::ffff:127.0.0.1] to the hex form ::ffff:7f00:1.
       const lookup: LookupFn = async () => [{ address: '::ffff:7f00:1', family: 6 }];
