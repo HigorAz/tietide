@@ -76,15 +76,23 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.app }}
           cache-to: type=gha,scope=${{ matrix.app }},mode=max
 
+      # Run Trivy from its Docker Hub image instead of aquasecurity/trivy-action:
+      # the action installs the binary from GitHub Releases, but Aqua keeps release
+      # assets ONLY on the latest Trivy version, so any pinned version 404s on
+      # install. Docker Hub tags are retained permanently and stay pinnable.
+      # The vulnerable image stays local (load: true above) and is never pushed
+      # if a fixable HIGH/CRITICAL is found (--exit-code 1 fails the job).
       - name: Scan image for vulnerabilities (Trivy)
-        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
-        with:
-          image-ref: tietide-${{ matrix.app }}:scan
-          format: table
-          exit-code: '1' # fail the job on findings at/above the threshold
-          ignore-unfixed: true
-          severity: HIGH,CRITICAL
-          vuln-type: os,library
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.71.0 image \
+              --exit-code 1 \
+              --ignore-unfixed \
+              --severity HIGH,CRITICAL \
+              --pkg-types os,library \
+              --format table \
+              tietide-${{ matrix.app }}:scan
 
       - name: Build and push
         id: build

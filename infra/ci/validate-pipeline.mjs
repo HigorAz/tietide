@@ -93,7 +93,7 @@ if (publish) {
   // Supply-chain hardening (W5.51):
   check(
     'publish scans images before push',
-    /trivy-action|grype/i.test(publish),
+    /trivy|grype/i.test(publish),
     'Trivy/Grype image scan',
   );
   check(
