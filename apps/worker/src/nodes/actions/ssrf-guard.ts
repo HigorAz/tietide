@@ -12,10 +12,11 @@ import { isIP } from 'net';
  * resolved address falls in a loopback / link-local / private / unique-local /
  * carrier-grade-NAT range. Literal-IP hosts are checked directly.
  *
- * Note: a determined attacker could still attempt DNS rebinding (resolve to a
- * public IP here, then to a private one at connect time). Fully closing that
- * requires pinning the validated IP into the socket connect; tracked as a
- * follow-up. This guard closes the direct/by-name SSRF vectors.
+ * DNS rebinding (validate-vs-connect TOCTOU) is closed by the caller: this guard
+ * surfaces the exact set of addresses it validated (`assertUrlAllowedWithAddresses`)
+ * so the HTTP node can pin the socket connect to those addresses via a custom
+ * undici dispatcher, instead of letting fetch re-resolve the hostname at connect
+ * time (where an attacker's TTL-0 record could swap in a private IP). See W5.6.
  */
 
 export type LookupFn = (hostname: string) => Promise<Array<{ address: string; family: number }>>;
@@ -104,13 +105,30 @@ export function isBlockedAddress(ip: string): boolean {
 }
 
 /**
- * Validate a user-supplied URL for outbound fetch. Returns the parsed URL when
- * allowed; throws SsrfBlockedError otherwise. Pass `lookupFn` in tests.
+ * Result of a successful SSRF validation: the parsed URL plus the exact set of
+ * IP addresses that were validated. `addresses` is what the caller MUST pin the
+ * socket to (via an undici dispatcher) so the connect-time DNS lookup cannot be
+ * rebound to a private IP. For a literal-IP host it contains just that IP; for a
+ * hostname it contains every address the resolver returned (all already proven
+ * public). `isLiteralIp` lets the caller skip pinning when there is no DNS to
+ * rebind.
  */
-export async function assertUrlAllowed(
+export interface AllowedUrl {
+  url: URL;
+  addresses: string[];
+  isLiteralIp: boolean;
+}
+
+/**
+ * Validate a user-supplied URL for outbound fetch and surface the validated
+ * addresses so the caller can pin them into the socket connect (closing the
+ * DNS-rebinding TOCTOU — W5.6). Throws SsrfBlockedError when disallowed. Pass
+ * `lookupFn` in tests.
+ */
+export async function assertUrlAllowedWithAddresses(
   rawUrl: string,
   lookupFn: LookupFn = defaultLookup,
-): Promise<URL> {
+): Promise<AllowedUrl> {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -126,12 +144,12 @@ export async function assertUrlAllowed(
 
   const host = url.hostname.replace(/^\[|\]$/g, '');
 
-  // Literal IP host — check directly, no DNS.
+  // Literal IP host — check directly, no DNS. Pin to the literal itself.
   if (isIP(host) !== 0) {
     if (isBlockedAddress(host)) {
       throw new SsrfBlockedError('Refusing to connect to a private or internal address');
     }
-    return url;
+    return { url, addresses: [host], isLiteralIp: true };
   }
 
   // Common hostnames that resolve to loopback regardless of DNS.
@@ -139,19 +157,32 @@ export async function assertUrlAllowed(
     throw new SsrfBlockedError('Refusing to connect to localhost');
   }
 
-  let addresses: Array<{ address: string }>;
+  let resolved: Array<{ address: string }>;
   try {
-    addresses = await lookupFn(host);
+    resolved = await lookupFn(host);
   } catch {
     throw new SsrfBlockedError(`Could not resolve host "${host}"`);
   }
-  if (addresses.length === 0) {
+  if (resolved.length === 0) {
     throw new SsrfBlockedError(`Host "${host}" did not resolve to any address`);
   }
-  for (const { address } of addresses) {
+  for (const { address } of resolved) {
     if (isBlockedAddress(address)) {
       throw new SsrfBlockedError('Refusing to connect to a private or internal address');
     }
   }
+  return { url, addresses: resolved.map((r) => r.address), isLiteralIp: false };
+}
+
+/**
+ * Backwards-compatible wrapper: validate a user-supplied URL and return only the
+ * parsed URL. Prefer `assertUrlAllowedWithAddresses` when you need to pin the
+ * connect address.
+ */
+export async function assertUrlAllowed(
+  rawUrl: string,
+  lookupFn: LookupFn = defaultLookup,
+): Promise<URL> {
+  const { url } = await assertUrlAllowedWithAddresses(rawUrl, lookupFn);
   return url;
 }

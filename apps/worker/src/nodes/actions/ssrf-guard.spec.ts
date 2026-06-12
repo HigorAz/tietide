@@ -1,4 +1,10 @@
-import { assertUrlAllowed, isBlockedAddress, SsrfBlockedError, type LookupFn } from './ssrf-guard';
+import {
+  assertUrlAllowed,
+  assertUrlAllowedWithAddresses,
+  isBlockedAddress,
+  SsrfBlockedError,
+  type LookupFn,
+} from './ssrf-guard';
 
 describe('ssrf-guard', () => {
   describe('isBlockedAddress', () => {
@@ -115,6 +121,41 @@ describe('ssrf-guard', () => {
       await expect(assertUrlAllowed('https://nope.invalid/', lookup)).rejects.toBeInstanceOf(
         SsrfBlockedError,
       );
+    });
+  });
+
+  describe('assertUrlAllowedWithAddresses', () => {
+    it('surfaces the validated resolved addresses so the caller can pin the socket (W5.6)', async () => {
+      const lookup: LookupFn = async () => [
+        { address: '93.184.216.34', family: 4 },
+        { address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
+      ];
+      const { url, addresses } = await assertUrlAllowedWithAddresses(
+        'https://api.example.com/path',
+        lookup,
+      );
+      expect(url.hostname).toBe('api.example.com');
+      expect(addresses).toEqual(['93.184.216.34', '2606:2800:220:1:248:1893:25c8:1946']);
+    });
+
+    it('returns the literal IP itself as the single validated address (no DNS lookup)', async () => {
+      const lookup = jest.fn();
+      const { addresses } = await assertUrlAllowedWithAddresses(
+        'https://203.0.113.7/health',
+        lookup as unknown as LookupFn,
+      );
+      expect(addresses).toEqual(['203.0.113.7']);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('rejects (never surfaces addresses) when any resolved address is private', async () => {
+      const lookup: LookupFn = async () => [
+        { address: '93.184.216.34', family: 4 },
+        { address: '10.0.0.9', family: 4 },
+      ];
+      await expect(
+        assertUrlAllowedWithAddresses('https://evil.example.com/', lookup),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
     });
   });
 });
