@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -12,7 +13,12 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { MAX_WORKFLOW_NODES, MAX_WORKFLOW_EDGES } from '@tietide/shared';
 import { IsSafeNodeConfig } from '../../common/validators/safe-node-config.validator';
+
+// Re-export the shared graph-size caps so the HTTP boundary and the Zod save
+// boundary stay in lockstep (a single source of truth in @tietide/shared).
+export { MAX_WORKFLOW_NODES, MAX_WORKFLOW_EDGES };
 
 export class WorkflowNodePositionDto {
   @ApiProperty()
@@ -108,14 +114,16 @@ export class WorkflowDefinitionDto {
   // Empty `nodes` is valid: new workflows are saved as drafts so the user can
   // pick a trigger from the sidebar before being committed to one. Topology
   // (trigger count, no cycles, no dangling edges) is enforced at execute time.
-  @ApiProperty({ type: [WorkflowNodeDto] })
+  @ApiProperty({ type: [WorkflowNodeDto], maxItems: MAX_WORKFLOW_NODES })
   @IsArray()
+  @ArrayMaxSize(MAX_WORKFLOW_NODES)
   @ValidateNested({ each: true })
   @Type(() => WorkflowNodeDto)
   nodes!: WorkflowNodeDto[];
 
-  @ApiProperty({ type: [WorkflowEdgeDto] })
+  @ApiProperty({ type: [WorkflowEdgeDto], maxItems: MAX_WORKFLOW_EDGES })
   @IsArray()
+  @ArrayMaxSize(MAX_WORKFLOW_EDGES)
   @ValidateNested({ each: true })
   @Type(() => WorkflowEdgeDto)
   edges!: WorkflowEdgeDto[];

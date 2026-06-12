@@ -92,13 +92,22 @@ export const workflowEdgeSchema = z.object({
   kind: z.enum(['success', 'error']).optional(),
 });
 
+// Hard upper bounds on graph size, enforced at the save boundary. The 1mb body
+// limit already caps raw payload size, but an element-count cap is a cheaper,
+// explicit defense-in-depth guard (CLAUDE.md §10) that bounds the O(n) work each
+// save/test performs synchronously on the event loop (nested validation, the
+// recursive findUnsafeConfigIssue walk, Kahn's topological sort). Real workflows
+// are far smaller; these leave generous headroom. Mirrors the API DTO caps.
+export const MAX_WORKFLOW_NODES = 500;
+export const MAX_WORKFLOW_EDGES = 1000;
+
 export const workflowDefinitionSchema = z.object({
   // Empty `nodes` is valid: new workflows are created as drafts so the user
   // can pick a trigger from the sidebar instead of being committed to one
   // before the canvas opens. Topology rules (trigger count, no cycles, no
   // dangling edges) are enforced at execute/activate time, not at save time.
-  nodes: z.array(workflowNodeSchema),
-  edges: z.array(workflowEdgeSchema),
+  nodes: z.array(workflowNodeSchema).max(MAX_WORKFLOW_NODES),
+  edges: z.array(workflowEdgeSchema).max(MAX_WORKFLOW_EDGES),
 });
 
 // Stricter variant: structurally identical to workflowDefinitionSchema but
