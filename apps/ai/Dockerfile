@@ -22,7 +22,11 @@ COPY apps/ai/requirements.txt ./requirements.txt
 RUN python -m venv /venv \
     && /venv/bin/pip install --upgrade pip \
     && /venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch \
-    && /venv/bin/pip install -r requirements.txt
+    && /venv/bin/pip install -r requirements.txt \
+    # Upgrade setuptools past CVE-2025-47273 (path traversal, fixed in 78.1.1).
+    # Done last so a transitive requirement can't pin it back to the venv-seeded
+    # vulnerable version.
+    && /venv/bin/pip install --upgrade 'setuptools>=78.1.1'
 
 # ---- Runtime stage ---------------------------------------------------------
 FROM python:3.12-slim AS runtime

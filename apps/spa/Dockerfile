@@ -36,7 +36,12 @@ RUN pnpm --filter @tietide/shared run build \
     && pnpm --filter @tietide/spa run build
 
 # ---- Runtime stage (nginx serves static assets) ----------------------------
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.29-alpine AS runtime
+
+# Patch OS packages to the latest Alpine security releases (openssl, libxml2,
+# libpng, zlib, musl, …) so the published image carries no known fixable
+# HIGH/CRITICAL OS CVEs.
+RUN apk upgrade --no-cache
 
 # Drop the default config and replace with one tuned for an SPA.
 RUN rm /etc/nginx/conf.d/default.conf
