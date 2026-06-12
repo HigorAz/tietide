@@ -47,4 +47,13 @@ describe('ToggleSwitch', () => {
     );
     expect(container.innerHTML).toContain('accent-teal');
   });
+
+  it('anchors the thumb to the track left edge so translate-x keeps it inside', () => {
+    // Regression: without left-0 the absolute thumb falls back to the button's
+    // centered static position and translate-x-[14px] pushes it past the track.
+    render(<ToggleSwitch checked onChange={vi.fn()} label="On" />);
+    const thumb = screen.getByRole('switch').querySelector('span');
+    expect(thumb?.className).toContain('left-0');
+    expect(thumb?.className).toContain('translate-x-[14px]');
+  });
 });

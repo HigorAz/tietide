@@ -74,7 +74,7 @@ export function RunSectionTimeline({
           type="button"
           data-testid="run-section-expand-all"
           onClick={() => setAll(!allOpen)}
-          className="text-[10px] text-text-secondary transition hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+          className="text-xs text-text-secondary transition hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
         >
           {allOpen ? '− collapse all' : '+ expand all'}
         </button>
@@ -87,7 +87,7 @@ export function RunSectionTimeline({
             <div
               key={section.id}
               data-testid={`run-section-card-${section.id}`}
-              className="relative rounded border border-white/5 bg-deep-blue/30"
+              className="relative rounded-md border border-white/5 bg-deep-blue/40"
             >
               <span
                 data-testid={`run-section-dot-${section.id}`}
@@ -101,7 +101,7 @@ export function RunSectionTimeline({
                   type="button"
                   onClick={() => toggle(section.id)}
                   aria-expanded={isOpen}
-                  className="flex flex-1 items-center gap-2 px-3 py-2 text-left text-[11px] uppercase tracking-wide text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+                  className="flex flex-1 items-center gap-2 px-3 py-2 text-left text-xs uppercase tracking-wide text-text-secondary transition hover:text-text-primary focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
                 >
                   <ChevronRight
                     size={12}

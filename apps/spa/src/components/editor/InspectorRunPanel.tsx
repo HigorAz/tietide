@@ -35,7 +35,7 @@ interface DataPaneProps {
 function DataPane({ label, testId, children, copyValue }: DataPaneProps): JSX.Element {
   return (
     <div data-testid={testId} className="space-y-1">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-text-secondary">
+      <div className="flex items-center justify-between text-xs uppercase tracking-wide text-text-secondary">
         <span>{label}</span>
         <CopyJsonButton value={copyValue} />
       </div>
@@ -130,7 +130,7 @@ export function InspectorRunPanel(): JSX.Element {
             data-testid="run-node-status"
             data-status={selected.state.status}
             className={cn(
-              'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+              'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
               selected.state.status === 'running' && 'bg-status-running/15 text-status-running',
               selected.state.status === 'success' && 'bg-status-success/15 text-status-success',
               selected.state.status === 'failed' && 'bg-status-failed/15 text-status-failed',
@@ -154,21 +154,21 @@ export function InspectorRunPanel(): JSX.Element {
 
         {selected.state.iterations && selected.state.iterations.length > 0 && (
           <div data-testid="run-node-iterations" className="space-y-1">
-            <div className="text-[11px] uppercase tracking-wide text-text-secondary">
+            <div className="text-xs uppercase tracking-wide text-text-secondary">
               Iterations ({selected.state.iterations.length})
             </div>
-            <ul className="rounded border border-white/5 bg-deep-blue/40">
+            <ul className="rounded-md border border-white/5 bg-deep-blue/40">
               {selected.state.iterations.map((it) => (
                 <li
                   key={it.index}
                   data-testid={`run-iteration-${it.index}`}
                   data-status={it.status}
-                  className="flex items-center justify-between gap-2 border-b border-white/5 px-2 py-1.5 text-[11px] last:border-b-0"
+                  className="flex items-center justify-between gap-2 border-b border-white/5 px-2 py-1.5 text-xs last:border-b-0"
                 >
                   <span className="flex items-center gap-2">
                     <span
                       className={cn(
-                        'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                        'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
                         it.status === 'running' && 'bg-status-running/15 text-status-running',
                         it.status === 'success' && 'bg-status-success/15 text-status-success',
                         it.status === 'failed' && 'bg-status-failed/15 text-status-failed',
