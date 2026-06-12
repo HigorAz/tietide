@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import type { DecryptedConnection } from '@tietide/sdk';
 import type { OllamaConfig } from '@tietide/shared';
 import { assertUrlAllowed, type LookupFn } from '../../actions/ssrf-guard';
@@ -58,7 +58,7 @@ export class OllamaClientFactory {
   // node. `lookupFn` is injectable so tests can simulate DNS-based SSRF.
   private readonly lookupFn?: LookupFn;
 
-  constructor(lookupFn?: LookupFn) {
+  constructor(@Optional() lookupFn?: LookupFn) {
     this.lookupFn = lookupFn;
   }
 
