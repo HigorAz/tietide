@@ -294,7 +294,8 @@ COMPOSE="docker compose -f infra/docker/docker-compose.prod.yml --env-file .env"
 $COMPOSE build
 
 # 3. Apply migrations once BEFORE starting the apps (the slim runtime image has no
-#    prisma CLI; the `migrate` profile reuses the api builder stage, which does).
+#    prisma CLI; the `migrate` profile builds a dedicated lean, non-root migrate
+#    stage = slim runtime + a pinned prisma CLI, not the full builder image).
 $COMPOSE --profile migrate run --rm migrate
 
 # 4. Start everything.
