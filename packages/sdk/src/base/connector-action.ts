@@ -54,6 +54,20 @@ export abstract class BaseConnectorAction<
 
     const connection = await context.getConnection<TConfig>(connectionId);
 
+    // Confused-deputy guard (W5.11): the resolver only scopes by organization,
+    // so a workflow author can point any connector node at any connection in
+    // their workspace. Enforce that the resolved connection actually belongs to
+    // the provider this node was built for BEFORE run() ever touches its
+    // decrypted config — `requiredConnectionType` is matched against the
+    // connection's `provider` (e.g. 'slack', 'notion'), the field that names
+    // the integration, not the credential-shape `type` (OAUTH2/API_KEY/CUSTOM).
+    if (connection.provider !== this.requiredConnectionType) {
+      throw new ConnectorMisconfiguredError(
+        `Node "${this.type}" requires a "${this.requiredConnectionType}" connection, but connection "${connectionId}" is a "${connection.provider}" connection`,
+        this.type,
+      );
+    }
+
     try {
       return await this.run(input, connection, context);
     } catch (error) {

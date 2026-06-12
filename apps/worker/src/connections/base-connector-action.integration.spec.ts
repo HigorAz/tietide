@@ -94,6 +94,29 @@ describe('BaseConnectorAction (integration)', () => {
       expect(output).toEqual({ data: { ok: true } });
     });
 
+    it('throws ConnectorMisconfiguredError and does NOT call run() when the resolved connection provider does not match requiredConnectionType (W5.11 confused-deputy guard)', async () => {
+      // The node requires a `fake` connection but the resolver hands back a
+      // `slack` connection (the workspace author pointed the node at the wrong
+      // connection). The base class MUST reject before run() ever sees the
+      // mismatched, decrypted config of an unrelated provider.
+      const action = new FakeConnectorAction();
+      const ctx = makeContext({
+        getConnection: jest.fn(async () => ({
+          id: 'conn-1',
+          type: 'OAUTH2',
+          provider: 'slack',
+          config: { accessToken: 'tok' },
+        })) as unknown as ExecutionContext['getConnection'],
+      });
+      const runSpy = jest.spyOn(action, 'runImpl');
+
+      const input: NodeInput = { data: {}, params: {}, connectionId: 'conn-1' };
+
+      await expect(action.execute(input, ctx)).rejects.toBeInstanceOf(ConnectorMisconfiguredError);
+      expect(runSpy).not.toHaveBeenCalled();
+      expect(ctx.markConnectionForRefresh).not.toHaveBeenCalled();
+    });
+
     it('throws ConnectorMisconfiguredError when input.connectionId is missing', async () => {
       const action = new FakeConnectorAction();
       const ctx = makeContext();
