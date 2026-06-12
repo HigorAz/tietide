@@ -12,7 +12,11 @@ export interface StepSectionProps {
   status: StepStatus;
   /** Shown in the header when collapsed (e.g. 'My Google · active'). */
   summary?: string;
-  /** Exactly one StepSection is open at a time — parent enforces. */
+  /**
+   * Whether this step's body is expanded. The guided flow keeps exactly one step
+   * open; the expanded layout (a previously-tested node) opens them all. The
+   * parent decides — this component just renders the flag.
+   */
   open: boolean;
   /** Parent opens this step; ignored when locked. */
   onToggle: () => void;

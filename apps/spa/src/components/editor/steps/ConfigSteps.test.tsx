@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { ComponentType } from 'react';
+import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { ConnectionPicker } from '../ConnectionPicker';
 import { useReportConfigValidity } from './StepLayoutContext';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
@@ -133,6 +134,41 @@ describe('ConfigSteps', () => {
     expect(connection).toHaveAttribute('data-status', 'done');
     expect(configure).toHaveAttribute('data-status', 'done');
     expect(test).toHaveAttribute('data-status', 'active');
+  });
+
+  it('PERSISTENCE: a previously-tested node (persisted sample) opens all 3 steps done, no Continue', () => {
+    renderSteps(makeConnectorForm({ value: googleConnection.id, valid: true }), {
+      connectionId: googleConnection.id,
+      query: 'is:unread',
+      [PILL_SAMPLE_KEY]: { id: 1 },
+    });
+
+    expect(screen.getByTestId('config-step-connection')).toHaveAttribute('data-status', 'done');
+    expect(screen.getByTestId('config-step-configure')).toHaveAttribute('data-status', 'done');
+    // The Test step is restored as done from the persisted sample — not "not done".
+    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'done');
+
+    // Expanded layout: the Configure body is visible (not collapsed/hidden)…
+    expect(screen.getByTestId('connector-form-body').closest('.hidden')).toBeNull();
+    // …and there is no Continue button — it is all done already.
+    expect(screen.queryByText('Continue')).not.toBeInTheDocument();
+  });
+
+  it('RE-ARM: editing config on a tested node re-shows Continue and re-arms the Test step', () => {
+    const Form = makeConnectorForm({ value: googleConnection.id, valid: true });
+    const base = { connectionId: googleConnection.id, [PILL_SAMPLE_KEY]: { id: 1 } };
+
+    const { rerender } = render(
+      <ConfigSteps nodeId={NODE_ID} config={{ ...base, query: 'a' }} Form={Form} />,
+    );
+    expect(screen.queryByText('Continue')).not.toBeInTheDocument();
+    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'done');
+
+    // Simulate a Configure edit: the parent feeds a changed config prop.
+    rerender(<ConfigSteps nodeId={NODE_ID} config={{ ...base, query: 'b' }} Form={Form} />);
+
+    expect(screen.getByText('Continue')).toBeInTheDocument();
+    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'active');
   });
 
   it('locks the Test step with a "Finish step N first" summary while Configure is invalid', () => {
