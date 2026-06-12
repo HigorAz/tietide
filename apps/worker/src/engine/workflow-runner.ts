@@ -6,6 +6,7 @@ import {
   NodeCategory,
   NodeType,
   assignNodeAliases,
+  type EnvScope,
   type WorkflowDefinition,
   type WorkflowNode,
   type WorkflowEdge,
@@ -21,6 +22,7 @@ import { CircularDependencyError, topologicalSort } from './topological-sort';
 import { ITERATOR_NODE_TYPE } from '../nodes/logic/iterator';
 import { IteratorExecutor } from './iterator-executor';
 import { resolveNodeTimeoutMs, withNodeTimeout } from './node-timeout';
+import { StepBudget, StepBudgetExceededError } from './step-budget';
 import {
   buildInput,
   classifyUnreached,
@@ -58,6 +60,12 @@ export interface RunArgs {
   // Bound on a pino child logger so step-level logs can be correlated back
   // to the originating request (CLAUDE.md §11).
   requestId?: string;
+  // Shared per-execution-tree step budget (W5.16). Created once at the top-level
+  // run and passed by reference into every iterator/subworkflow child so the whole
+  // tree shares one cap on processed nodes, defeating the multiplicative
+  // depth × per-iterator fan-out DoS. Left unset for top-level runs (the runner
+  // mints a fresh budget); children receive the parent's budget.
+  stepBudget?: StepBudget;
 }
 
 export interface RunResult {
@@ -111,6 +119,15 @@ export class WorkflowRunner {
     const { executionId, workflowId, definition, triggerData, isDryRun = false } = args;
     const depth = args.depth ?? 0;
     const runLog = this.buildRunLogger({ requestId: args.requestId });
+
+    // Shared step budget for the whole parent->child execution tree (W5.16). The
+    // top-level run mints it; iterator/subworkflow children inherit it by reference
+    // so the multiplicative depth × per-iterator fan-out is bounded by one global cap.
+    // Only the OWNER (top-level) run converts a blown budget into a FAILED result;
+    // child runs rethrow it so the abort unwinds the entire tree at once rather than
+    // being masked per-iteration by an iterator's continueOnError.
+    const ownsBudget = args.stepBudget === undefined;
+    const stepBudget = args.stepBudget ?? new StepBudget();
 
     if (depth > MAX_RECURSION_DEPTH) {
       return {
@@ -195,8 +212,128 @@ export class WorkflowRunner {
     const statusByNode = new Map<string, string>();
     let failure: { nodeId: string; error: string } | null = null;
 
+    try {
+      await this.runNodeLoop({
+        order,
+        nodeById,
+        incomingEdges,
+        outgoingEdges,
+        reusable,
+        outputs,
+        reachable,
+        executionOrder,
+        statusByNode,
+        stepBudget,
+        executionId,
+        workflowId,
+        definition,
+        triggerData,
+        isDryRun,
+        depth,
+        envScope,
+        aliasMap,
+        runLog,
+        requestId: args.requestId,
+        setFailure: (f) => {
+          failure = f;
+        },
+        getFailure: () => failure,
+      });
+    } catch (err) {
+      // A blown step budget aborts the whole tree non-retryably (W5.16): the
+      // definition is structurally too large / fans out too far, so a BullMQ retry
+      // would re-hit the cap. Other errors are unexpected runner crashes — propagate.
+      if (err instanceof StepBudgetExceededError) {
+        // Children rethrow so the budget overflow unwinds the whole tree (it must not
+        // be masked by an iterator's continueOnError). Only the owner converts it to a
+        // terminal non-retryable FAILED for the top-level execution.
+        if (!ownsBudget) throw err;
+        runLog.warn(
+          { executionId, workflowId, used: stepBudget.consumed, max: stepBudget.max },
+          err.message,
+        );
+        return { status: 'FAILED', error: err.message, retryable: false };
+      }
+      throw err;
+    }
+
+    if (failure) {
+      // A node threw at runtime — retryable (a flaky dependency may recover). The
+      // step-level resume above means a BullMQ retry won't re-fire nodes that
+      // already succeeded, so re-running this execution is safe.
+      return {
+        status: 'FAILED',
+        error: (failure as { nodeId: string; error: string }).error,
+        failedNodeId: (failure as { nodeId: string; error: string }).nodeId,
+        retryable: true,
+      };
+    }
+    return { status: 'SUCCESS' };
+  }
+
+  // The main DAG processing loop, extracted so runInner can wrap it in a single
+  // try/catch for the per-execution step budget (W5.16). Mutates the shared
+  // outputs/reachable/executionOrder/statusByNode collections and reports a hard
+  // failure back via setFailure.
+  private async runNodeLoop(p: {
+    order: string[];
+    nodeById: Map<string, WorkflowNode>;
+    incomingEdges: Map<string, WorkflowEdge[]>;
+    outgoingEdges: Map<string, WorkflowEdge[]>;
+    reusable: Map<string, Record<string, unknown>>;
+    outputs: Map<string, NodeOutput>;
+    reachable: Set<string>;
+    executionOrder: string[];
+    statusByNode: Map<string, string>;
+    stepBudget: StepBudget;
+    executionId: string;
+    workflowId: string;
+    definition: WorkflowDefinition;
+    triggerData: Record<string, unknown> | undefined;
+    isDryRun: boolean;
+    depth: number;
+    envScope: EnvScope;
+    aliasMap: ReadonlyMap<string, string>;
+    runLog: PinoChildLogger;
+    requestId: string | undefined;
+    setFailure: (f: { nodeId: string; error: string }) => void;
+    getFailure: () => { nodeId: string; error: string } | null;
+  }): Promise<void> {
+    const {
+      order,
+      nodeById,
+      incomingEdges,
+      outgoingEdges,
+      reusable,
+      outputs,
+      reachable,
+      executionOrder,
+      statusByNode,
+      stepBudget,
+      executionId,
+      workflowId,
+      definition,
+      triggerData,
+      isDryRun,
+      depth,
+      envScope,
+      aliasMap,
+      runLog,
+      requestId,
+      setFailure,
+      getFailure,
+    } = p;
+
     for (const nodeId of order) {
       const n = nodeById.get(nodeId)!;
+      const failure = getFailure();
+
+      // Charge one unit to the shared per-execution-tree budget BEFORE recording or
+      // running anything for this node (W5.16). When exhausted this throws, unwinding
+      // to runInner's catch which aborts the whole tree non-retryably — bounding the
+      // multiplicative iterator/subworkflow fan-out independent of the depth and
+      // per-iterator caps.
+      stepBudget.consume();
 
       // A hard failure with no error-handler aborts the rest of the run: every
       // remaining node is CANCELLED regardless of why it would not have run.
@@ -270,12 +407,13 @@ export class WorkflowRunner {
           isDryRun,
           envScope,
           aliasMap,
-          requestId: args.requestId,
+          requestId,
+          stepBudget,
           runChild: (childArgs) => this.run(childArgs),
         });
         statusByNode.set(n.id, iterResult.status);
         if (iterResult.status === 'FAILED') {
-          failure = { nodeId: n.id, error: iterResult.error ?? 'Iterator failed' };
+          setFailure({ nodeId: n.id, error: iterResult.error ?? 'Iterator failed' });
         }
         continue;
       }
@@ -301,14 +439,7 @@ export class WorkflowRunner {
       const started = Date.now();
       try {
         const executor = this.registry.resolve(n.type)!;
-        const ctx = this.buildContext(
-          executionId,
-          workflowId,
-          n.id,
-          isDryRun,
-          depth,
-          args.requestId,
-        );
+        const ctx = this.buildContext(executionId, workflowId, n.id, isDryRun, depth, requestId);
         const resolvedInput = resolveInputTemplates(
           input,
           executionOrder,
@@ -418,23 +549,10 @@ export class WorkflowRunner {
           executionOrder.push(n.id);
           propagateReachability(errorOutput, outgoing, reachable, 'error');
         } else {
-          failure = { nodeId: n.id, error: message };
+          setFailure({ nodeId: n.id, error: message });
         }
       }
     }
-
-    if (failure) {
-      // A node threw at runtime — retryable (a flaky dependency may recover). The
-      // step-level resume above means a BullMQ retry won't re-fire nodes that
-      // already succeeded, so re-running this execution is safe.
-      return {
-        status: 'FAILED',
-        error: failure.error,
-        failedNodeId: failure.nodeId,
-        retryable: true,
-      };
-    }
-    return { status: 'SUCCESS' };
   }
 
   // Load the outputs that a re-run may reuse. On the first attempt there are no
