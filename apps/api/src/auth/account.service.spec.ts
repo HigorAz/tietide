@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { MailerService } from '../mailer/mailer.service';
+import { Logger } from 'nestjs-pino';
 
 jest.mock('bcrypt');
 
@@ -25,6 +26,7 @@ describe('AccountService', () => {
   let auth: { signSession: jest.Mock; issueVerificationToken: jest.Mock };
   let audit: { log: jest.Mock; logSync: jest.Mock };
   let mailer: { sendAccountDeletedEmail: jest.Mock };
+  let logger: { error: jest.Mock };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
   beforeEach(async () => {
@@ -38,6 +40,7 @@ describe('AccountService', () => {
     auth = { signSession: jest.fn(), issueVerificationToken: jest.fn(async () => undefined) };
     audit = { log: jest.fn(async () => undefined), logSync: jest.fn(async () => undefined) };
     mailer = { sendAccountDeletedEmail: jest.fn(async () => undefined) };
+    logger = { error: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -46,6 +49,7 @@ describe('AccountService', () => {
         { provide: AuthService, useValue: auth },
         { provide: AuditLogService, useValue: audit },
         { provide: MailerService, useValue: mailer },
+        { provide: Logger, useValue: logger },
       ],
     }).compile();
 
@@ -211,6 +215,31 @@ describe('AccountService', () => {
 
       expect(auth.issueVerificationToken).not.toHaveBeenCalled();
       expect(result).toEqual(NEUTRAL_RESEND);
+    });
+
+    it('does not block the response on the existence-dependent token issuance (no timing oracle, W5.27)', async () => {
+      // A real, unverified account triggers a token INSERT + awaited SMTP send;
+      // every other branch returns after a single findUnique. Awaiting issuance
+      // here leaks account existence via response latency despite the neutral
+      // message. Simulate a slow (never-resolving) issuance and assert the response
+      // still resolves immediately — proving it is dispatched in the background.
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'u1',
+        emailVerified: false,
+        deletedAt: null,
+      });
+      let release: (() => void) | undefined;
+      auth.issueVerificationToken.mockReturnValue(
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+      );
+
+      const result = await service.resendVerification('a@b.com');
+
+      expect(result).toEqual(NEUTRAL_RESEND);
+      release?.();
+      await new Promise((r) => setImmediate(r));
     });
   });
 

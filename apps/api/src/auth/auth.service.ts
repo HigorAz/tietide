@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
@@ -63,6 +64,7 @@ export class AuthService {
     private readonly mailer: MailerService,
     private readonly organizations: OrganizationsService,
     private readonly audit: AuditLogService,
+    private readonly logger: Logger,
   ) {}
 
   async register(dto: RegisterDto): Promise<RegisterResponseDto> {
@@ -240,7 +242,20 @@ export class AuthService {
     });
 
     if (user) {
-      await this.issuePasswordResetToken(user.id, dto.email);
+      // Dispatch the token INSERT + SMTP send in the background rather than
+      // awaiting it. Awaiting it here would make the registered-email path take
+      // substantially longer than the unknown-email path (a full SMTP round-trip
+      // under the SMTP transport), turning response latency into an account-
+      // enumeration oracle that partially defeats the neutral message (W5.27).
+      // issuePasswordResetToken swallows its own delivery failures, so this can
+      // never surface or 500 the request. The .catch() guards the one remaining
+      // path (a DB INSERT failure) from becoming an unhandled rejection.
+      void this.issuePasswordResetToken(user.id, dto.email).catch((err) => {
+        this.logger.error(
+          { err: (err as Error).message },
+          'Background password-reset token issuance failed',
+        );
+      });
     }
 
     return NEUTRAL_FORGOT_RESPONSE;

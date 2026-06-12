@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { AuditLogService } from '../audit/audit-log.service';
+import { Logger } from 'nestjs-pino';
 
 jest.mock('bcrypt');
 
@@ -26,6 +27,7 @@ describe('AuthService', () => {
   };
   let organizations: { create: jest.Mock };
   let audit: { logSync: jest.Mock };
+  let logger: { error: jest.Mock };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
   beforeEach(async () => {
@@ -42,6 +44,7 @@ describe('AuthService', () => {
     };
     organizations = { create: jest.fn(async () => undefined) };
     audit = { logSync: jest.fn(async () => undefined) };
+    logger = { error: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -51,6 +54,7 @@ describe('AuthService', () => {
         { provide: MailerService, useValue: mailer },
         { provide: OrganizationsService, useValue: organizations },
         { provide: AuditLogService, useValue: audit },
+        { provide: Logger, useValue: logger },
       ],
     }).compile();
 
@@ -351,6 +355,29 @@ describe('AuthService', () => {
       expect(result).toEqual(NEUTRAL);
       expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
       expect(mailer.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('does not block the response on the existence-dependent token issuance (no timing oracle, W5.27)', async () => {
+      // A registered email triggers a token INSERT + SMTP send; an unknown email
+      // returns after a single findUnique. If the existent branch is AWAITED, its
+      // latency leaks account existence despite the neutral message. Simulate a slow
+      // (here: never-resolving) issuance and assert the response still resolves
+      // immediately — proving the work is dispatched in the background, not awaited.
+      prisma.user.findUnique.mockResolvedValue({ id: 'uuid-1' });
+      let releaseInsert: (() => void) | undefined;
+      prisma.passwordResetToken.create.mockReturnValue(
+        new Promise<void>((resolve) => {
+          releaseInsert = resolve;
+        }),
+      );
+
+      const result = await service.forgotPassword(dto);
+
+      // Returned WITHOUT the slow issuance having completed.
+      expect(result).toEqual(NEUTRAL);
+      // Let the backgrounded issuance settle so it doesn't leak as an unhandled job.
+      releaseInsert?.();
+      await new Promise((r) => setImmediate(r));
     });
   });
 
