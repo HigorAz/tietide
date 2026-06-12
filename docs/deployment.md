@@ -423,7 +423,7 @@ Before pointing real users at the deployment:
 
 - [ ] All `.env` placeholders replaced — grep for `change-in-production`, `your-`, `base64-encoded-32-byte`.
 - [ ] `JWT_SECRET`, `ENCRYPTION_MASTER_KEY`, `WEBHOOK_HMAC_SECRET`, `BACKUP_ENCRYPTION_KEY` rotated, stored out of band.
-- [ ] PostgreSQL port (5432) and Valkey port (6379) **not** published on the public interface — `docker-compose.prod.yml` already omits their `ports:` blocks (internal network only); if you instead run the dev compose, remove those mappings or rely on the firewall.
+- [ ] PostgreSQL port (5432) and Valkey port (6379) **not** published on the public interface — `docker-compose.prod.yml` already omits their `ports:` blocks (internal network only). The dev compose now binds both to `127.0.0.1` (loopback only), so they are reachable by host-run apps but not from the network; set a strong `POSTGRES_PASSWORD` and `REDIS_PASSWORD` in `.env` (the latter enables Valkey `--requirepass`) before any internet-facing run.
 - [ ] `CORS_ORIGIN` matches the real frontend domain — no `*`, no `localhost`.
 - [ ] TLS reachable, HSTS preload eligible.
 - [ ] Backup cron scheduled, first dump verified by listing `${BACKUP_DIR}`.
