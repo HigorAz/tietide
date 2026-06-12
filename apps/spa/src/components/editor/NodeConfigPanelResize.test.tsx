@@ -21,28 +21,28 @@ describe('useResizableWidth', () => {
   });
 
   it('persists the FINAL dragged width to localStorage, not the pre-drag width (WR-02)', () => {
-    // Start at the minimum (320). Drag the left edge leftwards by 200px → +200 width.
+    // Start at the default (440). Drag the left edge leftwards by 200px → +200 width.
     const { result } = renderHook(() => useResizableWidth());
-    expect(result.current.width).toBe(320);
+    expect(result.current.width).toBe(440);
 
     act(() => {
       // Cast: the hook only touches `clientX` + `preventDefault` from the event.
       result.current.onPointerDown(pointer(500) as unknown as ReactPointerEvent);
     });
 
-    // Drag leftwards: clientX 500 → 300 widens by (500 - 300) = 200 → 520.
+    // Drag leftwards: clientX 500 → 300 widens by (500 - 300) = 200 → 640.
     act(() => {
       fireWindow('pointermove', 300);
     });
-    expect(result.current.width).toBe(520);
+    expect(result.current.width).toBe(640);
 
     // Release.
     act(() => {
       fireWindow('pointerup', 300);
     });
 
-    // The persisted value must equal the final dragged width (520), not 320.
-    expect(window.localStorage.getItem(PANEL_WIDTH_KEY)).toBe('520');
+    // The persisted value must equal the final dragged width (640), not 440.
+    expect(window.localStorage.getItem(PANEL_WIDTH_KEY)).toBe('640');
   });
 
   it('persists the last move position across multiple move events', () => {
@@ -52,17 +52,17 @@ describe('useResizableWidth', () => {
       result.current.onPointerDown(pointer(600) as unknown as ReactPointerEvent);
     });
     act(() => {
-      fireWindow('pointermove', 500); // +100 → 420
+      fireWindow('pointermove', 500); // +100 → 540
     });
     act(() => {
-      fireWindow('pointermove', 450); // +150 → 470
+      fireWindow('pointermove', 450); // +150 → 590
     });
     act(() => {
       fireWindow('pointerup', 450);
     });
 
-    expect(result.current.width).toBe(470);
-    expect(window.localStorage.getItem(PANEL_WIDTH_KEY)).toBe('470');
+    expect(result.current.width).toBe(590);
+    expect(window.localStorage.getItem(PANEL_WIDTH_KEY)).toBe('590');
   });
 
   it('clamps the persisted width to the max bound', () => {

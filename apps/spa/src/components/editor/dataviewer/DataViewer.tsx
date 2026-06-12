@@ -36,8 +36,8 @@ export function DataViewer({
 
   return (
     <div data-testid={testId}>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <div className="relative flex items-center">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="relative flex min-w-0 flex-1 items-center">
           <Search size={12} className="absolute left-2 text-text-muted" />
           <input
             type="text"
@@ -46,7 +46,7 @@ export function DataViewer({
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             onClick={(e) => e.stopPropagation()}
-            className="h-6 w-40 rounded-md border border-white/10 bg-deep-blue/40 pl-6 pr-2 text-xs text-text-primary placeholder:text-text-muted focus:border-accent-teal/50 focus:outline-none"
+            className="h-6 w-full min-w-0 rounded-md border border-white/10 bg-deep-blue/40 pl-6 pr-2 text-xs text-text-primary placeholder:text-text-muted focus:border-accent-teal/50 focus:outline-none"
           />
         </div>
         <ViewToggle view={view} onChange={setView} />

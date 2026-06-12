@@ -137,7 +137,7 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
               <button
                 type="button"
                 onClick={() => openStep('test')}
-                className="self-start rounded-md bg-accent-teal px-3.5 py-2 text-xs font-semibold text-text-primary transition hover:bg-accent-teal-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
+                className="self-start rounded-md bg-accent-teal px-3.5 py-2 text-xs font-semibold text-deep-blue transition hover:bg-accent-teal-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
               >
                 Continue
               </button>

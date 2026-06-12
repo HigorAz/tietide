@@ -124,7 +124,7 @@ describe('NodeConfigPanel', () => {
       seedNodeOfType(NodeType.HTTP_REQUEST);
       render(<NodeConfigPanel />);
       expect(screen.getByTestId('node-config-resize')).toBeInTheDocument();
-      expect(screen.getByTestId('node-config-panel').style.width).toBe('320px');
+      expect(screen.getByTestId('node-config-panel').style.width).toBe('440px');
     });
   });
 
