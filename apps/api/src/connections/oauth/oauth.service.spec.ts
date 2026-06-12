@@ -45,6 +45,7 @@ function makeService(opts: {
   stateFindUnique?: jest.Mock;
   cryptoEncrypt?: jest.Mock;
   cryptoDecrypt?: jest.Mock;
+  memberFindFirst?: jest.Mock;
 }) {
   const provider = opts.provider ?? makeProvider();
   const registry = {
@@ -106,6 +107,11 @@ function makeService(opts: {
           // default crypto.decrypt mock unpacks this back to 'verifier-xyz'.
           codeVerifier: 'nonce-1:ct(verifier-xyz)',
         }),
+    },
+    organizationMember: {
+      findFirst:
+        opts.memberFindFirst ??
+        jest.fn().mockResolvedValue({ userId: USER_ID, role: 'SUPERADMIN' }),
     },
   } as unknown as PrismaService;
 
@@ -334,6 +340,22 @@ describe('OAuthService', () => {
       const { service } = makeService({ provider });
 
       await expect(service.handleCallback(callback())).rejects.toThrow('boom');
+    });
+
+    it('rejects when the user is no longer a member of the org from the signed state — W5.28', async () => {
+      // The state JWT was minted while the user belonged to the org, but they were
+      // removed within the state TTL. The callback must NOT persist a connection
+      // (with a live refresh token) into a workspace they no longer belong to.
+      const memberFindFirst = jest.fn().mockResolvedValue(null);
+      const { service, connections } = makeService({ memberFindFirst });
+
+      await expect(service.handleCallback(callback())).rejects.toThrow(BadRequestException);
+      expect(memberFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: ORG_ID, userId: USER_ID },
+        }),
+      );
+      expect(connections.create).not.toHaveBeenCalled();
     });
   });
 

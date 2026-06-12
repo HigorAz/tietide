@@ -174,6 +174,18 @@ export class OAuthService {
     const schema = PROVIDER_CONFIG_SCHEMAS[provider.id as keyof ProviderConfigMap];
     schema.parse(exchanged.config);
 
+    // Re-verify membership at callback time (W5.28). The org id was bound into the
+    // signed state when start() ran behind OrgContextGuard, but membership can have
+    // been revoked within the state TTL. Without this check the callback would write
+    // a live-refresh-token connection into a workspace the user no longer belongs to.
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { organizationId: decoded.organizationId, userId: decoded.userId },
+      select: { userId: true },
+    });
+    if (!membership) {
+      throw new BadRequestException('Invalid or expired OAuth state');
+    }
+
     const created = await this.connections.create(decoded.organizationId, decoded.userId, {
       type: ConnectionType.OAUTH2,
       provider: provider.id,

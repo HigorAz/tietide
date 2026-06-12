@@ -65,6 +65,9 @@ describe('OAuth Google flow (fixture token server)', () => {
       updateMany: jest.Mock;
       findUnique: jest.Mock;
     };
+    organizationMember: {
+      findFirst: jest.Mock;
+    };
   };
   let audit: { log: jest.Mock };
   let fixture: Awaited<ReturnType<typeof startFixtureTokenServer>>;
@@ -126,6 +129,11 @@ describe('OAuth Google flow (fixture token server)', () => {
           }
           return row;
         }),
+      },
+      organizationMember: {
+        // W5.28: handleCallback re-verifies membership before persisting. The
+        // fixture user is still a member, so the happy-path flow proceeds.
+        findFirst: jest.fn().mockResolvedValue({ userId: '00000000-0000-4000-8000-000000000001' }),
       },
     };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
