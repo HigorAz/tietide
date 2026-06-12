@@ -533,6 +533,19 @@ describe('WorkflowsService', () => {
       expect(call.where.AND).toBeDefined();
     });
 
+    it('should reject a cursor whose decoded value is not a valid date (W5.41)', async () => {
+      prisma.workflow.findMany.mockResolvedValue([]);
+      // A well-formed base64url keyset cursor whose `v` is a non-date string.
+      // Previously this produced `new Date('not-a-date')` → Invalid Date, which
+      // Prisma rejects with a raw 500. It must surface as a 400 instead.
+      const cursor = Buffer.from(JSON.stringify({ v: 'not-a-date', id: 'wf-x' }), 'utf8').toString(
+        'base64url',
+      );
+
+      await expect(service.list(orgId, { cursor })).rejects.toThrow(BadRequestException);
+      expect(prisma.workflow.findMany).not.toHaveBeenCalled();
+    });
+
     it('should request the execution count via Prisma _count', async () => {
       prisma.workflow.findMany.mockResolvedValue([]);
 

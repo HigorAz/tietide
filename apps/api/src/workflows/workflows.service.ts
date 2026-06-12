@@ -166,6 +166,13 @@ export class WorkflowsService {
     if (filter.cursor) {
       const cursor = decodeKeysetCursor(filter.cursor);
       const createdAt = new Date(cursor.v as string);
+      // Guard against a well-formed cursor carrying a non-date `v` (e.g. an
+      // attacker-supplied base64url payload). An Invalid Date would otherwise
+      // reach Prisma and surface as a raw 500 (W5.41) — mirror the executions
+      // cursor guard and reject as a 400 before touching the DB.
+      if (Number.isNaN(createdAt.getTime())) {
+        throw new BadRequestException('Invalid cursor');
+      }
       where = {
         AND: [
           baseWhere,
