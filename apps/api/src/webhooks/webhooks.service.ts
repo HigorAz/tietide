@@ -1,13 +1,24 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { createHash } from 'crypto';
 import type { Prisma } from '@prisma/client';
+import { findUnsafeConfigIssue } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { EntitlementsService } from '../billing/entitlements.service';
 import { EXECUTION_JOB_NAME, EXECUTION_QUEUE_NAME } from '../executions/execution-queue.constants';
 import type { WorkflowExecutionJobPayload } from '../executions/executions.service';
 import { assertFreshTimestamp, assertValidHexHmac } from './signature-helpers';
+import {
+  DEFAULT_TRIGGER_DATA_MAX_BYTES,
+  serializedByteLength,
+} from '../common/validators/max-serialized-bytes.validator';
 
 export interface WebhookTriggerInput {
   path: string;
@@ -136,14 +147,37 @@ export class WebhooksService {
     if (rawBody.length === 0) {
       return {};
     }
+    let triggerData: Record<string, unknown>;
     try {
       const parsed = JSON.parse(rawBody.toString('utf8')) as unknown;
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
+        triggerData = parsed as Record<string, unknown>;
+      } else {
+        triggerData = { value: parsed };
       }
-      return { value: parsed };
     } catch {
-      return { raw: rawBody.toString('utf8') };
+      triggerData = { raw: rawBody.toString('utf8') };
     }
+
+    // Bound the JSONB payload before it is persisted and enqueued. The global
+    // 1 MiB Express body limit is 16x larger than the intended 64 KiB cap, so
+    // enforce the trigger-data cap on the parsed value here.
+    if (serializedByteLength(triggerData) > DEFAULT_TRIGGER_DATA_MAX_BYTES) {
+      throw new PayloadTooLargeException(
+        `Webhook payload exceeds the maximum size of ${DEFAULT_TRIGGER_DATA_MAX_BYTES} bytes`,
+      );
+    }
+
+    // Defense-in-depth (W5.46): JSON.parse keeps `__proto__`/`constructor`/
+    // `prototype` as inert own keys. They are harmless to this process, but
+    // must not round-trip into the JSONB column or be forwarded to the worker,
+    // where any future deep-merge/walk consumer could be poisoned. Reject with
+    // the same shared walker the node-config save boundary uses.
+    const issue = findUnsafeConfigIssue(triggerData);
+    if (issue) {
+      throw new BadRequestException(`Webhook payload contains an unsafe value: ${issue.message}`);
+    }
+
+    return triggerData;
   }
 }

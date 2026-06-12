@@ -1,11 +1,61 @@
+import { isIP } from 'net';
+import { Agent } from 'undici';
 import { Injectable, Optional } from '@nestjs/common';
 import type { ExecutionContext, INodeExecutor, NodeInput, NodeOutput } from '@tietide/sdk';
 import { httpRequestOutputSchema, type HttpConnectionConfig } from '@tietide/shared';
-import { assertUrlAllowed, SsrfBlockedError, type LookupFn } from './ssrf-guard';
+import { assertUrlAllowedWithAddresses, SsrfBlockedError, type LookupFn } from './ssrf-guard';
 
 export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
+// Node `net`-style lookup callback. With `options.all` the result is an array of
+// `{ address, family }`; otherwise a single `(address, family)` pair.
+type LookupCallback = (
+  err: NodeJS.ErrnoException | null,
+  address: string | Array<{ address: string; family: number }>,
+  family?: number,
+) => void;
+type PinnedLookup = (
+  hostname: string,
+  options: { all?: boolean } | number,
+  callback: LookupCallback,
+) => void;
+
+// Factory that turns the SSRF-validated address set into a fetch `dispatcher`.
+// Injectable so tests can observe exactly which addresses the request is pinned
+// to without standing up a real undici Agent / socket.
+export type DispatcherFactory = (opts: { addresses: string[]; servername: string }) => unknown;
+
+const familyOf = (address: string): number => (isIP(address) === 6 ? 6 : 4);
+
+/**
+ * Build a synchronous, real-DNS-free lookup that ALWAYS resolves to the
+ * pre-validated addresses, ignoring the hostname it is asked about. undici calls
+ * this at socket-connect time, so a TTL-0 rebinding record that would return a
+ * private IP is never consulted — closing the validate-vs-connect TOCTOU (W5.6).
+ */
+export function buildPinnedLookup(addresses: string[]): PinnedLookup {
+  const pinned = addresses.map((address) => ({ address, family: familyOf(address) }));
+  return (_hostname, options, callback) => {
+    const wantsAll = typeof options === 'object' && options !== null && options.all === true;
+    if (wantsAll) {
+      callback(null, pinned);
+      return;
+    }
+    callback(null, pinned[0].address, pinned[0].family);
+  };
+}
+
+// Default dispatcher factory: an undici Agent whose connector resolves only to
+// the validated addresses. `servername` is forced to the original hostname so
+// TLS SNI / cert validation still target the real host (we only swap the IP).
+const defaultDispatcherFactory: DispatcherFactory = ({ addresses, servername }) =>
+  new Agent({ connect: { lookup: buildPinnedLookup(addresses), servername } });
+
 const DEFAULT_TIMEOUT_MS = 30_000;
+// Hard upper bound on the per-call timeout, mirroring httpRequestConfigSchema's
+// .max(30000). Concurrency is 5, so an unbounded timeout could hold a shared
+// worker slot for hours; clamp here since node config bypasses the Zod schema.
+const MAX_TIMEOUT_MS = 30_000;
 // Cap the response we buffer + persist to ExecutionStep.outputData. Prevents a
 // large/malicious endpoint from OOMing the worker or bloating Postgres JSONB.
 const MAX_RESPONSE_BYTES = 10 * 1024 * 1024; // 10 MiB
@@ -41,10 +91,16 @@ export class HttpRequestAction implements INodeExecutor {
 
   private readonly fetchImpl: FetchLike;
   private readonly lookupFn?: LookupFn;
+  private readonly dispatcherFactory: DispatcherFactory;
 
-  constructor(@Optional() fetchImpl?: FetchLike, @Optional() lookupFn?: LookupFn) {
+  constructor(
+    @Optional() fetchImpl?: FetchLike,
+    @Optional() lookupFn?: LookupFn,
+    @Optional() dispatcherFactory?: DispatcherFactory,
+  ) {
     this.fetchImpl = fetchImpl ?? ((url, init) => fetch(url, init));
     this.lookupFn = lookupFn;
+    this.dispatcherFactory = dispatcherFactory ?? defaultDispatcherFactory;
   }
 
   async execute(input: NodeInput, context: ExecutionContext): Promise<NodeOutput> {
@@ -83,11 +139,10 @@ export class HttpRequestAction implements INodeExecutor {
       };
     }
 
-    // SSRF guard: validate scheme + reject private/loopback/link-local/metadata
-    // targets BEFORE connecting. Runs on the post-template-resolution URL. Each
-    // redirect hop is re-validated inside fetchFollowingRedirects.
-    await assertUrlAllowed(params.url, this.lookupFn);
-
+    // SSRF guard runs inside fetchFollowingRedirects: the initial URL and every
+    // redirect hop are validated AND the connection is pinned to the validated
+    // address(es), so neither the initial fetch nor any hop can be DNS-rebound to
+    // a private/metadata IP at connect time (W5.6).
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), params.timeoutMs);
     const started = Date.now();
@@ -101,9 +156,9 @@ export class HttpRequestAction implements INodeExecutor {
       );
     } catch (err) {
       const error = err as Error;
-      // SSRF rejections (initial guard already ran; this is a redirect hop) and
-      // the redirect-cap error are surfaced verbatim — they are the security
-      // signal, not a transport failure.
+      // SSRF rejections (initial URL or a redirect hop) and the redirect-cap
+      // error are surfaced verbatim — they are the security signal, not a
+      // transport failure.
       if (error.name === 'SsrfBlockedError' || error.name === 'TooManyRedirectsError') {
         throw error;
       }
@@ -159,10 +214,14 @@ export class HttpRequestAction implements INodeExecutor {
       }
     }
 
-    const timeoutMs =
+    // Clamp to MAX_TIMEOUT_MS (mirrors httpRequestConfigSchema's .max()). The
+    // node config reaches us as z.record(z.unknown()), so a definition saved via
+    // PATCH that bypasses the SPA could otherwise pin a worker slot indefinitely.
+    const rawTimeout =
       typeof raw.timeout === 'number' && Number.isFinite(raw.timeout) && raw.timeout > 0
         ? raw.timeout
         : DEFAULT_TIMEOUT_MS;
+    const timeoutMs = Math.min(rawTimeout, MAX_TIMEOUT_MS);
 
     const mockOnDryRun = raw.mockOnDryRun === true;
 
@@ -220,10 +279,11 @@ export class HttpRequestAction implements INodeExecutor {
   // to 20 redirects WITHOUT re-running the SSRF guard, so a public attacker host
   // could 302 the worker to http://169.254.169.254/ or an internal service and
   // the internal response would be persisted. Instead we pass `redirect: manual`
-  // and drive the hops ourselves: re-validate every Location with
-  // assertUrlAllowed before re-fetching, and strip the Authorization header (and
-  // any connection-injected auth) when a redirect crosses origin so credentials
-  // never leak to a different host.
+  // and drive the hops ourselves: re-validate every URL (initial + each Location)
+  // with the SSRF guard and PIN the connection to the validated address(es)
+  // (W5.6 — defeats DNS rebinding) before re-fetching, and strip the
+  // Authorization header (and any connection-injected auth) when a redirect
+  // crosses origin so credentials never leak to a different host.
   private async fetchFollowingRedirects(
     initialUrl: string,
     init: RequestInit & { headers: Record<string, string> },
@@ -233,11 +293,27 @@ export class HttpRequestAction implements INodeExecutor {
     let headers = init.headers;
 
     for (let hop = 0; ; hop += 1) {
+      // Validate THIS hop and capture the exact addresses to pin. Throws
+      // SsrfBlockedError before any socket is opened if the target is internal.
+      const allowed = await assertUrlAllowedWithAddresses(currentUrl, this.lookupFn);
+
+      // Literal-IP hosts have no DNS to rebind, so no dispatcher is needed; the
+      // guard already proved the literal is public. For hostnames, build a
+      // dispatcher that pins the socket to the just-validated addresses so undici
+      // cannot re-resolve (and be rebound) at connect time.
+      const dispatcher = allowed.isLiteralIp
+        ? undefined
+        : this.dispatcherFactory({
+            addresses: allowed.addresses,
+            servername: allowed.url.hostname,
+          });
+
       const response = await this.fetchImpl(currentUrl, {
         ...init,
         headers,
         redirect: 'manual',
-      });
+        ...(dispatcher !== undefined ? { dispatcher } : {}),
+      } as RequestInit);
 
       const location = response.headers.get('location');
       if (!REDIRECT_STATUSES.has(response.status) || !location) {
@@ -254,9 +330,6 @@ export class HttpRequestAction implements INodeExecutor {
       } catch {
         throw new SsrfBlockedError('Invalid redirect Location');
       }
-
-      // Re-run the full SSRF guard on the resolved target BEFORE re-fetching.
-      await assertUrlAllowed(nextUrl.toString(), this.lookupFn);
 
       // Drop the Authorization header and any connection-injected auth header
       // when the redirect crosses origin (scheme + host + port).

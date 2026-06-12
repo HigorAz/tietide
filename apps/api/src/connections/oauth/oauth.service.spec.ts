@@ -6,6 +6,7 @@ import type { OAuthProviderRegistry } from './oauth-provider.registry';
 import type { OAuthStateService, OAuthStatePayload } from './oauth-state.service';
 import type { ConnectionsService } from '../connections.service';
 import type { PrismaService } from '../../prisma/prisma.service';
+import type { CryptoService } from '../../crypto/crypto.service';
 import type { OAuthProvider } from './providers/oauth-provider.interface';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
@@ -42,6 +43,9 @@ function makeService(opts: {
   spaBaseUrl?: string;
   stateUpdateMany?: jest.Mock;
   stateFindUnique?: jest.Mock;
+  cryptoEncrypt?: jest.Mock;
+  cryptoDecrypt?: jest.Mock;
+  memberFindFirst?: jest.Mock;
 }) {
   const provider = opts.provider ?? makeProvider();
   const registry = {
@@ -99,13 +103,27 @@ function makeService(opts: {
           jti: 'abc',
           userId: USER_ID,
           provider: provider.id,
-          codeVerifier: 'verifier-xyz',
+          // Stored encrypted-at-rest (W5.29): packed as `nonce:ciphertext`. The
+          // default crypto.decrypt mock unpacks this back to 'verifier-xyz'.
+          codeVerifier: 'nonce-1:ct(verifier-xyz)',
         }),
+    },
+    organizationMember: {
+      findFirst:
+        opts.memberFindFirst ??
+        jest.fn().mockResolvedValue({ userId: USER_ID, role: 'SUPERADMIN' }),
     },
   } as unknown as PrismaService;
 
-  const service = new OAuthService(registry, state, connections, config, prisma);
-  return { service, provider, registry, state, connections, config, prisma };
+  const crypto = {
+    encrypt:
+      opts.cryptoEncrypt ??
+      jest.fn((plaintext: string) => ({ ciphertext: `ct(${plaintext})`, nonce: 'nonce-1' })),
+    decrypt: opts.cryptoDecrypt ?? jest.fn(() => 'verifier-xyz'),
+  } as unknown as CryptoService;
+
+  const service = new OAuthService(registry, state, connections, config, prisma, crypto);
+  return { service, provider, registry, state, connections, config, prisma, crypto };
 }
 
 describe('OAuthService', () => {
@@ -157,6 +175,27 @@ describe('OAuthService', () => {
       ).rejects.toThrow(BadRequestException);
     });
 
+    it('encrypts the PKCE code_verifier at rest (never stores plaintext) — W5.29', async () => {
+      const create = jest.fn().mockResolvedValue({});
+      const encrypt = jest.fn().mockReturnValue({ ciphertext: 'CIPHER', nonce: 'NONCE' });
+      const { service, crypto } = makeService({ cryptoEncrypt: encrypt });
+      (
+        service as unknown as { prisma: { oAuthState: { create: jest.Mock } } }
+      ).prisma.oAuthState.create = create;
+
+      await service.start(ORG_ID, USER_ID, { provider: 'google', label: 'X' });
+
+      expect(crypto.encrypt).toHaveBeenCalledTimes(1);
+      const plaintextVerifier = (encrypt.mock.calls[0] as string[])[0];
+      const stored = create.mock.calls[0][0].data.codeVerifier as string;
+      // The persisted column must NOT contain the raw verifier.
+      expect(stored).not.toBe(plaintextVerifier);
+      expect(stored).not.toContain(plaintextVerifier);
+      // It must carry both the nonce and ciphertext so it can be decrypted later.
+      expect(stored).toContain('CIPHER');
+      expect(stored).toContain('NONCE');
+    });
+
     it('throws BadRequest when scopes contain values outside the provider allowlist', async () => {
       const { service } = makeService({});
 
@@ -200,6 +239,27 @@ describe('OAuthService', () => {
           name: 'My Label',
           refreshToken: 'r',
         }),
+      );
+    });
+
+    it('decrypts the stored code_verifier before the code exchange — W5.29', async () => {
+      const decrypt = jest.fn().mockReturnValue('plain-verifier');
+      const findUnique = jest.fn().mockResolvedValue({
+        jti: 'abc',
+        userId: USER_ID,
+        provider: 'google',
+        codeVerifier: 'NONCE:CIPHER',
+      });
+      const { service, provider, crypto } = makeService({
+        cryptoDecrypt: decrypt,
+        stateFindUnique: findUnique,
+      });
+
+      await service.handleCallback(callback());
+
+      expect(crypto.decrypt).toHaveBeenCalledWith('CIPHER', 'NONCE');
+      expect(provider.exchangeCode).toHaveBeenCalledWith(
+        expect.objectContaining({ codeVerifier: 'plain-verifier' }),
       );
     });
 
@@ -280,6 +340,22 @@ describe('OAuthService', () => {
       const { service } = makeService({ provider });
 
       await expect(service.handleCallback(callback())).rejects.toThrow('boom');
+    });
+
+    it('rejects when the user is no longer a member of the org from the signed state — W5.28', async () => {
+      // The state JWT was minted while the user belonged to the org, but they were
+      // removed within the state TTL. The callback must NOT persist a connection
+      // (with a live refresh token) into a workspace they no longer belong to.
+      const memberFindFirst = jest.fn().mockResolvedValue(null);
+      const { service, connections } = makeService({ memberFindFirst });
+
+      await expect(service.handleCallback(callback())).rejects.toThrow(BadRequestException);
+      expect(memberFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: ORG_ID, userId: USER_ID },
+        }),
+      );
+      expect(connections.create).not.toHaveBeenCalled();
     });
   });
 

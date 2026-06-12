@@ -112,6 +112,38 @@ describe('TwilioSmsReceivedTrigger', () => {
         }),
       ).toBe(false);
     });
+
+    // W5.31 — Twilio's signature scheme carries no timestamp, so a captured,
+    // validly-signed request stays forever-replayable. The only replay defense
+    // is per-event idempotency keyed on MessageSid/SmsSid. A signed request that
+    // omits both anchors would fall back to a body hash that has no durable
+    // dedup once the execution row is reaped — so we reject it at verification
+    // time, guaranteeing the dedup layer always has its strongest natural anchor.
+    it('rejects a validly-signed request that carries no MessageSid/SmsSid replay anchor', () => {
+      const anchorless = { From: '+14155551234', To: '+14155555678', Body: 'hi' };
+      const body = formEncode(anchorless);
+      const sig = computeTwilioSig(AUTH_TOKEN, CALLBACK_URL, anchorless);
+      expect(
+        trigger.verifySignature({
+          rawBody: body,
+          headers: { 'x-twilio-signature': sig },
+          signingSecret,
+        }),
+      ).toBe(false);
+    });
+
+    it('accepts a validly-signed request whose replay anchor is SmsSid (no MessageSid)', () => {
+      const withSmsSid = { From: '+14155551234', To: '+14155555678', Body: 'hi', SmsSid: 'SM9' };
+      const body = formEncode(withSmsSid);
+      const sig = computeTwilioSig(AUTH_TOKEN, CALLBACK_URL, withSmsSid);
+      expect(
+        trigger.verifySignature({
+          rawBody: body,
+          headers: { 'x-twilio-signature': sig },
+          signingSecret,
+        }),
+      ).toBe(true);
+    });
   });
 
   describe('onActivate', () => {

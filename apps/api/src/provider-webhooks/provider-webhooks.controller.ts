@@ -10,25 +10,36 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
-import {
-  ApiAcceptedResponse,
-  ApiNotFoundResponse,
-  ApiOperation,
-  ApiTags,
-  ApiUnauthorizedResponse,
-} from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
+import { ApiAcceptedResponse, ApiNotFoundResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { ProviderWebhooksService } from './provider-webhooks.service';
 import { ProviderWebhookResponseDto } from './dto/provider-webhook-response.dto';
 import { ProviderTriggerRegistry } from '../provider-triggers/provider-trigger.registry';
+import {
+  DEFAULT_WEBHOOK_THROTTLE_LIMIT,
+  DEFAULT_WEBHOOK_THROTTLE_TTL_MS,
+  IP_THROTTLER_NAME,
+} from '../common/throttler/throttler.config';
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
 }
 
 @ApiTags('provider-webhooks')
-@SkipThrottle()
+// W5.10: public, unauthenticated ingress. Each POST does a Prisma findUnique
+// and (on a valid sub) a libsodium decrypt of the signing secret BEFORE the
+// signature is verified. Previously @SkipThrottle() (never limited) — replaced
+// with a generous-but-bounded per-IP cap via the `ip` named throttler so a
+// flood of arbitrary :subscriptionId values can't drive unbounded pre-auth DB
+// lookups + decrypts. Real providers fan out across many IPs, so 300/IP/min
+// leaves legitimate webhook bursts untouched.
+@Throttle({
+  [IP_THROTTLER_NAME]: {
+    ttl: DEFAULT_WEBHOOK_THROTTLE_TTL_MS,
+    limit: DEFAULT_WEBHOOK_THROTTLE_LIMIT,
+  },
+})
 @Controller('provider-webhooks')
 export class ProviderWebhooksController {
   constructor(
@@ -55,7 +66,9 @@ export class ProviderWebhooksController {
     summary: 'Receive a signed event from an external provider (public, signature-protected)',
   })
   @ApiAcceptedResponse({ type: ProviderWebhookResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Invalid signature' })
+  // A bad signature returns the same generic 404 as a missing/inactive/
+  // mismatched subscription so the response cannot be used as a
+  // subscription-existence oracle (W5.30). The real reason is logged internally.
   @ApiNotFoundResponse({ description: 'Provider webhook not found' })
   async receive(
     @Param('provider') provider: string,
@@ -93,7 +106,8 @@ export class ProviderWebhooksController {
 
     // Verified handshake (e.g. Discord PING): reply with the PONG body and 200
     // rather than the 202 ack envelope. The signature was already validated, so
-    // bad-signature probes never reach here (they 401 in the service).
+    // bad-signature probes never reach here (they get the uniform 404 in the
+    // service — same response as a missing subscription, no existence oracle).
     if (result.ack) {
       res.status(HttpStatus.OK).type(result.ack.contentType).send(result.ack.body);
       return undefined;

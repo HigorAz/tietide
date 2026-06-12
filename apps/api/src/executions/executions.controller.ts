@@ -32,9 +32,9 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { OrgRolesGuard } from '../common/guards/org-roles.guard';
 import {
-  DEFAULT_THROTTLER_NAME,
   DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
   DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
+  EXECUTE_THROTTLER_NAME,
 } from '../common/throttler/throttler.config';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import type { OrgContext } from '../common/org-context/org-context.types';
@@ -43,8 +43,12 @@ import { TriggerExecutionDto } from './dto/trigger-execution.dto';
 import { TestExecutionDto } from './dto/test-execution.dto';
 import { ExecutionResponseDto } from './dto/execution-response.dto';
 
+// W5.8: env-tunable per-tenant execute cap. Buckets on the default (per-user)
+// tracker; the guard substitutes the env-resolved limit/ttl so THROTTLE_EXECUTE_LIMIT /
+// THROTTLE_EXECUTE_TTL_MS take effect at runtime. The values are the opt-in marker +
+// compile-time fallback only.
 const EXECUTE_THROTTLE = {
-  [DEFAULT_THROTTLER_NAME]: {
+  [EXECUTE_THROTTLER_NAME]: {
     ttl: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_TTL_MS,
     limit: DEFAULT_WORKFLOW_EXECUTE_THROTTLE_LIMIT,
   },

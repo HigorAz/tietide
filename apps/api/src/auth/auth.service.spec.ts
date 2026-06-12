@@ -7,6 +7,8 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { AuditLogService } from '../audit/audit-log.service';
+import { Logger } from 'nestjs-pino';
 
 jest.mock('bcrypt');
 
@@ -24,6 +26,8 @@ describe('AuthService', () => {
     sendPasswordResetEmail: jest.Mock;
   };
   let organizations: { create: jest.Mock };
+  let audit: { logSync: jest.Mock };
+  let logger: { error: jest.Mock };
   const mockedBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 
   beforeEach(async () => {
@@ -39,6 +43,8 @@ describe('AuthService', () => {
       sendPasswordResetEmail: jest.fn(async () => undefined),
     };
     organizations = { create: jest.fn(async () => undefined) };
+    audit = { logSync: jest.fn(async () => undefined) };
+    logger = { error: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +53,8 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: jwt },
         { provide: MailerService, useValue: mailer },
         { provide: OrganizationsService, useValue: organizations },
+        { provide: AuditLogService, useValue: audit },
+        { provide: Logger, useValue: logger },
       ],
     }).compile();
 
@@ -168,6 +176,50 @@ describe('AuthService', () => {
       });
     });
 
+    it('writes a durable audit entry on a successful login (W5.21)', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
+      jwt.sign.mockReturnValue('signed.jwt.token');
+
+      await service.login(validDto);
+
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: storedUser.id,
+          action: 'auth.login',
+          resource: 'user',
+          resourceId: storedUser.id,
+        }),
+      );
+    });
+
+    it('audits a failed login for a real account (with userId, email metadata, never the password) (W5.21)', async () => {
+      prisma.user.findUnique.mockResolvedValue(storedUser);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: storedUser.id,
+          action: 'auth.login-failed',
+          resource: 'user',
+          resourceId: storedUser.id,
+        }),
+      );
+      const entry = audit.logSync.mock.calls[0][0];
+      expect(JSON.stringify(entry)).not.toContain(validDto.password);
+    });
+
+    it('does NOT audit (no FK-valid userId) a failed login for an unknown email (W5.21)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(false);
+
+      await expect(service.login(validDto)).rejects.toThrow(UnauthorizedException);
+
+      expect(audit.logSync).not.toHaveBeenCalled();
+    });
+
     it('throws ForbiddenException for valid credentials on an unverified account', async () => {
       prisma.user.findUnique.mockResolvedValue({ ...storedUser, emailVerified: false });
       (mockedBcrypt.compare as unknown as jest.Mock).mockResolvedValue(true);
@@ -208,6 +260,7 @@ describe('AuthService', () => {
 
     it('consumes a valid token, marks the user verified, and issues a session', async () => {
       prisma.emailVerificationToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.emailVerificationToken.updateMany.mockResolvedValue({ count: 1 });
       prisma.user.update.mockResolvedValue({
         id: 'uuid-1',
@@ -223,6 +276,14 @@ describe('AuthService', () => {
         expect.objectContaining({ where: { id: 'uuid-1' }, data: { emailVerified: true } }),
       );
       expect(result).toEqual({ accessToken: 'signed.jwt.token', tokenType: 'Bearer' });
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'uuid-1',
+          action: 'auth.email-verified',
+          resource: 'user',
+          resourceId: 'uuid-1',
+        }),
+      );
     });
 
     it('rejects an unknown token', async () => {
@@ -234,6 +295,7 @@ describe('AuthService', () => {
 
     it('rejects a token that is already consumed or expired (atomic consume flips 0 rows)', async () => {
       prisma.emailVerificationToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.emailVerificationToken.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.verifyEmail(dto)).rejects.toThrow(BadRequestException);
@@ -248,6 +310,19 @@ describe('AuthService', () => {
       const lookup = prisma.emailVerificationToken.findUnique.mock.calls[0][0];
       expect(lookup.where.tokenHash).toEqual(expect.any(String));
       expect(lookup.where.tokenHash).not.toEqual(dto.token);
+    });
+
+    it('rejects (generic invalid/expired) a token whose user is soft-deleted, without consuming it or issuing a session', async () => {
+      prisma.emailVerificationToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: new Date('2026-06-08T00:00:00Z') });
+
+      await expect(service.verifyEmail(dto)).rejects.toThrow(
+        'This verification link is invalid or has expired.',
+      );
+      // The stale token must NOT be consumed and no session minted on a tombstoned row.
+      expect(prisma.emailVerificationToken.updateMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(jwt.sign).not.toHaveBeenCalled();
     });
   });
 
@@ -281,6 +356,29 @@ describe('AuthService', () => {
       expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
       expect(mailer.sendPasswordResetEmail).not.toHaveBeenCalled();
     });
+
+    it('does not block the response on the existence-dependent token issuance (no timing oracle, W5.27)', async () => {
+      // A registered email triggers a token INSERT + SMTP send; an unknown email
+      // returns after a single findUnique. If the existent branch is AWAITED, its
+      // latency leaks account existence despite the neutral message. Simulate a slow
+      // (here: never-resolving) issuance and assert the response still resolves
+      // immediately — proving the work is dispatched in the background, not awaited.
+      prisma.user.findUnique.mockResolvedValue({ id: 'uuid-1' });
+      let releaseInsert: (() => void) | undefined;
+      prisma.passwordResetToken.create.mockReturnValue(
+        new Promise<void>((resolve) => {
+          releaseInsert = resolve;
+        }),
+      );
+
+      const result = await service.forgotPassword(dto);
+
+      // Returned WITHOUT the slow issuance having completed.
+      expect(result).toEqual(NEUTRAL);
+      // Let the backgrounded issuance settle so it doesn't leak as an unhandled job.
+      releaseInsert?.();
+      await new Promise((r) => setImmediate(r));
+    });
   });
 
   describe('resetPassword', () => {
@@ -288,6 +386,7 @@ describe('AuthService', () => {
 
     it('consumes the token, sets the password, verifies email, bumps tokenVersion, and logs in', async () => {
       prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
       prisma.user.update.mockResolvedValue({
         id: 'uuid-1',
@@ -314,6 +413,14 @@ describe('AuthService', () => {
       // The signed session carries the *bumped* version, so it stays valid while
       // the pre-reset sessions do not.
       expect(jwt.sign).toHaveBeenCalledWith(expect.objectContaining({ tokenVersion: 3 }));
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'uuid-1',
+          action: 'auth.password-reset',
+          resource: 'user',
+          resourceId: 'uuid-1',
+        }),
+      );
     });
 
     it('looks the token up by its hash, never by the raw value', async () => {
@@ -335,10 +442,24 @@ describe('AuthService', () => {
 
     it('rejects an already-consumed or expired token (atomic consume flips 0 rows)', async () => {
       prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: null });
       prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
 
       await expect(service.resetPassword(dto)).rejects.toThrow(BadRequestException);
       expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects (generic invalid/expired) a token whose user is soft-deleted, without consuming it or resetting the password', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue({ id: 'tok-1', userId: 'uuid-1' });
+      prisma.user.findUnique.mockResolvedValue({ deletedAt: new Date('2026-06-08T00:00:00Z') });
+
+      await expect(service.resetPassword(dto)).rejects.toThrow(
+        'This password reset link is invalid or has expired.',
+      );
+      // The stale token must NOT be consumed and no password set / session minted on a tombstoned row.
+      expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(jwt.sign).not.toHaveBeenCalled();
     });
   });
 
@@ -390,6 +511,21 @@ describe('AuthService', () => {
         data: { tokenVersion: { increment: 1 } },
         select: { id: true },
       });
+    });
+
+    it('writes a durable audit entry for the session revoke-all (W5.21)', async () => {
+      prisma.user.update.mockResolvedValue({ id: 'uuid-1' });
+
+      await service.logout('uuid-1');
+
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'uuid-1',
+          action: 'auth.logout',
+          resource: 'user',
+          resourceId: 'uuid-1',
+        }),
+      );
     });
   });
 });

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -36,6 +37,7 @@ export class AccountService {
     private readonly auth: AuthService,
     private readonly audit: AuditLogService,
     private readonly mailer: MailerService,
+    private readonly logger: Logger,
   ) {}
 
   async updateProfile(userId: string, name: string): Promise<UserResponseDto> {
@@ -86,6 +88,16 @@ export class AccountService {
       select: { id: true, email: true, role: true, tokenVersion: true },
     });
 
+    // Durable account-level audit (no organizationId): a password change also
+    // revokes every other session, so it must leave a trace for takeover forensics.
+    await this.audit.logSync({
+      userId,
+      action: 'auth.password-change',
+      resource: 'user',
+      resourceId: userId,
+      metadata: { email: updated.email },
+    });
+
     return this.auth.signSession(updated);
   }
 
@@ -101,7 +113,20 @@ export class AccountService {
     });
 
     if (user && !user.emailVerified && !user.deletedAt) {
-      await this.auth.issueVerificationToken(user.id, email);
+      // Dispatch the token INSERT + SMTP send in the background rather than
+      // awaiting it. Awaiting it here would make the real-account path take
+      // substantially longer than every other branch (a full SMTP round-trip
+      // under the SMTP transport), turning response latency into an account-
+      // enumeration oracle that partially defeats the neutral message (W5.27).
+      // issueVerificationToken's mailer send swallows its own delivery failures;
+      // the .catch() guards the remaining DB-INSERT path from becoming an
+      // unhandled rejection.
+      void this.auth.issueVerificationToken(user.id, email).catch((err) => {
+        this.logger.error(
+          { err: (err as Error).message },
+          'Background verification token issuance failed',
+        );
+      });
     }
 
     return NEUTRAL_RESEND_RESPONSE;

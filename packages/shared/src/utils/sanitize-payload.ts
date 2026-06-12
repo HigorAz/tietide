@@ -1,4 +1,9 @@
-const SENSITIVE_KEY_PATTERN = /password|token|secret|apikey|authorization|cookie|credential/i;
+// Aligned with the pino log redactor (logger.config.ts) and the audit-log
+// sanitizer (audit-log.service.ts) so all three redaction surfaces drop the
+// same crypto/credential key set. Broad substring match — defense-in-depth on
+// the user-facing execution payload (ownership-scoped, same-user only).
+const SENSITIVE_KEY_PATTERN =
+  /password|token|secret|apikey|authorization|cookie|credential|nonce|encryptionkey|privatekey|client_secret|configencrypted|confignonce|valueenc|valuenonce|hmacsecret|^iv$|^value$|^config$/i;
 
 const REDACTED = '[REDACTED]';
 

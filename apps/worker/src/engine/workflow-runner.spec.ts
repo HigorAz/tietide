@@ -250,6 +250,46 @@ describe('WorkflowRunner', () => {
       });
     });
 
+    describe('provider error-response redaction (W5.35)', () => {
+      it('should not log the raw provider response body/headers on node failure', async () => {
+        const sensitiveResponse = {
+          status: 401,
+          statusText: 'Unauthorized',
+          headers: { authorization: 'Bearer super-secret-token' },
+          data: { access_token: 'leaked-token', detail: 'x'.repeat(5000) },
+        };
+        registry.register(
+          makeExecutor('a', async () => {
+            const err = new Error('provider rejected request') as Error & {
+              response?: unknown;
+            };
+            err.response = sensitiveResponse;
+            throw err;
+          }),
+        );
+        const def: WorkflowDefinition = { nodes: [node('A', 'a')], edges: [] };
+
+        await runner.run({ executionId: 'exec-1', workflowId: 'wf-1', definition: def });
+
+        expect(childLogger.warn).toHaveBeenCalled();
+        const warnArgs = childLogger.warn.mock.calls[0][0] as Record<string, unknown>;
+        const serialized = JSON.stringify(warnArgs);
+
+        // No raw token material from headers or body may reach the logs.
+        expect(serialized).not.toContain('super-secret-token');
+        expect(serialized).not.toContain('leaked-token');
+        expect(serialized).not.toContain('authorization');
+
+        // The full 5KB body must not be retained at all.
+        expect(serialized).not.toContain('x'.repeat(513));
+
+        // The status code is still useful and safe to keep.
+        const errResponse = warnArgs.errResponse as { status?: number } | null;
+        expect(errResponse).not.toBeNull();
+        expect(errResponse?.status).toBe(401);
+      });
+    });
+
     it('should abort with clear error when NodeRegistry has no executor for a node type', async () => {
       const def: WorkflowDefinition = { nodes: [node('A', 'missing')], edges: [] };
 

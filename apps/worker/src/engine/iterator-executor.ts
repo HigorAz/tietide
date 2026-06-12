@@ -14,6 +14,7 @@ import { buildBodyDefinition, extractBodySubgraph, validateBodySubgraph } from '
 import { isUniqueViolation } from '../common/prisma-error';
 import { buildInput, propagateReachability, resolveInputTemplates } from './runner-helpers';
 import type { RunArgs, RunResult } from './workflow-runner';
+import type { StepBudget } from './step-budget';
 
 // A single iterator node's execution: fan out the body subgraph once per array
 // item via child WorkflowExecutions, then route the parent's `done` branch.
@@ -37,6 +38,10 @@ export interface IteratorRunOptions {
   envScope: EnvScope;
   aliasMap: ReadonlyMap<string, string>;
   requestId: string | undefined;
+  // Shared per-execution-tree step budget (W5.16). Passed to each iteration's body
+  // run so every nested node charges against the same global cap, bounding the
+  // multiplicative fan-out across all iterations and nesting levels.
+  stepBudget: StepBudget;
   // Re-enter the workflow runner for one iteration's body subgraph. Wired by
   // WorkflowRunner to `(args) => this.run(args)` so recursion stays on the runner.
   runChild: (args: RunArgs) => Promise<RunResult>;
@@ -66,6 +71,7 @@ export class IteratorExecutor {
       envScope,
       aliasMap,
       requestId,
+      stepBudget,
       runChild,
     } = opts;
 
@@ -224,6 +230,7 @@ export class IteratorExecutor {
           parentExecutionId,
           depth: depth + 1,
           requestId,
+          stepBudget,
         });
         iterStatus = childResult.status;
         iterError = childResult.error;

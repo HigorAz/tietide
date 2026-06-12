@@ -39,7 +39,7 @@ interface PrismaMock {
 describe('OrganizationsService', () => {
   let service: OrganizationsService;
   let prisma: PrismaMock;
-  let audit: { log: jest.Mock };
+  let audit: { log: jest.Mock; logSync: jest.Mock };
   let entitlements: { assertCanCreateWorkspace: jest.Mock };
 
   const orgId = 'org-uuid-1';
@@ -75,7 +75,10 @@ describe('OrganizationsService', () => {
       subscription: { create: jest.fn() },
       user: { update: jest.fn(), updateMany: jest.fn() },
     };
-    audit = { log: jest.fn().mockResolvedValue(undefined) };
+    audit = {
+      log: jest.fn().mockResolvedValue(undefined),
+      logSync: jest.fn().mockResolvedValue(undefined),
+    };
     entitlements = { assertCanCreateWorkspace: jest.fn().mockResolvedValue(undefined) };
 
     const mod: TestingModule = await Test.createTestingModule({
@@ -252,9 +255,45 @@ describe('OrganizationsService', () => {
       await service.remove(orgId, actingUserId);
 
       expect(prisma.organization.delete).toHaveBeenCalledWith({ where: { id: orgId } });
-      expect(audit.log).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'org.delete', organizationId: orgId }),
+    });
+
+    it('writes a DURABLE workspace.deleted audit entry BEFORE deleting (W5.20)', async () => {
+      prisma.organizationMember.findFirst.mockResolvedValue(member('SUPERADMIN'));
+      prisma.organizationMember.count.mockResolvedValue(2);
+      const order: string[] = [];
+      audit.logSync.mockImplementation(async () => {
+        order.push('audit');
+      });
+      prisma.organization.delete.mockImplementation(async () => {
+        order.push('delete');
+        return { id: orgId };
+      });
+
+      await service.remove(orgId, actingUserId);
+
+      // The deletion is recorded durably (awaited logSync, not fire-and-forget log).
+      expect(audit.logSync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: actingUserId,
+          organizationId: orgId,
+          action: 'workspace.deleted',
+          resource: 'organization',
+          resourceId: orgId,
+        }),
       );
+      // The audit row must be written BEFORE the cascade so the event is never lost.
+      expect(order).toEqual(['audit', 'delete']);
+      // The lossy fire-and-forget path must NOT be used for this security event.
+      expect(audit.log).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'org.delete' }));
+    });
+
+    it('does not delete the org if the durable audit write fails (W5.20)', async () => {
+      prisma.organizationMember.findFirst.mockResolvedValue(member('SUPERADMIN'));
+      prisma.organizationMember.count.mockResolvedValue(2);
+      audit.logSync.mockRejectedValueOnce(new Error('db down'));
+
+      await expect(service.remove(orgId, actingUserId)).rejects.toThrow('db down');
+      expect(prisma.organization.delete).not.toHaveBeenCalled();
     });
 
     it('blocks deleting the caller’s only org', async () => {

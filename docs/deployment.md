@@ -97,11 +97,19 @@ AI_SERVICE_URL=http://ai:8000
 # Lock CORS to your real frontend origin
 CORS_ORIGIN=https://tietide.example.com
 
-# Rate limiting (production-tighter than dev)
-THROTTLE_TTL=60
+# Rate limiting (production-tighter than dev). All windows are milliseconds.
+# Read at API startup; the per-category named throttlers resolve their limits from
+# these vars at module init, so changes take effect on the next API boot.
+THROTTLE_TTL_MS=60000
 THROTTLE_LIMIT=60
 THROTTLE_AUTH_TTL_MS=60000
 THROTTLE_AUTH_LIMIT=5
+THROTTLE_IP_TTL_MS=60000
+THROTTLE_IP_LIMIT=30
+THROTTLE_EXECUTE_TTL_MS=60000
+THROTTLE_EXECUTE_LIMIT=20
+THROTTLE_AI_TTL_MS=60000
+THROTTLE_AI_LIMIT=3
 
 # Backups (paths inside the VPS, not the container)
 BACKUP_DIR=/var/backups/tietide
@@ -286,7 +294,8 @@ COMPOSE="docker compose -f infra/docker/docker-compose.prod.yml --env-file .env"
 $COMPOSE build
 
 # 3. Apply migrations once BEFORE starting the apps (the slim runtime image has no
-#    prisma CLI; the `migrate` profile reuses the api builder stage, which does).
+#    prisma CLI; the `migrate` profile builds a dedicated lean, non-root migrate
+#    stage = slim runtime + a pinned prisma CLI, not the full builder image).
 $COMPOSE --profile migrate run --rm migrate
 
 # 4. Start everything.
@@ -415,7 +424,7 @@ Before pointing real users at the deployment:
 
 - [ ] All `.env` placeholders replaced — grep for `change-in-production`, `your-`, `base64-encoded-32-byte`.
 - [ ] `JWT_SECRET`, `ENCRYPTION_MASTER_KEY`, `WEBHOOK_HMAC_SECRET`, `BACKUP_ENCRYPTION_KEY` rotated, stored out of band.
-- [ ] PostgreSQL port (5432) and Valkey port (6379) **not** published on the public interface — `docker-compose.prod.yml` already omits their `ports:` blocks (internal network only); if you instead run the dev compose, remove those mappings or rely on the firewall.
+- [ ] PostgreSQL port (5432) and Valkey port (6379) **not** published on the public interface — `docker-compose.prod.yml` already omits their `ports:` blocks (internal network only). The dev compose now binds both to `127.0.0.1` (loopback only), so they are reachable by host-run apps but not from the network; set a strong `POSTGRES_PASSWORD` and `REDIS_PASSWORD` in `.env` (the latter enables Valkey `--requirepass`) before any internet-facing run.
 - [ ] `CORS_ORIGIN` matches the real frontend domain — no `*`, no `localhost`.
 - [ ] TLS reachable, HSTS preload eligible.
 - [ ] Backup cron scheduled, first dump verified by listing `${BACKUP_DIR}`.

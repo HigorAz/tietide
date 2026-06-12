@@ -23,9 +23,12 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+  AUTH_THROTTLER_NAME,
   DEFAULT_AUTH_THROTTLE_LIMIT,
   DEFAULT_AUTH_THROTTLE_TTL_MS,
-  DEFAULT_THROTTLER_NAME,
+  DEFAULT_IP_THROTTLE_LIMIT,
+  DEFAULT_IP_THROTTLE_TTL_MS,
+  IP_THROTTLER_NAME,
 } from '../common/throttler/throttler.config';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -56,9 +59,19 @@ export class AuthController {
 
   @Post('register')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap layered on top so one IP cannot rotate the email
+    // field to spray past the per-(ip,email) bucket.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -73,9 +86,18 @@ export class AuthController {
 
   @Post('verify-email')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap bounds token-guessing sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.OK)
@@ -91,9 +113,18 @@ export class AuthController {
 
   @Post('forgot-password')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap bounds email-rotation sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -108,9 +139,18 @@ export class AuthController {
 
   @Post('reset-password')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap bounds reset-token-guessing sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.OK)
@@ -126,9 +166,19 @@ export class AuthController {
 
   @Post('login')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap so one IP cannot spray one password across many
+    // distinct emails by rotating the email field past the per-(ip,email) bucket.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.OK)
@@ -166,11 +216,22 @@ export class AuthController {
 
   @Patch('password')
   @UseGuards(JwtAuthGuard)
+  @Throttle({
+    // W5.50: changePassword runs an online bcrypt.compare against the current
+    // password, so a stolen session could brute-force it. Opt into the same
+    // env-tunable auth-tier cap (THROTTLE_AUTH_*) as every other credential route
+    // instead of falling back to the 100/min global default.
+    [AUTH_THROTTLER_NAME]: {
+      ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
+      limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+  })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Change password — revokes every other session and re-issues this one',
   })
   @ApiOkResponse({ type: LoginResponseDto })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid token or wrong current password' })
   async changePassword(
     @CurrentUser() user: AuthenticatedUser,
@@ -181,9 +242,18 @@ export class AuthController {
 
   @Post('resend-verification')
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
+    },
+    // W5.9: aggregate per-IP cap bounds email-rotation sprays from one source IP.
+    [IP_THROTTLER_NAME]: {
+      ttl: DEFAULT_IP_THROTTLE_TTL_MS,
+      limit: DEFAULT_IP_THROTTLE_LIMIT,
     },
   })
   @HttpCode(HttpStatus.ACCEPTED)
@@ -199,7 +269,11 @@ export class AuthController {
   @Delete('account')
   @UseGuards(JwtAuthGuard)
   @Throttle({
-    [DEFAULT_THROTTLER_NAME]: {
+    // W5.8: env-tunable per-account auth cap. Buckets on the default (per-user /
+    // per-(ip,email)) tracker; the guard substitutes the env-resolved limit/ttl so
+    // THROTTLE_AUTH_LIMIT / THROTTLE_AUTH_TTL_MS actually take effect at runtime. The
+    // values below are the opt-in marker + compile-time fallback only.
+    [AUTH_THROTTLER_NAME]: {
       ttl: DEFAULT_AUTH_THROTTLE_TTL_MS,
       limit: DEFAULT_AUTH_THROTTLE_LIMIT,
     },

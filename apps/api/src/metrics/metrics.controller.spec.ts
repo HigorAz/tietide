@@ -1,10 +1,12 @@
 import type { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { MetricsController } from './metrics.controller';
 import { MetricsService } from './metrics.service';
+import { IP_THROTTLER_NAME } from '../common/throttler/throttler.config';
 
 describe('MetricsController (integration)', () => {
   let app: INestApplication;
@@ -51,5 +53,21 @@ describe('MetricsController (integration)', () => {
       .set('Authorization', 'Bearer sekret')
       .expect(200);
     expect(render).toHaveBeenCalled();
+  });
+
+  it('carries a per-IP throttle on the scrape route (not @SkipThrottle)', () => {
+    const reflector = new Reflector();
+    // @SkipThrottle() sets THROTTLER:SKIP metadata; a real throttle must not.
+    const skip = reflector.getAllAndOverride('THROTTLER:SKIP', [
+      MetricsController.prototype.scrape,
+      MetricsController,
+    ]);
+    expect(skip).toBeFalsy();
+    // @Throttle({ ip: ... }) stores the limit under THROTTLER:LIMIT<name>.
+    const ipLimit = reflector.getAllAndOverride(`THROTTLER:LIMIT${IP_THROTTLER_NAME}`, [
+      MetricsController.prototype.scrape,
+      MetricsController,
+    ]);
+    expect(ipLimit).toBeDefined();
   });
 });

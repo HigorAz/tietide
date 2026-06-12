@@ -151,23 +151,24 @@ services:
 
   # ---- One-shot DB migration (opt-in via the `migrate` profile) --------------
   # The slim api runtime image strips the prisma CLI (a devDependency), so it
-  # cannot run `migrate deploy` itself. This service reuses the api Dockerfile's
-  # BUILDER stage, which still has the CLI, the schema, and the migrations.
+  # cannot run `migrate deploy` itself. Rather than republish the heavy BUILDER
+  # stage (entire repo source + dev deps, root) as a reusable image, this targets
+  # the dedicated lean `migrate` stage: the slim runtime + a version-pinned prisma
+  # CLI, running as the unprivileged `tietide` user (apps/api/Dockerfile).
   #   docker compose -f infra/docker/docker-compose.prod.yml --profile migrate \
   #     run --rm migrate
   # Run it once per deploy that ships a schema change, BEFORE the apps start.
+  # The stage's CMD already runs `prisma migrate deploy` with the bundled schema.
   migrate:
     profiles: ['migrate']
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
-      target: builder
-    image: tietide-api-builder:latest
+      target: migrate
+    image: tietide-api-migrate:latest
     restart: 'no'
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-tietide}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tietide}?schema=public
-    working_dir: /repo
-    command: ['pnpm', '--filter', '@tietide/api', 'exec', 'prisma', 'migrate', 'deploy']
     depends_on:
       postgres:
         condition: service_healthy

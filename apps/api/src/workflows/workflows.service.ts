@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { ActivationService } from '../provider-triggers/activation.service';
+import { EntitlementsService } from '../billing/entitlements.service';
 import type { CreateWorkflowDto } from './dto/create-workflow.dto';
 import type { UpdateWorkflowDto } from './dto/update-workflow.dto';
 import type { WorkflowResponseDto } from './dto/workflow-response.dto';
@@ -97,6 +98,7 @@ export class WorkflowsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditLogService,
     private readonly activation: ActivationService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   async create(
@@ -104,6 +106,7 @@ export class WorkflowsService {
     userId: string,
     dto: CreateWorkflowDto,
   ): Promise<WorkflowResponseDto> {
+    await this.entitlements.assertCanCreateWorkflow(organizationId);
     assertExecutableDefinition(dto.definition);
 
     const row = await this.prisma.$transaction(async (tx) => {
@@ -163,6 +166,13 @@ export class WorkflowsService {
     if (filter.cursor) {
       const cursor = decodeKeysetCursor(filter.cursor);
       const createdAt = new Date(cursor.v as string);
+      // Guard against a well-formed cursor carrying a non-date `v` (e.g. an
+      // attacker-supplied base64url payload). An Invalid Date would otherwise
+      // reach Prisma and surface as a raw 500 (W5.41) — mirror the executions
+      // cursor guard and reject as a 400 before touching the DB.
+      if (Number.isNaN(createdAt.getTime())) {
+        throw new BadRequestException('Invalid cursor');
+      }
       where = {
         AND: [
           baseWhere,

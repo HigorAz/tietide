@@ -10,6 +10,7 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { DecryptedConnection } from '@tietide/sdk';
 import type { S3CustomConfig } from '@tietide/shared';
+import { assertUrlAllowed, type LookupFn } from '../../actions/ssrf-guard';
 
 export interface S3PutResult {
   bucket: string;
@@ -58,6 +59,25 @@ export interface S3DeleteResult {
 
 @Injectable()
 export class S3ClientFactory {
+  // The S3-compatible `endpoint` (R2/MinIO/etc.) is fully user-controlled, so
+  // an author could point it at an internal/metadata address and use the worker
+  // as an SSRF proxy. We resolve+validate the endpoint before every operation.
+  // Real AWS S3 omits `endpoint` (region-derived), so there is nothing to guard
+  // in that path. `lookupFn` is injectable so tests can simulate DNS-based SSRF.
+  private readonly lookupFn?: LookupFn;
+
+  constructor(lookupFn?: LookupFn) {
+    this.lookupFn = lookupFn;
+  }
+
+  // Validates a user-supplied custom endpoint against the SSRF guard. No-op when
+  // the connection uses the default AWS endpoint (no `endpoint` configured).
+  async assertEndpointAllowed(connection: DecryptedConnection<S3CustomConfig>): Promise<void> {
+    const endpoint = connection.config.endpoint;
+    if (!endpoint) return;
+    await assertUrlAllowed(endpoint, this.lookupFn);
+  }
+
   buildClient(connection: DecryptedConnection<S3CustomConfig>): S3Client {
     const cfg = connection.config;
     return new S3Client({
@@ -80,6 +100,7 @@ export class S3ClientFactory {
     cacheControl?: string;
     metadata?: Record<string, string>;
   }): Promise<S3PutResult> {
+    await this.assertEndpointAllowed(args.connection);
     const client = this.buildClient(args.connection);
     const result = await client.send(
       new PutObjectCommand({
@@ -115,6 +136,7 @@ export class S3ClientFactory {
     cacheControl?: string;
     metadata?: Record<string, string>;
   }): Promise<S3PutResult> {
+    await this.assertEndpointAllowed(args.connection);
     const client = this.buildClient(args.connection);
     const upload = new Upload({
       client,
@@ -153,6 +175,7 @@ export class S3ClientFactory {
     bucket: string;
     key: string;
   }): Promise<S3GetResult> {
+    await this.assertEndpointAllowed(args.connection);
     const client = this.buildClient(args.connection);
     const result = await client.send(new GetObjectCommand({ Bucket: args.bucket, Key: args.key }));
 
@@ -179,6 +202,7 @@ export class S3ClientFactory {
     continuationToken?: string;
     maxKeys?: number;
   }): Promise<S3ListResult> {
+    await this.assertEndpointAllowed(args.connection);
     const client = this.buildClient(args.connection);
     const result = await client.send(
       new ListObjectsV2Command({
@@ -210,6 +234,7 @@ export class S3ClientFactory {
     bucket: string;
     key: string;
   }): Promise<S3DeleteResult> {
+    await this.assertEndpointAllowed(args.connection);
     const client = this.buildClient(args.connection);
     const result = await client.send(
       new DeleteObjectCommand({ Bucket: args.bucket, Key: args.key }),

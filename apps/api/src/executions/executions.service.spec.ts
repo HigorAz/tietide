@@ -34,7 +34,7 @@ describe('ExecutionsService', () => {
   let prisma: PrismaMock;
   let queue: QueueMock;
   let audit: { log: jest.Mock };
-  let entitlements: { assertCanRun: jest.Mock };
+  let entitlements: { assertCanRun: jest.Mock; enforceRunCapAround: jest.Mock };
 
   const userId = 'user-uuid-1';
   const organizationId = 'org-uuid-1';
@@ -56,7 +56,17 @@ describe('ExecutionsService', () => {
     };
     queue = { add: jest.fn(async () => undefined) };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
-    entitlements = { assertCanRun: jest.fn().mockResolvedValue(undefined) };
+    entitlements = {
+      assertCanRun: jest.fn().mockResolvedValue(undefined),
+      // The atomic run-cap wrapper just runs the caller's create against the
+      // prisma mock (tx === prisma in these unit tests) by default; the cap
+      // re-check is covered in entitlements.service.spec.ts.
+      enforceRunCapAround: jest
+        .fn()
+        .mockImplementation((_orgId: string, create: (tx: typeof prisma) => unknown) =>
+          create(prisma),
+        ),
+    };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -133,6 +143,27 @@ describe('ExecutionsService', () => {
           triggerType: 'manual',
         }),
       );
+    });
+
+    it('creates the execution through the atomic run-cap wrapper (W5.25)', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'manual',
+        triggerData: null,
+        idempotencyKey: null,
+        createdAt: new Date(),
+      });
+
+      await service.triggerManual(organizationId, userId, workflowId, {});
+
+      expect(entitlements.enforceRunCapAround).toHaveBeenCalledWith(
+        organizationId,
+        expect.any(Function),
+      );
+      expect(prisma.workflowExecution.create).toHaveBeenCalledTimes(1);
     });
 
     it('should throw NotFoundException when the workflow does not exist', async () => {

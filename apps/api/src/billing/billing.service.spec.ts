@@ -31,6 +31,7 @@ describe('BillingService', () => {
     subscription: { update: jest.Mock; findUnique: jest.Mock; findFirst: jest.Mock };
     organization: { findUnique: jest.Mock };
     organizationMember: { count: jest.Mock };
+    processedStripeEvent: { create: jest.Mock };
   };
   let stripe: jest.Mocked<
     Pick<
@@ -48,9 +49,14 @@ describe('BillingService', () => {
 
   beforeEach(() => {
     prisma = {
-      subscription: { update: jest.fn(), findUnique: jest.fn(), findFirst: jest.fn() },
+      subscription: {
+        update: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({ lastStripeEventAt: null }),
+        findFirst: jest.fn(),
+      },
       organization: { findUnique: jest.fn() },
       organizationMember: { count: jest.fn() },
+      processedStripeEvent: { create: jest.fn().mockResolvedValue({}) },
     };
     stripe = {
       isConfigured: jest.fn().mockReturnValue(true),
@@ -107,9 +113,13 @@ describe('BillingService', () => {
     });
   });
 
+  // A representative event timestamp (seconds since epoch → Date) for ordering.
+  const T1 = new Date(1_700_000_000 * 1000);
+  const T2 = new Date(1_700_009_999 * 1000); // strictly later than T1
+
   describe('syncFromStripeSubscription', () => {
     it('maps the Stripe subscription onto the workspace row', async () => {
-      await service.syncFromStripeSubscription(makeStripeSub());
+      await service.syncFromStripeSubscription(makeStripeSub(), T1);
 
       expect(prisma.subscription.update).toHaveBeenCalledWith({
         where: { organizationId: ORG },
@@ -123,12 +133,13 @@ describe('BillingService', () => {
           meteredSubItemId: 'si_metered',
           seats: 3,
           cancelAtPeriodEnd: false,
+          lastStripeEventAt: T1,
         }),
       });
     });
 
     it('maps past_due status through', async () => {
-      await service.syncFromStripeSubscription(makeStripeSub({ status: 'past_due' }));
+      await service.syncFromStripeSubscription(makeStripeSub({ status: 'past_due' }), T1);
       expect(prisma.subscription.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ status: 'PAST_DUE' }) }),
       );
@@ -136,18 +147,37 @@ describe('BillingService', () => {
 
     it('falls back to the stored customer id when metadata lacks the org', async () => {
       prisma.subscription.findFirst.mockResolvedValue({ organizationId: ORG });
-      await service.syncFromStripeSubscription(makeStripeSub({ metadata: {} as Stripe.Metadata }));
+      await service.syncFromStripeSubscription(
+        makeStripeSub({ metadata: {} as Stripe.Metadata }),
+        T1,
+      );
       expect(prisma.subscription.findFirst).toHaveBeenCalledWith({
         where: { stripeCustomerId: 'cus_1' },
         select: { organizationId: true },
       });
       expect(prisma.subscription.update).toHaveBeenCalled();
     });
+
+    it('applies a newer in-order event and advances lastStripeEventAt', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({ lastStripeEventAt: T1 });
+      await service.syncFromStripeSubscription(makeStripeSub(), T2);
+      expect(prisma.subscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ lastStripeEventAt: T2 }) }),
+      );
+    });
+
+    it('ignores a stale (older) event so a cancelled workspace is not re-elevated', async () => {
+      // The workspace already processed a newer event (T2, the deletion).
+      prisma.subscription.findUnique.mockResolvedValue({ lastStripeEventAt: T2 });
+      // A retried/out-of-order subscription.updated arrives stamped T1 (older).
+      await service.syncFromStripeSubscription(makeStripeSub(), T1);
+      expect(prisma.subscription.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('markSubscriptionDeleted', () => {
     it('drops the workspace back to FREE/CANCELED and clears Stripe ids', async () => {
-      await service.markSubscriptionDeleted(makeStripeSub());
+      await service.markSubscriptionDeleted(makeStripeSub(), T1);
       expect(prisma.subscription.update).toHaveBeenCalledWith({
         where: { organizationId: ORG },
         data: expect.objectContaining({
@@ -155,8 +185,32 @@ describe('BillingService', () => {
           status: 'CANCELED',
           stripeSubscriptionId: null,
           meteredSubItemId: null,
+          lastStripeEventAt: T1,
         }),
       });
+    });
+
+    it('ignores a stale delete event', async () => {
+      prisma.subscription.findUnique.mockResolvedValue({ lastStripeEventAt: T2 });
+      await service.markSubscriptionDeleted(makeStripeSub(), T1);
+      expect(prisma.subscription.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('recordStripeEvent', () => {
+    it('returns true the first time an event id is seen', async () => {
+      const ok = await service.recordStripeEvent('evt_1', 'customer.subscription.updated');
+      expect(ok).toBe(true);
+      expect(prisma.processedStripeEvent.create).toHaveBeenCalledWith({
+        data: { eventId: 'evt_1', type: 'customer.subscription.updated' },
+      });
+    });
+
+    it('returns false when the event id was already recorded (P2002)', async () => {
+      const dup = Object.assign(new Error('unique'), { code: 'P2002' });
+      prisma.processedStripeEvent.create.mockRejectedValue(dup);
+      const ok = await service.recordStripeEvent('evt_1', 'customer.subscription.updated');
+      expect(ok).toBe(false);
     });
   });
 });

@@ -1,4 +1,10 @@
-import { assertUrlAllowed, isBlockedAddress, SsrfBlockedError, type LookupFn } from './ssrf-guard';
+import {
+  assertUrlAllowed,
+  assertUrlAllowedWithAddresses,
+  isBlockedAddress,
+  SsrfBlockedError,
+  type LookupFn,
+} from './ssrf-guard';
 
 describe('ssrf-guard', () => {
   describe('isBlockedAddress', () => {
@@ -76,6 +82,25 @@ describe('ssrf-guard', () => {
       expect(url.hostname).toBe('api.example.com');
     });
 
+    it('rejects a literal IPv4-mapped loopback URL the WHATWG parser normalizes to hex (no DNS lookup)', async () => {
+      // new URL('http://[::ffff:127.0.0.1]/') normalizes the host to the hex
+      // form [::ffff:7f00:1], which flows through the literal-IP branch (no DNS).
+      // This is the W5.3 bypass class: regression-guard it end-to-end.
+      const lookup = jest.fn();
+      await expect(
+        assertUrlAllowed('http://[::ffff:127.0.0.1]/', lookup as unknown as LookupFn),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('rejects a literal IPv4-mapped cloud-metadata URL in hex-normalized form', async () => {
+      const lookup = jest.fn();
+      await expect(
+        assertUrlAllowed('http://[::ffff:169.254.169.254]/', lookup as unknown as LookupFn),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
     it('rejects a hostname that resolves to a hex IPv4-mapped loopback', async () => {
       // WHATWG URL normalizes [::ffff:127.0.0.1] to the hex form ::ffff:7f00:1.
       const lookup: LookupFn = async () => [{ address: '::ffff:7f00:1', family: 6 }];
@@ -96,6 +121,41 @@ describe('ssrf-guard', () => {
       await expect(assertUrlAllowed('https://nope.invalid/', lookup)).rejects.toBeInstanceOf(
         SsrfBlockedError,
       );
+    });
+  });
+
+  describe('assertUrlAllowedWithAddresses', () => {
+    it('surfaces the validated resolved addresses so the caller can pin the socket (W5.6)', async () => {
+      const lookup: LookupFn = async () => [
+        { address: '93.184.216.34', family: 4 },
+        { address: '2606:2800:220:1:248:1893:25c8:1946', family: 6 },
+      ];
+      const { url, addresses } = await assertUrlAllowedWithAddresses(
+        'https://api.example.com/path',
+        lookup,
+      );
+      expect(url.hostname).toBe('api.example.com');
+      expect(addresses).toEqual(['93.184.216.34', '2606:2800:220:1:248:1893:25c8:1946']);
+    });
+
+    it('returns the literal IP itself as the single validated address (no DNS lookup)', async () => {
+      const lookup = jest.fn();
+      const { addresses } = await assertUrlAllowedWithAddresses(
+        'https://203.0.113.7/health',
+        lookup as unknown as LookupFn,
+      );
+      expect(addresses).toEqual(['203.0.113.7']);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('rejects (never surfaces addresses) when any resolved address is private', async () => {
+      const lookup: LookupFn = async () => [
+        { address: '93.184.216.34', family: 4 },
+        { address: '10.0.0.9', family: 4 },
+      ];
+      await expect(
+        assertUrlAllowedWithAddresses('https://evil.example.com/', lookup),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
     });
   });
 });

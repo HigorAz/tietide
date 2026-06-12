@@ -115,6 +115,7 @@ export class WorkflowVersionsService {
 
     await this.audit.log({
       userId,
+      organizationId,
       action: 'workflow.version.restore',
       resource: 'workflow',
       resourceId: workflowId,

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { createHash } from 'crypto';
@@ -124,7 +124,16 @@ export class ProviderWebhooksService {
       }),
     );
     if (!verified) {
-      throw new UnauthorizedException('Invalid signature');
+      // Uniform generic response: a bad signature returns the SAME status and
+      // message as a missing/inactive/mismatched subscription so an
+      // unauthenticated caller cannot use the response to distinguish a real
+      // subscription id from a non-existent one (existence oracle, W5.30). The
+      // real reason is kept in internal logs only.
+      this.log.warn(
+        { provider: input.provider, subscriptionId: input.subscriptionId },
+        'Provider webhook signature verification failed',
+      );
+      throw new NotFoundException('Provider webhook not found');
     }
 
     const triggerData = this.parseBody(input.rawBody);
@@ -332,9 +341,52 @@ export class ProviderWebhooksService {
         }
         return null;
       }
+      case 'microsoft':
+        // MS Graph batches changes under value[]. Anchor on the per-item natural
+        // keys (resourceData.id + changeType, plus the subscription expiry as a
+        // weak per-delivery salt) so distinct events get distinct keys instead of
+        // collapsing onto a full-body hash whenever envelopes serialize alike.
+        return this.microsoftNaturalKey(data);
+      case 'google':
+        // Pub/Sub assigns a monotonically increasing message number per channel.
+        return header('x-goog-message-number');
       default:
-        return null; // mailchimp/calendly/google/microsoft → body-hash fallback
+        return null; // mailchimp/calendly → body-hash fallback
     }
+  }
+
+  // Build a per-notification natural key for MS Graph from the value[] batch.
+  // Each entry contributes its resourceData.id + changeType (the per-item anchor);
+  // entries with no id (e.g. the OneDrive /me/drive/root delta-style envelope,
+  // which carries no per-change item id) contribute their changeType +
+  // subscriptionExpirationDateTime so at least the constant-envelope case stays
+  // self-consistent. Returns null when the body has no usable value[] so the
+  // caller falls back to the body hash.
+  private microsoftNaturalKey(data: Record<string, unknown>): string | null {
+    const value = data.value;
+    if (!Array.isArray(value) || value.length === 0) return null;
+    const parts: string[] = [];
+    for (const entry of value) {
+      if (!entry || typeof entry !== 'object') continue;
+      const e = entry as {
+        changeType?: unknown;
+        subscriptionExpirationDateTime?: unknown;
+        resourceData?: { id?: unknown } | null;
+      };
+      const change = typeof e.changeType === 'string' ? e.changeType : '';
+      const id =
+        e.resourceData && typeof e.resourceData === 'object' && e.resourceData.id != null
+          ? String(e.resourceData.id)
+          : '';
+      const exp =
+        typeof e.subscriptionExpirationDateTime === 'string'
+          ? e.subscriptionExpirationDateTime
+          : '';
+      const anchor = id !== '' ? `${id}:${change}` : `${change}:${exp}`;
+      if (anchor !== ':') parts.push(anchor);
+    }
+    if (parts.length === 0) return null;
+    return createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 32);
   }
 
   private parseBody(rawBody: Buffer): Record<string, unknown> {

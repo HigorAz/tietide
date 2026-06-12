@@ -86,5 +86,53 @@ describe('DlqService', () => {
 
       expect(dlqQueue.add).toHaveBeenCalledTimes(1);
     });
+
+    it('should redact sensitive fields in triggerData before persisting to the DLQ', async () => {
+      const summary: FailedJobSummary = {
+        jobId: 'job-4',
+        attemptsMade: MAX_EXECUTION_ATTEMPTS,
+        attemptsAllowed: MAX_EXECUTION_ATTEMPTS,
+        failedAt: new Date(),
+        error: 'database down',
+        payload: {
+          executionId: 'exec-4',
+          workflowId: 'wf-4',
+          triggerType: 'webhook',
+          triggerData: {
+            email: 'customer@example.com',
+            authorization: 'Bearer super-secret-token',
+            nested: { apiKey: 'sk-live-123', other: 'keep' },
+          },
+        },
+      };
+
+      await service.publishFailed(summary);
+
+      const [, body] = dlqQueue.add.mock.calls[0];
+      expect(body.payload.triggerData).toEqual({
+        email: 'customer@example.com',
+        authorization: '[REDACTED]',
+        nested: { apiKey: '[REDACTED]', other: 'keep' },
+      });
+    });
+
+    it('should bound DLQ retention with an age-based removeOnComplete/removeOnFail policy', async () => {
+      const summary: FailedJobSummary = {
+        jobId: 'job-5',
+        attemptsMade: MAX_EXECUTION_ATTEMPTS,
+        attemptsAllowed: MAX_EXECUTION_ATTEMPTS,
+        failedAt: new Date(),
+        error: 'database down',
+        payload: { executionId: 'exec-5', workflowId: 'wf-5', triggerType: 'manual' },
+      };
+
+      await service.publishFailed(summary);
+
+      const [, , opts] = dlqQueue.add.mock.calls[0];
+      expect(opts.removeOnComplete).toEqual(expect.objectContaining({ age: expect.any(Number) }));
+      expect(opts.removeOnFail).toEqual(expect.objectContaining({ age: expect.any(Number) }));
+      expect(opts.removeOnComplete.age).toBeGreaterThan(0);
+      expect(opts.removeOnFail.age).toBeGreaterThan(0);
+    });
   });
 });

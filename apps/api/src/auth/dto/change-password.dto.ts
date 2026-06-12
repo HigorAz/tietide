@@ -1,5 +1,6 @@
-import { IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH, PasswordPolicy } from './password-policy';
 
 export class ChangePasswordDto {
   @ApiProperty({ minLength: 1, maxLength: 128, description: 'The account’s current password' })
@@ -8,13 +9,9 @@ export class ChangePasswordDto {
   @MaxLength(128)
   currentPassword!: string;
 
-  @ApiProperty({ minLength: 8, maxLength: 128 })
-  @IsString()
-  @MinLength(8)
-  @MaxLength(128)
-  // Same strength policy as registration: at least one letter and one digit.
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
-    message: 'password must contain at least one letter and one number',
-  })
+  @ApiProperty({ minLength: MIN_PASSWORD_LENGTH, maxLength: MAX_PASSWORD_BYTES })
+  // Same strength policy as registration: letter+digit, no common password, within
+  // bcrypt's 72-byte input.
+  @PasswordPolicy()
   newPassword!: string;
 }

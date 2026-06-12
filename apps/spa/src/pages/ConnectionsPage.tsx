@@ -85,11 +85,13 @@ export function ConnectionsPage(): JSX.Element {
 
   useEffect(() => {
     if (!closing || !initialOutcome) return;
+    // No `message` is forwarded: the OAuth bridge URL is attacker-controllable,
+    // so we never echo a raw param. The opener derives its own fixed copy from
+    // `status` (W5.44).
     const payload = {
       type: 'tietide:oauth:done',
       status: initialOutcome.status,
       connectionId: initialOutcome.connectionId,
-      message: initialOutcome.message,
     };
     try {
       window.opener?.postMessage(payload, window.location.origin);
@@ -119,7 +121,8 @@ export function ConnectionsPage(): JSX.Element {
       if (initialOutcome.status === 'success') {
         toast({ tone: 'success', message: 'Connection added' });
       } else {
-        toast({ tone: 'error', message: initialOutcome.message ?? 'OAuth failed' });
+        // Fixed, status-keyed copy — never the raw `message` URL param (W5.44).
+        toast({ tone: 'error', message: 'OAuth failed' });
       }
       window.history.replaceState({}, '', window.location.pathname);
       setClosing(false);

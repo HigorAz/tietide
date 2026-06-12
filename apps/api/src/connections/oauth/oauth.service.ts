@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger, UnauthorizedException } from '
 import { ConfigService } from '@nestjs/config';
 import { ConnectionType, PROVIDER_CONFIG_SCHEMAS, type ProviderConfigMap } from '@tietide/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CryptoService } from '../../crypto/crypto.service';
 import { ConnectionsService } from '../connections.service';
 import { OAuthProviderRegistry } from './oauth-provider.registry';
 import { OAuthStateService } from './oauth-state.service';
@@ -11,6 +12,13 @@ import { generatePkcePair } from './pkce';
 const MAX_ERROR_MESSAGE_LEN = 200;
 /** OAuth state (and its PKCE verifier) lives this long before it is unusable. */
 const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
+/**
+ * The PKCE verifier is encrypted at rest (W5.29). The `code_verifier` column is a
+ * single String, so we pack the libsodium nonce and ciphertext as `nonce:ciphertext`.
+ * Both halves are base64 (ORIGINAL variant — `+/=` only), so a colon is an
+ * unambiguous, collision-free separator.
+ */
+const VERIFIER_PACK_SEP = ':';
 
 export class OAuthCallbackError extends Error {
   constructor(public readonly providerErrorCode: string) {
@@ -54,6 +62,7 @@ export class OAuthService {
     private readonly connections: ConnectionsService,
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly crypto: CryptoService,
   ) {}
 
   async start(
@@ -78,12 +87,16 @@ export class OAuthService {
     const nonce = randomUUID();
     const { verifier, challenge } = generatePkcePair();
 
+    // Encrypt the PKCE verifier at rest (W5.29): a DB read alone must not leak it.
+    const encrypted = this.crypto.encrypt(verifier);
+    const packedVerifier = `${encrypted.nonce}${VERIFIER_PACK_SEP}${encrypted.ciphertext}`;
+
     await this.prisma.oAuthState.create({
       data: {
         jti: nonce,
         userId,
         provider: provider.id,
-        codeVerifier: verifier,
+        codeVerifier: packedVerifier,
         expiresAt: new Date(Date.now() + OAUTH_STATE_TTL_MS),
       },
     });
@@ -151,14 +164,27 @@ export class OAuthService {
     }
 
     const provider = this.registry.get(decoded.provider);
+    const codeVerifier = this.unpackVerifier(stateRow.codeVerifier);
     const exchanged = await provider.exchangeCode({
       code: input.code,
       redirectUri: provider.redirectUri(),
-      codeVerifier: stateRow.codeVerifier,
+      codeVerifier,
     });
 
     const schema = PROVIDER_CONFIG_SCHEMAS[provider.id as keyof ProviderConfigMap];
     schema.parse(exchanged.config);
+
+    // Re-verify membership at callback time (W5.28). The org id was bound into the
+    // signed state when start() ran behind OrgContextGuard, but membership can have
+    // been revoked within the state TTL. Without this check the callback would write
+    // a live-refresh-token connection into a workspace the user no longer belongs to.
+    const membership = await this.prisma.organizationMember.findFirst({
+      where: { organizationId: decoded.organizationId, userId: decoded.userId },
+      select: { userId: true },
+    });
+    if (!membership) {
+      throw new BadRequestException('Invalid or expired OAuth state');
+    }
 
     const created = await this.connections.create(decoded.organizationId, decoded.userId, {
       type: ConnectionType.OAUTH2,
@@ -186,6 +212,21 @@ export class OAuthService {
     const truncated = message.slice(0, MAX_ERROR_MESSAGE_LEN);
     const params = new URLSearchParams({ status: 'error', message: truncated });
     return `${this.spaBaseUrl()}/connections?${params.toString()}`;
+  }
+
+  /**
+   * Reverse the `nonce:ciphertext` packing from `start` and decrypt (W5.29). Only
+   * the first separator is honoured so a base64 ciphertext containing no colon is
+   * split cleanly.
+   */
+  private unpackVerifier(packed: string): string {
+    const sepIndex = packed.indexOf(VERIFIER_PACK_SEP);
+    if (sepIndex === -1) {
+      throw new BadRequestException('Invalid or expired OAuth state');
+    }
+    const nonce = packed.slice(0, sepIndex);
+    const ciphertext = packed.slice(sepIndex + 1);
+    return this.crypto.decrypt(ciphertext, nonce);
   }
 
   private spaBaseUrl(): string {

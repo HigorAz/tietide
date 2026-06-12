@@ -159,6 +159,11 @@ model Subscription {
   currentPeriodStart   DateTime?          @map("current_period_start")
   currentPeriodEnd     DateTime?          @map("current_period_end")
   cancelAtPeriodEnd    Boolean            @default(false) @map("cancel_at_period_end")
+  // High-water mark: the `created` timestamp of the most recently applied Stripe
+  // event. Out-of-order / retried webhooks older than this are ignored so a stale
+  // subscription.updated can't re-elevate a workspace already cancelled by a newer
+  // subscription.deleted (W5.17).
+  lastStripeEventAt    DateTime?          @map("last_stripe_event_at")
   createdAt            DateTime           @default(now()) @map("created_at")
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
@@ -166,6 +171,18 @@ model Subscription {
 
   @@index([stripeCustomerId])
   @@map("subscriptions")
+}
+
+// Idempotency ledger for Stripe webhook delivery. Every event id is recorded once;
+// a retried delivery hits the unique constraint and is short-circuited as already
+// processed, so handlers never run twice (W5.17).
+model ProcessedStripeEvent {
+  id         String   @id @default(uuid())
+  eventId    String   @unique @map("event_id")
+  type       String?
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@map("processed_stripe_events")
 }
 
 model OrganizationMember {
@@ -488,11 +505,16 @@ model AuditLog {
   metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at")
 
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // SetNull (not Cascade): deleting a workspace must RETAIN its audit rows for
+  // forensics. The org_id is nulled rather than the row being wiped (W5.20).
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   user         User          @relation(fields: [userId], references: [id])
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
+  // Backs the (non-org-scoped) SELECT DISTINCT action / resource sweeps in
+  // AuditLogService.listFilterValues — avoids a full table scan of audit_logs.
+  @@index([action, resource])
   @@map("audit_logs")
 }
 

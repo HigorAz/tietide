@@ -1,6 +1,7 @@
-import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { MAX_PASSWORD_BYTES, MIN_PASSWORD_LENGTH, PasswordPolicy } from './password-policy';
 
 export class RegisterDto {
   @ApiProperty({ example: 'user@example.com', maxLength: 255 })
@@ -9,16 +10,11 @@ export class RegisterDto {
   @MaxLength(255)
   email!: string;
 
-  @ApiProperty({ minLength: 8, maxLength: 128 })
-  @IsString()
-  @MinLength(8)
-  @MaxLength(128)
-  // Strength policy: require at least one letter and one digit, rejecting
-  // all-numeric/all-alphabetic passwords. (HIBP breach check deferred — needs an
+  @ApiProperty({ minLength: MIN_PASSWORD_LENGTH, maxLength: MAX_PASSWORD_BYTES })
+  // Strength policy: at least one letter and one digit, no known common password,
+  // and within bcrypt's 72-byte input. (HIBP breach check deferred — needs an
   // external k-anonymity lookup.)
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
-    message: 'password must contain at least one letter and one number',
-  })
+  @PasswordPolicy()
   password!: string;
 
   @ApiProperty({ minLength: 1, maxLength: 100 })

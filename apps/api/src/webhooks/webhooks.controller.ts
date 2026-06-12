@@ -7,17 +7,32 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { SkipThrottle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { WebhooksService } from './webhooks.service';
 import { WebhookTriggerResponseDto } from './dto/webhook-trigger-response.dto';
+import {
+  DEFAULT_WEBHOOK_THROTTLE_LIMIT,
+  DEFAULT_WEBHOOK_THROTTLE_TTL_MS,
+  IP_THROTTLER_NAME,
+} from '../common/throttler/throttler.config';
 
 interface RawBodyRequest extends Request {
   rawBody?: Buffer;
 }
 
 @ApiTags('webhooks')
-@SkipThrottle()
+// W5.10: public, unauthenticated ingress that does a Prisma findUnique BEFORE
+// any signature check. Previously @SkipThrottle() (never limited) — replaced
+// with a generous-but-bounded per-IP cap via the `ip` named throttler so a
+// flood of arbitrary :path values can't drive unbounded pre-auth DB lookups.
+// Real providers fan out across many IPs, so 300/IP/min leaves them untouched.
+@Throttle({
+  [IP_THROTTLER_NAME]: {
+    ttl: DEFAULT_WEBHOOK_THROTTLE_TTL_MS,
+    limit: DEFAULT_WEBHOOK_THROTTLE_LIMIT,
+  },
+})
 @Controller('webhooks')
 export class WebhooksController {
   constructor(private readonly webhooks: WebhooksService) {}

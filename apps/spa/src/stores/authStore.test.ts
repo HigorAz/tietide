@@ -52,6 +52,7 @@ const resetStore = (): void => {
     hydrated: false,
   });
   localStorage.clear();
+  sessionStorage.clear();
 };
 
 describe('authStore', () => {
@@ -75,7 +76,9 @@ describe('authStore', () => {
       const state = useAuthStore.getState();
       expect(state.token).toBe('jwt-123');
       expect(state.user).toEqual(sampleUser);
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('jwt-123');
+      // The session token lives in sessionStorage (W5.43), never localStorage.
+      expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('jwt-123');
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     });
 
     it('should not write a token when the login request fails', async () => {
@@ -88,7 +91,7 @@ describe('authStore', () => {
       const state = useAuthStore.getState();
       expect(state.token).toBeNull();
       expect(state.user).toBeNull();
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+      expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
       expect(mockedGetMe).not.toHaveBeenCalled();
     });
   });
@@ -105,7 +108,7 @@ describe('authStore', () => {
       const state = useAuthStore.getState();
       expect(state.token).toBeNull();
       expect(state.user).toBeNull();
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+      expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
       expect(mockedGetMe).not.toHaveBeenCalled();
     });
 
@@ -134,7 +137,8 @@ describe('authStore', () => {
       expect(mockedVerifyEmail).toHaveBeenCalledWith('a-token');
       expect(state.token).toBe('jwt-verify');
       expect(state.user).toEqual(sampleUser);
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('jwt-verify');
+      expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBe('jwt-verify');
+      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     });
 
     it('does not write a token when verification fails', async () => {
@@ -148,22 +152,22 @@ describe('authStore', () => {
   });
 
   describe('logout', () => {
-    it('should clear state and localStorage', () => {
+    it('should clear state and the stored token', () => {
       useAuthStore.setState({ user: sampleUser, token: 'jwt-123' });
-      localStorage.setItem(TOKEN_STORAGE_KEY, 'jwt-123');
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, 'jwt-123');
 
       useAuthStore.getState().logout();
 
       const state = useAuthStore.getState();
       expect(state.token).toBeNull();
       expect(state.user).toBeNull();
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+      expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     });
   });
 
   describe('hydrate', () => {
-    it('should lift the token from localStorage into state and fetch the user', async () => {
-      localStorage.setItem(TOKEN_STORAGE_KEY, 'jwt-123');
+    it('should lift the token from sessionStorage into state and fetch the user', async () => {
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, 'jwt-123');
       mockedGetMe.mockResolvedValueOnce(sampleUser);
 
       await useAuthStore.getState().hydrate();
@@ -183,7 +187,7 @@ describe('authStore', () => {
     });
 
     it('should drop an invalid stored token (and mark hydrated) when getMe fails', async () => {
-      localStorage.setItem(TOKEN_STORAGE_KEY, 'expired-jwt');
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, 'expired-jwt');
       mockedGetMe.mockRejectedValueOnce(new Error('401 Unauthorized'));
 
       await useAuthStore.getState().hydrate();
@@ -192,11 +196,11 @@ describe('authStore', () => {
       expect(state.token).toBeNull();
       expect(state.user).toBeNull();
       expect(state.hydrated).toBe(true);
-      expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+      expect(sessionStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
     });
 
     it('loads the membership list and activates the persisted org on hydrate', async () => {
-      localStorage.setItem(TOKEN_STORAGE_KEY, 'jwt-123');
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, 'jwt-123');
       localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, 'b');
       mockedGetMe.mockResolvedValueOnce(sampleUser);
       mockedListOrganizations.mockResolvedValueOnce([org('a'), org('b')]);

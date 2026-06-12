@@ -43,8 +43,16 @@ export class UsageReportProcessor extends WorkerHost {
     const nowSeconds = Math.floor(now.getTime() / 1000);
     const dayKey = now.toISOString().slice(0, 10);
 
+    const monthStart = startOfMonthUtc(now);
+
     for (const sub of subs) {
-      const since = sub.currentPeriodStart ?? startOfMonthUtc(now);
+      // Clamp the counting window to the period containing `now`. `currentPeriodStart`
+      // is updated only by Stripe webhooks; if a webhook lags past a period boundary it
+      // still points at the OLD (larger) period. Counting from a stale start and then
+      // `set`ting that total into the NEW Stripe period would over-bill, so we never
+      // let the window reach earlier than the month containing the report timestamp.
+      const periodStart = sub.currentPeriodStart ?? monthStart;
+      const since = periodStart > monthStart ? periodStart : monthStart;
       const quantity = await this.prisma.workflowExecution.count({
         where: {
           workflow: { organizationId: sub.organizationId },

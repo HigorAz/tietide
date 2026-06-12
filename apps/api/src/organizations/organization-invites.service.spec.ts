@@ -28,7 +28,7 @@ describe('OrganizationInvitesService', () => {
   let prisma: PrismaMock;
   let mailer: { sendOrganizationInviteEmail: jest.Mock };
   let audit: { log: jest.Mock };
-  let entitlements: { assertCanAddSeat: jest.Mock };
+  let entitlements: { assertCanAddSeat: jest.Mock; enforceSeatCapAround: jest.Mock };
 
   const orgId = 'org-uuid-1';
   const actingUserId = 'user-acting';
@@ -51,7 +51,17 @@ describe('OrganizationInvitesService', () => {
     };
     mailer = { sendOrganizationInviteEmail: jest.fn().mockResolvedValue(undefined) };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
-    entitlements = { assertCanAddSeat: jest.fn().mockResolvedValue(undefined) };
+    entitlements = {
+      assertCanAddSeat: jest.fn().mockResolvedValue(undefined),
+      // The atomic seat-cap wrapper just runs the caller's create against the
+      // prisma mock (tx === prisma in these unit tests) by default; the cap
+      // re-check is covered in entitlements.service.spec.ts.
+      enforceSeatCapAround: jest
+        .fn()
+        .mockImplementation((_orgId: string, create: (tx: typeof prisma) => unknown) =>
+          create(prisma),
+        ),
+    };
 
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
@@ -221,6 +231,44 @@ describe('OrganizationInvitesService', () => {
         }),
       );
       expect(result).toEqual({ id: orgId, name: 'Acme', slug: 'acme-1', role: 'MEMBER' });
+    });
+
+    it('creates the membership through the atomic seat-cap wrapper for a new member (W5.25)', async () => {
+      prisma.organizationInvite.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        organizationId: orgId,
+        email: 'new@x.com',
+        role: 'MEMBER',
+      });
+      prisma.organizationMember.findFirst.mockResolvedValue(null); // not already a member
+      prisma.organizationInvite.updateMany.mockResolvedValue({ count: 1 });
+      prisma.organizationMember.create.mockResolvedValue({ id: 'm-new' });
+      prisma.organization.findFirst.mockResolvedValue({ id: orgId, name: 'Acme', slug: 'acme-1' });
+      prisma.user.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.accept(targetUserId, 'new@x.com', { token: rawToken });
+
+      expect(entitlements.enforceSeatCapAround).toHaveBeenCalledWith(orgId, expect.any(Function));
+      expect(prisma.organizationMember.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT route an already-member re-accept through the seat-cap wrapper (W5.25)', async () => {
+      prisma.organizationInvite.findUnique.mockResolvedValue({
+        id: 'inv-1',
+        organizationId: orgId,
+        email: 'new@x.com',
+        role: 'MEMBER',
+      });
+      prisma.organizationMember.findFirst.mockResolvedValue(member('MEMBER', targetUserId)); // already a member
+      prisma.organizationInvite.updateMany.mockResolvedValue({ count: 1 });
+      prisma.organizationMember.create.mockResolvedValue({ id: 'm-existing' });
+      prisma.organization.findFirst.mockResolvedValue({ id: orgId, name: 'Acme', slug: 'acme-1' });
+      prisma.user.updateMany.mockResolvedValue({ count: 0 });
+
+      await service.accept(targetUserId, 'new@x.com', { token: rawToken });
+
+      expect(entitlements.enforceSeatCapAround).not.toHaveBeenCalled();
+      expect(prisma.organizationMember.create).toHaveBeenCalledTimes(1);
     });
 
     it('rejects (without consuming) when the workspace is at its seat cap', async () => {

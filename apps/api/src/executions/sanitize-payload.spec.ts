@@ -28,6 +28,38 @@ describe('sanitizePayload', () => {
     expect(result.safe).toBe('value');
   });
 
+  it('should redact crypto/credential keys covered by the log and audit redactors', () => {
+    const input = {
+      nonce: 'n1',
+      value: 'plaintext-secret',
+      config: { host: 'db' },
+      encryptionKey: 'k',
+      iv: 'init-vector',
+      privateKey: '-----BEGIN-----',
+      client_secret: 'cs',
+      configEncrypted: 'enc',
+      configNonce: 'cn',
+      valueEnc: 've',
+      valueNonce: 'vn',
+      hmacSecret: 'hs',
+      safe: 'value',
+    };
+    const result = sanitizePayload(input) as Record<string, unknown>;
+    expect(result.nonce).toBe('[REDACTED]');
+    expect(result.value).toBe('[REDACTED]');
+    expect(result.config).toBe('[REDACTED]');
+    expect(result.encryptionKey).toBe('[REDACTED]');
+    expect(result.iv).toBe('[REDACTED]');
+    expect(result.privateKey).toBe('[REDACTED]');
+    expect(result.client_secret).toBe('[REDACTED]');
+    expect(result.configEncrypted).toBe('[REDACTED]');
+    expect(result.configNonce).toBe('[REDACTED]');
+    expect(result.valueEnc).toBe('[REDACTED]');
+    expect(result.valueNonce).toBe('[REDACTED]');
+    expect(result.hmacSecret).toBe('[REDACTED]');
+    expect(result.safe).toBe('value');
+  });
+
   it('should match secret keys case-insensitively and via substring', () => {
     const input = {
       Password: 'a',
