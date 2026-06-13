@@ -3,7 +3,6 @@ import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { ReactFlowProvider } from 'reactflow';
 import { Canvas } from '@/components/editor/Canvas';
 import { DataPillPicker } from '@/components/editor/config/DataPillPicker';
-import { DocumentationPanel } from '@/components/editor/DocumentationPanel';
 import { EditorMobileToolbox } from '@/components/editor/EditorMobileToolbox';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { InspectorDock } from '@/components/editor/InspectorDock';
@@ -272,7 +271,6 @@ export function WorkflowEditorPage() {
               sheet on mobile and returns null when no field is focused. */}
           {!isMobile && <InspectorDock />}
           <DataPillPicker />
-          <DocumentationPanel workflowId={id} />
           {isMobile && <EditorMobileToolbox />}
         </div>
         <NodeConfigPanel />

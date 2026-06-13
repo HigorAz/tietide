@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type ComponentType } from 'react';
+import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { NodeConfigFormProps } from '../config/formRegistry';
@@ -28,6 +29,35 @@ const STEP_TITLES: Record<StepId, string> = {
 
 const ERROR_HANDLER_DESCRIPTION =
   'Reveals a red output handle. Connect it to route execution down an error path when this node fails.';
+
+// Config keys that do NOT represent a tested-output-affecting change: the
+// persisted sample itself, and the error-handler toggle (a routing concern, not
+// an input). Edits to anything else re-arm the Test step.
+const TEST_INVARIANT_KEYS = new Set<string>([PILL_SAMPLE_KEY, 'hasErrorHandler']);
+
+const hasPillSample = (config: Record<string, unknown>): boolean =>
+  config[PILL_SAMPLE_KEY] !== undefined;
+
+/** Order-independent fingerprint of the config that actually affects a test run. */
+const configFingerprint = (config: Record<string, unknown>): string => {
+  const stable = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (value && typeof value === 'object') {
+      return Object.keys(value as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((acc, k) => {
+          acc[k] = stable((value as Record<string, unknown>)[k]);
+          return acc;
+        }, {});
+    }
+    return value;
+  };
+  const stripped: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(config)) {
+    if (!TEST_INVARIANT_KEYS.has(k)) stripped[k] = v;
+  }
+  return JSON.stringify(stable(stripped));
+};
 
 /** Shallow field equality for ConnectionStepMeta — avoids re-registration churn. */
 const connectionMetaEqual = (a: ConnectionStepMeta, b: ConnectionStepMeta): boolean =>
@@ -59,9 +89,20 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
   const [connectionMeta, setConnectionMeta] = useState<ConnectionStepMeta | null>(null);
   const [slotEl, setSlotEl] = useState<HTMLElement | null>(null);
   const [configureValid, setConfigureValid] = useState(true);
-  // `tested` + its summary are driven by a successful live run from the Test step.
-  const [tested, setTested] = useState(false);
+  // Result of a *live* test run this session. 'none' until the user runs one;
+  // a prior tested node is recognised separately via its persisted pill sample.
+  const [liveResult, setLiveResult] = useState<'none' | 'ok' | 'fail'>('none');
   const [testSummary, setTestSummary] = useState<string | null>(null);
+
+  // The config fingerprint captured at the last known-good test. Seeded from the
+  // persisted sample on load so a re-opened tested node starts clean (not dirty),
+  // and refreshed after every successful live run.
+  const snapshotRef = useRef<string | null>(
+    hasPillSample(config) ? configFingerprint(config) : null,
+  );
+  // Latest config, readable from the (memoised) test-result callback.
+  const configRef = useRef(config);
+  configRef.current = config;
 
   // Reset owned state when the active node changes (never on a transient collapse —
   // keepMounted means there is no transient unmount).
@@ -70,14 +111,25 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
     prevNodeId.current = nodeId;
     setConnectionMeta(null);
     setConfigureValid(true);
-    setTested(false);
+    setLiveResult('none');
     setTestSummary(null);
+    snapshotRef.current = hasPillSample(config) ? configFingerprint(config) : null;
   }
 
   const handleTestResult = useCallback((r: { ok: boolean; summary: string }) => {
-    setTested(r.ok);
+    setLiveResult(r.ok ? 'ok' : 'fail');
     setTestSummary(r.ok ? r.summary : null);
+    if (r.ok) snapshotRef.current = configFingerprint(configRef.current);
   }, []);
+
+  // A node is "ever tested" if it carries a persisted sample OR a live run just
+  // succeeded — that flips the panel into the all-steps-expanded editing layout.
+  const everTested = hasPillSample(config) || liveResult === 'ok';
+  // Config changed since the last good test → re-arm Test + re-show Continue.
+  const dirty =
+    everTested && snapshotRef.current !== null && snapshotRef.current !== configFingerprint(config);
+  // The Test step shows "done" unless the last live run failed.
+  const testedDone = liveResult === 'fail' ? false : everTested;
 
   // Guard against churn: the picker registers primitive-derived meta, but a
   // shallow-equal-but-new object still triggers a useConfigSteps recompute via
@@ -103,8 +155,14 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
   const { steps, openStep } = useConfigSteps({
     connection: connectionMeta,
     configureValid,
-    tested,
+    tested: testedDone,
+    expandedAll: everTested,
+    dirty,
   });
+
+  // Continue gates the guided flow for brand-new nodes; for an already-tested
+  // node it only reappears when an edit re-arms the Test step.
+  const showContinue = configureValid && (!everTested || dirty);
 
   const hasErrorHandler = config.hasErrorHandler === true;
   const configureIndex = steps.find((s) => s.id === 'configure')?.index ?? 1;
@@ -133,7 +191,13 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
 
             <NodePreviewPanel nodeId={nodeId} />
 
-            {configureValid && (
+            {dirty && (
+              <p className="text-xs text-status-warning">
+                Configuration changed — re-test to refresh the captured sample output.
+              </p>
+            )}
+
+            {showContinue && (
               <button
                 type="button"
                 onClick={() => openStep('test')}
@@ -172,7 +236,9 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
     if (step.id === 'configure') return configureSummary(config);
     if (step.id === 'test') {
       if (step.status === 'locked') return `Finish step ${configureIndex} first`;
-      if (tested && testSummary) return `✓ tested · ${testSummary}`;
+      if (dirty) return 'Configuration changed — re-test to refresh sample output';
+      if (testSummary) return `✓ tested · ${testSummary}`;
+      if (testedDone) return '✓ tested · sample output captured';
       return 'Run a live test to capture sample output';
     }
     return undefined;

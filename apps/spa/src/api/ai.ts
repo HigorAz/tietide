@@ -45,6 +45,21 @@ export async function getWorkflowDocs(
   }
 }
 
+/**
+ * Persist a human-edited documentation body. Returns the saved row (with the
+ * `model` flipped to `manual` and a fresh `generatedAt`).
+ */
+export async function saveWorkflowDocs(
+  workflowId: string,
+  documentation: string,
+): Promise<WorkflowDocumentationResponse> {
+  const { data } = await api.patch<WorkflowDocumentationResponse>(
+    `/workflows/${workflowId}/documentation`,
+    { documentation },
+  );
+  return data;
+}
+
 export interface DocumentationRegenerationAccepted {
   workflowId: string;
   status: 'pending';

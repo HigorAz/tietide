@@ -25,9 +25,11 @@ import { DraggableWorkflowRow } from '@/components/workflows/DraggableWorkflowRo
 import { useToastStore } from '@/stores/toastStore';
 import {
   getWorkflowDocs,
+  saveWorkflowDocs,
   startWorkflowDocsRegeneration,
   type WorkflowDocumentationResponse,
 } from '@/api/ai';
+import { DocumentationModal } from '@/components/documentation/DocumentationModal';
 import { DOC_POLL_INTERVAL_MS, DOC_POLL_MAX_ATTEMPTS } from '@/stores/documentationStore';
 import { cn } from '@/utils/cn';
 
@@ -114,6 +116,7 @@ export function WorkflowsPage(): JSX.Element {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
   const [query, setQuery] = useState('');
   const [docsByWorkflow, setDocsByWorkflow] = useState<Record<string, RowDocsState>>({});
+  const [docsModalId, setDocsModalId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
@@ -562,22 +565,25 @@ export function WorkflowsPage(): JSX.Element {
     }
   };
 
-  const handleGenerateDocs = (id: string): void => {
-    void regenerateDocs(id);
-  };
-
-  const handleToggleDocsExpanded = (id: string): void => {
-    const state = docsByWorkflow[id] ?? emptyRowDocs;
-    if (state.isExpanded) {
-      updateRowDocs(id, { isExpanded: false });
-      return;
-    }
-    updateRowDocs(id, { isExpanded: true });
-    // While a regeneration is in flight, just reveal the live generating state —
-    // don't fire a competing fetch that would replace it with the stale doc.
-    if (!state.content && !state.isGenerating) {
+  const handleOpenDocs = (id: string): void => {
+    setDocsModalId(id);
+    const state = docsByWorkflow[id];
+    const hasDocs = workflows.find((w) => w.id === id)?.documentation != null;
+    // Lazily load the cached doc the first time the pop-up opens (only when one
+    // exists — otherwise the modal shows its "Generate" empty state). Never
+    // interrupt an in-flight regeneration with a competing stale fetch.
+    if (hasDocs && !state?.content && !state?.isGenerating) {
       void viewDocs(id);
     }
+  };
+
+  const handleSaveDocs = async (id: string, documentation: string): Promise<void> => {
+    const saved = await saveWorkflowDocs(id, documentation);
+    updateRowDocs(id, { isGenerating: false, content: saved.documentation, error: null });
+    setDocumentationMeta(id, {
+      generatedAt: new Date(saved.generatedAt),
+      version: saved.version,
+    });
   };
 
   const isFiltering = query.trim().length > 0;
@@ -735,15 +741,10 @@ export function WorkflowsPage(): JSX.Element {
                 )}
                 <ul aria-label="Workflows" className="flex flex-col gap-3">
                   {filtered.map((wf) => {
-                    const docs = docsByWorkflow[wf.id] ?? emptyRowDocs;
                     return (
                       <DraggableWorkflowRow key={wf.id} workflowId={wf.id}>
                         <WorkflowRow
                           workflow={wf}
-                          isExpanded={docs.isExpanded}
-                          isGeneratingDocs={docs.isGenerating}
-                          docsContent={docs.content}
-                          docsError={docs.error}
                           selected={selectedIds.has(wf.id)}
                           onOpen={handleOpen}
                           onToggleActive={handleToggle}
@@ -751,8 +752,7 @@ export function WorkflowsPage(): JSX.Element {
                             const target = workflows.find((w) => w.id === id) ?? null;
                             setToDelete(target);
                           }}
-                          onGenerateDocs={handleGenerateDocs}
-                          onToggleDocsExpanded={handleToggleDocsExpanded}
+                          onOpenDocs={handleOpenDocs}
                           onToggleSelect={toggleSelect}
                           onRename={handleRename}
                           availableTags={tags}
@@ -832,6 +832,40 @@ export function WorkflowsPage(): JSX.Element {
             }}
           />
         )}
+
+        {docsModalId &&
+          (() => {
+            const wf = workflows.find((w) => w.id === docsModalId);
+            const state = docsByWorkflow[docsModalId] ?? emptyRowDocs;
+            const status: 'idle' | 'loading' | 'ready' | 'error' = state.isGenerating
+              ? 'loading'
+              : state.error
+                ? 'error'
+                : state.content
+                  ? 'ready'
+                  : 'idle';
+            const docs: WorkflowDocumentationResponse | null = state.content
+              ? {
+                  workflowId: docsModalId,
+                  version: wf?.documentation?.version ?? 1,
+                  documentation: state.content,
+                  sections: {},
+                  model: '',
+                  generatedAt: new Date(wf?.documentation?.generatedAt ?? Date.now()).toISOString(),
+                }
+              : null;
+            return (
+              <DocumentationModal
+                workflowName={wf?.name ?? 'Workflow'}
+                status={status}
+                docs={docs}
+                error={state.error}
+                onRegenerate={() => void regenerateDocs(docsModalId)}
+                onSave={(documentation) => handleSaveDocs(docsModalId, documentation)}
+                onClose={() => setDocsModalId(null)}
+              />
+            );
+          })()}
       </div>
     </DndContext>
   );

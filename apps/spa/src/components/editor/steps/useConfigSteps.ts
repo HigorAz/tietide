@@ -16,6 +16,19 @@ export interface ConfigStepsInput {
   configureValid: boolean;
   /** A live test has succeeded for the current config. */
   tested: boolean;
+  /**
+   * The node has been tested at least once (a live run this session OR a
+   * persisted sample from a prior session). When true the panel switches to the
+   * "expanded" layout — every step renders open so the whole node is editable at
+   * a glance, instead of the guided single-open flow used for brand-new nodes.
+   */
+  expandedAll?: boolean;
+  /**
+   * The configuration changed since the last successful test. Re-arms the Test
+   * step (it is no longer "done") so the Continue button reappears and the user
+   * re-tests to refresh the captured sample output.
+   */
+  dirty?: boolean;
 }
 
 export interface StepModel {
@@ -32,7 +45,7 @@ export interface UseConfigStepsResult {
 }
 
 export function useConfigSteps(input: ConfigStepsInput): UseConfigStepsResult {
-  const { connection, configureValid, tested } = input;
+  const { connection, configureValid, tested, expandedAll = false, dirty = false } = input;
   // null = "auto": follow the first-incomplete-unlocked rule. A user click sets
   // an explicit step, which only sticks while that step is unlocked.
   const [explicit, setExplicit] = useState<StepId | null>(null);
@@ -51,13 +64,28 @@ export function useConfigSteps(input: ConfigStepsInput): UseConfigStepsResult {
     const connectionComplete =
       connection !== null && (connection.hasSelection || connection.optional);
     const configureComplete = configureValid;
-    const testComplete = tested;
+    // A pending edit since the last test re-arms the Test step (no longer done).
+    const testComplete = tested && !dirty;
 
     const complete: Record<StepId, boolean> = {
       connection: connectionComplete,
       configure: configureComplete,
       test: testComplete,
     };
+
+    // Expanded layout (a previously-tested node): every step renders open so the
+    // node is fully editable at a glance — no Continue gating, no collapsing.
+    // Nothing locks here because the node has already run end-to-end; a re-armed
+    // (dirty) Test shows as active rather than done.
+    if (expandedAll) {
+      const expandedSteps: StepModel[] = order.map((id, i) => ({
+        id,
+        index: i + 1,
+        status: complete[id] ? 'done' : 'active',
+        open: true,
+      }));
+      return { steps: expandedSteps, openStep: (id: StepId) => setExplicit(id) };
+    }
 
     // Test is locked until Configure is valid AND (no connection step or the
     // connection step is complete).
@@ -95,7 +123,7 @@ export function useConfigSteps(input: ConfigStepsInput): UseConfigStepsResult {
         setExplicit(id);
       },
     };
-  }, [connection, configureValid, tested, explicit]);
+  }, [connection, configureValid, tested, expandedAll, dirty, explicit]);
 
   return result;
 }

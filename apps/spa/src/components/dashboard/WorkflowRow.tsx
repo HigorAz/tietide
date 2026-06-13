@@ -7,38 +7,23 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  Activity,
-  ChevronDown,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Power,
-  Sparkles,
-  Trash2,
-} from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Activity, ChevronRight, FileText, Power, Trash2 } from 'lucide-react';
 import type { Tag } from '@tietide/shared';
 import type { WorkflowListItem } from '@/api/workflows';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { formatRelativeTime } from './relativeTime';
-import { MarkdownContent } from './MarkdownContent';
 import { TagChips } from '@/components/workflows/TagChips';
 import { TagPickerPopover } from '@/components/workflows/TagPickerPopover';
 
 export interface WorkflowRowProps {
   workflow: WorkflowListItem;
-  isExpanded: boolean;
-  isGeneratingDocs: boolean;
-  docsContent: string | null;
-  docsError: string | null;
   selected: boolean;
   onOpen: (id: string) => void;
   onToggleActive: (id: string, next: boolean) => void;
   onDelete: (id: string) => void;
-  onGenerateDocs: (id: string) => void;
-  onToggleDocsExpanded: (id: string) => void;
+  /** Open the documentation pop-up for this workflow (view / edit / download). */
+  onOpenDocs: (id: string) => void;
   onToggleSelect: (id: string) => void;
   onRename: (id: string, name: string) => Promise<void>;
   availableTags: Tag[];
@@ -55,16 +40,11 @@ const stop = (event: MouseEvent<HTMLElement> | PointerEvent<HTMLElement>): void 
 
 export function WorkflowRow({
   workflow,
-  isExpanded,
-  isGeneratingDocs,
-  docsContent,
-  docsError,
   selected,
   onOpen,
   onToggleActive,
   onDelete,
-  onGenerateDocs,
-  onToggleDocsExpanded,
+  onOpenDocs,
   onToggleSelect,
   onRename,
   availableTags,
@@ -74,7 +54,6 @@ export function WorkflowRow({
   isDeleting,
 }: WorkflowRowProps): JSX.Element {
   const { id, name, isActive, updatedAt, executionCount, documentation, tags } = workflow;
-  const hasDocs = documentation !== null || docsContent !== null;
 
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(name);
@@ -143,13 +122,10 @@ export function WorkflowRow({
     onToggleSelect(id);
   };
 
-  const docsLabel = documentation
-    ? `Update docs · ${formatDistanceToNow(documentation.generatedAt, { addSuffix: true })}`
-    : 'Generate docs';
-  const docsAriaLabel = documentation ? `Update docs for ${name}` : `Generate docs for ${name}`;
-
-  const expandLabel = isExpanded ? 'Hide docs' : 'View docs';
-  const expandAriaLabel = isExpanded ? `Hide docs for ${name}` : `View docs for ${name}`;
+  const docsLabel = documentation ? 'View docs' : 'Generate docs';
+  const docsAriaLabel = documentation
+    ? `View documentation for ${name}`
+    : `Generate documentation for ${name}`;
 
   return (
     <li
@@ -183,17 +159,7 @@ export function WorkflowRow({
             'focus:outline-none focus:ring-1 focus:ring-accent-teal',
           )}
         >
-          {hasDocs ? (
-            <ChevronDown
-              aria-hidden="true"
-              className={cn(
-                'h-4 w-4 shrink-0 text-text-muted transition',
-                isExpanded ? 'rotate-0' : '-rotate-90',
-              )}
-            />
-          ) : (
-            <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
-          )}
+          <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
           {editing ? (
             <input
               autoFocus
@@ -286,22 +252,15 @@ export function WorkflowRow({
             aria-label={docsAriaLabel}
             onClick={(event) => {
               stop(event);
-              if (isGeneratingDocs) return;
-              onGenerateDocs(id);
+              onOpenDocs(id);
             }}
-            disabled={isGeneratingDocs}
             className={cn(
               'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-text-secondary transition',
               'hover:bg-accent-teal/10 hover:text-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-              'disabled:cursor-not-allowed disabled:opacity-60',
             )}
           >
-            {isGeneratingDocs ? (
-              <Spinner size="sm" className="h-3.5 w-3.5" label={`Generating docs for ${name}`} />
-            ) : (
-              <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
-            )}
-            <span>{docsLabel}</span>
+            <FileText aria-hidden="true" className="h-3.5 w-3.5" />
+            <span className="whitespace-nowrap">{docsLabel}</span>
           </button>
 
           <TagPickerPopover
@@ -311,28 +270,6 @@ export function WorkflowRow({
             onManage={onManageTags}
             triggerAriaLabel={`Edit tags for ${name}`}
           />
-
-          {hasDocs && (
-            <button
-              type="button"
-              aria-label={expandAriaLabel}
-              onClick={(event) => {
-                stop(event);
-                onToggleDocsExpanded(id);
-              }}
-              className={cn(
-                'inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-text-secondary transition',
-                'hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal',
-              )}
-            >
-              {isExpanded ? (
-                <EyeOff aria-hidden="true" className="h-3.5 w-3.5" />
-              ) : (
-                <Eye aria-hidden="true" className="h-3.5 w-3.5" />
-              )}
-              {expandLabel}
-            </button>
-          )}
 
           <button
             type="button"
@@ -357,39 +294,6 @@ export function WorkflowRow({
           </button>
         </div>
       </div>
-
-      {isExpanded && (
-        <div className="border-t border-white/5 px-6 py-4">
-          {docsError ? (
-            <div role="alert" className="flex flex-col items-start gap-2 text-sm text-error">
-              <p>{docsError}</p>
-              <button
-                type="button"
-                aria-label={`Retry generating docs for ${name}`}
-                onClick={() => onGenerateDocs(id)}
-                className="rounded-md bg-error/20 px-3 py-1 text-xs font-semibold text-error transition hover:bg-error/30"
-              >
-                Retry
-              </button>
-            </div>
-          ) : isGeneratingDocs && !docsContent ? (
-            <div className="flex items-center gap-2 text-sm text-text-secondary">
-              <Spinner size="sm" label={`Generating docs for ${name}`} />
-              <span>Generating documentation…</span>
-            </div>
-          ) : docsContent ? (
-            <>
-              {isGeneratingDocs && (
-                <div className="mb-3 flex items-center gap-2 text-xs text-text-secondary">
-                  <Spinner size="sm" label={`Updating docs for ${name}`} />
-                  <span>Updating documentation…</span>
-                </div>
-              )}
-              <MarkdownContent source={docsContent} />
-            </>
-          ) : null}
-        </div>
-      )}
     </li>
   );
 }
