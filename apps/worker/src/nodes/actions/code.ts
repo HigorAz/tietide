@@ -24,6 +24,16 @@ interface ParsedParams {
   inputs: Record<string, unknown>;
 }
 
+// Map the script's return value onto NodeOutput.data. A plain object becomes the
+// output directly (its fields are referenced as {{steps.code.field}}); anything
+// else (primitive, array, null) nests under `result` because data must be an object.
+function toNodeData(value: unknown): Record<string, unknown> {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return { result: value };
+}
+
 interface SandboxResult {
   ok: boolean;
   result?: unknown;
@@ -167,8 +177,14 @@ export class CodeAction implements INodeExecutor {
     );
     const duration = Date.now() - started;
 
+    // The script's returned value IS the node output, so downstream nodes can
+    // reference its fields directly as {{steps.code.field}} (the n8n/Zapier model).
+    // NodeOutput.data must be an object, so a non-object return (primitive/array/
+    // null) nests under `result` as a fallback. `duration` lives in metadata only
+    // — it would otherwise pollute (or collide with) the user's field namespace,
+    // and the runner already persists it as the step's durationMs.
     return {
-      data: { result, duration },
+      data: toNodeData(result),
       metadata: { duration },
     };
   }

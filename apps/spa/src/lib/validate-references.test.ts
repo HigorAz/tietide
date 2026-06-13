@@ -76,8 +76,9 @@ describe('findInvalidReferences', () => {
 });
 
 describe('findInvalidReferences with __pillSample overrides', () => {
-  // Code's static output schema is { result, duration } — `count` only exists
-  // when the node carries an OUTPUT SAMPLE (or a "Test this node" capture).
+  // Code's output shape is dynamic (an open record), so a field like `count` is
+  // only known when the node carries an OUTPUT SAMPLE (or a "Test this node"
+  // capture); a sample narrows validation to the captured fields.
   const codeGraph = (sinkConfig: Record<string, unknown>, sample?: unknown) => {
     const codeConfig = sample === undefined ? {} : { [PILL_SAMPLE_KEY]: sample };
     const nodes = [
@@ -109,11 +110,11 @@ describe('findInvalidReferences with __pillSample overrides', () => {
     expect(invalid[0]).toMatchObject({ reason: 'unknown-field' });
   });
 
-  it('without a sample, the static code schema still rejects an unknown field', () => {
+  it('without a sample, the open code schema accepts any field (dynamic output)', () => {
+    // The Code node's output shape is unknown ahead of a run, so its record schema
+    // exposes a whole-output pill (anyField) — no field can be flagged unknown.
     const { nodes, edges } = codeGraph({ url: '{{steps.code.count}}' });
-    const invalid = findInvalidReferences(nodes, edges);
-    expect(invalid).toHaveLength(1);
-    expect(invalid[0]).toMatchObject({ reason: 'unknown-field' });
+    expect(findInvalidReferences(nodes, edges)).toEqual([]);
   });
 });
 
