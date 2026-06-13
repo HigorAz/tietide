@@ -157,6 +157,68 @@ describe('WorkflowDocumentationService', () => {
     });
   });
 
+  describe('update', () => {
+    it('overwrites the documentation, preserves sections, and marks model manual', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
+      prisma.workflowDocumentation.findUnique.mockResolvedValue({ sections: generatedSections });
+      prisma.workflowDocumentation.upsert.mockResolvedValue({
+        ...cachedRow,
+        documentation: '# Edited by hand',
+        model: 'manual',
+      });
+
+      const result = await service.update(orgId, workflowId, '# Edited by hand');
+
+      expect(ai.generateDocs).not.toHaveBeenCalled();
+      expect(prisma.workflowDocumentation.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { workflowId },
+          create: expect.objectContaining({
+            workflowId,
+            documentation: '# Edited by hand',
+            sections: generatedSections,
+            model: 'manual',
+          }),
+          update: expect.objectContaining({ documentation: '# Edited by hand', model: 'manual' }),
+        }),
+      );
+      expect(result).toMatchObject({ documentation: '# Edited by hand', model: 'manual' });
+    });
+
+    it('upserts with empty sections when no documentation row exists yet', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(persistedWorkflow);
+      prisma.workflowDocumentation.findUnique.mockResolvedValue(null);
+      prisma.workflowDocumentation.upsert.mockResolvedValue({
+        ...cachedRow,
+        documentation: '# First',
+        model: 'manual',
+      });
+
+      await service.update(orgId, workflowId, '# First');
+
+      expect(prisma.workflowDocumentation.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ create: expect.objectContaining({ sections: {} }) }),
+      );
+    });
+
+    it('throws NotFoundException when the workflow does not exist', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(null);
+
+      await expect(service.update(orgId, workflowId, '# x')).rejects.toThrow(NotFoundException);
+      expect(prisma.workflowDocumentation.upsert).not.toHaveBeenCalled();
+    });
+
+    it('throws ForbiddenException when the active org does not own the workflow', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        ...persistedWorkflow,
+        organizationId: otherOrgId,
+      });
+
+      await expect(service.update(orgId, workflowId, '# x')).rejects.toThrow(ForbiddenException);
+      expect(prisma.workflowDocumentation.upsert).not.toHaveBeenCalled();
+    });
+  });
+
   describe('startRegeneration', () => {
     // Let the detached background promise (ai.generateDocs → upsert → finally) settle.
     const flush = async (): Promise<void> => {

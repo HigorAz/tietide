@@ -21,6 +21,7 @@ describe('WorkflowDocumentationController (integration)', () => {
   let docs: {
     findExisting: jest.Mock;
     startRegeneration: jest.Mock;
+    update: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
   let activeOrg: OrgContext | null;
@@ -53,6 +54,7 @@ describe('WorkflowDocumentationController (integration)', () => {
     docs = {
       findExisting: jest.fn(),
       startRegeneration: jest.fn(),
+      update: jest.fn(),
     };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
     activeOrg = { id: 'org-uuid', role: 'MEMBER' };
@@ -223,6 +225,94 @@ describe('WorkflowDocumentationController (integration)', () => {
         .get(`/workflows/${uuid}/documentation`)
         .set('If-Modified-Since', 'not-a-date')
         .expect(200);
+    });
+  });
+
+  describe('PATCH /workflows/:id/documentation', () => {
+    it('should return 200 with the saved doc and pass the active org id to the service', async () => {
+      docs.update.mockResolvedValue({ ...result, documentation: '# Edited', model: 'manual' });
+
+      const res = await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: '# Edited' })
+        .expect(200);
+
+      expect(docs.update).toHaveBeenCalledWith('org-uuid', uuid, '# Edited');
+      expect(res.body).toMatchObject({ documentation: '# Edited', model: 'manual' });
+    });
+
+    it('authorizes by the active org id, not the caller user id (W5.5)', async () => {
+      activeOrg = { id: 'owning-org', role: 'MEMBER' };
+      authedUser = { id: 'co-member-uuid', email: 'peer@example.com', role: 'USER' };
+      docs.update.mockResolvedValue({ ...result, documentation: '# Edited' });
+
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: '# Edited' })
+        .expect(200);
+
+      expect(docs.update).toHaveBeenCalledWith('owning-org', uuid, '# Edited');
+      expect(docs.update).not.toHaveBeenCalledWith('co-member-uuid', uuid, '# Edited');
+    });
+
+    it('should return 400 when documentation is empty', async () => {
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: '' })
+        .expect(400);
+      expect(docs.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when documentation exceeds the max length', async () => {
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: 'x'.repeat(50_001) })
+        .expect(400);
+      expect(docs.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when an unknown property is sent (whitelist)', async () => {
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: '# ok', sections: { overview: 'x' } })
+        .expect(400);
+      expect(docs.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when id is not a UUID', async () => {
+      await request(app.getHttpServer())
+        .patch('/workflows/not-a-uuid/documentation')
+        .send({ documentation: '# ok' })
+        .expect(400);
+      expect(docs.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when the guard rejects', async () => {
+      authedUser = null;
+
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: '# ok' })
+        .expect(401);
+      expect(docs.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 when service throws NotFoundException', async () => {
+      docs.update.mockRejectedValue(new NotFoundException('Workflow not found'));
+
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: '# ok' })
+        .expect(404);
+    });
+
+    it('should return 403 when service throws ForbiddenException', async () => {
+      docs.update.mockRejectedValue(new ForbiddenException('No access'));
+
+      await request(app.getHttpServer())
+        .patch(`/workflows/${uuid}/documentation`)
+        .send({ documentation: '# ok' })
+        .expect(403);
     });
   });
 

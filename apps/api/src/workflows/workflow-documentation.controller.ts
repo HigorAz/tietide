@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Headers,
@@ -7,6 +8,7 @@ import {
   NotFoundException,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Res,
   UseGuards,
@@ -36,6 +38,7 @@ import {
 } from '../common/throttler/throttler.config';
 import type { OrgContext } from '../common/org-context/org-context.types';
 import { WorkflowDocumentationService } from './workflow-documentation.service';
+import { UpdateWorkflowDocumentationDto } from './dto/update-workflow-documentation.dto';
 import {
   DocumentationRegenerationAcceptedDto,
   WorkflowDocumentationResponseDto,
@@ -112,6 +115,26 @@ export class WorkflowDocumentationController {
     res.setHeader('ETag', etag);
     res.setHeader('Last-Modified', lastModified);
     return existing;
+  }
+
+  @Patch('documentation')
+  @ApiOperation({
+    summary: 'Save a human-edited documentation body for a workflow',
+    description:
+      'Overwrites the stored markdown with the supplied text, preserving the ' +
+      'existing section breakdown and marking the row as manually edited. Upserts ' +
+      'when no documentation row exists yet.',
+  })
+  @ApiOkResponse({ type: WorkflowDocumentationResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid workflow id or documentation body' })
+  @ApiNotFoundResponse({ description: 'Workflow not found' })
+  @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
+  async updateDocumentation(
+    @CurrentOrg() org: OrgContext,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() body: UpdateWorkflowDocumentationDto,
+  ): Promise<WorkflowDocumentationResponseDto> {
+    return this.docs.update(org.id, id, body.documentation);
   }
 
   @Post('documentation/regenerate')

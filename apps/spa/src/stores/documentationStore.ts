@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { AxiosError } from 'axios';
 import {
   getWorkflowDocs,
+  saveWorkflowDocs,
   startWorkflowDocsRegeneration,
   type WorkflowDocumentationResponse,
 } from '@/api/ai';
@@ -28,6 +29,8 @@ export interface DocumentationState {
 export interface DocumentationActions {
   fetch: (workflowId: string) => Promise<void>;
   regenerate: (workflowId: string) => Promise<void>;
+  /** Persist a human-edited body; resolves on success and rejects on failure. */
+  save: (workflowId: string, documentation: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -110,6 +113,19 @@ export const useDocumentationStore = create<DocumentationStore>((set, get) => ({
       status: 'error',
       error: 'Documentation is taking longer than expected. Please try again.',
     });
+  },
+
+  save: async (workflowId, documentation) => {
+    // A manual save supersedes any in-flight regenerate poll loop.
+    const token = ++activePoll;
+    try {
+      const saved = await saveWorkflowDocs(workflowId, documentation);
+      if (token !== activePoll) return;
+      set({ status: 'ready', docs: saved, error: null });
+    } catch (err) {
+      // Leave the existing docs untouched; the caller surfaces the failure.
+      throw new Error(toMessage(err, 'Failed to save documentation'));
+    }
   },
 
   // Bump the token so any in-flight poll loop sees it's been superseded and stops.

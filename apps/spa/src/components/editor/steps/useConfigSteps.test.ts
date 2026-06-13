@@ -159,6 +159,42 @@ describe('useConfigSteps', () => {
     expect(test.status).toBe('done');
   });
 
+  it('expanded layout opens EVERY step; completed steps are done', () => {
+    const { result } = renderHook(() =>
+      useConfigSteps(
+        input({
+          connection: meta({ hasSelection: true, selectedName: 'My Google' }),
+          configureValid: true,
+          tested: true,
+          expandedAll: true,
+        }),
+      ),
+    );
+    const { steps } = result.current;
+    expect(steps.every((s) => s.open)).toBe(true);
+    expect(steps.find((s) => s.id === 'connection')!.status).toBe('done');
+    expect(steps.find((s) => s.id === 'configure')!.status).toBe('done');
+    expect(steps.find((s) => s.id === 'test')!.status).toBe('done');
+  });
+
+  it('expanded + dirty re-arms Test (active, not done) while keeping all steps open', () => {
+    const { result } = renderHook(() =>
+      useConfigSteps(
+        input({
+          connection: null,
+          configureValid: true,
+          tested: true,
+          expandedAll: true,
+          dirty: true,
+        }),
+      ),
+    );
+    const { steps } = result.current;
+    expect(steps.every((s) => s.open)).toBe(true);
+    expect(steps.find((s) => s.id === 'configure')!.status).toBe('done');
+    expect(steps.find((s) => s.id === 'test')!.status).toBe('active');
+  });
+
   it('opens Configure when every step is complete — the panel is never all-collapsed', () => {
     const { result } = renderHook(() =>
       useConfigSteps(

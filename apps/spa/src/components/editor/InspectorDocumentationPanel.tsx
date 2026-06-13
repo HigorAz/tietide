@@ -1,20 +1,26 @@
-import { useCallback, useEffect } from 'react';
-import { FileText, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { FileText, Pencil, RefreshCw } from 'lucide-react';
 import { useDocumentationStore } from '@/stores/documentationStore';
 import { useEditorStore } from '@/stores/editorStore';
+import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { Spinner } from '@/components/ui/Spinner';
-import { Markdown } from './markdown';
+import { DocumentationModal } from '@/components/documentation/DocumentationModal';
 
 export function InspectorDocumentationPanel(): JSX.Element {
   const workflowId = useEditorStore((s) => s.workflowId);
+  const workflowName = useWorkflowsStore(
+    (s) => s.workflows.find((w) => w.id === workflowId)?.name ?? 'Workflow',
+  );
   const status = useDocumentationStore((s) => s.status);
   const docs = useDocumentationStore((s) => s.docs);
   const error = useDocumentationStore((s) => s.error);
   const fetch = useDocumentationStore((s) => s.fetch);
   const regenerate = useDocumentationStore((s) => s.regenerate);
+  const save = useDocumentationStore((s) => s.save);
 
-  // Hydrate cached docs the first time this tab is opened — the floating
-  // dialog version of the same store performs the same lazy hydration.
+  const [open, setOpen] = useState(false);
+
+  // Hydrate cached docs the first time this tab is opened.
   useEffect(() => {
     if (!workflowId) return;
     if (status === 'idle' && !docs) {
@@ -24,20 +30,20 @@ export function InspectorDocumentationPanel(): JSX.Element {
 
   const handleRegenerate = useCallback(() => {
     if (!workflowId || status === 'loading') return;
+    setOpen(true);
     void regenerate(workflowId);
   }, [workflowId, status, regenerate]);
 
+  let panel: JSX.Element;
   if (status === 'loading') {
-    return (
+    panel = (
       <div className="flex h-full items-center justify-center gap-2 text-xs text-text-secondary">
         <Spinner size="sm" />
         <span>Generating documentation… this can take a minute or two.</span>
       </div>
     );
-  }
-
-  if (status === 'error') {
-    return (
+  } else if (status === 'error') {
+    panel = (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-4 py-6 text-center text-xs text-text-secondary">
         <p className="font-medium text-status-failed">Failed to load documentation</p>
         {error ? <p>{error}</p> : null}
@@ -51,10 +57,8 @@ export function InspectorDocumentationPanel(): JSX.Element {
         </button>
       </div>
     );
-  }
-
-  if (status === 'idle' || !docs) {
-    return (
+  } else if (status === 'idle' || !docs) {
+    panel = (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-4 py-6 text-center text-xs text-text-secondary">
         <FileText size={24} className="text-text-muted" aria-hidden />
         <p>No documentation yet.</p>
@@ -68,49 +72,40 @@ export function InspectorDocumentationPanel(): JSX.Element {
         </button>
       </div>
     );
+  } else {
+    panel = (
+      <div
+        data-testid="inspector-docs-panel"
+        className="flex h-full flex-col items-center justify-center gap-3 px-4 py-6 text-center text-xs text-text-secondary"
+      >
+        <FileText size={24} className="text-accent-teal" aria-hidden />
+        <p>Documentation is ready.</p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded bg-accent-teal px-2.5 py-1 text-xs font-medium text-deep-blue hover:bg-accent-teal-hover"
+        >
+          <Pencil size={12} aria-hidden />
+          Open documentation
+        </button>
+      </div>
+    );
   }
 
   return (
-    <div data-testid="inspector-docs-panel" className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5">
-        <span className="text-[11px] uppercase tracking-wide text-text-secondary">
-          Workflow documentation
-        </span>
-        <button
-          type="button"
-          onClick={handleRegenerate}
-          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-text-secondary hover:bg-white/5 hover:text-accent-teal focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
-        >
-          <RefreshCw size={11} aria-hidden />
-          Regenerate
-        </button>
-      </div>
-      <div className="flex-1 overflow-y-auto px-3 py-2 text-xs leading-relaxed text-text-primary">
-        <Markdown source={docs.documentation} />
-        <dl className="mt-3 space-y-2 border-t border-white/10 pt-3 text-[11px]">
-          {(
-            [
-              ['Overview', docs.sections.overview ?? docs.sections.objective],
-              ['Prerequisites', docs.sections.prerequisites],
-              ['Trigger', docs.sections.trigger ?? docs.sections.triggers],
-              ['Walkthrough', docs.sections.walkthrough],
-              ['Actions', docs.sections.actions],
-              ['Data flow', docs.sections.dataFlow],
-              ['Decisions', docs.sections.decisions],
-              ['Error handling', docs.sections.errorHandling],
-            ] as const
-          )
-            .filter(([, value]) => Boolean(value))
-            .map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-[10px] font-semibold uppercase tracking-wide text-text-secondary">
-                  {label}
-                </dt>
-                <dd className="mt-0.5 text-text-primary">{value}</dd>
-              </div>
-            ))}
-        </dl>
-      </div>
-    </div>
+    <>
+      {panel}
+      {open && (
+        <DocumentationModal
+          workflowName={workflowName}
+          status={status}
+          docs={docs}
+          error={error}
+          onRegenerate={() => workflowId && void regenerate(workflowId)}
+          onSave={(documentation) => save(workflowId ?? '', documentation)}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }

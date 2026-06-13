@@ -67,6 +67,53 @@ export class WorkflowDocumentationService {
   }
 
   /**
+   * Persist a human-edited documentation body. Overwrites the markdown text,
+   * preserves the existing section breakdown, and tags the row `model: 'manual'`
+   * so the UI can tell hand-edited docs from AI output. Authorizes by the active
+   * org (co-members allowed; ejected ex-authors 403'd) like the read path.
+   */
+  async update(
+    organizationId: string,
+    workflowId: string,
+    documentation: string,
+  ): Promise<WorkflowDocumentationResult> {
+    const workflow = await this.loadAuthorizedWorkflow(organizationId, workflowId);
+
+    // Preserve whatever sections were last generated; a manual edit only changes
+    // the prose. Fall back to an empty object when no row exists yet.
+    const existing = await this.prisma.workflowDocumentation.findUnique({
+      where: { workflowId: workflow.id },
+      select: { sections: true },
+    });
+    const sectionsJson = (existing?.sections ?? {}) as Prisma.InputJsonValue;
+
+    const row = await this.prisma.workflowDocumentation.upsert({
+      where: { workflowId: workflow.id },
+      create: {
+        workflowId: workflow.id,
+        version: workflow.version,
+        documentation,
+        sections: sectionsJson,
+        model: 'manual',
+      },
+      update: {
+        version: workflow.version,
+        documentation,
+        model: 'manual',
+      },
+    });
+
+    return {
+      workflowId: workflow.id,
+      version: row.version,
+      documentation: row.documentation,
+      sections: row.sections as unknown as DocumentationSections,
+      model: row.model,
+      generatedAt: row.updatedAt,
+    };
+  }
+
+  /**
    * Kick off documentation generation in the background and return immediately.
    * Ownership/existence are validated synchronously (so the caller still gets a
    * 404/403 right away); the slow AI call then runs detached and upserts the row
