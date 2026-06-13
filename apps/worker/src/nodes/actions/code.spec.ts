@@ -67,9 +67,50 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual({ doubled: 10 });
-      expect(typeof result.data.duration).toBe('number');
-      expect(result.data.duration).toBeGreaterThanOrEqual(0);
+      // The returned object IS the node output — fields are at the top level so
+      // downstream nodes reference them as {{steps.code.doubled}} (not .result.doubled).
+      expect(result.data).toEqual({ doubled: 10 });
+      // Wall-clock duration is metadata, not a data field (kept out of the user's
+      // field namespace; the runner also persists it as the step's durationMs).
+      expect(typeof result.metadata?.duration).toBe('number');
+      expect(result.metadata?.duration).toBeGreaterThanOrEqual(0);
+    });
+
+    it('should expose a returned object’s fields directly on data', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(
+        makeInput({ code: 'return { name: "x", total: 5 };' }),
+        makeContext(),
+      );
+
+      expect(result.data).toEqual({ name: 'x', total: 5 });
+      expect(result.data.result).toBeUndefined();
+    });
+
+    it('should wrap a primitive return value under `result`', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(makeInput({ code: 'return 42;' }), makeContext());
+
+      // NodeOutput.data must be an object, so non-object returns nest under `result`.
+      expect(result.data).toEqual({ result: 42 });
+    });
+
+    it('should wrap an array return value under `result`', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(makeInput({ code: 'return [1, 2, 3];' }), makeContext());
+
+      expect(result.data).toEqual({ result: [1, 2, 3] });
+    });
+
+    it('should wrap a null/empty return under `result`', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(makeInput({ code: 'return null;' }), makeContext());
+
+      expect(result.data).toEqual({ result: null });
     });
 
     it('should support async code (await + Promise)', async () => {
@@ -85,7 +126,7 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual({ ok: true, n: 42 });
+      expect(result.data).toEqual({ ok: true, n: 42 });
     });
 
     it('should serialize functions away (JSON-only output)', async () => {
@@ -97,7 +138,7 @@ describe('CodeAction', () => {
       );
 
       // JSON.stringify drops function-valued properties.
-      expect(result.data.result).toEqual({ name: 'x' });
+      expect(result.data).toEqual({ name: 'x' });
     });
   });
 
@@ -114,7 +155,7 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual({ n: 99, who: 'alice' });
+      expect(result.data).toEqual({ n: 99, who: 'alice' });
     });
 
     it('should default $nodes to an empty object when no scope is provided', async () => {
@@ -125,7 +166,7 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual({ type: 'object', keys: 0 });
+      expect(result.data).toEqual({ type: 'object', keys: 0 });
     });
 
     it('should carry the scope intact across the worker_thread boundary (nested objects + arrays)', async () => {
@@ -140,7 +181,7 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual(scope);
+      expect(result.data).toEqual(scope);
     });
 
     it('should keep $nodes (full upstream map) distinct from input (flattened last predecessor)', async () => {
@@ -155,7 +196,7 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual({ fromInput: 'right', branches: ['left', 'right'] });
+      expect(result.data).toEqual({ fromInput: 'right', branches: ['left', 'right'] });
     });
   });
 
@@ -172,7 +213,7 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual({ greeting: 'Hi bob', doubled: 42 });
+      expect(result.data).toEqual({ greeting: 'Hi bob', doubled: 42 });
     });
 
     it('should ignore inputs with invalid or reserved keys (defensive)', async () => {
@@ -188,7 +229,7 @@ describe('CodeAction', () => {
 
       // 'ok' is bound; 'bad key' (space) and 'input' (reserved) are dropped, so the
       // built-in `input` (the predecessor data, here {}) is not overridden by 9.
-      expect(result.data.result).toEqual({ ok: 1, inputType: 'object' });
+      expect(result.data).toEqual({ ok: 1, inputType: 'object' });
     });
   });
 
@@ -249,7 +290,7 @@ describe('CodeAction', () => {
         makeContext(),
       );
 
-      expect(result.data.result).toEqual({
+      expect(result.data).toEqual({
         require: 'undefined',
         process: 'undefined',
         global: 'undefined',
@@ -276,17 +317,17 @@ describe('CodeAction', () => {
       try {
         const result = await action.execute(makeInput({ code }), makeContext());
         // If it resolved, the only acceptable outcome is that no host process /
-        // its secrets leaked through (e.g. result is null/undefined/empty).
-        const value = result.data.result;
-        if (value && typeof value === 'object') {
-          // A leaked host `process` would carry env / pid / platform.
-          const obj = value as Record<string, unknown>;
-          if ('env' in obj || 'pid' in obj || 'platform' in obj || 'version' in obj) {
-            escaped = true;
-          }
-        }
+        // its secrets leaked through. An object return is unwrapped onto `data`;
+        // a non-object (e.g. stringified process) nests under `data.result`.
+        const markers = ['env', 'pid', 'platform', 'version'];
+        const hasMarkers = (o: unknown): boolean =>
+          !!o && typeof o === 'object' && markers.some((k) => k in (o as Record<string, unknown>));
+        // A leaked host `process` would carry env / pid / platform at the top level.
+        if (hasMarkers(result.data)) escaped = true;
+        const inner = (result.data as Record<string, unknown>).result;
+        if (hasMarkers(inner)) escaped = true;
         // A stringified host process also counts as a leak.
-        if (typeof value === 'string' && /process|nodejs|platform|pid/i.test(value)) {
+        if (typeof inner === 'string' && /process|nodejs|platform|pid/i.test(inner)) {
           escaped = true;
         }
       } catch {

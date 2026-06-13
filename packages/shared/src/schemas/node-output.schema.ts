@@ -14,12 +14,12 @@ export const httpRequestOutputSchema = z.object({
   duration: z.number(),
 });
 
-// The Code node returns the JSON-cloned value the user's script resolved to,
-// plus the wall-clock duration. See apps/worker/src/nodes/actions/code.ts.
-export const codeOutputSchema = z.object({
-  result: z.unknown(),
-  duration: z.number(),
-});
+// The Code node's output IS the JSON-cloned object the user's script returned —
+// its fields land at the top level (referenced as {{steps.code.field}}), so the
+// shape is open. A non-object return nests under `result`. The picker derives
+// precise field pills from a live run or the node's Output sample, not this
+// schema. See apps/worker/src/nodes/actions/code.ts.
+export const codeOutputSchema = z.record(z.unknown());
 
 export const conditionalOutputSchema = z.object({
   branch: z.boolean(),
