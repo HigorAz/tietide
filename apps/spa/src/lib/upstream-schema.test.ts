@@ -234,10 +234,19 @@ describe('getUpstreamSchemas source precedence', () => {
     expect(paths).toEqual(['liveOnly']);
   });
 
-  it('lets a per-node override beat both live output and the schema', () => {
+  it('lets a live output beat a per-node override (a fresh run wins over a persisted sample)', () => {
+    // A persisted __pillSample can go stale when the node's output shape changes;
+    // the live run reflects the current shape, so it takes precedence.
     const paths = pathsForA({
       overrides: { A: { overrideOnly: 'x' } },
       liveNodes: new Map([['A', { output: { liveOnly: 'y' } }]]),
+    });
+    expect(paths).toEqual(['liveOnly']);
+  });
+
+  it('lets a per-node override beat the static schema when there is no live output', () => {
+    const paths = pathsForA({
+      overrides: { A: { overrideOnly: 'x' } },
     });
     expect(paths).toEqual(['overrideOnly']);
   });

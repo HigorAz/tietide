@@ -91,8 +91,14 @@ interface PathEntry {
 
 /**
  * Resolve one ancestor's pill paths by source precedence:
- *   per-node override → live output → concrete static schema → example → generic.
- * Sample sources (override/live/example) derive paths from runtime data;
+ *   live output → per-node override → concrete static schema → example → generic.
+ * A live run reflects the node's CURRENT output shape, so it wins over a persisted
+ * `__pillSample` override, which can go stale when a node's output shape changes
+ * (e.g. the Code node after #327 unwrapped its output: a sample captured as
+ * `{ result, duration }` would otherwise keep offering the dead `steps.code.result.*`
+ * path even though live runs now return the fields at the top level). The override
+ * remains the fallback for authoring pills before any run this session.
+ * Sample sources (live/override/example) derive paths from runtime data;
  * schema sources walk the Zod schema. `byNode` is populated only for the schema
  * tiers (the only place a concrete Zod type exists).
  */
@@ -102,14 +108,14 @@ function resolveEntries(
   options: UpstreamSchemaOptions,
   byNode: Record<string, z.ZodTypeAny>,
 ): PathEntry[] {
-  const override = options.overrides?.[ancestorId];
-  if (override !== undefined && override !== null) {
-    return derivePathsFromSample(override);
-  }
-
   const liveOutput = options.liveNodes?.get(ancestorId)?.output;
   if (liveOutput !== undefined && liveOutput !== null) {
     return derivePathsFromSample(liveOutput);
+  }
+
+  const override = options.overrides?.[ancestorId];
+  if (override !== undefined && override !== null) {
+    return derivePathsFromSample(override);
   }
 
   // Concrete, field-bearing schema beats the curated example so high-value
