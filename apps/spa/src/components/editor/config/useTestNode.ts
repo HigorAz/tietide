@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PILL_SAMPLE_KEY } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { useToastStore } from '@/stores/toastStore';
 import { getExecution, listExecutionSteps, testNode } from '@/api/executions';
 import { invalidTokensForNode } from '@/lib/validate-references';
@@ -95,10 +96,12 @@ export function useTestNode(nodeId: string): UseTestNodeResult {
     runIdRef.current += 1;
   }, [nodeId]);
 
-  // This node can't be tested while it references a deleted/invalid node.
+  // This node can't be tested while it references a deleted/invalid node. Live run
+  // output beats a possibly-stale sample, matching the picker's resolution.
+  const liveNodes = useExecutionLiveStore((s) => s.nodes);
   const hasInvalid = useMemo(
-    () => invalidTokensForNode(nodeId, nodes, edges).size > 0,
-    [nodeId, nodes, edges],
+    () => invalidTokensForNode(nodeId, nodes, edges, liveNodes).size > 0,
+    [nodeId, nodes, edges, liveNodes],
   );
 
   const canRun = !!workflowId && !hasInvalid;

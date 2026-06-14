@@ -5,6 +5,13 @@ import { resetConnectionsStore, useConnectionsStore } from '@/stores/connections
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { OllamaGenerateForm } from './OllamaGenerateForm';
 
+// The model field renders OllamaModelSelect, which probes the server on mount.
+// Stub the api client so the form tests never hit the network.
+vi.mock('@/api/connections', () => ({
+  listOllamaModels: vi.fn().mockResolvedValue({ models: [], reachable: false }),
+  pullOllamaModel: vi.fn(),
+}));
+
 const NODE_ID = 'node-ollama-1';
 const CONNECTION_ID = '33333333-3333-4333-8333-333333333333';
 
@@ -61,7 +68,7 @@ describe('OllamaGenerateForm', () => {
     expect(screen.getByTestId('ollama-generate-connection-error')).toBeInTheDocument();
   });
 
-  it('calls updateNodeConfig with model=undefined when override field is cleared', () => {
+  it('calls updateNodeConfig with model=undefined when the override is cleared to the default', () => {
     const updateNodeConfig = vi.fn();
     useEditorStore.setState({ updateNodeConfig });
     seedOllamaConnection();
@@ -71,6 +78,7 @@ describe('OllamaGenerateForm', () => {
         config={{ connectionId: CONNECTION_ID, prompt: 'hi', model: 'mistral:7b' }}
       />,
     );
+    // Selecting the blank "use connection default" option clears the override.
     fireEvent.change(screen.getByLabelText(/^model override/i), { target: { value: '' } });
     expect(updateNodeConfig).toHaveBeenCalledWith(NODE_ID, { model: undefined });
   });

@@ -158,4 +158,46 @@ describe('ssrf-guard', () => {
       ).rejects.toBeInstanceOf(SsrfBlockedError);
     });
   });
+
+  describe('SSRF_ALLOWED_HOSTS allowlist', () => {
+    const prev = process.env.SSRF_ALLOWED_HOSTS;
+    afterEach(() => {
+      if (prev === undefined) delete process.env.SSRF_ALLOWED_HOSTS;
+      else process.env.SSRF_ALLOWED_HOSTS = prev;
+    });
+
+    it('allows an allowlisted localhost host (self-hosted Ollama)', async () => {
+      process.env.SSRF_ALLOWED_HOSTS = 'localhost,127.0.0.1';
+      const loopback: LookupFn = async () => [{ address: '127.0.0.1', family: 4 }];
+      const url = await assertUrlAllowed('http://localhost:11434/api/tags', loopback);
+      expect(url.hostname).toBe('localhost');
+    });
+
+    it('allows an allowlisted literal loopback IP without a DNS lookup', async () => {
+      process.env.SSRF_ALLOWED_HOSTS = '127.0.0.1';
+      const lookup = jest.fn();
+      const { addresses } = await assertUrlAllowedWithAddresses(
+        'http://127.0.0.1:11434/api/tags',
+        lookup as unknown as LookupFn,
+      );
+      expect(addresses).toEqual(['127.0.0.1']);
+      expect(lookup).not.toHaveBeenCalled();
+    });
+
+    it('still blocks a private host that is NOT allowlisted', async () => {
+      process.env.SSRF_ALLOWED_HOSTS = 'localhost';
+      await expect(
+        assertUrlAllowed('http://127.0.0.1:11434/', jest.fn() as unknown as LookupFn),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+    });
+
+    it('is strict when the env is empty (default)', async () => {
+      delete process.env.SSRF_ALLOWED_HOSTS;
+      await expect(
+        assertUrlAllowed('http://localhost:3000/', async () => [
+          { address: '127.0.0.1', family: 4 },
+        ]),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+    });
+  });
 });

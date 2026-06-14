@@ -8,7 +8,12 @@ import {
   type WorkflowNode,
 } from '@tietide/shared';
 import type { CustomNodeData } from '@/components/editor/nodes/CustomNode.types';
-import { bfsAncestors, getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
+import {
+  bfsAncestors,
+  getUpstreamSchemas,
+  type PathSuggestion,
+  type UpstreamSchemaOptions,
+} from '@/lib/upstream-schema';
 import { parsePillSample } from '@/lib/parsePillSample';
 
 export type InvalidReferenceReason = 'missing' | 'not-upstream' | 'unknown-field';
@@ -30,11 +35,17 @@ interface ValidationContext {
   nodeById: Map<string, Node<CustomNodeData>>;
   triggerId: string | undefined;
   aliasToId: Map<string, string>;
-  /** Per-node `__pillSample` overrides keyed by nodeId — the top-priority pill source. */
+  /** Per-node `__pillSample` overrides keyed by nodeId. */
   overrides: Record<string, unknown>;
+  /** Live run output keyed by nodeId — wins over a (possibly stale) sample. */
+  liveNodes: UpstreamSchemaOptions['liveNodes'];
 }
 
-function buildContext(nodes: Node<CustomNodeData>[], edges: Edge[]): ValidationContext {
+function buildContext(
+  nodes: Node<CustomNodeData>[],
+  edges: Edge[],
+  liveNodes?: UpstreamSchemaOptions['liveNodes'],
+): ValidationContext {
   const aliasMap = assignNodeAliases(nodes.map(toAliasInput));
   const aliasToId = new Map<string, string>();
   let triggerId: string | undefined;
@@ -49,13 +60,14 @@ function buildContext(nodes: Node<CustomNodeData>[], edges: Edge[]): ValidationC
     triggerId,
     aliasToId,
     overrides: buildOverrides(nodes),
+    liveNodes,
   };
 }
 
-// A user-declared OUTPUT SAMPLE (or a "Test this node" capture) is stored under
-// `__pillSample` and is the top-priority pill source — the same one the picker
-// uses. Building it here lets the validator agree with the picker: a field the
-// picker offers from a sample is never flagged as a broken pill.
+// A user-declared OUTPUT SAMPLE (or a "Test this node" capture) stored under
+// `__pillSample`, and the live run output, are both richer pill sources than the
+// static schema. Building them here lets the validator agree with the picker: a
+// field the picker offers is never flagged as a broken pill.
 function buildOverrides(nodes: Node<CustomNodeData>[]): Record<string, unknown> {
   const map: Record<string, unknown> = {};
   for (const n of nodes) {
@@ -112,8 +124,8 @@ interface NodeFields {
 
 // Fold the picker's own suggestions (for one target node's upstream graph) into a
 // per-ancestor field set. Because this is the SAME resolution the data-pill picker
-// uses (sample override → live → static schema → example → generic), a field the
-// picker offers is never rejected here. A suggestion with an empty path means the
+// uses (live output → sample override → static schema → example → generic), a field
+// the picker offers is never rejected here. A suggestion with an empty path means the
 // node's whole output is a record/unknown — no concrete fields to validate.
 function buildFieldIndex(suggestions: PathSuggestion[]): Map<string, NodeFields> {
   const index = new Map<string, NodeFields>();
@@ -187,6 +199,7 @@ function nodeInvalid(node: Node<CustomNodeData>, ctx: ValidationContext): Invali
   const ancestors = new Set(bfsAncestors(node.id, ctx.edges));
   const { suggestions } = getUpstreamSchemas(node.id, ctx.nodes, ctx.edges, {
     overrides: ctx.overrides,
+    liveNodes: ctx.liveNodes,
   });
   const fieldIndex = buildFieldIndex(suggestions);
 
@@ -200,12 +213,18 @@ function nodeInvalid(node: Node<CustomNodeData>, ctx: ValidationContext): Invali
   return out;
 }
 
-/** Every data-pill reference in the workflow that points at a missing, non-upstream, or unknown field. */
+/**
+ * Every data-pill reference in the workflow that points at a missing, non-upstream,
+ * or unknown field. Pass `liveNodes` (the executionLiveStore node map) so validation
+ * uses the same live-output-first resolution as the picker — without it, a sample that
+ * went stale after an output-shape change would wrongly flag the now-correct pills.
+ */
 export function findInvalidReferences(
   nodes: Node<CustomNodeData>[],
   edges: Edge[],
+  liveNodes?: UpstreamSchemaOptions['liveNodes'],
 ): InvalidReference[] {
-  const ctx = buildContext(nodes, edges);
+  const ctx = buildContext(nodes, edges, liveNodes);
   return nodes.flatMap((n) => nodeInvalid(n, ctx));
 }
 
@@ -214,8 +233,9 @@ export function invalidTokensForNode(
   nodeId: string,
   nodes: Node<CustomNodeData>[],
   edges: Edge[],
+  liveNodes?: UpstreamSchemaOptions['liveNodes'],
 ): Set<string> {
-  const ctx = buildContext(nodes, edges);
+  const ctx = buildContext(nodes, edges, liveNodes);
   const node = ctx.nodeById.get(nodeId);
   if (!node) return new Set();
   return new Set(nodeInvalid(node, ctx).map((r) => r.token));

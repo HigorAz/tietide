@@ -41,6 +41,14 @@ export type FieldSpec =
       label: string;
       help?: string;
       description?: string;
+    }
+  | {
+      kind: 'ollama-model';
+      key: string;
+      label: string;
+      modelKind: 'text' | 'embedding';
+      required?: boolean;
+      help?: string;
     };
 
 export interface GenericConnectorFormProps extends NodeConfigFormProps {

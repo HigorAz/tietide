@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
-import type { ConnectionStatus, ConnectionType } from '@tietide/shared';
+import type { ConnectionStatus, ConnectionType, OllamaModelsResult } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService, type EncryptedPayload } from '../crypto/crypto.service';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -8,6 +8,7 @@ import type { UpdateConnectionDto } from './dto/update-connection.dto';
 import type { ConnectionResponseDto } from './dto/connection-response.dto';
 import { ProviderHealthRegistry } from './health/provider-health.registry';
 import type { ProviderHealthResult } from './health/provider-health.types';
+import { assertHealthUrlAllowed, SsrfBlockedError } from './health/ssrf-guard';
 import { decodeKeysetCursor } from '../common/pagination/cursor';
 import { buildPage, keysetWhere, type Page } from '../common/pagination/paginate';
 import { resolveLimit } from '../common/pagination/page-query.dto';
@@ -216,6 +217,90 @@ export class ConnectionsService {
     );
 
     return result;
+  }
+
+  // Resolve the Ollama base URL from either a saved (owned) connection or an ad-hoc
+  // baseUrl (the connection-create form, before a connection exists). Trailing slashes
+  // trimmed so `${base}/api/...` joins cleanly.
+  async resolveOllamaBaseUrl(
+    organizationId: string,
+    input: { connectionId?: string; baseUrl?: string },
+  ): Promise<string> {
+    if (input.connectionId) {
+      const row = await this.prisma.connection.findFirst({
+        where: { id: input.connectionId, organizationId, provider: 'ollama' },
+      });
+      if (!row) {
+        throw new NotFoundException('Connection not found');
+      }
+      const cfg = this.decryptConfig(row.configEncrypted, row.configNonce) as { baseUrl?: unknown };
+      if (typeof cfg.baseUrl !== 'string' || cfg.baseUrl.length === 0) {
+        throw new BadRequestException('Connection has no baseUrl');
+      }
+      return cfg.baseUrl.replace(/\/+$/, '');
+    }
+    if (input.baseUrl && input.baseUrl.length > 0) {
+      return input.baseUrl.replace(/\/+$/, '');
+    }
+    throw new BadRequestException('Provide a connectionId or baseUrl');
+  }
+
+  // List the models installed on an Ollama server (GET /api/tags). SSRF-guarded — a
+  // private/loopback baseUrl needs the operator's SSRF_ALLOWED_HOSTS allowlist. Any
+  // failure (SSRF block, unreachable, bad body) degrades to `reachable:false` so the UI
+  // falls back to the curated model list instead of erroring.
+  async listOllamaModels(
+    organizationId: string,
+    input: { connectionId?: string; baseUrl?: string },
+  ): Promise<OllamaModelsResult> {
+    const base = await this.resolveOllamaBaseUrl(organizationId, input);
+    const url = `${base}/api/tags`;
+    try {
+      await assertHealthUrlAllowed(url);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        return { models: [], reachable: false };
+      }
+      throw err;
+    }
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS) });
+      if (!res.ok) {
+        return { models: [], reachable: false };
+      }
+      const body = (await res.json()) as { models?: Array<{ name?: unknown }> };
+      const names = (body.models ?? [])
+        .map((m) => (typeof m?.name === 'string' ? m.name : null))
+        .filter((n): n is string => n !== null && n.length > 0);
+      return { models: [...new Set(names)].sort(), reachable: true };
+    } catch {
+      return { models: [], reachable: false };
+    }
+  }
+
+  // Open a streaming Ollama model pull (POST /api/pull, stream:true). Resolves +
+  // SSRF-guards the baseUrl, then returns the raw upstream fetch Response so the
+  // controller can forward its NDJSON progress chunks to the client. SSRF-blocked hosts
+  // throw BadRequest (the operator must allowlist them via SSRF_ALLOWED_HOSTS).
+  async openOllamaPull(
+    organizationId: string,
+    input: { connectionId?: string; baseUrl?: string; model: string },
+  ): Promise<Response> {
+    const base = await this.resolveOllamaBaseUrl(organizationId, input);
+    const url = `${base}/api/pull`;
+    try {
+      await assertHealthUrlAllowed(url);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: input.model, stream: true }),
+    });
   }
 
   encryptConfig(config: object): EncryptedPayload {

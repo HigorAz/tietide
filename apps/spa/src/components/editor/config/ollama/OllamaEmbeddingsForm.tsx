@@ -5,10 +5,10 @@ import { GenericConnectorForm, type FieldSpec } from '../GenericConnectorForm';
 const FIELDS: ReadonlyArray<FieldSpec> = [
   { kind: 'text', key: 'prompt', label: 'Input text', multiline: true, required: true },
   {
-    kind: 'pill',
+    kind: 'ollama-model',
     key: 'model',
     label: 'Model (defaults to connection)',
-    placeholder: 'nomic-embed-text',
+    modelKind: 'embedding',
   },
 ];
 
