@@ -24,6 +24,22 @@ export type LookupFn = (hostname: string) => Promise<Array<{ address: string; fa
 const defaultLookup: LookupFn = (hostname) =>
   lookup(hostname, { all: true }) as Promise<Array<{ address: string; family: number }>>;
 
+// Operator-trusted hosts that bypass the private/loopback block — for self-hosted
+// internal services (e.g. an Ollama at localhost:11434, which is otherwise refused).
+// Empty by default → strict. Comma-separated hostnames in SSRF_ALLOWED_HOSTS, matched
+// case-insensitively against the URL hostname. The operator vouches for these hosts, so
+// an allowlisted host that resolves to a private IP is intentionally permitted. Read at
+// call time so ops/tests can set it without re-importing.
+export function isAllowlistedHost(host: string): boolean {
+  const raw = process.env.SSRF_ALLOWED_HOSTS;
+  if (!raw) return false;
+  const target = host.toLowerCase();
+  return raw.split(',').some((h) => {
+    const trimmed = h.trim().toLowerCase();
+    return trimmed.length > 0 && trimmed === target;
+  });
+}
+
 export class SsrfBlockedError extends Error {
   constructor(message: string) {
     super(message);
@@ -143,17 +159,19 @@ export async function assertUrlAllowedWithAddresses(
   }
 
   const host = url.hostname.replace(/^\[|\]$/g, '');
+  // Operator-trusted host (SSRF_ALLOWED_HOSTS) — bypass the private/loopback block.
+  const allowlisted = isAllowlistedHost(host);
 
   // Literal IP host — check directly, no DNS. Pin to the literal itself.
   if (isIP(host) !== 0) {
-    if (isBlockedAddress(host)) {
+    if (!allowlisted && isBlockedAddress(host)) {
       throw new SsrfBlockedError('Refusing to connect to a private or internal address');
     }
     return { url, addresses: [host], isLiteralIp: true };
   }
 
   // Common hostnames that resolve to loopback regardless of DNS.
-  if (host === 'localhost' || host.endsWith('.localhost')) {
+  if (!allowlisted && (host === 'localhost' || host.endsWith('.localhost'))) {
     throw new SsrfBlockedError('Refusing to connect to localhost');
   }
 
@@ -166,9 +184,11 @@ export async function assertUrlAllowedWithAddresses(
   if (resolved.length === 0) {
     throw new SsrfBlockedError(`Host "${host}" did not resolve to any address`);
   }
-  for (const { address } of resolved) {
-    if (isBlockedAddress(address)) {
-      throw new SsrfBlockedError('Refusing to connect to a private or internal address');
+  if (!allowlisted) {
+    for (const { address } of resolved) {
+      if (isBlockedAddress(address)) {
+        throw new SsrfBlockedError('Refusing to connect to a private or internal address');
+      }
     }
   }
   return { url, addresses: resolved.map((r) => r.address), isLiteralIp: false };

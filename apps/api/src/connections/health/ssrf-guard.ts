@@ -19,6 +19,21 @@ export type LookupFn = (hostname: string) => Promise<Array<{ address: string; fa
 const defaultLookup: LookupFn = (hostname) =>
   lookup(hostname, { all: true }) as Promise<Array<{ address: string; family: number }>>;
 
+// Operator-trusted hosts that bypass the private/loopback block — for self-hosted
+// internal services (e.g. an Ollama at localhost:11434, otherwise refused). Empty by
+// default → strict. Comma-separated hostnames in SSRF_ALLOWED_HOSTS, matched
+// case-insensitively. The operator vouches for these hosts. Read at call time so
+// ops/tests can set it. Mirrors the worker's guard (kept as a self-contained copy).
+export function isAllowlistedHost(host: string): boolean {
+  const raw = process.env.SSRF_ALLOWED_HOSTS;
+  if (!raw) return false;
+  const target = host.toLowerCase();
+  return raw.split(',').some((h) => {
+    const trimmed = h.trim().toLowerCase();
+    return trimmed.length > 0 && trimmed === target;
+  });
+}
+
 export class SsrfBlockedError extends Error {
   constructor(message: string) {
     super(message);
@@ -114,6 +129,11 @@ export async function assertHealthUrlAllowed(
   }
 
   const host = url.hostname.replace(/^\[|\]$/g, '');
+
+  // Operator-trusted host (SSRF_ALLOWED_HOSTS) — bypass the private/loopback block.
+  if (isAllowlistedHost(host)) {
+    return url;
+  }
 
   if (isIP(host) !== 0) {
     if (isBlockedAddress(host)) {
