@@ -152,20 +152,14 @@ export class CodeAction implements INodeExecutor {
   readonly description =
     'Runs JavaScript in a sandboxed worker thread (5s timeout, 128MB memory cap, no require/process/network)';
   readonly category = 'action' as const;
+  // The sandbox cannot reach the network/filesystem/process, so running it during
+  // a dry-run/Test has no external side effects. Executing for real (rather than
+  // returning a stub) lets Test surface the actual output and lets the data-pill
+  // picker derive real field paths (e.g. {{steps.code.count}}).
+  readonly sideEffectFree = true;
 
-  async execute(input: NodeInput, context: ExecutionContext): Promise<NodeOutput> {
+  async execute(input: NodeInput, _context: ExecutionContext): Promise<NodeOutput> {
     const params = this.parseParams(input.params);
-
-    if (context.isDryRun) {
-      return {
-        data: {
-          mocked: true,
-          mode: 'dry-run',
-          codePreview: params.code.slice(0, 200),
-        },
-        metadata: { mocked: true },
-      };
-    }
 
     const started = Date.now();
     const result = await this.runInSandbox(

@@ -150,8 +150,12 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
     {
       id: 'base',
       label: 'Base',
-      description: 'Post messages and list channels (required)',
-      scopes: ['chat:write', 'channels:read'],
+      // chat:write.public lets the bot post to a public channel it hasn't joined —
+      // required for "Post to Channel by Name" to work without manually inviting
+      // the bot first (otherwise chat.postMessage returns missing_scope).
+      description:
+        'Post messages (incl. channels the bot has not joined) and list channels (required)',
+      scopes: ['chat:write', 'chat:write.public', 'channels:read'],
       defaultOn: true,
       locked: true,
     },
@@ -160,6 +164,15 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
       label: 'Channels',
       description: 'Read history, create and manage channels',
       scopes: ['channels:history', 'channels:manage'],
+      defaultOn: true,
+    },
+    {
+      id: 'private-channels',
+      label: 'Private channels',
+      // groups:read is required to resolve a private channel by name in
+      // conversations.list (the lookup "Post to Channel by Name" performs).
+      description: 'Find private channels by name and read their history',
+      scopes: ['groups:read', 'groups:history'],
       defaultOn: true,
     },
     {
