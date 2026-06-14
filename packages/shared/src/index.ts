@@ -169,6 +169,7 @@ export {
   linearApiKeyConfigSchema,
   githubOAuth2ConfigSchema,
   ollamaConfigSchema,
+  huggingfaceApiKeyConfigSchema,
   hubspotOAuth2ConfigSchema,
   mailchimpApiKeyConfigSchema,
   calendlyApiKeyConfigSchema,
@@ -194,6 +195,7 @@ export {
   type LinearApiKeyConfig,
   type GitHubOAuth2Config,
   type OllamaConfig,
+  type HuggingfaceApiKeyConfig,
   type HubspotOAuth2Config,
   type MailchimpApiKeyConfig,
   type CalendlyApiKeyConfig,
@@ -648,6 +650,10 @@ export {
   type OllamaGenerateConfig,
   type OllamaEmbeddingsConfig,
 } from './schemas/ollama.schema.js';
+export {
+  aiGenerateImageConfigSchema,
+  type AiGenerateImageConfig,
+} from './schemas/ai-image.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,

@@ -34,6 +34,7 @@ export const ConnectionProvider = {
   LINEAR: 'linear',
   GITHUB: 'github',
   OLLAMA: 'ollama',
+  HUGGINGFACE: 'huggingface',
   HUBSPOT: 'hubspot',
   MAILCHIMP: 'mailchimp',
   CALENDLY: 'calendly',

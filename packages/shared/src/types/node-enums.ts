@@ -186,6 +186,7 @@ export const NodeType = {
   OPENAI_GENERATE_IMAGE: 'openai-generate-image',
   ANTHROPIC_VISION: 'anthropic-vision',
   OLLAMA_EMBEDDINGS: 'ollama-embeddings',
+  AI_GENERATE_IMAGE: 'ai-generate-image',
   STRIPE_INVOICE_PAID: 'stripe-invoice-paid',
   HUBSPOT_DEAL_CHANGED: 'hubspot-deal-changed',
   S3_OBJECT_CREATED: 's3-object-created',

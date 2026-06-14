@@ -163,6 +163,12 @@ export const ollamaConfigSchema = z.object({
   model: z.string().min(1).max(128),
 });
 
+// Hugging Face Inference API: a single access token (hf_...). Used by the
+// AI: Generate Image node's `huggingface` provider for token-based text-to-image.
+export const huggingfaceApiKeyConfigSchema = z.object({
+  apiKey: z.string().min(1),
+});
+
 // HubSpot OAuth2: access + refresh token, plus the hub identifier returned by the
 // token introspection endpoint so we can attribute API calls to the right portal.
 export const hubspotOAuth2ConfigSchema = z.object({
@@ -264,6 +270,7 @@ export type AirtableApiKeyConfig = z.infer<typeof airtableApiKeyConfigSchema>;
 export type LinearApiKeyConfig = z.infer<typeof linearApiKeyConfigSchema>;
 export type GitHubOAuth2Config = z.infer<typeof githubOAuth2ConfigSchema>;
 export type OllamaConfig = z.infer<typeof ollamaConfigSchema>;
+export type HuggingfaceApiKeyConfig = z.infer<typeof huggingfaceApiKeyConfigSchema>;
 export type HubspotOAuth2Config = z.infer<typeof hubspotOAuth2ConfigSchema>;
 export type MailchimpApiKeyConfig = z.infer<typeof mailchimpApiKeyConfigSchema>;
 export type CalendlyApiKeyConfig = z.infer<typeof calendlyApiKeyConfigSchema>;
@@ -289,6 +296,7 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.LINEAR]: linearApiKeyConfigSchema,
   [ConnectionProvider.GITHUB]: githubOAuth2ConfigSchema,
   [ConnectionProvider.OLLAMA]: ollamaConfigSchema,
+  [ConnectionProvider.HUGGINGFACE]: huggingfaceApiKeyConfigSchema,
   [ConnectionProvider.HUBSPOT]: hubspotOAuth2ConfigSchema,
   [ConnectionProvider.MAILCHIMP]: mailchimpApiKeyConfigSchema,
   [ConnectionProvider.CALENDLY]: calendlyApiKeyConfigSchema,
@@ -315,6 +323,7 @@ export type ProviderConfigMap = {
   linear: LinearApiKeyConfig;
   github: GitHubOAuth2Config;
   ollama: OllamaConfig;
+  huggingface: HuggingfaceApiKeyConfig;
   hubspot: HubspotOAuth2Config;
   mailchimp: MailchimpApiKeyConfig;
   calendly: CalendlyApiKeyConfig;

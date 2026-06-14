@@ -1,4 +1,5 @@
 import { HttpRequestAction } from '../nodes/actions/http-request';
+import { AiGenerateImageAction } from '../nodes/actions/ai-generate-image';
 import { CodeAction } from '../nodes/actions/code';
 import { Conditional } from '../nodes/logic/conditional';
 import { IteratorNode } from '../nodes/logic/iterator';
@@ -189,6 +190,7 @@ describe('EngineModule', () => {
     const cronTrigger = new CronTrigger();
     const webhookTrigger = new WebhookTrigger();
     const httpRequest = new HttpRequestAction();
+    const aiGenerateImage = new AiGenerateImageAction();
     const codeAction = new CodeAction();
     const conditional = new Conditional();
     const returnNode = new ReturnNode();
@@ -384,6 +386,7 @@ describe('EngineModule', () => {
       cronTrigger,
       webhookTrigger,
       httpRequest,
+      aiGenerateImage,
       codeAction,
       conditional,
       returnNode,
@@ -565,6 +568,7 @@ describe('EngineModule', () => {
       cronTrigger,
       webhookTrigger,
       httpRequest,
+      aiGenerateImage,
       codeAction,
       conditional,
       returnNode,
@@ -724,6 +728,7 @@ describe('EngineModule', () => {
       ['CronTrigger', 'cron-trigger', 'cronTrigger'],
       ['WebhookTrigger', 'webhook-trigger', 'webhookTrigger'],
       ['HttpRequestAction', 'http-request', 'httpRequest'],
+      ['AiGenerateImageAction', 'ai-generate-image', 'aiGenerateImage'],
       ['CodeAction', 'code', 'codeAction'],
       ['Conditional', 'conditional', 'conditional'],
       ['ReturnNode', 'return', 'returnNode'],
@@ -942,7 +947,8 @@ describe('EngineModule', () => {
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
       // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
       // Mailchimp ×5 + Calendly ×3 + S3 ×4 + AI enrichment ×4.
-      expect(counts.action).toBe(136);
+      // +1 ai-generate-image (Pollinations/Hugging Face text-to-image).
+      expect(counts.action).toBe(137);
     });
 
     // Invariant: every poll trigger type the scheduler can schedule MUST have an

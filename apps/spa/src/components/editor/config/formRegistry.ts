@@ -134,6 +134,7 @@ import { OpenAIEmbeddingsForm } from './openai/OpenAIEmbeddingsForm';
 import { OpenAIGenerateImageForm } from './openai/OpenAIGenerateImageForm';
 import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
 import { OllamaEmbeddingsForm } from './ollama/OllamaEmbeddingsForm';
+import { AiGenerateImageForm } from './ai/AiGenerateImageForm';
 import { HubspotCreateContactForm } from './hubspot/HubspotCreateContactForm';
 import { HubspotCreateDealForm } from './hubspot/HubspotCreateDealForm';
 import { HubspotContactChangedForm } from './hubspot/HubspotContactChangedForm';
@@ -319,6 +320,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.OPENAI_GENERATE_IMAGE]: OpenAIGenerateImageForm,
   [NodeType.OLLAMA_GENERATE]: OllamaGenerateForm,
   [NodeType.OLLAMA_EMBEDDINGS]: OllamaEmbeddingsForm,
+  [NodeType.AI_GENERATE_IMAGE]: AiGenerateImageForm,
   [NodeType.HUBSPOT_CREATE_CONTACT]: HubspotCreateContactForm,
   [NodeType.HUBSPOT_CREATE_DEAL]: HubspotCreateDealForm,
   [NodeType.HUBSPOT_CONTACT_CHANGED]: HubspotContactChangedForm,

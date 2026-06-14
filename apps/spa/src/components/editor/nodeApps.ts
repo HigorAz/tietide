@@ -4,6 +4,7 @@ import {
   GitBranch,
   Hash,
   HardDrive,
+  Image as ImageIcon,
   Mail,
   Phone,
   Sheet,
@@ -58,6 +59,7 @@ export type AppId =
   | 'anthropic'
   | 'openai'
   | 'ollama'
+  | 'ai'
   | 'hubspot'
   | 'stripe'
   | 'mailchimp'
@@ -108,6 +110,7 @@ export const APP_INFO: Record<AppId, AppDescriptor> = {
   anthropic: { id: 'anthropic', label: 'Anthropic Claude', brand: brand(siAnthropic) },
   openai: { id: 'openai', label: 'OpenAI', icon: Sparkles },
   ollama: { id: 'ollama', label: 'Ollama', brand: brand(siOllama) },
+  ai: { id: 'ai', label: 'AI', icon: ImageIcon },
   hubspot: { id: 'hubspot', label: 'HubSpot', brand: brand(siHubspot) },
   stripe: { id: 'stripe', label: 'Stripe', brand: brand(siStripe) },
   mailchimp: { id: 'mailchimp', label: 'Mailchimp', brand: brand(siMailchimp) },
@@ -124,6 +127,7 @@ export const APP_INFO: Record<AppId, AppDescriptor> = {
 // nodes that bucket into each app.
 export const APP_ORDER: readonly AppId[] = [
   'core',
+  'ai',
   'airtable',
   'anthropic',
   'calendly',
@@ -267,6 +271,9 @@ export function getAppIdForNodeType(type: NodeType | string): AppId {
     case NodeType.OLLAMA_GENERATE:
       return 'ollama';
 
+    case NodeType.AI_GENERATE_IMAGE:
+      return 'ai';
+
     case NodeType.HUBSPOT_CREATE_CONTACT:
     case NodeType.HUBSPOT_CREATE_DEAL:
     case NodeType.HUBSPOT_CONTACT_CHANGED:
@@ -325,6 +332,7 @@ const PREFIX_TO_APP: ReadonlyArray<readonly [string, AppId]> = [
   ['anthropic-', 'anthropic'],
   ['openai-', 'openai'],
   ['ollama-', 'ollama'],
+  ['ai-', 'ai'],
   ['hubspot-', 'hubspot'],
   ['stripe-', 'stripe'],
   ['mailchimp-', 'mailchimp'],

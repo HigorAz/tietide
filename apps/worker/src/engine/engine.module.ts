@@ -1,5 +1,6 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { HttpRequestAction } from '../nodes/actions/http-request';
+import { AiGenerateImageAction } from '../nodes/actions/ai-generate-image';
 import { CodeAction } from '../nodes/actions/code';
 import { Conditional } from '../nodes/logic/conditional';
 import { IteratorNode } from '../nodes/logic/iterator';
@@ -228,6 +229,7 @@ import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created
     CronTrigger,
     WebhookTrigger,
     HttpRequestAction,
+    AiGenerateImageAction,
     CodeAction,
     Conditional,
     ReturnNode,
@@ -437,6 +439,7 @@ export class EngineModule implements OnModuleInit {
     private readonly cronTrigger: CronTrigger,
     private readonly webhookTrigger: WebhookTrigger,
     private readonly httpRequest: HttpRequestAction,
+    private readonly aiGenerateImage: AiGenerateImageAction,
     private readonly codeAction: CodeAction,
     private readonly conditional: Conditional,
     private readonly returnNode: ReturnNode,
@@ -618,6 +621,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.cronTrigger);
     this.registry.register(this.webhookTrigger);
     this.registry.register(this.httpRequest);
+    this.registry.register(this.aiGenerateImage);
     this.registry.register(this.codeAction);
     this.registry.register(this.conditional);
     this.registry.register(this.returnNode);

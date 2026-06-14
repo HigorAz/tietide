@@ -56,6 +56,18 @@ export const aiNodeOutputSchema = z.object({
   finishReason: z.string().nullable(),
 });
 
+// AI: Generate Image output. `imageUrl` is present for the Pollinations provider
+// (a public URL usable directly as e.g. an Instagram image_url); `imageBase64` +
+// `contentType` are present for Hugging Face (raw bytes, NOT a public URL).
+export const aiImageOutputSchema = z.object({
+  provider: z.string(),
+  prompt: z.string(),
+  imageUrl: z.string().optional(),
+  imageBase64: z.string().optional(),
+  contentType: z.string().optional(),
+  model: z.string().optional(),
+});
+
 // ── High-value trigger output schemas ───────────────────────────────────────
 // These mirror the curated NODE_OUTPUT_EXAMPLES shapes and the trigger emitters
 // in apps/worker + apps/api. Concrete shapes let downstream nodes data-pill the
@@ -142,6 +154,7 @@ export const nodeOutputSchemas: Record<string, z.ZodTypeAny> = {
   'openai-chat-completion': aiNodeOutputSchema,
   'ollama-generate': aiNodeOutputSchema,
   'anthropic-vision': aiNodeOutputSchema,
+  'ai-generate-image': aiImageOutputSchema,
   'gmail-message-received': gmailMessageReceivedOutputSchema,
   'drive-file-added': driveFileAddedOutputSchema,
   'sheets-row-added': sheetsRowAddedOutputSchema,

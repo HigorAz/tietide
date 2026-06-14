@@ -6,6 +6,7 @@ import notionIcon from '@/assets/providers/notion.svg';
 import openaiIcon from '@/assets/providers/openai.svg';
 import anthropicIcon from '@/assets/providers/anthropic.svg';
 import ollamaIcon from '@/assets/providers/ollama.svg';
+import huggingfaceIcon from '@/assets/providers/huggingface.svg';
 import discordIcon from '@/assets/providers/discord.svg';
 import twilioIcon from '@/assets/providers/twilio.svg';
 import telegramIcon from '@/assets/providers/telegram.svg';
@@ -80,6 +81,12 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     type: ConnectionType.CUSTOM,
     iconUrl: ollamaIcon,
     setupGuidePath: 'docs/Connection-setup/connection-ollama-setup.md',
+  },
+  {
+    id: ConnectionProvider.HUGGINGFACE,
+    label: 'Hugging Face',
+    type: ConnectionType.API_KEY,
+    iconUrl: huggingfaceIcon,
   },
   {
     id: ConnectionProvider.DISCORD,
