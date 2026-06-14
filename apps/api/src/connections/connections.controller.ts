@@ -39,8 +39,10 @@ import { OrgContextGuard } from '../common/guards/org-context.guard';
 import { OrgRolesGuard } from '../common/guards/org-roles.guard';
 import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import type { OrgContext } from '../common/org-context/org-context.types';
+import type { OllamaModelsResult } from '@tietide/shared';
 import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
+import { OllamaModelsRequestDto } from './dto/ollama-models-request.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { ConnectionResponseDto } from './dto/connection-response.dto';
 import { TestConnectionResponseDto } from './dto/test-connection-response.dto';
@@ -160,6 +162,24 @@ export class ConnectionsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<TestConnectionResponseDto> {
     return this.connections.test(org.id, user.id, id);
+  }
+
+  @Post('ollama/models')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
+  @Throttle(EXECUTE_THROTTLE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "List an Ollama server's installed models (via /api/tags)",
+  })
+  @ApiBadRequestResponse({ description: 'Missing connectionId/baseUrl or invalid input' })
+  async ollamaModels(
+    @CurrentOrg() org: OrgContext,
+    @Body() dto: OllamaModelsRequestDto,
+  ): Promise<OllamaModelsResult> {
+    return this.connections.listOllamaModels(org.id, {
+      connectionId: dto.connectionId,
+      baseUrl: dto.baseUrl,
+    });
   }
 
   @Delete(':id')
