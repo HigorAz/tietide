@@ -107,6 +107,10 @@ import {
   HubspotDealChangedTrigger,
   HUBSPOT_DEAL_CHANGED_TYPE,
 } from './triggers/hubspot/hubspot-deal-changed.trigger';
+import {
+  WhatsappMessageReceivedTrigger,
+  WHATSAPP_MESSAGE_RECEIVED_TYPE,
+} from './triggers/whatsapp/whatsapp-message-received.trigger';
 import { RENEWAL_QUEUE_NAME } from './renewal/subscription-renewer.constants';
 import { SubscriptionRenewerProcessor } from './renewal/subscription-renewer.processor';
 import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-bootstrap.service';
@@ -152,6 +156,7 @@ import { SubscriptionRenewerBootstrap } from './renewal/subscription-renewer-boo
     GithubPrOpenedTrigger,
     StripeInvoicePaidTrigger,
     HubspotDealChangedTrigger,
+    WhatsappMessageReceivedTrigger,
     ActivationService,
     SubscriptionRenewerProcessor,
     SubscriptionRenewerBootstrap,
@@ -191,6 +196,7 @@ export class ProviderTriggerModule implements OnModuleInit {
     private readonly githubPrOpened: GithubPrOpenedTrigger,
     private readonly stripeInvoicePaid: StripeInvoicePaidTrigger,
     private readonly hubspotDealChanged: HubspotDealChangedTrigger,
+    private readonly whatsappMessageReceived: WhatsappMessageReceivedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -221,5 +227,6 @@ export class ProviderTriggerModule implements OnModuleInit {
     this.registry.register(GITHUB_PR_OPENED_TYPE, this.githubPrOpened);
     this.registry.register(STRIPE_INVOICE_PAID_TYPE, this.stripeInvoicePaid);
     this.registry.register(HUBSPOT_DEAL_CHANGED_TYPE, this.hubspotDealChanged);
+    this.registry.register(WHATSAPP_MESSAGE_RECEIVED_TYPE, this.whatsappMessageReceived);
   }
 }

@@ -9,4 +9,12 @@ export const INSTAGRAM_NODES: NodeTypeDefinition[] = [
     group: NodeGroup.COMMUNICATION,
     provider: 'instagram',
   },
+  {
+    type: NodeType.INSTAGRAM_COMMENT_ADDED,
+    name: 'Instagram: Comment Added',
+    description: 'Fires when a new comment is added to an Instagram media (polled)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMUNICATION_TRIGGERS,
+    provider: 'instagram',
+  },
 ];

@@ -660,13 +660,17 @@ export {
 } from './schemas/ai-image.schema.js';
 export {
   instagramPublishPhotoConfigSchema,
+  instagramCommentAddedConfigSchema,
   type InstagramPublishPhotoConfig,
+  type InstagramCommentAddedConfig,
 } from './schemas/instagram.schema.js';
 export {
   whatsappSendMessageConfigSchema,
   whatsappSendTemplateConfigSchema,
+  whatsappMessageReceivedConfigSchema,
   type WhatsappSendMessageConfig,
   type WhatsappSendTemplateConfig,
+  type WhatsappMessageReceivedConfig,
 } from './schemas/whatsapp.schema.js';
 
 export {

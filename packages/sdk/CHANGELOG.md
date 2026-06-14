@@ -5,6 +5,18 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] — 2026-06-14
+
+### Added
+
+- `BasePushTrigger.handleSubscriptionVerification?(input)` — optional GET-based
+  URL-ownership handshake for webhook providers that verify the callback URL with
+  a GET request before delivering events (e.g. Meta/Facebook's
+  `?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`). Returning a
+  `ValidationResponse` tells the webhook controller's GET handler to echo it;
+  null/undefined means "not handled". Distinct from `handleValidation`, which
+  runs on the POST route for body-carrying challenges. Optional and additive.
+
 ## [2.9.0] — 2026-06-14
 
 ### Added

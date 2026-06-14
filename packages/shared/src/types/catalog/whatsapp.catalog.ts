@@ -17,4 +17,12 @@ export const WHATSAPP_NODES: NodeTypeDefinition[] = [
     group: NodeGroup.COMMUNICATION,
     provider: 'whatsapp',
   },
+  {
+    type: NodeType.WHATSAPP_MESSAGE_RECEIVED,
+    name: 'WhatsApp: Message Received',
+    description: 'Fires when an inbound message arrives on your WhatsApp Business number (webhook)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.COMMUNICATION_TRIGGERS,
+    provider: 'whatsapp',
+  },
 ];

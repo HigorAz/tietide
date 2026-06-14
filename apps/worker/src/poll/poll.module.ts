@@ -54,6 +54,11 @@ import {
   S3_OBJECT_CREATED_TYPE,
 } from '../nodes/triggers/poll/s3-object-created';
 import { S3ClientFactory } from '../nodes/connectors/s3/s3-client.factory';
+import {
+  InstagramCommentAddedTrigger,
+  INSTAGRAM_COMMENT_ADDED_TYPE,
+} from '../nodes/triggers/poll/instagram-comment-added';
+import { MetaGraphClientFactory } from '../nodes/connectors/meta/meta-graph-client.factory';
 import { MicrosoftAuthService } from '../nodes/connectors/microsoft/microsoft-auth';
 import { POLL_QUEUE_NAME } from './poll.constants';
 import { PollSchedulerService } from './poll-scheduler.service';
@@ -92,6 +97,8 @@ import { PollConnectionLoader } from './poll-connection-loader';
     LinearIssueUpdatedTrigger,
     S3ClientFactory,
     S3ObjectCreatedTrigger,
+    MetaGraphClientFactory,
+    InstagramCommentAddedTrigger,
   ],
   exports: [PollTriggerRegistry],
 })
@@ -109,6 +116,7 @@ export class PollModule implements OnModuleInit {
     private readonly airtableRecordCreated: AirtableRecordCreatedTrigger,
     private readonly linearIssueUpdated: LinearIssueUpdatedTrigger,
     private readonly s3ObjectCreated: S3ObjectCreatedTrigger,
+    private readonly instagramCommentAdded: InstagramCommentAddedTrigger,
   ) {}
 
   onModuleInit(): void {
@@ -123,5 +131,6 @@ export class PollModule implements OnModuleInit {
     this.registry.register(AIRTABLE_RECORD_CREATED_TYPE, this.airtableRecordCreated);
     this.registry.register(LINEAR_ISSUE_UPDATED_TYPE, this.linearIssueUpdated);
     this.registry.register(S3_OBJECT_CREATED_TYPE, this.s3ObjectCreated);
+    this.registry.register(INSTAGRAM_COMMENT_ADDED_TYPE, this.instagramCommentAdded);
   }
 }

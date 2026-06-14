@@ -35,3 +35,13 @@ export const whatsappSendTemplateConfigSchema = z.object({
   mockOnDryRun: z.boolean().optional(),
 });
 export type WhatsappSendTemplateConfig = z.infer<typeof whatsappSendTemplateConfigSchema>;
+
+/**
+ * WhatsApp: Message Received trigger. A Meta webhook push trigger — it only
+ * needs the connection to activate; inbound payloads arrive via the provider
+ * webhook and are surfaced as-is.
+ */
+export const whatsappMessageReceivedConfigSchema = z.object({
+  connectionId,
+});
+export type WhatsappMessageReceivedConfig = z.infer<typeof whatsappMessageReceivedConfigSchema>;

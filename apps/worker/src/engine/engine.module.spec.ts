@@ -150,6 +150,7 @@ import {
   GithubPrOpenedPassthrough,
   StripeInvoicePaidPassthrough,
   HubspotDealChangedPassthrough,
+  WhatsappMessageReceivedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created';
@@ -182,6 +183,7 @@ import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs'
 import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr';
 import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
 import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-record-created';
+import { InstagramCommentAddedTrigger } from '../nodes/triggers/poll/instagram-comment-added';
 import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
 import { POLL_TRIGGER_TYPES } from '@tietide/shared';
 import { EngineModule } from './engine.module';
@@ -349,6 +351,7 @@ describe('EngineModule', () => {
     const githubMergePr = new GitHubMergePrAction(undefined as never);
     const notionDbItemUpdated = new NotionDatabaseItemUpdatedTrigger(undefined as never);
     const airtableRecordCreated = new AirtableRecordCreatedTrigger(undefined as never);
+    const instagramCommentAdded = new InstagramCommentAddedTrigger(undefined as never);
     const linearIssueUpdated = new LinearIssueUpdatedTrigger(undefined as never);
     const githubIssueOpened = new GithubIssueOpenedPassthrough();
     const githubPrOpened = new GithubPrOpenedPassthrough();
@@ -385,6 +388,7 @@ describe('EngineModule', () => {
     const ollamaEmbeddings = new OllamaEmbeddingsAction(undefined as never);
     const stripeInvoicePaid = new StripeInvoicePaidPassthrough();
     const hubspotDealChanged = new HubspotDealChangedPassthrough();
+    const whatsappMessageReceived = new WhatsappMessageReceivedPassthrough();
     const s3ObjectCreated = new S3ObjectCreatedTrigger(undefined as never);
     const module = new EngineModule(
       registry,
@@ -533,6 +537,7 @@ describe('EngineModule', () => {
       githubMergePr,
       notionDbItemUpdated,
       airtableRecordCreated,
+      instagramCommentAdded,
       linearIssueUpdated,
       githubIssueOpened,
       githubPrOpened,
@@ -569,6 +574,7 @@ describe('EngineModule', () => {
       ollamaEmbeddings,
       stripeInvoicePaid,
       hubspotDealChanged,
+      whatsappMessageReceived,
       s3ObjectCreated,
     );
     return {
@@ -729,6 +735,7 @@ describe('EngineModule', () => {
       ollamaEmbeddings,
       stripeInvoicePaid,
       hubspotDealChanged,
+      whatsappMessageReceived,
       s3ObjectCreated,
       module,
     };
@@ -920,6 +927,11 @@ describe('EngineModule', () => {
       ['OllamaEmbeddingsAction', 'ollama-embeddings', 'ollamaEmbeddings'],
       ['StripeInvoicePaidPassthrough', 'stripe-invoice-paid', 'stripeInvoicePaid'],
       ['HubspotDealChangedPassthrough', 'hubspot-deal-changed', 'hubspotDealChanged'],
+      [
+        'WhatsappMessageReceivedPassthrough',
+        'whatsapp-message-received',
+        'whatsappMessageReceived',
+      ],
       ['S3ObjectCreatedTrigger', 's3-object-created', 's3ObjectCreated'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
@@ -950,7 +962,8 @@ describe('EngineModule', () => {
       // +#246 triggers: stripe-invoice-paid + hubspot-deal-changed (push) + s3-object-created (poll).
       // +W1.2: sheets-row-added + gmail-label-added + calendar-event-created (poll) — these 3
       // were registered in PollModule but missing from NodeRegistry until the dual-registration fix.
-      expect(counts.trigger).toBe(38);
+      // +2 Meta triggers: whatsapp-message-received (push) + instagram-comment-added (poll).
+      expect(counts.trigger).toBe(40);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +

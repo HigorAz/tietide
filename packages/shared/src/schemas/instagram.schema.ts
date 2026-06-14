@@ -17,3 +17,14 @@ export const instagramPublishPhotoConfigSchema = z.object({
   mockOnDryRun: z.boolean().optional(),
 });
 export type InstagramPublishPhotoConfig = z.infer<typeof instagramPublishPhotoConfigSchema>;
+
+/**
+ * Instagram: Comment Added trigger. Polls a single media's comments and fires
+ * for each new one. `mediaId` is the IG media (post) id to watch.
+ */
+export const instagramCommentAddedConfigSchema = z.object({
+  connectionId,
+  mediaId: z.string().min(1),
+  intervalSeconds: z.number().int().min(60).max(86_400).optional(),
+});
+export type InstagramCommentAddedConfig = z.infer<typeof instagramCommentAddedConfigSchema>;

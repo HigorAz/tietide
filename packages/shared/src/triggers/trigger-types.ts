@@ -23,6 +23,7 @@ export const PUSH_TRIGGER_TYPES = [
   'github-pr-opened',
   'stripe-invoice-paid',
   'hubspot-deal-changed',
+  'whatsapp-message-received',
 ] as const;
 export type PushTriggerType = (typeof PUSH_TRIGGER_TYPES)[number];
 export const isPushTriggerType = (value: string): value is PushTriggerType =>
@@ -40,6 +41,7 @@ export const POLL_TRIGGER_TYPES = [
   'airtable-record-created',
   'linear-issue-updated',
   's3-object-created',
+  'instagram-comment-added',
 ] as const;
 export type PollTriggerType = (typeof POLL_TRIGGER_TYPES)[number];
 export const isPollTriggerType = (value: string): value is PollTriggerType =>
@@ -58,6 +60,7 @@ export const PROVIDER_TRIGGER_PROVIDERS = [
   'calendly',
   'trello',
   'github',
+  'whatsapp',
 ] as const;
 export type ProviderTriggerProvider = (typeof PROVIDER_TRIGGER_PROVIDERS)[number];
 
@@ -86,4 +89,5 @@ export const TRIGGER_TYPE_TO_PROVIDER: Record<PushTriggerType, ProviderTriggerPr
   'github-pr-opened': 'github',
   'stripe-invoice-paid': 'stripe',
   'hubspot-deal-changed': 'hubspot',
+  'whatsapp-message-received': 'whatsapp',
 };
