@@ -11,8 +11,10 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response as ExpressResponse } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -43,6 +45,7 @@ import type { OllamaModelsResult } from '@tietide/shared';
 import { ConnectionsService } from './connections.service';
 import { CreateConnectionDto } from './dto/create-connection.dto';
 import { OllamaModelsRequestDto } from './dto/ollama-models-request.dto';
+import { OllamaPullRequestDto } from './dto/ollama-pull-request.dto';
 import { UpdateConnectionDto } from './dto/update-connection.dto';
 import { ConnectionResponseDto } from './dto/connection-response.dto';
 import { TestConnectionResponseDto } from './dto/test-connection-response.dto';
@@ -180,6 +183,47 @@ export class ConnectionsController {
       connectionId: dto.connectionId,
       baseUrl: dto.baseUrl,
     });
+  }
+
+  @Post('ollama/pull')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
+  @Throttle(EXECUTE_THROTTLE)
+  @ApiOperation({ summary: 'Pull a model onto an Ollama server (streams NDJSON progress)' })
+  @ApiBadRequestResponse({ description: 'Missing model/server or SSRF-blocked host' })
+  async ollamaPull(
+    @CurrentOrg() org: OrgContext,
+    @Body() dto: OllamaPullRequestDto,
+    @Res() res: ExpressResponse,
+  ): Promise<void> {
+    const upstream = await this.connections.openOllamaPull(org.id, {
+      connectionId: dto.connectionId,
+      baseUrl: dto.baseUrl,
+      model: dto.model,
+    });
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable nginx response buffering
+    if (!upstream.ok || !upstream.body) {
+      res.statusCode = HttpStatus.BAD_GATEWAY;
+      res.end(`${JSON.stringify({ error: `Ollama pull failed (status ${upstream.status})` })}\n`);
+      return;
+    }
+    const reader = upstream.body.getReader();
+    res.on('close', () => {
+      void reader.cancel().catch(() => undefined);
+    });
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) res.write(Buffer.from(value));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'pull stream error';
+      res.write(`${JSON.stringify({ error: message })}\n`);
+    } finally {
+      res.end();
+    }
   }
 
   @Delete(':id')

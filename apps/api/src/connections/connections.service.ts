@@ -278,6 +278,31 @@ export class ConnectionsService {
     }
   }
 
+  // Open a streaming Ollama model pull (POST /api/pull, stream:true). Resolves +
+  // SSRF-guards the baseUrl, then returns the raw upstream fetch Response so the
+  // controller can forward its NDJSON progress chunks to the client. SSRF-blocked hosts
+  // throw BadRequest (the operator must allowlist them via SSRF_ALLOWED_HOSTS).
+  async openOllamaPull(
+    organizationId: string,
+    input: { connectionId?: string; baseUrl?: string; model: string },
+  ): Promise<Response> {
+    const base = await this.resolveOllamaBaseUrl(organizationId, input);
+    const url = `${base}/api/pull`;
+    try {
+      await assertHealthUrlAllowed(url);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: input.model, stream: true }),
+    });
+  }
+
   encryptConfig(config: object): EncryptedPayload {
     return this.crypto.encrypt(JSON.stringify(config));
   }

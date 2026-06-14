@@ -550,4 +550,43 @@ describe('ConnectionsService', () => {
       await expect(service.listOllamaModels(orgId, {})).rejects.toThrow();
     });
   });
+
+  describe('openOllamaPull', () => {
+    const realFetch = global.fetch;
+    const prevAllow = process.env.SSRF_ALLOWED_HOSTS;
+    beforeEach(() => {
+      process.env.SSRF_ALLOWED_HOSTS = 'localhost,127.0.0.1';
+    });
+    afterEach(() => {
+      global.fetch = realFetch;
+      if (prevAllow === undefined) delete process.env.SSRF_ALLOWED_HOSTS;
+      else process.env.SSRF_ALLOWED_HOSTS = prevAllow;
+    });
+
+    it('POSTs /api/pull with stream:true and the model name', async () => {
+      const fakeRes = { ok: true, body: {} };
+      global.fetch = jest.fn().mockResolvedValue(fakeRes) as unknown as typeof fetch;
+
+      const res = await service.openOllamaPull(orgId, {
+        baseUrl: 'http://127.0.0.1:11434',
+        model: 'qwen2.5:7b',
+      });
+
+      const [url, init] = (global.fetch as jest.Mock).mock.calls[0];
+      expect(url).toBe('http://127.0.0.1:11434/api/pull');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body)).toEqual({ name: 'qwen2.5:7b', stream: true });
+      expect(res).toBe(fakeRes);
+    });
+
+    it('throws BadRequest when the host is SSRF-blocked (not allowlisted)', async () => {
+      delete process.env.SSRF_ALLOWED_HOSTS;
+      const fetchSpy = jest.fn();
+      global.fetch = fetchSpy as unknown as typeof fetch;
+      await expect(
+        service.openOllamaPull(orgId, { baseUrl: 'http://10.0.0.5:11434', model: 'x' }),
+      ).rejects.toThrow();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
 });
