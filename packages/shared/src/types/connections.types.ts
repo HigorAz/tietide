@@ -33,6 +33,8 @@ export const ConnectionProvider = {
   AIRTABLE: 'airtable',
   LINEAR: 'linear',
   GITHUB: 'github',
+  INSTAGRAM: 'instagram',
+  WHATSAPP: 'whatsapp',
   OLLAMA: 'ollama',
   HUGGINGFACE: 'huggingface',
   HUBSPOT: 'hubspot',

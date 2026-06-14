@@ -168,6 +168,8 @@ export {
   airtableApiKeyConfigSchema,
   linearApiKeyConfigSchema,
   githubOAuth2ConfigSchema,
+  instagramOAuth2ConfigSchema,
+  whatsappOAuth2ConfigSchema,
   ollamaConfigSchema,
   huggingfaceApiKeyConfigSchema,
   hubspotOAuth2ConfigSchema,
@@ -194,6 +196,8 @@ export {
   type AirtableApiKeyConfig,
   type LinearApiKeyConfig,
   type GitHubOAuth2Config,
+  type InstagramOAuth2Config,
+  type WhatsappOAuth2Config,
   type OllamaConfig,
   type HuggingfaceApiKeyConfig,
   type HubspotOAuth2Config,
@@ -654,6 +658,16 @@ export {
   aiGenerateImageConfigSchema,
   type AiGenerateImageConfig,
 } from './schemas/ai-image.schema.js';
+export {
+  instagramPublishPhotoConfigSchema,
+  type InstagramPublishPhotoConfig,
+} from './schemas/instagram.schema.js';
+export {
+  whatsappSendMessageConfigSchema,
+  whatsappSendTemplateConfigSchema,
+  type WhatsappSendMessageConfig,
+  type WhatsappSendTemplateConfig,
+} from './schemas/whatsapp.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,

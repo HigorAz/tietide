@@ -238,6 +238,42 @@ const SCOPE_GROUPS: Record<string, readonly ScopeGroup[]> = {
       defaultOn: false,
     },
   ],
+  instagram: [
+    {
+      id: 'publish',
+      label: 'Publish content',
+      description: 'Read the account and publish photo posts',
+      scopes: [
+        'instagram_basic',
+        'instagram_content_publish',
+        'pages_show_list',
+        'business_management',
+      ],
+      defaultOn: true,
+      locked: true,
+    },
+    {
+      id: 'comments',
+      label: 'Comments',
+      description: 'Read comments (needed for the comment trigger)',
+      scopes: ['instagram_manage_comments'],
+      defaultOn: false,
+    },
+  ],
+  whatsapp: [
+    {
+      id: 'messaging',
+      label: 'Messaging',
+      description: 'Send messages and templates, and manage the WhatsApp Business account',
+      scopes: [
+        'whatsapp_business_messaging',
+        'whatsapp_business_management',
+        'business_management',
+      ],
+      defaultOn: true,
+      locked: true,
+    },
+  ],
 };
 
 const inputClasses = cn(

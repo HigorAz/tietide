@@ -135,6 +135,9 @@ import { OpenAIGenerateImageForm } from './openai/OpenAIGenerateImageForm';
 import { OllamaGenerateForm } from './ollama/OllamaGenerateForm';
 import { OllamaEmbeddingsForm } from './ollama/OllamaEmbeddingsForm';
 import { AiGenerateImageForm } from './ai/AiGenerateImageForm';
+import { InstagramPublishPhotoForm } from './instagram/InstagramPublishPhotoForm';
+import { WhatsappSendMessageForm } from './whatsapp/WhatsappSendMessageForm';
+import { WhatsappSendTemplateForm } from './whatsapp/WhatsappSendTemplateForm';
 import { HubspotCreateContactForm } from './hubspot/HubspotCreateContactForm';
 import { HubspotCreateDealForm } from './hubspot/HubspotCreateDealForm';
 import { HubspotContactChangedForm } from './hubspot/HubspotContactChangedForm';
@@ -321,6 +324,9 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.OLLAMA_GENERATE]: OllamaGenerateForm,
   [NodeType.OLLAMA_EMBEDDINGS]: OllamaEmbeddingsForm,
   [NodeType.AI_GENERATE_IMAGE]: AiGenerateImageForm,
+  [NodeType.INSTAGRAM_PUBLISH_PHOTO]: InstagramPublishPhotoForm,
+  [NodeType.WHATSAPP_SEND_MESSAGE]: WhatsappSendMessageForm,
+  [NodeType.WHATSAPP_SEND_TEMPLATE]: WhatsappSendTemplateForm,
   [NodeType.HUBSPOT_CREATE_CONTACT]: HubspotCreateContactForm,
   [NodeType.HUBSPOT_CREATE_DEAL]: HubspotCreateDealForm,
   [NodeType.HUBSPOT_CONTACT_CHANGED]: HubspotContactChangedForm,

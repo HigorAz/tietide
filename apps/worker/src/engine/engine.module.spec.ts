@@ -106,6 +106,9 @@ import { MailchimpUpdateSubscriberAction } from '../nodes/connectors/mailchimp/m
 import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailchimp-unsubscribe';
 import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
 import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
+import { InstagramPublishPhotoAction } from '../nodes/connectors/instagram/instagram-publish-photo';
+import { WhatsappSendMessageAction } from '../nodes/connectors/whatsapp/whatsapp-send-message';
+import { WhatsappSendTemplateAction } from '../nodes/connectors/whatsapp/whatsapp-send-template';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
 import { CalendlyGetEventAction } from '../nodes/connectors/calendly/calendly-get-event';
 import { CalendlyCancelEventAction } from '../nodes/connectors/calendly/calendly-cancel-event';
@@ -366,6 +369,9 @@ describe('EngineModule', () => {
     const mailchimpUnsubscribe = new MailchimpUnsubscribeAction(undefined as never);
     const mailchimpAddTag = new MailchimpAddTagAction(undefined as never);
     const mailchimpListCampaigns = new MailchimpListCampaignsAction(undefined as never);
+    const instagramPublishPhoto = new InstagramPublishPhotoAction(undefined as never);
+    const whatsappSendMessage = new WhatsappSendMessageAction(undefined as never);
+    const whatsappSendTemplate = new WhatsappSendTemplateAction(undefined as never);
     const calendlyGetEvent = new CalendlyGetEventAction(undefined as never);
     const calendlyCancelEvent = new CalendlyCancelEventAction(undefined as never);
     const calendlyListInvitees = new CalendlyListInviteesAction(undefined as never);
@@ -547,6 +553,9 @@ describe('EngineModule', () => {
       mailchimpUnsubscribe,
       mailchimpAddTag,
       mailchimpListCampaigns,
+      instagramPublishPhoto,
+      whatsappSendMessage,
+      whatsappSendTemplate,
       calendlyGetEvent,
       calendlyCancelEvent,
       calendlyListInvitees,
@@ -704,6 +713,9 @@ describe('EngineModule', () => {
       mailchimpUnsubscribe,
       mailchimpAddTag,
       mailchimpListCampaigns,
+      instagramPublishPhoto,
+      whatsappSendMessage,
+      whatsappSendTemplate,
       calendlyGetEvent,
       calendlyCancelEvent,
       calendlyListInvitees,
@@ -892,6 +904,9 @@ describe('EngineModule', () => {
       ['MailchimpUnsubscribeAction', 'mailchimp-unsubscribe', 'mailchimpUnsubscribe'],
       ['MailchimpAddTagAction', 'mailchimp-add-tag', 'mailchimpAddTag'],
       ['MailchimpListCampaignsAction', 'mailchimp-list-campaigns', 'mailchimpListCampaigns'],
+      ['InstagramPublishPhotoAction', 'instagram-publish-photo', 'instagramPublishPhoto'],
+      ['WhatsappSendMessageAction', 'whatsapp-send-message', 'whatsappSendMessage'],
+      ['WhatsappSendTemplateAction', 'whatsapp-send-template', 'whatsappSendTemplate'],
       ['CalendlyGetEventAction', 'calendly-get-event', 'calendlyGetEvent'],
       ['CalendlyCancelEventAction', 'calendly-cancel-event', 'calendlyCancelEvent'],
       ['CalendlyListInviteesAction', 'calendly-list-invitees', 'calendlyListInvitees'],
@@ -948,7 +963,9 @@ describe('EngineModule', () => {
       // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
       // Mailchimp ×5 + Calendly ×3 + S3 ×4 + AI enrichment ×4.
       // +1 ai-generate-image (Pollinations/Hugging Face text-to-image).
-      expect(counts.action).toBe(137);
+      // +3 Meta actions (instagram-publish-photo, whatsapp-send-message,
+      //   whatsapp-send-template).
+      expect(counts.action).toBe(140);
     });
 
     // Invariant: every poll trigger type the scheduler can schedule MUST have an

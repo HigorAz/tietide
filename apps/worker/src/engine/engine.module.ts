@@ -163,6 +163,10 @@ import { MailchimpUpdateSubscriberAction } from '../nodes/connectors/mailchimp/m
 import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailchimp-unsubscribe';
 import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
 import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
+import { MetaGraphClientFactory } from '../nodes/connectors/meta/meta-graph-client.factory';
+import { InstagramPublishPhotoAction } from '../nodes/connectors/instagram/instagram-publish-photo';
+import { WhatsappSendMessageAction } from '../nodes/connectors/whatsapp/whatsapp-send-message';
+import { WhatsappSendTemplateAction } from '../nodes/connectors/whatsapp/whatsapp-send-template';
 import { CalendlyClientFactory } from '../nodes/connectors/calendly/calendly-client.factory';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
 import { CalendlyGetEventAction } from '../nodes/connectors/calendly/calendly-get-event';
@@ -382,6 +386,10 @@ import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created
     MailchimpUnsubscribeAction,
     MailchimpAddTagAction,
     MailchimpListCampaignsAction,
+    MetaGraphClientFactory,
+    InstagramPublishPhotoAction,
+    WhatsappSendMessageAction,
+    WhatsappSendTemplateAction,
     CalendlyClientFactory,
     CalendlyListEventsAction,
     CalendlyGetEventAction,
@@ -600,6 +608,9 @@ export class EngineModule implements OnModuleInit {
     private readonly mailchimpUnsubscribe: MailchimpUnsubscribeAction,
     private readonly mailchimpAddTag: MailchimpAddTagAction,
     private readonly mailchimpListCampaigns: MailchimpListCampaignsAction,
+    private readonly instagramPublishPhoto: InstagramPublishPhotoAction,
+    private readonly whatsappSendMessage: WhatsappSendMessageAction,
+    private readonly whatsappSendTemplate: WhatsappSendTemplateAction,
     private readonly calendlyGetEvent: CalendlyGetEventAction,
     private readonly calendlyCancelEvent: CalendlyCancelEventAction,
     private readonly calendlyListInvitees: CalendlyListInviteesAction,
@@ -782,6 +793,9 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.mailchimpUnsubscribe);
     this.registry.register(this.mailchimpAddTag);
     this.registry.register(this.mailchimpListCampaigns);
+    this.registry.register(this.instagramPublishPhoto);
+    this.registry.register(this.whatsappSendMessage);
+    this.registry.register(this.whatsappSendTemplate);
     this.registry.register(this.calendlyGetEvent);
     this.registry.register(this.calendlyCancelEvent);
     this.registry.register(this.calendlyListInvitees);

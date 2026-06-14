@@ -5,6 +5,8 @@ import { NotionOAuthProvider } from './providers/notion.provider';
 import { SlackOAuthProvider } from './providers/slack.provider';
 import { HubspotOAuthProvider } from './providers/hubspot.provider';
 import { GithubOAuthProvider } from './providers/github.provider';
+import { InstagramOAuthProvider } from './providers/instagram.provider';
+import { WhatsappOAuthProvider } from './providers/whatsapp.provider';
 import type { OAuthProvider } from './providers/oauth-provider.interface';
 
 @Injectable()
@@ -18,9 +20,11 @@ export class OAuthProviderRegistry {
     notion: NotionOAuthProvider,
     hubspot: HubspotOAuthProvider,
     github: GithubOAuthProvider,
+    instagram: InstagramOAuthProvider,
+    whatsapp: WhatsappOAuthProvider,
   ) {
     const m = new Map<string, OAuthProvider>();
-    for (const p of [google, microsoft, slack, notion, hubspot, github]) {
+    for (const p of [google, microsoft, slack, notion, hubspot, github, instagram, whatsapp]) {
       m.set(p.id, p);
     }
     this.providers = m;

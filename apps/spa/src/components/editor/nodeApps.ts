@@ -20,6 +20,8 @@ import {
   siDiscord,
   siGithub,
   siGmail,
+  siInstagram,
+  siWhatsapp,
   siGooglecalendar,
   siGoogledocs,
   siGoogledrive,
@@ -56,6 +58,8 @@ export type AppId =
   | 'airtable'
   | 'linear'
   | 'github'
+  | 'instagram'
+  | 'whatsapp'
   | 'anthropic'
   | 'openai'
   | 'ollama'
@@ -107,6 +111,8 @@ export const APP_INFO: Record<AppId, AppDescriptor> = {
   airtable: { id: 'airtable', label: 'Airtable', brand: brand(siAirtable) },
   linear: { id: 'linear', label: 'Linear', brand: brand(siLinear) },
   github: { id: 'github', label: 'GitHub', brand: brand(siGithub) },
+  instagram: { id: 'instagram', label: 'Instagram', brand: brand(siInstagram) },
+  whatsapp: { id: 'whatsapp', label: 'WhatsApp', brand: brand(siWhatsapp) },
   anthropic: { id: 'anthropic', label: 'Anthropic Claude', brand: brand(siAnthropic) },
   openai: { id: 'openai', label: 'OpenAI', icon: Sparkles },
   ollama: { id: 'ollama', label: 'Ollama', brand: brand(siOllama) },
@@ -135,6 +141,8 @@ export const APP_ORDER: readonly AppId[] = [
   'excel',
   'github',
   'gmail',
+  'instagram',
+  'whatsapp',
   'google-calendar',
   'google-docs',
   'google-drive',
@@ -262,6 +270,13 @@ export function getAppIdForNodeType(type: NodeType | string): AppId {
     case NodeType.GITHUB_CREATE_PR:
       return 'github';
 
+    case NodeType.INSTAGRAM_PUBLISH_PHOTO:
+      return 'instagram';
+
+    case NodeType.WHATSAPP_SEND_MESSAGE:
+    case NodeType.WHATSAPP_SEND_TEMPLATE:
+      return 'whatsapp';
+
     case NodeType.CLAUDE_MESSAGES:
       return 'anthropic';
 
@@ -328,6 +343,8 @@ const PREFIX_TO_APP: ReadonlyArray<readonly [string, AppId]> = [
   ['airtable-', 'airtable'],
   ['linear-', 'linear'],
   ['github-', 'github'],
+  ['instagram-', 'instagram'],
+  ['whatsapp-', 'whatsapp'],
   ['claude-', 'anthropic'],
   ['anthropic-', 'anthropic'],
   ['openai-', 'openai'],
