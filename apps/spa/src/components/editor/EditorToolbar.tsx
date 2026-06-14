@@ -151,7 +151,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
     // split-view widths the controls bar wraps to the next line (below Back)
     // instead of overflowing the canvas or overlapping Back. pointer-events-none
     // here keeps the canvas interactive in the gap; each pill re-enables them.
-    <div className="pointer-events-none absolute inset-x-4 top-4 z-10 flex flex-wrap items-start justify-between gap-2">
+    <div className="pointer-events-none absolute inset-x-4 top-4 z-20 flex flex-wrap items-start justify-between gap-2">
       <div
         data-testid="editor-toolbar-back"
         className={cn(
