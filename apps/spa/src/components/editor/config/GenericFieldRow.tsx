@@ -1,7 +1,9 @@
+import { OLLAMA_EMBEDDING_MODELS, OLLAMA_TEXT_MODELS } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import { DataPillInput } from './DataPillInput';
 import { FieldLabel } from './FieldLabel';
+import { OllamaModelSelect } from './ollama/OllamaModelSelect';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { FieldSpec } from './GenericConnectorForm';
 
@@ -53,6 +55,24 @@ export function GenericFieldRow({
         label={f.label}
         description={f.description}
       />
+    );
+  }
+
+  if (f.kind === 'ollama-model') {
+    const v = asString(config[f.key]);
+    return (
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
+        <OllamaModelSelect
+          id={fieldId}
+          connectionId={asString(config.connectionId) || undefined}
+          value={v}
+          onChange={(next) => updateNodeConfig(nodeId, { [f.key]: next || undefined })}
+          curated={f.modelKind === 'embedding' ? OLLAMA_EMBEDDING_MODELS : OLLAMA_TEXT_MODELS}
+          allowBlank
+        />
+        {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
+      </div>
     );
   }
 

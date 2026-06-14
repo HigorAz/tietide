@@ -17,6 +17,7 @@ import { findInvalidReferences } from '@/lib/validate-references';
 import { useToastStore } from '@/stores/toastStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { useDocumentationStore } from '@/stores/documentationStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { executeWorkflow, testWorkflow } from '@/api/executions';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
@@ -134,8 +135,13 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   }, [fetchDocs, workflowId]);
 
   // Block save/run/test while any data pill points at a deleted/invalid node —
-  // the red pills must be fixed first (referential integrity).
-  const invalidCount = useMemo(() => findInvalidReferences(nodes, edges).length, [nodes, edges]);
+  // the red pills must be fixed first (referential integrity). Pass live run output
+  // so validation matches the picker (live output beats a possibly-stale sample).
+  const liveNodes = useExecutionLiveStore((s) => s.nodes);
+  const invalidCount = useMemo(
+    () => findInvalidReferences(nodes, edges, liveNodes).length,
+    [nodes, edges, liveNodes],
+  );
   const hasInvalid = invalidCount > 0;
   const invalidMessage = `${invalidCount} data-pill reference${invalidCount > 1 ? 's' : ''} point to a deleted/invalid node — fix the red pills to save or run.`;
 

@@ -11,6 +11,8 @@ vi.mock('@/api/connections', () => ({
   deleteConnection: vi.fn(),
   testConnection: vi.fn(),
   startOAuth: vi.fn(),
+  listOllamaModels: vi.fn().mockResolvedValue({ models: [], reachable: false }),
+  pullOllamaModel: vi.fn(),
 }));
 
 import * as connectionsApi from '@/api/connections';
@@ -376,6 +378,19 @@ describe('ConnectionsPage', () => {
       await user.click(screen.getByTestId('provider-card-http'));
 
       expect(await screen.findByLabelText(/authentication method/i)).toBeInTheDocument();
+    });
+
+    it('opens the Ollama modal from the Ollama provider card', async () => {
+      const user = userEvent.setup();
+      mockedList.mockResolvedValueOnce([]);
+
+      render(<ConnectionsPage />);
+      await waitFor(() => expect(mockedList).toHaveBeenCalled());
+      await user.click(screen.getByRole('tab', { name: /available connections/i }));
+
+      await user.click(screen.getByTestId('provider-card-ollama'));
+
+      expect(await screen.findByLabelText(/server url/i)).toBeInTheDocument();
     });
   });
 });

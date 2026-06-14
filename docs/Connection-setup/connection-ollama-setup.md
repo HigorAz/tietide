@@ -57,8 +57,18 @@ just a fallback.
    - **baseUrl**: the URL your **worker** can reach Ollama at — the same value as the
      `OLLAMA_BASE_URL` env var the stack uses. In Docker Compose that's the service URL
      (e.g. `http://ollama:11434`), not `localhost`.
-   - **model**: e.g. `qwen2.5:7b`.
+   - **model**: pick from the **dropdown**. It lists the models already **installed** on
+     the server (once the base URL is reachable) plus a curated **available** list you can
+     **Pull** straight from the form; choose **Other…** to type any tag manually.
 4. **Connect**.
+
+> **⚠ Self-hosted on localhost/private? Set `SSRF_ALLOWED_HOSTS`.** The worker and API
+> refuse outbound calls to loopback/private addresses (SSRF protection), so a
+> `baseUrl` like `http://localhost:11434` is **blocked by default** — Ollama actions, the
+> connection test, and the model dropdown's live list/pull will all fail. Add the host to
+> the operator allowlist and restart the stack:
+> `SSRF_ALLOWED_HOSTS=localhost,127.0.0.1` (comma-separated hostnames; only hosts you
+> trust bypass the guard). A publicly-resolvable Ollama host needs no change.
 
 ### 4. Test the connection
 

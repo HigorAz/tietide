@@ -51,6 +51,12 @@ export {
   RESERVED_CONFIG_KEYS,
   type ReservedConfigKey,
 } from './constants/reserved-config.js';
+export {
+  OLLAMA_TEXT_MODELS,
+  OLLAMA_EMBEDDING_MODELS,
+  type OllamaModelOption,
+  type OllamaModelsResult,
+} from './constants/ollama-models.js';
 
 // Schemas
 export {

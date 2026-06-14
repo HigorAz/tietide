@@ -16,6 +16,7 @@ import {
 import { GripHorizontal } from 'lucide-react';
 import type { TemplateOperator } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { cn } from '@/utils/cn';
 import { getUpstreamSchemas, type PathSuggestion } from '@/lib/upstream-schema';
 import {
@@ -95,9 +96,12 @@ export function DataPillInput({
   }, [upstream.suggestions, filterText]);
 
   const segments = useMemo(() => splitSegments(value), [value]);
+  // Live run output beats a possibly-stale sample, matching the picker — so a pill
+  // that resolves at runtime isn't wrongly underlined as broken.
+  const liveNodes = useExecutionLiveStore((s) => s.nodes);
   const invalidTokens = useMemo(
-    () => invalidTokensForNode(nodeId, nodes, edges),
-    [nodeId, nodes, edges],
+    () => invalidTokensForNode(nodeId, nodes, edges, liveNodes),
+    [nodeId, nodes, edges, liveNodes],
   );
 
   useEffect(() => {

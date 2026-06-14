@@ -118,6 +118,50 @@ describe('findInvalidReferences with __pillSample overrides', () => {
   });
 });
 
+describe('findInvalidReferences with live output beating a stale sample', () => {
+  // A sample captured before the Code output was unwrapped holds { result, duration };
+  // a live run reflects the current shape { count }. Live must win so the validator
+  // agrees with the picker (which prefers live output over the persisted sample).
+  const staleSample = { result: { count: 1 }, duration: 2 };
+  const liveCode = new Map([['c', { output: { count: 1 } }]]);
+
+  const codeGraph = (sinkConfig: Record<string, unknown>) => {
+    const nodes = [
+      N('t', NodeType.MANUAL_TRIGGER, 'Trigger'),
+      N('c', NodeType.CODE, 'Code', { [PILL_SAMPLE_KEY]: staleSample }), // alias `code`
+      N('b', NodeType.HTTP_REQUEST, 'Sink', sinkConfig),
+    ];
+    const edges = [E('t', 'c'), E('c', 'b')];
+    return { nodes, edges };
+  };
+
+  const bothPills = { msg: '{{steps.code.result.count}} {{steps.code.count}}' };
+
+  it('flags the stale-sample path and accepts the live path when live output is provided', () => {
+    const { nodes, edges } = codeGraph(bothPills);
+    const invalid = findInvalidReferences(nodes, edges, liveCode);
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]).toMatchObject({
+      token: '{{steps.code.result.count}}',
+      reason: 'unknown-field',
+    });
+  });
+
+  it('without live output, the stale sample still wins (behavior unchanged)', () => {
+    const { nodes, edges } = codeGraph(bothPills);
+    const invalid = findInvalidReferences(nodes, edges);
+    // Sample shape { result, duration } → `result` valid, `count` unknown.
+    expect(invalid).toHaveLength(1);
+    expect(invalid[0]).toMatchObject({ token: '{{steps.code.count}}', reason: 'unknown-field' });
+  });
+
+  it('invalidTokensForNode also prefers live output', () => {
+    const { nodes, edges } = codeGraph(bothPills);
+    const tokens = invalidTokensForNode('b', nodes, edges, liveCode);
+    expect(tokens).toEqual(new Set(['{{steps.code.result.count}}']));
+  });
+});
+
 describe('invalidTokensForNode', () => {
   it('returns only the invalid tokens for the node (valid + env excluded)', () => {
     const { nodes, edges } = graph({
