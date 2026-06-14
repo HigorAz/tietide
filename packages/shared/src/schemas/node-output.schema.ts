@@ -41,9 +41,13 @@ export const returnOutputSchema = z.object({
 // Standardized output for AI/LLM action nodes (Claude, OpenAI, Ollama). All three
 // nodes normalize their provider-specific responses into this shape so downstream
 // nodes can data-pill `{{node.text}}`, `{{node.usage.inputTokens}}`, etc. without
-// caring which provider produced the result.
+// caring which provider produced the result. `json` is best-effort: when the model's
+// `text` is a JSON object/array it is parsed and exposed so downstream nodes can pill
+// its fields directly (e.g. `{{node.json.count}}`) without a Code node; it is absent
+// otherwise. Optional and additive — nodes/responses that don't set it are unaffected.
 export const aiNodeOutputSchema = z.object({
   text: z.string(),
+  json: z.unknown().optional(),
   usage: z.object({
     inputTokens: z.number().int().nonnegative(),
     outputTokens: z.number().int().nonnegative(),

@@ -124,6 +124,55 @@ describe('OllamaGenerateAction', () => {
     });
   });
 
+  describe('best-effort json field', () => {
+    it('parses a JSON-object output into data.json while keeping raw text', async () => {
+      generate.mockResolvedValue({
+        text: '{"count": 10, "ok": true}',
+        inputTokens: 5,
+        outputTokens: 6,
+        model: 'llama3.1:8b',
+        finishReason: 'stop',
+      });
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+
+      const result = await action.execute(makeInput(), ctx);
+
+      expect(result.data.text).toBe('{"count": 10, "ok": true}');
+      expect(result.data.json).toEqual({ count: 10, ok: true });
+    });
+
+    it('strips a ```json fence before parsing', async () => {
+      generate.mockResolvedValue({
+        text: '```json\n{"name":"x"}\n```',
+        inputTokens: 1,
+        outputTokens: 1,
+        model: 'llama3.1:8b',
+        finishReason: 'stop',
+      });
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+
+      const result = await action.execute(makeInput(), ctx);
+
+      expect(result.data.json).toEqual({ name: 'x' });
+    });
+
+    it('omits json when the output is not a JSON object/array', async () => {
+      generate.mockResolvedValue({
+        text: 'Just some prose, not JSON.',
+        inputTokens: 1,
+        outputTokens: 1,
+        model: 'llama3.1:8b',
+        finishReason: 'stop',
+      });
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+
+      const result = await action.execute(makeInput(), ctx);
+
+      expect(result.data.text).toBe('Just some prose, not JSON.');
+      expect('json' in result.data).toBe(false);
+    });
+  });
+
   describe('schema rejection', () => {
     it('rejects empty prompt before contacting Ollama', async () => {
       const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
