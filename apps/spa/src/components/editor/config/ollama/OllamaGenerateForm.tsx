@@ -1,9 +1,10 @@
 import { useId } from 'react';
-import { ollamaGenerateConfigSchema } from '@tietide/shared';
+import { ollamaGenerateConfigSchema, OLLAMA_TEXT_MODELS } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
+import { OllamaModelSelect } from './OllamaModelSelect';
 
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -56,12 +57,13 @@ export function OllamaGenerateForm({ nodeId, config }: NodeConfigFormProps): JSX
         <label htmlFor={modelInputId} className={labelClass}>
           Model override (optional)
         </label>
-        <DataPillInput
+        <OllamaModelSelect
           id={modelInputId}
-          nodeId={nodeId}
+          connectionId={connectionId || undefined}
           value={model}
-          placeholder="leave blank to use connection default"
           onChange={(next) => updateNodeConfig(nodeId, { model: next || undefined })}
+          curated={OLLAMA_TEXT_MODELS}
+          allowBlank
         />
       </div>
 

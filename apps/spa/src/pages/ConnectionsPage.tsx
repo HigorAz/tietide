@@ -8,6 +8,7 @@ import { ProviderPicker } from '@/components/connections/ProviderPicker';
 import { ConnectionRow } from '@/components/connections/ConnectionRow';
 import { ApiKeyConnectionModal } from '@/components/connections/ApiKeyConnectionModal';
 import { HttpConnectionModal } from '@/components/connections/HttpConnectionModal';
+import { OllamaConnectionModal } from '@/components/connections/OllamaConnectionModal';
 import { OAuthConnectionModal } from '@/components/connections/OAuthConnectionModal';
 import { DeleteConnectionDialog } from '@/components/connections/DeleteConnectionDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
@@ -67,6 +68,7 @@ export function ConnectionsPage(): JSX.Element {
   const [apiKeyProvider, setApiKeyProvider] = useState<ProviderEntry | null>(null);
   const [oauthProvider, setOauthProvider] = useState<ProviderEntry | null>(null);
   const [httpModalOpen, setHttpModalOpen] = useState<boolean>(false);
+  const [ollamaModalOpen, setOllamaModalOpen] = useState<boolean>(false);
   const [toRevoke, setToRevoke] = useState<ConnectionView | null>(null);
   const [mineQuery, setMineQuery] = useState<string>('');
   const [availableQuery, setAvailableQuery] = useState<string>('');
@@ -161,6 +163,12 @@ export function ConnectionsPage(): JSX.Element {
       setHttpModalOpen(true);
       return;
     }
+    // Ollama is CUSTOM-typed but needs the model-aware modal (server probe +
+    // pull) rather than the flat schema-driven form — give it its own branch.
+    if (provider.id === ConnectionProvider.OLLAMA) {
+      setOllamaModalOpen(true);
+      return;
+    }
     // API_KEY and CUSTOM both render via the same form-from-schema modal.
     if (provider.type === ConnectionType.API_KEY || provider.type === ConnectionType.CUSTOM) {
       setApiKeyProvider(provider);
@@ -215,6 +223,17 @@ export function ConnectionsPage(): JSX.Element {
       await create(body);
       toast({ tone: 'success', message: 'Connection added' });
       setHttpModalOpen(false);
+    } catch (err) {
+      toast({ tone: 'error', message: errorMessage(err, 'Could not create connection') });
+      throw err;
+    }
+  };
+
+  const handleOllamaCreate = async (body: Parameters<typeof create>[0]): Promise<void> => {
+    try {
+      await create(body);
+      toast({ tone: 'success', message: 'Connection added' });
+      setOllamaModalOpen(false);
     } catch (err) {
       toast({ tone: 'error', message: errorMessage(err, 'Could not create connection') });
       throw err;
@@ -381,6 +400,13 @@ export function ConnectionsPage(): JSX.Element {
 
       {httpModalOpen && (
         <HttpConnectionModal onClose={() => setHttpModalOpen(false)} onCreate={handleHttpCreate} />
+      )}
+
+      {ollamaModalOpen && (
+        <OllamaConnectionModal
+          onClose={() => setOllamaModalOpen(false)}
+          onCreate={handleOllamaCreate}
+        />
       )}
 
       {oauthProvider && (
