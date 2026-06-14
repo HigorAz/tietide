@@ -45,6 +45,22 @@ describe('Library templates', () => {
     expect(withCode.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('should use Ollama (not Claude/OpenAI) for every AI step', () => {
+    // The library leads with the free, self-hostable Ollama path — no template
+    // should depend on a paid Anthropic/OpenAI key.
+    const paidAiNodes = LIBRARY_TEMPLATES.flatMap((t) =>
+      t.definition.nodes.filter((n) => /^(claude|anthropic|openai)/.test(n.type)),
+    );
+    expect(paidAiNodes).toEqual([]);
+  });
+
+  it('should use the ollama-generate node in at least one template', () => {
+    const withOllama = LIBRARY_TEMPLATES.filter((t) =>
+      t.definition.nodes.some((n) => n.type === NodeType.OLLAMA_GENERATE),
+    );
+    expect(withOllama.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('should call a public no-auth API via http-request in at least 2 templates', () => {
     const withPublicApi = LIBRARY_TEMPLATES.filter((t) =>
       t.definition.nodes.some(
