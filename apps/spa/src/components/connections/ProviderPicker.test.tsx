@@ -29,6 +29,7 @@ describe('ProviderPicker', () => {
       'Airtable',
       'Linear',
       'GitHub',
+      'Ollama',
     ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
@@ -38,11 +39,11 @@ describe('ProviderPicker', () => {
     render(<ProviderPicker onPick={onPick} />);
     // OAuth: Google, Microsoft, Slack, Notion, HubSpot, GitHub = 6.
     // The picker labels both API_KEY and CUSTOM types as "API key" since users
-    // see only one form-from-schema flow either way: OpenAI, Anthropic, Twilio,
-    // Telegram, Discord (Webhook), Discord (Bot), Trello, Airtable, Linear,
-    // Stripe, Mailchimp, Calendly, Postgres, MySQL, S3, HTTP = 16.
+    // see only one form-from-schema flow either way: OpenAI, Anthropic, Ollama,
+    // Twilio, Telegram, Discord (Webhook), Discord (Bot), Trello, Airtable,
+    // Linear, Stripe, Mailchimp, Calendly, Postgres, MySQL, S3, HTTP = 17.
     expect(screen.getAllByText(/^OAuth$/).length).toBe(6);
-    expect(screen.getAllByText(/^API key$/).length).toBe(16);
+    expect(screen.getAllByText(/^API key$/).length).toBe(17);
   });
 
   it('should call onPick with the provider entry when a card is clicked', async () => {

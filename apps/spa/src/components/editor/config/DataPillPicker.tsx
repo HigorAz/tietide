@@ -39,10 +39,12 @@ export function DataPillPicker(): JSX.Element | null {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  // A user-declared (or test-captured) `__pillSample` is the top-priority pill
-  // source (#259) — it overrides the node's static schema. Keyed by nodeId for
-  // `getUpstreamSchemas`. Stored as a JSON string by the form; tolerate an
-  // already-structured value too. Invalid/empty samples are ignored.
+  // A user-declared (or test-captured) `__pillSample` overrides the node's static
+  // schema, but a live run output (when present) wins over it — see resolveEntries
+  // precedence — so a sample that went stale after an output-shape change can't keep
+  // offering dead paths. Keyed by nodeId for `getUpstreamSchemas`. Stored as a JSON
+  // string by the form; tolerate an already-structured value too. Invalid/empty
+  // samples are ignored.
   const overrides = useMemo<Record<string, unknown>>(() => {
     const map: Record<string, unknown> = {};
     for (const n of nodes) {

@@ -358,17 +358,37 @@ describe('CodeAction', () => {
     });
   });
 
-  describe('execute — dry-run', () => {
-    it('should not run user code on dry-run; returns a mock preview', async () => {
+  describe('execute — dry-run executes (side-effect-free)', () => {
+    it('should declare itself side-effect-free so a dry-run may run it', () => {
+      const action = new CodeAction();
+      expect(action.sideEffectFree).toBe(true);
+    });
+
+    it('should run user code for real on dry-run and return the real output', async () => {
       const action = new CodeAction();
 
       const result = await action.execute(
-        makeInput({ code: 'throw new Error("never run");' }),
+        makeInput({ code: 'return { count: input.value + 1 };' }, { value: 9 }),
         makeContext({ isDryRun: true }),
       );
 
-      expect(result.data).toEqual(expect.objectContaining({ mocked: true, mode: 'dry-run' }));
-      expect(result.metadata).toEqual(expect.objectContaining({ mocked: true }));
+      // The sandbox has no external side effects, so Test mode runs it and surfaces
+      // the real result (downstream pills resolve {{steps.code.count}}) instead of a
+      // mock stub — that mock is what blocked the picker from deriving real paths.
+      expect(result.data).toEqual({ count: 10 });
+      expect(result.data.mocked).toBeUndefined();
+      expect(result.metadata?.mocked).toBeUndefined();
+    });
+
+    it('should run cleanly on dry-run with empty/undefined input', async () => {
+      const action = new CodeAction();
+
+      const result = await action.execute(
+        makeInput({ code: 'return { ok: true };' }),
+        makeContext({ isDryRun: true }),
+      );
+
+      expect(result.data).toEqual({ ok: true });
     });
   });
 });

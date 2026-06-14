@@ -5,6 +5,17 @@ All notable changes to `@tietide/sdk` are documented here.
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] — 2026-06-14
+
+### Added
+
+- `INodeExecutor.sideEffectFree?` — marks a node as having no external side
+  effects (e.g. the sandboxed Code node, pure transforms), so it is safe to run
+  for real during a dry-run / Test instead of returning a mock. Side-effecting
+  connector actions leave it unset and keep mocking via `BaseConnectorAction`'s
+  `sideEffect` guard. Optional and additive; nodes that don't set it are treated
+  as potentially side-effecting.
+
 ## [2.8.0] — 2026-05-31
 
 ### Added
