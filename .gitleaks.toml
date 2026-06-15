@@ -1,0 +1,23 @@
+title = "TieTide gitleaks config"
+
+# Use the full upstream ruleset, then allowlist known false positives below.
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+Unit-test fixtures intentionally use fake, high-entropy credentials
+(e.g. apiKey: 'devkey1234567890', token: 'usrtoken1234567890', signing
+secrets like 'tok-abc...'). These are mock values, never real secrets, so
+test files are allowlisted to keep the scan signal clean. All non-test
+source, config, infra, and docs are still scanned with the default rules.
+"""
+paths = [
+  '''.*\.spec\.ts$''',
+  '''.*\.test\.ts$''',
+  '''.*\.spec\.tsx$''',
+  '''.*\.test\.tsx$''',
+  '''.*/test_.*\.py$''',
+  '''.*_test\.py$''',
+  '''infra/load/k6/.*\.js$''',
+]
