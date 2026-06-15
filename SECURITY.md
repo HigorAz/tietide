@@ -6,14 +6,10 @@ If you discover a security vulnerability in TieTide, **please do not open a publ
 issue or pull request**. Public disclosure before a fix is available puts every
 deployment at risk.
 
-Instead, report it privately through one of these channels:
-
-1. **GitHub Private Vulnerability Reporting** (preferred) — use the
-   **"Report a vulnerability"** button on the
-   [Security tab](../../security/advisories/new). This keeps the report private
-   and lets us collaborate on a fix and coordinated disclosure.
-2. **Email** — `higor.azevedo2010@gmail.com` with the subject line
-   `[SECURITY] TieTide`.
+Instead, report it privately using **GitHub Private Vulnerability Reporting** —
+the **"Report a vulnerability"** button on the
+[Security tab](../../security/advisories/new). This keeps the report private and
+lets us collaborate on a fix and coordinated disclosure.
 
 Please include:
 
