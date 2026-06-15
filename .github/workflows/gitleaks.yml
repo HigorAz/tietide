@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Full history is required so gitleaks can scan every commit, not just
           # the tip — a secret added and later removed still leaks once public.
