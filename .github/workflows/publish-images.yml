@@ -1,8 +1,11 @@
 name: Publish Images
 
+# Publish signed release images to GHCR. Runs only on version tags (and manual
+# dispatch) — NOT on every push to main: the prod deploy builds images locally
+# from source (docker-compose.prod.yml + docs/deployment.md), so nothing pulls
+# these per-commit. Cutting a v* tag is what produces a published, signed image.
 on:
   push:
-    branches: [main]
     tags: ['v*']
   workflow_dispatch:
 
