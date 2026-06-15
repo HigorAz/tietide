@@ -113,6 +113,18 @@ else
   echo "  No new migrations — skipping prisma migrate"
 fi
 
+# The AI service is a Docker image built from apps/ai — the Node rebuild_all below
+# doesn't touch the Python service, and the SKIP_BUILD=1 restart path runs
+# `docker compose up` WITHOUT --build, so apps/ai dependency changes never reach prod.
+# Rebuild + recreate just the ai container when its source/deps change. Docker-managed
+# containers aren't reaped by this oneshot's cgroup, so it's safe under the systemd timer.
+if ! git diff --quiet "${DIFF_BASE}" "${NEW_HEAD}" -- apps/ai/; then
+  echo "→ apps/ai changed — rebuilding + recreating the AI Docker image"
+  docker compose -f infra/docker/docker-compose.yml --env-file .env up -d --build ai
+else
+  echo "  apps/ai unchanged — AI image rebuild skipped"
+fi
+
 # Rebuild artifacts + restart when running CODE changed. Prod serves built
 # output (`node dist/main`, `vite preview` on dist/) with NO hot reload, so a
 # pull alone never goes live — dist/ must be rebuilt and the services restarted.
