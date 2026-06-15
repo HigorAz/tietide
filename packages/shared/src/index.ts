@@ -168,7 +168,10 @@ export {
   airtableApiKeyConfigSchema,
   linearApiKeyConfigSchema,
   githubOAuth2ConfigSchema,
+  instagramOAuth2ConfigSchema,
+  whatsappOAuth2ConfigSchema,
   ollamaConfigSchema,
+  huggingfaceApiKeyConfigSchema,
   hubspotOAuth2ConfigSchema,
   mailchimpApiKeyConfigSchema,
   calendlyApiKeyConfigSchema,
@@ -193,7 +196,10 @@ export {
   type AirtableApiKeyConfig,
   type LinearApiKeyConfig,
   type GitHubOAuth2Config,
+  type InstagramOAuth2Config,
+  type WhatsappOAuth2Config,
   type OllamaConfig,
+  type HuggingfaceApiKeyConfig,
   type HubspotOAuth2Config,
   type MailchimpApiKeyConfig,
   type CalendlyApiKeyConfig,
@@ -648,6 +654,24 @@ export {
   type OllamaGenerateConfig,
   type OllamaEmbeddingsConfig,
 } from './schemas/ollama.schema.js';
+export {
+  aiGenerateImageConfigSchema,
+  type AiGenerateImageConfig,
+} from './schemas/ai-image.schema.js';
+export {
+  instagramPublishPhotoConfigSchema,
+  instagramCommentAddedConfigSchema,
+  type InstagramPublishPhotoConfig,
+  type InstagramCommentAddedConfig,
+} from './schemas/instagram.schema.js';
+export {
+  whatsappSendMessageConfigSchema,
+  whatsappSendTemplateConfigSchema,
+  whatsappMessageReceivedConfigSchema,
+  type WhatsappSendMessageConfig,
+  type WhatsappSendTemplateConfig,
+  type WhatsappMessageReceivedConfig,
+} from './schemas/whatsapp.schema.js';
 
 export {
   EXECUTION_EVENT_TYPES,

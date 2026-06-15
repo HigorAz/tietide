@@ -60,7 +60,9 @@ check(
 );
 
 if (publish) {
-  check('publish triggers on push to main', /\bpush:[\s\S]*?branches:[\s\S]*?main/.test(publish));
+  // Release images are published on version tags (v*), NOT on every push to main
+  // — prod builds images locally from source, so nothing pulls per-commit images.
+  check('publish triggers on version tags', /\bpush:[\s\S]*?tags:[\s\S]*?v\*/.test(publish));
   check(
     'publish authenticates to ghcr.io',
     /docker\/login-action[\s\S]*registry:\s*ghcr\.io/.test(publish),

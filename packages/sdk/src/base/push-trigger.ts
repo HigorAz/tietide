@@ -20,6 +20,14 @@ export abstract class BasePushTrigger extends BaseTrigger {
   // null means "not a challenge — proceed with the signed-event flow."
   handleValidation?(input: ValidationInput): ValidationResponse | null;
 
+  // GET-based subscription verification handshake (e.g. Meta/Facebook webhooks:
+  // GET ?hub.mode=subscribe&hub.verify_token=<token>&hub.challenge=<nonce>, which
+  // expects the challenge echoed back as text/plain when the token matches). The
+  // webhook controller's GET handler invokes this; a non-null response is echoed,
+  // null/undefined means "not handled" → 404. Distinct from handleValidation,
+  // which runs on the POST route for body-carrying challenges.
+  handleSubscriptionVerification?(input: ValidationInput): ValidationResponse | null;
+
   protected async run(input: NodeInput): Promise<Record<string, unknown>> {
     const triggerData = input.data ?? {};
     return triggerData;

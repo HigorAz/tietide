@@ -13,6 +13,7 @@ vi.mock('@/api/connections', () => ({
   startOAuth: vi.fn(),
   listOllamaModels: vi.fn().mockResolvedValue({ models: [], reachable: false }),
   pullOllamaModel: vi.fn(),
+  getOllamaServerAvailability: vi.fn().mockResolvedValue(false),
 }));
 
 import * as connectionsApi from '@/api/connections';

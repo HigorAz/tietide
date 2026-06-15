@@ -3,7 +3,7 @@ import type { LibraryTemplate } from './types';
 
 /**
  * Marketing templates. `daily-hn-ai-digest` calls the public, no-auth Hacker
- * News Firebase API so it runs out-of-box except for the Claude + Slack bindings.
+ * News Firebase API so it runs out-of-box except for the Ollama + Slack bindings.
  */
 export const MARKETING_TEMPLATES: readonly LibraryTemplate[] = [
   {
@@ -92,7 +92,7 @@ export const MARKETING_TEMPLATES: readonly LibraryTemplate[] = [
     slug: 'daily-hn-ai-digest',
     name: 'Daily Hacker News AI digest',
     description:
-      'Every morning, pull the top Hacker News stories (public API), summarize the top 5 with Claude, and post a digest to Slack.',
+      'Every morning, pull the top Hacker News stories (public API), summarize the top 5 with a local Ollama model, and post a digest to Slack.',
     category: 'Marketing',
     definition: {
       nodes: [
@@ -149,18 +149,15 @@ export const MARKETING_TEMPLATES: readonly LibraryTemplate[] = [
         },
         {
           id: 'summarize',
-          type: NodeType.CLAUDE_MESSAGES,
-          name: 'Claude: summarize',
+          type: NodeType.OLLAMA_GENERATE,
+          name: 'Ollama: summarize',
           alias: 'summarize',
           position: { x: 1380, y: 220 },
           config: {
             connectionId: '',
-            model: 'claude-sonnet-4-6',
-            system: 'You write one-sentence, punchy tech-news summaries.',
+            model: 'llama3.1:8b',
             prompt:
-              'Summarize this Hacker News story in one sentence:\n\n{{ steps.item.body.title }}',
-            maxTokens: 120,
-            enablePromptCaching: true,
+              'You write one-sentence, punchy tech-news summaries. Reply with only the summary.\n\nSummarize this Hacker News story in one sentence:\n\n{{ steps.item.body.title }}',
           },
         },
         {

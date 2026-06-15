@@ -24,6 +24,9 @@ import { GITHUB_NODES } from './catalog/github.catalog.js';
 import { ANTHROPIC_NODES } from './catalog/anthropic.catalog.js';
 import { OPENAI_NODES } from './catalog/openai.catalog.js';
 import { OLLAMA_NODES } from './catalog/ollama.catalog.js';
+import { AI_IMAGE_NODES } from './catalog/ai.catalog.js';
+import { INSTAGRAM_NODES } from './catalog/instagram.catalog.js';
+import { WHATSAPP_NODES } from './catalog/whatsapp.catalog.js';
 import { HUBSPOT_NODES } from './catalog/hubspot.catalog.js';
 import { STRIPE_NODES } from './catalog/stripe.catalog.js';
 import { MAILCHIMP_NODES } from './catalog/mailchimp.catalog.js';
@@ -116,6 +119,9 @@ export const NODE_CATALOG: NodeTypeDefinition[] = [
   ...ANTHROPIC_NODES,
   ...OPENAI_NODES,
   ...OLLAMA_NODES,
+  ...AI_IMAGE_NODES,
+  ...INSTAGRAM_NODES,
+  ...WHATSAPP_NODES,
   ...HUBSPOT_NODES,
   ...STRIPE_NODES,
   ...MAILCHIMP_NODES,

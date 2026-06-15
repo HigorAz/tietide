@@ -14,6 +14,7 @@ import { TrelloHealthChecker } from './health/checkers/trello.checker';
 import { AirtableHealthChecker } from './health/checkers/airtable.checker';
 import { LinearHealthChecker } from './health/checkers/linear.checker';
 import { GitHubHealthChecker } from './health/checkers/github.checker';
+import { InstagramHealthChecker, WhatsappHealthChecker } from './health/checkers/meta.checker';
 import { OllamaHealthChecker } from './health/checkers/ollama.checker';
 import { HttpHealthChecker } from './health/checkers/http.checker';
 
@@ -36,6 +37,8 @@ import { HttpHealthChecker } from './health/checkers/http.checker';
         registry.register(AirtableHealthChecker.fromConfig(config));
         registry.register(LinearHealthChecker.fromConfig(config));
         registry.register(GitHubHealthChecker.fromConfig(config));
+        registry.register(InstagramHealthChecker.fromConfig(config));
+        registry.register(WhatsappHealthChecker.fromConfig(config));
         registry.register(OllamaHealthChecker.fromConfig());
         registry.register(new HttpHealthChecker());
         return registry;

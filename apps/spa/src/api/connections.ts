@@ -19,6 +19,8 @@ export interface ConnectionView {
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Whether the current user may edit/delete this connection (owner or SUPERADMIN).
+  canEdit?: boolean;
 }
 
 export interface CreateConnectionBody {
@@ -26,11 +28,16 @@ export interface CreateConnectionBody {
   type: ConnectionType;
   name: string;
   config: Record<string, unknown>;
+  // Ollama only: use TieTide's hosted server (baseUrl injected server-side).
+  ollamaServerHosted?: boolean;
 }
 
 export interface UpdateConnectionBody {
   name?: string;
   status?: ConnectionStatus;
+  // New provider credentials (validated + re-encrypted server-side). Not allowed
+  // for OAuth2 connections — reconnect those instead.
+  config?: Record<string, unknown>;
 }
 
 export interface TestConnectionResult {
@@ -84,6 +91,14 @@ export async function testConnection(id: string): Promise<TestConnectionResult> 
 export interface OllamaModelTarget {
   connectionId?: string;
   baseUrl?: string;
+  ollamaServerHosted?: boolean;
+}
+
+// Whether TieTide's hosted Ollama server is configured (feature-gates the
+// "Use TieTide's hosted Ollama" option). Returns only a boolean — never the URL.
+export async function getOllamaServerAvailability(): Promise<boolean> {
+  const { data } = await api.get<{ available: boolean }>('/connections/ollama/server');
+  return data.available;
 }
 
 export interface OllamaPullProgress {

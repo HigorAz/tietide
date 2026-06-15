@@ -1,5 +1,6 @@
 import {
   Controller,
+  Get,
   Head,
   Headers,
   HttpCode,
@@ -58,6 +59,33 @@ export class ProviderWebhooksController {
   @HttpCode(HttpStatus.OK)
   reachabilityCheck(): void {
     return;
+  }
+
+  // GET-based subscription verification handshake. Meta/Facebook webhooks verify
+  // the callback URL with a GET (`?hub.mode=subscribe&hub.verify_token=…&
+  // hub.challenge=…`) before delivering events, expecting the challenge echoed
+  // back as text/plain. We resolve the trigger by provider (one push trigger per
+  // provider) and delegate to its handleSubscriptionVerification; anything not
+  // recognised gets the uniform 404 so the route can't be probed.
+  @Get(':provider/:subscriptionId')
+  @ApiOperation({ summary: 'Answer a provider webhook subscription-verification GET handshake' })
+  @ApiNotFoundResponse({ description: 'Provider webhook not found' })
+  subscriptionVerification(
+    @Param('provider') provider: string,
+    @Query() query: Record<string, string | string[] | undefined>,
+    @Res({ passthrough: true }) res: Response,
+  ): void {
+    const trigger = this.registry.getByProvider(provider);
+    const result = trigger?.handleSubscriptionVerification?.({
+      query,
+      headers: {},
+      rawBody: Buffer.alloc(0),
+    });
+    if (result) {
+      res.status(HttpStatus.OK).type(result.contentType).send(result.body);
+      return;
+    }
+    res.status(HttpStatus.NOT_FOUND).send();
   }
 
   @Post(':provider/:subscriptionId')

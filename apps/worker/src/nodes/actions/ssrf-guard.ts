@@ -31,13 +31,33 @@ const defaultLookup: LookupFn = (hostname) =>
 // an allowlisted host that resolves to a private IP is intentionally permitted. Read at
 // call time so ops/tests can set it without re-importing.
 export function isAllowlistedHost(host: string): boolean {
+  const target = host.toLowerCase();
+  // Operator-trusted hosted Ollama server (OLLAMA_SERVER_BASE_URL). Its host is
+  // operator-set, so it is trusted-by-definition even when it resolves to
+  // localhost / a private Docker service name (e.g. http://ollama:11434). Only
+  // THIS single env-derived host is auto-allowed — user-supplied (self-hosted)
+  // URLs are NOT widened.
+  const serverHost = ollamaServerHost();
+  if (serverHost !== null && serverHost === target) return true;
+
   const raw = process.env.SSRF_ALLOWED_HOSTS;
   if (!raw) return false;
-  const target = host.toLowerCase();
   return raw.split(',').some((h) => {
     const trimmed = h.trim().toLowerCase();
     return trimmed.length > 0 && trimmed === target;
   });
+}
+
+// Hostname of the operator's hosted Ollama server, parsed defensively at call
+// time. Returns null when OLLAMA_SERVER_BASE_URL is unset or unparseable.
+function ollamaServerHost(): string | null {
+  const raw = process.env.OLLAMA_SERVER_BASE_URL;
+  if (!raw) return null;
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
 }
 
 export class SsrfBlockedError extends Error {

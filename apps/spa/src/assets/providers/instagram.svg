@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <defs>
+    <radialGradient id="ig" cx="0.3" cy="1" r="1.1">
+      <stop offset="0" stop-color="#FFD776"/>
+      <stop offset="0.35" stop-color="#F2913D"/>
+      <stop offset="0.6" stop-color="#E94F5A"/>
+      <stop offset="0.8" stop-color="#D52F8C"/>
+      <stop offset="1" stop-color="#8A3AB9"/>
+    </radialGradient>
+  </defs>
+  <rect x="2" y="2" width="20" height="20" rx="6" fill="url(#ig)"/>
+  <circle cx="12" cy="12" r="4.6" fill="none" stroke="#fff" stroke-width="1.8"/>
+  <circle cx="17.2" cy="6.8" r="1.2" fill="#fff"/>
+</svg>

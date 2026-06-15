@@ -8,6 +8,8 @@ export const SUPPORTED_OAUTH_PROVIDERS = [
   'notion',
   'hubspot',
   'github',
+  'instagram',
+  'whatsapp',
 ] as const;
 export type SupportedOAuthProvider = (typeof SUPPORTED_OAUTH_PROVIDERS)[number];
 

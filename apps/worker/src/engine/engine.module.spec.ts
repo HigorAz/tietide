@@ -1,4 +1,5 @@
 import { HttpRequestAction } from '../nodes/actions/http-request';
+import { AiGenerateImageAction } from '../nodes/actions/ai-generate-image';
 import { CodeAction } from '../nodes/actions/code';
 import { Conditional } from '../nodes/logic/conditional';
 import { IteratorNode } from '../nodes/logic/iterator';
@@ -105,6 +106,9 @@ import { MailchimpUpdateSubscriberAction } from '../nodes/connectors/mailchimp/m
 import { MailchimpUnsubscribeAction } from '../nodes/connectors/mailchimp/mailchimp-unsubscribe';
 import { MailchimpAddTagAction } from '../nodes/connectors/mailchimp/mailchimp-add-tag';
 import { MailchimpListCampaignsAction } from '../nodes/connectors/mailchimp/mailchimp-list-campaigns';
+import { InstagramPublishPhotoAction } from '../nodes/connectors/instagram/instagram-publish-photo';
+import { WhatsappSendMessageAction } from '../nodes/connectors/whatsapp/whatsapp-send-message';
+import { WhatsappSendTemplateAction } from '../nodes/connectors/whatsapp/whatsapp-send-template';
 import { CalendlyListEventsAction } from '../nodes/connectors/calendly/calendly-list-events';
 import { CalendlyGetEventAction } from '../nodes/connectors/calendly/calendly-get-event';
 import { CalendlyCancelEventAction } from '../nodes/connectors/calendly/calendly-cancel-event';
@@ -146,6 +150,7 @@ import {
   GithubPrOpenedPassthrough,
   StripeInvoicePaidPassthrough,
   HubspotDealChangedPassthrough,
+  WhatsappMessageReceivedPassthrough,
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created';
@@ -178,6 +183,7 @@ import { GitHubListPrsAction } from '../nodes/connectors/github/github-list-prs'
 import { GitHubMergePrAction } from '../nodes/connectors/github/github-merge-pr';
 import { NotionDatabaseItemUpdatedTrigger } from '../nodes/triggers/poll/notion-database-item-updated';
 import { AirtableRecordCreatedTrigger } from '../nodes/triggers/poll/airtable-record-created';
+import { InstagramCommentAddedTrigger } from '../nodes/triggers/poll/instagram-comment-added';
 import { LinearIssueUpdatedTrigger } from '../nodes/triggers/poll/linear-issue-updated';
 import { POLL_TRIGGER_TYPES } from '@tietide/shared';
 import { EngineModule } from './engine.module';
@@ -189,6 +195,7 @@ describe('EngineModule', () => {
     const cronTrigger = new CronTrigger();
     const webhookTrigger = new WebhookTrigger();
     const httpRequest = new HttpRequestAction();
+    const aiGenerateImage = new AiGenerateImageAction();
     const codeAction = new CodeAction();
     const conditional = new Conditional();
     const returnNode = new ReturnNode();
@@ -344,6 +351,7 @@ describe('EngineModule', () => {
     const githubMergePr = new GitHubMergePrAction(undefined as never);
     const notionDbItemUpdated = new NotionDatabaseItemUpdatedTrigger(undefined as never);
     const airtableRecordCreated = new AirtableRecordCreatedTrigger(undefined as never);
+    const instagramCommentAdded = new InstagramCommentAddedTrigger(undefined as never);
     const linearIssueUpdated = new LinearIssueUpdatedTrigger(undefined as never);
     const githubIssueOpened = new GithubIssueOpenedPassthrough();
     const githubPrOpened = new GithubPrOpenedPassthrough();
@@ -364,6 +372,9 @@ describe('EngineModule', () => {
     const mailchimpUnsubscribe = new MailchimpUnsubscribeAction(undefined as never);
     const mailchimpAddTag = new MailchimpAddTagAction(undefined as never);
     const mailchimpListCampaigns = new MailchimpListCampaignsAction(undefined as never);
+    const instagramPublishPhoto = new InstagramPublishPhotoAction(undefined as never);
+    const whatsappSendMessage = new WhatsappSendMessageAction(undefined as never);
+    const whatsappSendTemplate = new WhatsappSendTemplateAction(undefined as never);
     const calendlyGetEvent = new CalendlyGetEventAction(undefined as never);
     const calendlyCancelEvent = new CalendlyCancelEventAction(undefined as never);
     const calendlyListInvitees = new CalendlyListInviteesAction(undefined as never);
@@ -377,6 +388,7 @@ describe('EngineModule', () => {
     const ollamaEmbeddings = new OllamaEmbeddingsAction(undefined as never);
     const stripeInvoicePaid = new StripeInvoicePaidPassthrough();
     const hubspotDealChanged = new HubspotDealChangedPassthrough();
+    const whatsappMessageReceived = new WhatsappMessageReceivedPassthrough();
     const s3ObjectCreated = new S3ObjectCreatedTrigger(undefined as never);
     const module = new EngineModule(
       registry,
@@ -384,6 +396,7 @@ describe('EngineModule', () => {
       cronTrigger,
       webhookTrigger,
       httpRequest,
+      aiGenerateImage,
       codeAction,
       conditional,
       returnNode,
@@ -524,6 +537,7 @@ describe('EngineModule', () => {
       githubMergePr,
       notionDbItemUpdated,
       airtableRecordCreated,
+      instagramCommentAdded,
       linearIssueUpdated,
       githubIssueOpened,
       githubPrOpened,
@@ -544,6 +558,9 @@ describe('EngineModule', () => {
       mailchimpUnsubscribe,
       mailchimpAddTag,
       mailchimpListCampaigns,
+      instagramPublishPhoto,
+      whatsappSendMessage,
+      whatsappSendTemplate,
       calendlyGetEvent,
       calendlyCancelEvent,
       calendlyListInvitees,
@@ -557,6 +574,7 @@ describe('EngineModule', () => {
       ollamaEmbeddings,
       stripeInvoicePaid,
       hubspotDealChanged,
+      whatsappMessageReceived,
       s3ObjectCreated,
     );
     return {
@@ -565,6 +583,7 @@ describe('EngineModule', () => {
       cronTrigger,
       webhookTrigger,
       httpRequest,
+      aiGenerateImage,
       codeAction,
       conditional,
       returnNode,
@@ -700,6 +719,9 @@ describe('EngineModule', () => {
       mailchimpUnsubscribe,
       mailchimpAddTag,
       mailchimpListCampaigns,
+      instagramPublishPhoto,
+      whatsappSendMessage,
+      whatsappSendTemplate,
       calendlyGetEvent,
       calendlyCancelEvent,
       calendlyListInvitees,
@@ -713,6 +735,7 @@ describe('EngineModule', () => {
       ollamaEmbeddings,
       stripeInvoicePaid,
       hubspotDealChanged,
+      whatsappMessageReceived,
       s3ObjectCreated,
       module,
     };
@@ -724,6 +747,7 @@ describe('EngineModule', () => {
       ['CronTrigger', 'cron-trigger', 'cronTrigger'],
       ['WebhookTrigger', 'webhook-trigger', 'webhookTrigger'],
       ['HttpRequestAction', 'http-request', 'httpRequest'],
+      ['AiGenerateImageAction', 'ai-generate-image', 'aiGenerateImage'],
       ['CodeAction', 'code', 'codeAction'],
       ['Conditional', 'conditional', 'conditional'],
       ['ReturnNode', 'return', 'returnNode'],
@@ -887,6 +911,9 @@ describe('EngineModule', () => {
       ['MailchimpUnsubscribeAction', 'mailchimp-unsubscribe', 'mailchimpUnsubscribe'],
       ['MailchimpAddTagAction', 'mailchimp-add-tag', 'mailchimpAddTag'],
       ['MailchimpListCampaignsAction', 'mailchimp-list-campaigns', 'mailchimpListCampaigns'],
+      ['InstagramPublishPhotoAction', 'instagram-publish-photo', 'instagramPublishPhoto'],
+      ['WhatsappSendMessageAction', 'whatsapp-send-message', 'whatsappSendMessage'],
+      ['WhatsappSendTemplateAction', 'whatsapp-send-template', 'whatsappSendTemplate'],
       ['CalendlyGetEventAction', 'calendly-get-event', 'calendlyGetEvent'],
       ['CalendlyCancelEventAction', 'calendly-cancel-event', 'calendlyCancelEvent'],
       ['CalendlyListInviteesAction', 'calendly-list-invitees', 'calendlyListInvitees'],
@@ -900,6 +927,11 @@ describe('EngineModule', () => {
       ['OllamaEmbeddingsAction', 'ollama-embeddings', 'ollamaEmbeddings'],
       ['StripeInvoicePaidPassthrough', 'stripe-invoice-paid', 'stripeInvoicePaid'],
       ['HubspotDealChangedPassthrough', 'hubspot-deal-changed', 'hubspotDealChanged'],
+      [
+        'WhatsappMessageReceivedPassthrough',
+        'whatsapp-message-received',
+        'whatsappMessageReceived',
+      ],
       ['S3ObjectCreatedTrigger', 's3-object-created', 's3ObjectCreated'],
     ])('should register %s in the NodeRegistry', (_label, type, instanceKey) => {
       const built = build();
@@ -930,7 +962,8 @@ describe('EngineModule', () => {
       // +#246 triggers: stripe-invoice-paid + hubspot-deal-changed (push) + s3-object-created (poll).
       // +W1.2: sheets-row-added + gmail-label-added + calendar-event-created (poll) — these 3
       // were registered in PollModule but missing from NodeRegistry until the dual-registration fix.
-      expect(counts.trigger).toBe(38);
+      // +2 Meta triggers: whatsapp-message-received (push) + instagram-comment-added (poll).
+      expect(counts.trigger).toBe(40);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +
@@ -942,7 +975,10 @@ describe('EngineModule', () => {
       // +notion read/update pack (#244). +messaging read/manage pack (#245).
       // +commerce/data/storage read/update pack (#246): Stripe ×6 + HubSpot ×6 +
       // Mailchimp ×5 + Calendly ×3 + S3 ×4 + AI enrichment ×4.
-      expect(counts.action).toBe(136);
+      // +1 ai-generate-image (Pollinations/Hugging Face text-to-image).
+      // +3 Meta actions (instagram-publish-photo, whatsapp-send-message,
+      //   whatsapp-send-template).
+      expect(counts.action).toBe(140);
     });
 
     // Invariant: every poll trigger type the scheduler can schedule MUST have an

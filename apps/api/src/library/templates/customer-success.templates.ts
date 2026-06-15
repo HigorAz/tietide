@@ -2,16 +2,16 @@ import { NodeType } from '@tietide/shared';
 import type { LibraryTemplate } from './types';
 
 /**
- * Customer Success templates. The triage node uses Claude to classify an
- * inbound ticket; urgent tickets fan out to Linear + Slack, everything else
- * gets an automated Gmail acknowledgement.
+ * Customer Success templates. The triage node uses a local Ollama model to
+ * classify an inbound ticket; urgent tickets fan out to Linear + Slack,
+ * everything else gets an automated Gmail acknowledgement.
  */
 export const CUSTOMER_SUCCESS_TEMPLATES: readonly LibraryTemplate[] = [
   {
     slug: 'ai-support-ticket-triage',
     name: 'AI support-ticket triage',
     description:
-      'Inbound support ticket is classified by Claude (priority + category). Urgent tickets open a Linear issue and ping Slack; the rest get an instant Gmail auto-acknowledgement.',
+      'Inbound support ticket is classified by a local Ollama model (priority + category). Urgent tickets open a Linear issue and ping Slack; the rest get an instant Gmail auto-acknowledgement.',
     category: 'Customer Success',
     webhook: { pathSuffix: 'support-triage' },
     definition: {
@@ -25,18 +25,15 @@ export const CUSTOMER_SUCCESS_TEMPLATES: readonly LibraryTemplate[] = [
         },
         {
           id: 'classify',
-          type: NodeType.CLAUDE_MESSAGES,
-          name: 'Claude: classify ticket',
+          type: NodeType.OLLAMA_GENERATE,
+          name: 'Ollama: classify ticket',
           alias: 'classify',
           position: { x: 340, y: 220 },
           config: {
             connectionId: '',
-            model: 'claude-sonnet-4-6',
-            system:
-              'You triage support tickets. Reply with ONLY compact JSON: {"priority":"URGENT|NORMAL|LOW","category":"billing|bug|how-to|other"}.',
-            prompt: 'Classify this ticket:\n\n{{ trigger.body.message }}',
-            maxTokens: 128,
-            enablePromptCaching: true,
+            model: 'llama3.1:8b',
+            prompt:
+              'You triage support tickets. Reply with ONLY compact JSON: {"priority":"URGENT|NORMAL|LOW","category":"billing|bug|how-to|other"}.\n\nClassify this ticket:\n\n{{ trigger.body.message }}',
           },
         },
         {

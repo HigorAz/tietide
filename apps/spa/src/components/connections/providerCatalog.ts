@@ -6,6 +6,7 @@ import notionIcon from '@/assets/providers/notion.svg';
 import openaiIcon from '@/assets/providers/openai.svg';
 import anthropicIcon from '@/assets/providers/anthropic.svg';
 import ollamaIcon from '@/assets/providers/ollama.svg';
+import huggingfaceIcon from '@/assets/providers/huggingface.svg';
 import discordIcon from '@/assets/providers/discord.svg';
 import twilioIcon from '@/assets/providers/twilio.svg';
 import telegramIcon from '@/assets/providers/telegram.svg';
@@ -13,6 +14,8 @@ import trelloIcon from '@/assets/providers/trello.svg';
 import airtableIcon from '@/assets/providers/airtable.svg';
 import linearIcon from '@/assets/providers/linear.svg';
 import githubIcon from '@/assets/providers/github.svg';
+import instagramIcon from '@/assets/providers/instagram.svg';
+import whatsappIcon from '@/assets/providers/whatsapp.svg';
 import hubspotIcon from '@/assets/providers/hubspot.svg';
 import stripeIcon from '@/assets/providers/stripe.svg';
 import mailchimpIcon from '@/assets/providers/mailchimp.svg';
@@ -82,6 +85,12 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     setupGuidePath: 'docs/Connection-setup/connection-ollama-setup.md',
   },
   {
+    id: ConnectionProvider.HUGGINGFACE,
+    label: 'Hugging Face',
+    type: ConnectionType.API_KEY,
+    iconUrl: huggingfaceIcon,
+  },
+  {
     id: ConnectionProvider.DISCORD,
     label: 'Discord (Webhook)',
     type: ConnectionType.CUSTOM,
@@ -135,6 +144,20 @@ export const PROVIDER_CATALOG: readonly ProviderEntry[] = [
     type: ConnectionType.OAUTH2,
     iconUrl: githubIcon,
     setupGuidePath: 'docs/Connection-setup/oauth-github-setup.md',
+  },
+  {
+    id: ConnectionProvider.INSTAGRAM,
+    label: 'Instagram',
+    type: ConnectionType.OAUTH2,
+    iconUrl: instagramIcon,
+    setupGuidePath: 'docs/Connection-setup/oauth-meta-setup.md',
+  },
+  {
+    id: ConnectionProvider.WHATSAPP,
+    label: 'WhatsApp',
+    type: ConnectionType.OAUTH2,
+    iconUrl: whatsappIcon,
+    setupGuidePath: 'docs/Connection-setup/oauth-meta-setup.md',
   },
   {
     id: ConnectionProvider.HUBSPOT,

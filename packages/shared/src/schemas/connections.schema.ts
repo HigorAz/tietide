@@ -150,6 +150,28 @@ export const githubOAuth2ConfigSchema = z.object({
   tokenType: z.string().min(1).optional(),
 });
 
+// Instagram (Meta Graph API via Facebook Login). Stores the long-lived user
+// access token; `igUserId` (the IG Business Account id, the publish target) is
+// supplied per node and can be discovered later, so it is optional here.
+export const instagramOAuth2ConfigSchema = z.object({
+  accessToken: z.string().min(1),
+  scope: z.string().optional(),
+  tokenType: z.string().min(1).optional(),
+  igUserId: z.string().optional(),
+  pageId: z.string().optional(),
+});
+
+// WhatsApp Business (Meta Graph API via Facebook Login). Stores the long-lived
+// token; `phoneNumberId` (the sending number's resource id) and `wabaId` are
+// supplied per node, so optional here.
+export const whatsappOAuth2ConfigSchema = z.object({
+  accessToken: z.string().min(1),
+  scope: z.string().optional(),
+  tokenType: z.string().min(1).optional(),
+  phoneNumberId: z.string().optional(),
+  wabaId: z.string().optional(),
+});
+
 // Ollama: per-workspace pointer to a self-hosted Ollama server. baseUrl points at the
 // server root (e.g. http://localhost:11434); the default model is the connection-level
 // fallback used when the action node does not specify its own.
@@ -161,6 +183,12 @@ export const ollamaConfigSchema = z.object({
     .url({ message: 'baseUrl must be a valid URL' })
     .regex(/^https?:\/\//, { message: 'baseUrl must use http:// or https://' }),
   model: z.string().min(1).max(128),
+});
+
+// Hugging Face Inference API: a single access token (hf_...). Used by the
+// AI: Generate Image node's `huggingface` provider for token-based text-to-image.
+export const huggingfaceApiKeyConfigSchema = z.object({
+  apiKey: z.string().min(1),
 });
 
 // HubSpot OAuth2: access + refresh token, plus the hub identifier returned by the
@@ -263,7 +291,10 @@ export type TrelloApiKeyConfig = z.infer<typeof trelloApiKeyConfigSchema>;
 export type AirtableApiKeyConfig = z.infer<typeof airtableApiKeyConfigSchema>;
 export type LinearApiKeyConfig = z.infer<typeof linearApiKeyConfigSchema>;
 export type GitHubOAuth2Config = z.infer<typeof githubOAuth2ConfigSchema>;
+export type InstagramOAuth2Config = z.infer<typeof instagramOAuth2ConfigSchema>;
+export type WhatsappOAuth2Config = z.infer<typeof whatsappOAuth2ConfigSchema>;
 export type OllamaConfig = z.infer<typeof ollamaConfigSchema>;
+export type HuggingfaceApiKeyConfig = z.infer<typeof huggingfaceApiKeyConfigSchema>;
 export type HubspotOAuth2Config = z.infer<typeof hubspotOAuth2ConfigSchema>;
 export type MailchimpApiKeyConfig = z.infer<typeof mailchimpApiKeyConfigSchema>;
 export type CalendlyApiKeyConfig = z.infer<typeof calendlyApiKeyConfigSchema>;
@@ -288,7 +319,10 @@ export const PROVIDER_CONFIG_SCHEMAS = {
   [ConnectionProvider.AIRTABLE]: airtableApiKeyConfigSchema,
   [ConnectionProvider.LINEAR]: linearApiKeyConfigSchema,
   [ConnectionProvider.GITHUB]: githubOAuth2ConfigSchema,
+  [ConnectionProvider.INSTAGRAM]: instagramOAuth2ConfigSchema,
+  [ConnectionProvider.WHATSAPP]: whatsappOAuth2ConfigSchema,
   [ConnectionProvider.OLLAMA]: ollamaConfigSchema,
+  [ConnectionProvider.HUGGINGFACE]: huggingfaceApiKeyConfigSchema,
   [ConnectionProvider.HUBSPOT]: hubspotOAuth2ConfigSchema,
   [ConnectionProvider.MAILCHIMP]: mailchimpApiKeyConfigSchema,
   [ConnectionProvider.CALENDLY]: calendlyApiKeyConfigSchema,
@@ -314,7 +348,10 @@ export type ProviderConfigMap = {
   airtable: AirtableApiKeyConfig;
   linear: LinearApiKeyConfig;
   github: GitHubOAuth2Config;
+  instagram: InstagramOAuth2Config;
+  whatsapp: WhatsappOAuth2Config;
   ollama: OllamaConfig;
+  huggingface: HuggingfaceApiKeyConfig;
   hubspot: HubspotOAuth2Config;
   mailchimp: MailchimpApiKeyConfig;
   calendly: CalendlyApiKeyConfig;

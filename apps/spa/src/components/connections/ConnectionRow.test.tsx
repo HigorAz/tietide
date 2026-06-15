@@ -22,11 +22,13 @@ describe('ConnectionRow', () => {
   const onTest = vi.fn();
   const onRevoke = vi.fn();
   const onRename = vi.fn(async () => undefined);
+  const onEdit = vi.fn();
 
   beforeEach(() => {
     onTest.mockReset();
     onRevoke.mockReset();
     onRename.mockReset();
+    onEdit.mockReset();
     onRename.mockResolvedValue(undefined);
   });
 
@@ -39,6 +41,7 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
@@ -56,6 +59,7 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
@@ -72,6 +76,7 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
@@ -91,6 +96,7 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
@@ -108,6 +114,7 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
@@ -124,6 +131,7 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
@@ -140,6 +148,7 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
@@ -155,9 +164,45 @@ describe('ConnectionRow', () => {
         onTest={onTest}
         onRevoke={onRevoke}
         onRename={onRename}
+        onEdit={onEdit}
       />,
     );
 
     expect(screen.getByText(/last used never/i)).toBeInTheDocument();
+  });
+
+  it('should hide the Edit button when canEdit is not set', () => {
+    render(
+      <ConnectionRow
+        connection={make()}
+        isTesting={false}
+        isDeleting={false}
+        onTest={onTest}
+        onRevoke={onRevoke}
+        onRename={onRename}
+        onEdit={onEdit}
+      />,
+    );
+
+    expect(screen.queryByTestId('connection-row-c-1-edit')).not.toBeInTheDocument();
+  });
+
+  it('should show the Edit button and call onEdit when canEdit is true', async () => {
+    const user = userEvent.setup();
+    const connection = make({ canEdit: true });
+    render(
+      <ConnectionRow
+        connection={connection}
+        isTesting={false}
+        isDeleting={false}
+        onTest={onTest}
+        onRevoke={onRevoke}
+        onRename={onRename}
+        onEdit={onEdit}
+      />,
+    );
+
+    await user.click(screen.getByTestId('connection-row-c-1-edit'));
+    expect(onEdit).toHaveBeenCalledWith(connection);
   });
 });

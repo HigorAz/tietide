@@ -200,4 +200,29 @@ describe('ssrf-guard', () => {
       ).rejects.toBeInstanceOf(SsrfBlockedError);
     });
   });
+
+  describe('OLLAMA_SERVER_BASE_URL auto-allowlist', () => {
+    const prev = process.env.OLLAMA_SERVER_BASE_URL;
+    const privateLookup: LookupFn = async () => [{ address: '127.0.0.1', family: 4 }];
+    afterEach(() => {
+      if (prev === undefined) delete process.env.OLLAMA_SERVER_BASE_URL;
+      else process.env.OLLAMA_SERVER_BASE_URL = prev;
+    });
+
+    it('allows the env-configured hosted-Ollama host even though it resolves to a private IP', async () => {
+      process.env.OLLAMA_SERVER_BASE_URL = 'http://ollama:11434';
+      const { url } = await assertUrlAllowedWithAddresses(
+        'http://ollama:11434/api/tags',
+        privateLookup,
+      );
+      expect(url.hostname).toBe('ollama');
+    });
+
+    it('does NOT widen the guard for a different self-hosted private host', async () => {
+      process.env.OLLAMA_SERVER_BASE_URL = 'http://ollama:11434';
+      await expect(
+        assertUrlAllowed('http://localhost:11434/api/tags', privateLookup),
+      ).rejects.toBeInstanceOf(SsrfBlockedError);
+    });
+  });
 });

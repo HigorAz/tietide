@@ -12,6 +12,7 @@ export interface ConnectionRowProps {
   onTest: (id: string) => void;
   onRevoke: (connection: ConnectionView) => void;
   onRename: (id: string, name: string) => Promise<void>;
+  onEdit: (connection: ConnectionView) => void;
 }
 
 const formatRelative = (iso: string | null): string => {
@@ -36,6 +37,7 @@ export function ConnectionRow({
   onTest,
   onRevoke,
   onRename,
+  onEdit,
 }: ConnectionRowProps): JSX.Element {
   const [iconError, setIconError] = useState(false);
   const [renaming, setRenaming] = useState(false);
@@ -144,6 +146,21 @@ export function ConnectionRow({
             )}
           >
             Rename
+          </button>
+        )}
+        {!renaming && connection.canEdit && (
+          <button
+            type="button"
+            onClick={() => onEdit(connection)}
+            disabled={isDeleting}
+            data-testid={`connection-row-${connection.id}-edit`}
+            className={cn(
+              'rounded-md border border-white/10 px-2.5 py-1 text-xs font-medium text-text-primary transition',
+              'hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-accent-teal',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+            )}
+          >
+            Edit
           </button>
         )}
         <button
