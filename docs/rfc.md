@@ -442,6 +442,12 @@ Alternativas consideradas: Node para IA (menos bibliotecas de NLP/LLM), chamadas
 
 - Rate-limit (Traefik/Nest): proteção básica contra abuso/DoS.
 
+- Secret scanning + push protection (GitHub) e gitleaks no CI: bloqueiam o commit de segredos (varredura inclusive no histórico).
+
+- Dependabot (alertas + updates) e gate `pnpm audit --prod` no CI: gestão de vulnerabilidades de dependências (supply chain); CVEs transitivos corrigidos via `pnpm.overrides`.
+
+- Branch protection em `main`: exige PR + checks (CI, secret scan) antes do merge.
+
 #### **3.3.2.6 DevX (Qualidade)**
 
 - ESLint + Prettier: estilo e linting consistentes.
@@ -452,7 +458,7 @@ Alternativas consideradas: Node para IA (menos bibliotecas de NLP/LLM), chamadas
 
 #### **3.3.2.7 CI/CD**
 
-- GitHub Actions: pipeline único para lint, testes, coverage, build Docker, security scan e deploy.
+- GitHub Actions: pipeline para lint, testes, coverage, build Docker, secret scan (gitleaks) e auditoria de dependências (`pnpm audit`); imagens assinadas (cosign + SBOM) publicadas no GHCR em tags `v*`.
   - Benefício: automação reprodutível e visível; prepara para CD no VPS/K8s.
 
 #### **3.3.2.8 Deploy**

@@ -446,6 +446,11 @@ git checkout v<next-tag>
 docker build -f apps/api/Dockerfile    -t tietide-api:latest    .
 docker build -f apps/worker/Dockerfile -t tietide-worker:latest .
 
+# The AI service is a SEPARATE Python image — rebuild it whenever apps/ai/ changes,
+# including dependency-only changes to apps/ai/requirements.txt (a Node `pnpm install`
+# does NOT touch it). Its pip layer is cached, so this is fast unless requirements moved.
+docker build -f apps/ai/Dockerfile -t tietide-ai:latest .
+
 # Apply migrations BEFORE swapping containers — additive only (CLAUDE.md §11)
 docker run --rm --network "$NETWORK" --env-file .env \
   tietide-api:latest pnpm --filter @tietide/api prisma migrate deploy
