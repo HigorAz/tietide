@@ -1,0 +1,39 @@
+version: 2
+
+updates:
+  # JavaScript/TypeScript across the pnpm monorepo (root + every app & package).
+  - package-ecosystem: npm
+    directories:
+      - '/'
+      - '/apps/*'
+      - '/packages/*'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Group routine bumps into one PR each to keep noise (and CI minutes) down;
+    # security updates still come through regardless of grouping.
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Python AI service.
+  - package-ecosystem: pip
+    directory: /apps/ai
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Keep GitHub Actions pinned and patched (also feeds the SHA-pinning hygiene
+  # noted after the trivy/CF-obfuscation breakages).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
