@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { ConnectionStatus } from '@tietide/shared';
 
 export class UpdateConnectionDto {
@@ -32,4 +40,14 @@ export class UpdateConnectionDto {
   @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description:
+      "Ollama only: switch this connection to TieTide's hosted Ollama server. The " +
+      'baseUrl is injected server-side from OLLAMA_SERVER_BASE_URL.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  ollamaServerHosted?: boolean;
 }

@@ -27,7 +27,12 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { ConnectionType, PROVIDER_CONFIG_SCHEMAS, type ProviderConfigMap } from '@tietide/shared';
+import {
+  ConnectionProvider,
+  ConnectionType,
+  PROVIDER_CONFIG_SCHEMAS,
+  type ProviderConfigMap,
+} from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { OrgRoles } from '../common/decorators/org-roles.decorator';
@@ -107,7 +112,13 @@ export class ConnectionsController {
     if (!schema) {
       throw new BadRequestException(`Unknown provider "${dto.provider}"`);
     }
-    const result = schema.safeParse(dto.config);
+    // Hosted-Ollama create: inject the operator's server URL server-side so the
+    // client sends only { model } — the baseUrl is never client-supplied.
+    const config =
+      dto.provider === ConnectionProvider.OLLAMA && dto.ollamaServerHosted
+        ? { ...dto.config, baseUrl: this.connections.requireOllamaServerBaseUrl() }
+        : dto.config;
+    const result = schema.safeParse(config);
     if (!result.success) {
       const issues = result.error.issues
         .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
@@ -184,7 +195,19 @@ export class ConnectionsController {
     return this.connections.listOllamaModels(org.id, {
       connectionId: dto.connectionId,
       baseUrl: dto.baseUrl,
+      ollamaServerHosted: dto.ollamaServerHosted,
     });
+  }
+
+  @Get('ollama/server')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
+  @ApiOperation({
+    summary: "Whether TieTide's hosted Ollama server is available (OLLAMA_SERVER_BASE_URL set)",
+  })
+  ollamaServerAvailability(): { available: boolean } {
+    // Exposes only a boolean — never the URL — so the modal can feature-gate the
+    // "Use TieTide's hosted Ollama" option without leaking infra detail.
+    return { available: this.connections.ollamaServerBaseUrl() !== null };
   }
 
   @Post('ollama/pull')
@@ -200,6 +223,7 @@ export class ConnectionsController {
     const upstream = await this.connections.openOllamaPull(org.id, {
       connectionId: dto.connectionId,
       baseUrl: dto.baseUrl,
+      ollamaServerHosted: dto.ollamaServerHosted,
       model: dto.model,
     });
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');

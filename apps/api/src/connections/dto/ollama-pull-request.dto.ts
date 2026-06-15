@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsUrl, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 // Pull a model onto an Ollama server (POST /api/pull). Resolves the server from a saved
 // connection or an ad-hoc baseUrl (same as the models endpoint).
@@ -15,6 +23,13 @@ export class OllamaPullRequestDto {
   @MaxLength(256)
   @IsUrl({ require_tld: false, protocols: ['http', 'https'] })
   baseUrl?: string;
+
+  @ApiPropertyOptional({
+    description: "Pull onto TieTide's hosted Ollama server (resolved server-side)",
+  })
+  @IsOptional()
+  @IsBoolean()
+  ollamaServerHosted?: boolean;
 
   @ApiProperty({ description: 'Model tag to pull, e.g. qwen2.5:7b' })
   @IsString()

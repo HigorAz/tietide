@@ -695,4 +695,54 @@ describe('ConnectionsService', () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('hosted Ollama (OLLAMA_SERVER_BASE_URL)', () => {
+    const prevServer = process.env.OLLAMA_SERVER_BASE_URL;
+    afterEach(() => {
+      if (prevServer === undefined) delete process.env.OLLAMA_SERVER_BASE_URL;
+      else process.env.OLLAMA_SERVER_BASE_URL = prevServer;
+    });
+
+    it('reports availability based on the env var (trailing slash trimmed)', () => {
+      delete process.env.OLLAMA_SERVER_BASE_URL;
+      expect(service.ollamaServerBaseUrl()).toBeNull();
+      process.env.OLLAMA_SERVER_BASE_URL = 'http://ollama:11434/';
+      expect(service.ollamaServerBaseUrl()).toBe('http://ollama:11434');
+    });
+
+    it('resolveOllamaBaseUrl returns the server URL in hosted mode', async () => {
+      process.env.OLLAMA_SERVER_BASE_URL = 'http://ollama:11434';
+      const base = await service.resolveOllamaBaseUrl(orgId, { ollamaServerHosted: true });
+      expect(base).toBe('http://ollama:11434');
+      expect(prisma.connection.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects hosted mode when OLLAMA_SERVER_BASE_URL is unset', async () => {
+      delete process.env.OLLAMA_SERVER_BASE_URL;
+      await expect(
+        service.resolveOllamaBaseUrl(orgId, { ollamaServerHosted: true }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('injects the server baseUrl on a hosted-mode config edit (client sends only model)', async () => {
+      process.env.OLLAMA_SERVER_BASE_URL = 'http://ollama:11434';
+      prisma.connection.findFirst.mockResolvedValue({
+        id: connectionId,
+        userId,
+        type: ConnectionType.CUSTOM,
+        provider: 'ollama',
+      });
+      crypto.encrypt.mockReturnValue({ ciphertext: 'C', nonce: 'N' });
+      prisma.connection.update.mockResolvedValue(baseRow);
+
+      await service.update(orgId, userId, 'MEMBER', connectionId, {
+        config: { model: 'llama3.1:8b' },
+        ollamaServerHosted: true,
+      });
+
+      expect(crypto.encrypt).toHaveBeenCalledWith(
+        JSON.stringify({ baseUrl: 'http://ollama:11434', model: 'llama3.1:8b' }),
+      );
+    });
+  });
 });

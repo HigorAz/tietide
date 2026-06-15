@@ -142,7 +142,15 @@ export class ConnectionsService {
     if (dto.status !== undefined) {
       data.status = dto.status;
     }
-    if (dto.config !== undefined) {
+    // Hosted-Ollama edit: inject the operator's server URL so the client only
+    // sends { model }. The stored shape stays { baseUrl, model } — unchanged for
+    // the worker/health readers.
+    let configToValidate = dto.config;
+    if (existing.provider === 'ollama' && dto.ollamaServerHosted) {
+      configToValidate = { ...(dto.config ?? {}), baseUrl: this.requireOllamaServerBaseUrl() };
+    }
+
+    if (configToValidate !== undefined) {
       // Editing raw OAuth tokens by hand is wrong — those connections are
       // refreshed by re-running the OAuth flow ("Reconnect"), not by pasting a
       // token. Only credential-style connections accept a config edit.
@@ -158,7 +166,7 @@ export class ConnectionsService {
           `Provider "${existing.provider}" does not support config edits`,
         );
       }
-      const parsed = schema.safeParse(dto.config);
+      const parsed = schema.safeParse(configToValidate);
       if (!parsed.success) {
         throw new BadRequestException(
           parsed.error.issues[0]?.message ?? 'Invalid connection config',
@@ -290,8 +298,13 @@ export class ConnectionsService {
   // trimmed so `${base}/api/...` joins cleanly.
   async resolveOllamaBaseUrl(
     organizationId: string,
-    input: { connectionId?: string; baseUrl?: string },
+    input: { connectionId?: string; baseUrl?: string; ollamaServerHosted?: boolean },
   ): Promise<string> {
+    // Hosted mode: the model dropdown / pull query the operator's shared server,
+    // resolved server-side (the client never sends the URL).
+    if (input.ollamaServerHosted) {
+      return this.requireOllamaServerBaseUrl();
+    }
     if (input.connectionId) {
       const row = await this.prisma.connection.findFirst({
         where: { id: input.connectionId, organizationId, provider: 'ollama' },
@@ -317,7 +330,7 @@ export class ConnectionsService {
   // falls back to the curated model list instead of erroring.
   async listOllamaModels(
     organizationId: string,
-    input: { connectionId?: string; baseUrl?: string },
+    input: { connectionId?: string; baseUrl?: string; ollamaServerHosted?: boolean },
   ): Promise<OllamaModelsResult> {
     const base = await this.resolveOllamaBaseUrl(organizationId, input);
     const url = `${base}/api/tags`;
@@ -350,7 +363,7 @@ export class ConnectionsService {
   // throw BadRequest (the operator must allowlist them via SSRF_ALLOWED_HOSTS).
   async openOllamaPull(
     organizationId: string,
-    input: { connectionId?: string; baseUrl?: string; model: string },
+    input: { connectionId?: string; baseUrl?: string; ollamaServerHosted?: boolean; model: string },
   ): Promise<Response> {
     const base = await this.resolveOllamaBaseUrl(organizationId, input);
     const url = `${base}/api/pull`;
@@ -375,6 +388,23 @@ export class ConnectionsService {
     if (!canEditConnection(ownerId, requesterId, role)) {
       throw new ForbiddenException('You can only edit connections you own');
     }
+  }
+
+  // The operator-configured shared Ollama server backing "hosted" mode. Read
+  // server-side and never sent by the client, so it can't be an SSRF vector.
+  ollamaServerBaseUrl(): string | null {
+    const raw = process.env.OLLAMA_SERVER_BASE_URL;
+    return raw && raw.length > 0 ? raw.replace(/\/+$/, '') : null;
+  }
+
+  requireOllamaServerBaseUrl(): string {
+    const base = this.ollamaServerBaseUrl();
+    if (!base) {
+      throw new BadRequestException(
+        'Hosted Ollama is not available on this server (OLLAMA_SERVER_BASE_URL is not set).',
+      );
+    }
+    return base;
   }
 
   encryptConfig(config: object): EncryptedPayload {
