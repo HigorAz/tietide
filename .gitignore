@@ -64,6 +64,10 @@ docs/planning/
 # Local audit-prep study notes (personal, never committed)
 docs/audit-prep/
 
+# Security audit findings — kept private (documents accepted-risk/deferred
+# weaknesses; not for the public repo). Purged from history 2026-06-15.
+docs/audit/
+
 # Office lock files
 .~lock.*
 ~$*
