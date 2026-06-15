@@ -5,6 +5,7 @@ import { MARKETING_TEMPLATES } from './marketing.templates';
 import { ENGINEERING_TEMPLATES } from './engineering.templates';
 import { PRODUCT_TEMPLATES } from './product.templates';
 import { OPERATIONS_TEMPLATES } from './operations.templates';
+import { SOCIAL_TEMPLATES } from './social.templates';
 
 export type { LibraryTemplate, LibraryWebhookConfig } from './types';
 
@@ -34,6 +35,7 @@ export const LIBRARY_TEMPLATES: readonly LibraryTemplate[] = [
   ...ENGINEERING_TEMPLATES,
   ...PRODUCT_TEMPLATES,
   ...OPERATIONS_TEMPLATES,
+  ...SOCIAL_TEMPLATES,
 ];
 
 export const LIBRARY_TEMPLATE_SLUGS: readonly string[] = LIBRARY_TEMPLATES.map((t) => t.slug);
