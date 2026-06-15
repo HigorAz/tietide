@@ -106,7 +106,12 @@ describe('ConnectionsController (integration)', () => {
         expect(row).not.toHaveProperty('refreshTokenEncrypted');
         expect(row).not.toHaveProperty('refreshTokenNonce');
       }
-      expect(connectionsService.list).toHaveBeenCalledWith('org-uuid', {});
+      expect(connectionsService.list).toHaveBeenCalledWith(
+        'org-uuid',
+        'owner-uuid',
+        'SUPERADMIN',
+        {},
+      );
     });
   });
 
@@ -119,7 +124,12 @@ describe('ConnectionsController (integration)', () => {
       expect(res.body).toEqual(persisted);
       expect(res.body).not.toHaveProperty('configEncrypted');
       expect(res.body).not.toHaveProperty('refreshTokenEncrypted');
-      expect(connectionsService.findOne).toHaveBeenCalledWith('org-uuid', uuid);
+      expect(connectionsService.findOne).toHaveBeenCalledWith(
+        'org-uuid',
+        uuid,
+        'owner-uuid',
+        'SUPERADMIN',
+      );
     });
 
     it('should return 404 when the connection belongs to another user', async () => {
@@ -146,10 +156,16 @@ describe('ConnectionsController (integration)', () => {
 
       expect(res.body).toEqual(persisted);
       expect(res.body).not.toHaveProperty('configEncrypted');
-      expect(connectionsService.update).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid, {
-        name: 'Renamed',
-        status: ConnectionStatus.REVOKED,
-      });
+      expect(connectionsService.update).toHaveBeenCalledWith(
+        'org-uuid',
+        'owner-uuid',
+        'SUPERADMIN',
+        uuid,
+        {
+          name: 'Renamed',
+          status: ConnectionStatus.REVOKED,
+        },
+      );
     });
 
     it('should return 400 when the body is empty (no name, no status)', async () => {
@@ -407,7 +423,12 @@ describe('ConnectionsController (integration)', () => {
 
       await request(app.getHttpServer()).delete(`/connections/${uuid}`).expect(204);
 
-      expect(connectionsService.remove).toHaveBeenCalledWith('org-uuid', 'owner-uuid', uuid);
+      expect(connectionsService.remove).toHaveBeenCalledWith(
+        'org-uuid',
+        'owner-uuid',
+        'SUPERADMIN',
+        uuid,
+      );
     });
 
     it('should return 404 when the connection belongs to another user (ownership filter)', async () => {

@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { ConnectionStatus } from '@tietide/shared';
 
 export class UpdateConnectionDto {
@@ -21,4 +29,25 @@ export class UpdateConnectionDto {
   @IsOptional()
   @IsEnum(ConnectionStatus)
   status?: ConnectionStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'New provider-specific credentials, validated against the provider schema and re-encrypted. ' +
+      'Rejected for OAuth2 connections (reconnect to refresh those).',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description:
+      "Ollama only: switch this connection to TieTide's hosted Ollama server. The " +
+      'baseUrl is injected server-side from OLLAMA_SERVER_BASE_URL.',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  ollamaServerHosted?: boolean;
 }

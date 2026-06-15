@@ -7,6 +7,7 @@ import { OllamaConnectionModal } from './OllamaConnectionModal';
 vi.mock('@/api/connections', () => ({
   listOllamaModels: vi.fn(),
   pullOllamaModel: vi.fn(),
+  getOllamaServerAvailability: vi.fn().mockResolvedValue(false),
 }));
 
 import { listOllamaModels } from '@/api/connections';

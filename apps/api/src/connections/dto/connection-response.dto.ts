@@ -28,4 +28,11 @@ export class ConnectionResponseDto {
 
   @ApiProperty({ type: String, format: 'date-time' })
   updatedAt!: Date;
+
+  @ApiPropertyOptional({
+    description:
+      'Whether the requesting user may edit/delete this connection (its owner or a workspace SUPERADMIN).',
+    example: true,
+  })
+  canEdit?: boolean;
 }

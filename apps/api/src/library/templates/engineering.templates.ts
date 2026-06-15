@@ -10,7 +10,7 @@ export const ENGINEERING_TEMPLATES: readonly LibraryTemplate[] = [
     slug: 'github-issue-ai-triage',
     name: 'GitHub issue AI triage',
     description:
-      'When an issue is opened, Claude assigns a severity, a triage comment is posted back to GitHub, and high-severity issues fan out to Slack + Linear.',
+      'When an issue is opened, a local Ollama model assigns a severity, a triage comment is posted back to GitHub, and high-severity issues fan out to Slack + Linear.',
     category: 'Engineering',
     definition: {
       nodes: [
@@ -23,19 +23,15 @@ export const ENGINEERING_TEMPLATES: readonly LibraryTemplate[] = [
         },
         {
           id: 'triage',
-          type: NodeType.CLAUDE_MESSAGES,
-          name: 'Claude: assess severity',
+          type: NodeType.OLLAMA_GENERATE,
+          name: 'Ollama: assess severity',
           alias: 'triage',
           position: { x: 340, y: 220 },
           config: {
             connectionId: '',
-            model: 'claude-sonnet-4-6',
-            system:
-              'You triage GitHub issues. Reply with ONLY compact JSON: {"severity":"high|medium|low","labels":["..."]}.',
+            model: 'llama3.1:8b',
             prompt:
-              'Issue title: {{ trigger.body.issue.title }}\n\nBody:\n{{ trigger.body.issue.body }}',
-            maxTokens: 200,
-            enablePromptCaching: true,
+              'You triage GitHub issues. Reply with ONLY compact JSON: {"severity":"high|medium|low","labels":["..."]}.\n\nIssue title: {{ trigger.body.issue.title }}\n\nBody:\n{{ trigger.body.issue.body }}',
           },
         },
         {

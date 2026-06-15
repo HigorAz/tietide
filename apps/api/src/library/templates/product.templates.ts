@@ -10,7 +10,7 @@ export const PRODUCT_TEMPLATES: readonly LibraryTemplate[] = [
     slug: 'feedback-to-notion-linear',
     name: 'Product feedback → Notion + Linear',
     description:
-      'Inbound product feedback is categorized and sentiment-scored by Claude, logged to a Notion database, and — when it looks like a bug — turned into a Linear issue with a Slack heads-up.',
+      'Inbound product feedback is categorized and sentiment-scored by a local Ollama model, logged to a Notion database, and — when it looks like a bug — turned into a Linear issue with a Slack heads-up.',
     category: 'Product',
     webhook: { pathSuffix: 'product-feedback' },
     definition: {
@@ -24,18 +24,15 @@ export const PRODUCT_TEMPLATES: readonly LibraryTemplate[] = [
         },
         {
           id: 'analyze',
-          type: NodeType.CLAUDE_MESSAGES,
-          name: 'Claude: categorize + sentiment',
+          type: NodeType.OLLAMA_GENERATE,
+          name: 'Ollama: categorize + sentiment',
           alias: 'analyze',
           position: { x: 340, y: 220 },
           config: {
             connectionId: '',
-            model: 'claude-sonnet-4-6',
-            system:
-              'You analyze product feedback. Reply with ONLY compact JSON: {"category":"bug|feature|praise|other","sentiment":"positive|neutral|negative"}.',
-            prompt: '{{ trigger.body.message }}',
-            maxTokens: 128,
-            enablePromptCaching: true,
+            model: 'llama3.1:8b',
+            prompt:
+              'You analyze product feedback. Reply with ONLY compact JSON: {"category":"bug|feature|praise|other","sentiment":"positive|neutral|negative"}.\n\n{{ trigger.body.message }}',
           },
         },
         {

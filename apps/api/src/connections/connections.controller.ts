@@ -27,7 +27,12 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { ConnectionType, PROVIDER_CONFIG_SCHEMAS, type ProviderConfigMap } from '@tietide/shared';
+import {
+  ConnectionProvider,
+  ConnectionType,
+  PROVIDER_CONFIG_SCHEMAS,
+  type ProviderConfigMap,
+} from '@tietide/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentOrg } from '../common/decorators/current-org.decorator';
 import { OrgRoles } from '../common/decorators/org-roles.decorator';
@@ -80,9 +85,10 @@ export class ConnectionsController {
   @ApiOkResponse({ type: PaginatedConnectionsDto })
   async list(
     @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
     @Query() page: PageQueryDto,
   ): Promise<PaginatedConnectionsDto> {
-    return this.connections.list(org.id, page);
+    return this.connections.list(org.id, user.id, org.role, page);
   }
 
   @Post()
@@ -106,7 +112,13 @@ export class ConnectionsController {
     if (!schema) {
       throw new BadRequestException(`Unknown provider "${dto.provider}"`);
     }
-    const result = schema.safeParse(dto.config);
+    // Hosted-Ollama create: inject the operator's server URL server-side so the
+    // client sends only { model } — the baseUrl is never client-supplied.
+    const config =
+      dto.provider === ConnectionProvider.OLLAMA && dto.ollamaServerHosted
+        ? { ...dto.config, baseUrl: this.connections.requireOllamaServerBaseUrl() }
+        : dto.config;
+    const result = schema.safeParse(config);
     if (!result.success) {
       const issues = result.error.issues
         .map((i) => `${i.path.join('.') || '<root>'}: ${i.message}`)
@@ -127,9 +139,10 @@ export class ConnectionsController {
   @ApiNotFoundResponse({ description: 'Connection not found' })
   async findOne(
     @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<ConnectionResponseDto> {
-    return this.connections.findOne(org.id, id);
+    return this.connections.findOne(org.id, id, user.id, org.role);
   }
 
   @Patch(':id')
@@ -144,10 +157,10 @@ export class ConnectionsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateConnectionDto,
   ): Promise<ConnectionResponseDto> {
-    if (dto.name === undefined && dto.status === undefined) {
-      throw new BadRequestException('Provide at least one of: name, status');
+    if (dto.name === undefined && dto.status === undefined && dto.config === undefined) {
+      throw new BadRequestException('Provide at least one of: name, status, config');
     }
-    return this.connections.update(org.id, user.id, id, dto);
+    return this.connections.update(org.id, user.id, org.role, id, dto);
   }
 
   @Post(':id/test')
@@ -182,7 +195,19 @@ export class ConnectionsController {
     return this.connections.listOllamaModels(org.id, {
       connectionId: dto.connectionId,
       baseUrl: dto.baseUrl,
+      ollamaServerHosted: dto.ollamaServerHosted,
     });
+  }
+
+  @Get('ollama/server')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
+  @ApiOperation({
+    summary: "Whether TieTide's hosted Ollama server is available (OLLAMA_SERVER_BASE_URL set)",
+  })
+  ollamaServerAvailability(): { available: boolean } {
+    // Exposes only a boolean — never the URL — so the modal can feature-gate the
+    // "Use TieTide's hosted Ollama" option without leaking infra detail.
+    return { available: this.connections.ollamaServerBaseUrl() !== null };
   }
 
   @Post('ollama/pull')
@@ -198,6 +223,7 @@ export class ConnectionsController {
     const upstream = await this.connections.openOllamaPull(org.id, {
       connectionId: dto.connectionId,
       baseUrl: dto.baseUrl,
+      ollamaServerHosted: dto.ollamaServerHosted,
       model: dto.model,
     });
     res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
@@ -237,6 +263,6 @@ export class ConnectionsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<void> {
-    await this.connections.remove(org.id, user.id, id);
+    await this.connections.remove(org.id, user.id, org.role, id);
   }
 }

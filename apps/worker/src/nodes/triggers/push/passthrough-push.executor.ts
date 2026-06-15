@@ -274,3 +274,14 @@ export class HubspotDealChangedPassthrough extends PassthroughPushExecutor {
     );
   }
 }
+
+@Injectable()
+export class WhatsappMessageReceivedPassthrough extends PassthroughPushExecutor {
+  constructor() {
+    super(
+      'whatsapp-message-received',
+      'WhatsApp: Message Received',
+      'Triggers when an inbound message arrives on your WhatsApp Business number',
+    );
+  }
+}
