@@ -21,6 +21,9 @@ export interface OllamaModelSelectProps {
   onChange: (value: string) => void;
   connectionId?: string;
   baseUrl?: string;
+  // Query TieTide's hosted Ollama server (resolved server-side); takes priority
+  // over connectionId/baseUrl when set.
+  ollamaServerHosted?: boolean;
   curated: readonly OllamaModelOption[];
   allowBlank?: boolean;
   id?: string;
@@ -42,6 +45,7 @@ export function OllamaModelSelect({
   onChange,
   connectionId,
   baseUrl,
+  ollamaServerHosted = false,
   curated,
   allowBlank = false,
   id,
@@ -60,14 +64,18 @@ export function OllamaModelSelect({
   // dropdown mid-typing.
   const [customMode, setCustomMode] = useState<boolean>(false);
 
-  const target = connectionId
-    ? { connectionId }
-    : baseUrl && isHttpUrl(baseUrl)
-      ? { baseUrl }
-      : null;
+  const target = ollamaServerHosted
+    ? { ollamaServerHosted: true }
+    : connectionId
+      ? { connectionId }
+      : baseUrl && isHttpUrl(baseUrl)
+        ? { baseUrl }
+        : null;
   // Stable cache key so the fetch effect only re-runs when the resolved target
   // (or the debounced baseUrl) actually changes.
-  const targetKey = connectionId ?? (baseUrl && isHttpUrl(baseUrl) ? baseUrl.trim() : '');
+  const targetKey = ollamaServerHosted
+    ? 'server'
+    : (connectionId ?? (baseUrl && isHttpUrl(baseUrl) ? baseUrl.trim() : ''));
 
   const refresh = useCallback(async (): Promise<void> => {
     if (!target) {
@@ -91,12 +99,12 @@ export function OllamaModelSelect({
     // `target` is derived purely from connectionId/baseUrl, so keying the
     // callback on those primitives keeps it stable without depending on the
     // freshly-rebuilt `target` object each render.
-  }, [connectionId, targetKey]);
+  }, [connectionId, ollamaServerHosted, targetKey]);
 
-  // Debounce baseUrl-driven fetches (~400ms); connectionId-driven fetches fire
-  // immediately. The empty-target case resets state synchronously in `refresh`.
+  // Debounce baseUrl-driven fetches (~400ms); connectionId / hosted-server fetches
+  // fire immediately. The empty-target case resets state synchronously in `refresh`.
   useEffect(() => {
-    if (connectionId) {
+    if (connectionId || ollamaServerHosted) {
       void refresh();
       return;
     }
@@ -108,7 +116,7 @@ export function OllamaModelSelect({
     }
     const handle = window.setTimeout(() => void refresh(), 400);
     return () => window.clearTimeout(handle);
-  }, [connectionId, targetKey, refresh]);
+  }, [connectionId, ollamaServerHosted, targetKey, refresh]);
 
   const installedSet = new Set(installed);
   const curatedNames = new Set(curated.map((m) => m.name));

@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   ConnectionProvider,
   ConnectionType,
@@ -6,12 +6,15 @@ import {
   ollamaConfigSchema,
 } from '@tietide/shared';
 import type { HttpConnectionModalProps } from './HttpConnectionModal';
+import { getOllamaServerAvailability } from '@/api/connections';
 import { OllamaModelSelect } from '@/components/editor/config/ollama/OllamaModelSelect';
 import { Spinner } from '@/components/ui/Spinner';
 import { Modal } from '@/components/dashboard/Modal';
 import { cn } from '@/utils/cn';
 
 export type OllamaConnectionModalProps = HttpConnectionModalProps;
+
+type Mode = 'server' | 'self-hosted';
 
 const inputClasses = cn(
   'w-full rounded-md border border-white/5 bg-elevated px-3 py-2 text-sm text-text-primary',
@@ -28,6 +31,8 @@ export function OllamaConnectionModal({
   const baseUrlId = useId();
   const modelId = useId();
 
+  const [serverAvailable, setServerAvailable] = useState(false);
+  const [mode, setMode] = useState<Mode>('self-hosted');
   const [name, setName] = useState('Local Ollama');
   const [baseUrl, setBaseUrl] = useState('http://localhost:11434');
   const [model, setModel] = useState('');
@@ -35,16 +40,37 @@ export function OllamaConnectionModal({
   const [configError, setConfigError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+    void getOllamaServerAvailability()
+      .then((available) => {
+        if (!active) return;
+        setServerAvailable(available);
+        if (available) setMode('server');
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const submit = async (event: React.FormEvent): Promise<void> => {
     event.preventDefault();
     const trimmedName = name.trim();
     const nameOk = trimmedName.length > 0 && trimmedName.length <= 100;
     setNameError(nameOk ? null : 'Name is required');
 
-    const parsed = ollamaConfigSchema.safeParse({ baseUrl, model });
-    if (!parsed.success) {
-      setConfigError(parsed.error.issues[0]?.message ?? 'Invalid configuration');
-      return;
+    if (mode === 'server') {
+      if (model.trim().length === 0) {
+        setConfigError('Pick a default model');
+        return;
+      }
+    } else {
+      const parsed = ollamaConfigSchema.safeParse({ baseUrl, model });
+      if (!parsed.success) {
+        setConfigError(parsed.error.issues[0]?.message ?? 'Invalid configuration');
+        return;
+      }
     }
     setConfigError(null);
     if (!nameOk) return;
@@ -55,7 +81,9 @@ export function OllamaConnectionModal({
         provider: ConnectionProvider.OLLAMA,
         type: ConnectionType.CUSTOM,
         name: trimmedName,
-        config: parsed.data as Record<string, unknown>,
+        // In server mode the baseUrl is injected by the API — send only the model.
+        config: mode === 'server' ? { model } : { baseUrl, model },
+        ...(mode === 'server' ? { ollamaServerHosted: true } : {}),
       });
     } catch {
       // Parent toasts the error.
@@ -70,8 +98,8 @@ export function OllamaConnectionModal({
         Connect Ollama
       </h2>
       <p className="mb-5 text-sm text-text-secondary">
-        Point at a self-hosted Ollama server so workflows can run local LLMs. Pick a default model —
-        we’ll check what’s installed and let you pull one if needed.
+        Run local LLMs in your workflows. Use TieTide’s hosted Ollama, or point at your own
+        self-hosted server.
       </p>
 
       <form onSubmit={submit} noValidate className="space-y-4">
@@ -95,21 +123,51 @@ export function OllamaConnectionModal({
           )}
         </div>
 
-        <div>
-          <label htmlFor={baseUrlId} className={labelClasses}>
-            Server URL
-          </label>
-          <input
-            id={baseUrlId}
-            type="text"
-            autoComplete="off"
-            spellCheck={false}
-            value={baseUrl}
-            onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="http://localhost:11434"
-            className={inputClasses}
-          />
-        </div>
+        {serverAvailable && (
+          <fieldset className="space-y-2">
+            <legend className={labelClasses}>Server</legend>
+            <label className="flex items-center gap-2 text-sm text-text-primary">
+              <input
+                type="radio"
+                name="ollama-mode"
+                value="server"
+                checked={mode === 'server'}
+                onChange={() => setMode('server')}
+                data-testid="ollama-mode-server"
+              />
+              Use TieTide’s hosted Ollama
+            </label>
+            <label className="flex items-center gap-2 text-sm text-text-primary">
+              <input
+                type="radio"
+                name="ollama-mode"
+                value="self-hosted"
+                checked={mode === 'self-hosted'}
+                onChange={() => setMode('self-hosted')}
+                data-testid="ollama-mode-self-hosted"
+              />
+              Self-hosted (my own server)
+            </label>
+          </fieldset>
+        )}
+
+        {mode === 'self-hosted' && (
+          <div>
+            <label htmlFor={baseUrlId} className={labelClasses}>
+              Server URL
+            </label>
+            <input
+              id={baseUrlId}
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="http://localhost:11434"
+              className={inputClasses}
+            />
+          </div>
+        )}
 
         <div>
           <label htmlFor={modelId} className={labelClasses}>
@@ -117,7 +175,8 @@ export function OllamaConnectionModal({
           </label>
           <OllamaModelSelect
             id={modelId}
-            baseUrl={baseUrl || undefined}
+            baseUrl={mode === 'self-hosted' ? baseUrl || undefined : undefined}
+            ollamaServerHosted={mode === 'server'}
             value={model}
             onChange={setModel}
             curated={OLLAMA_TEXT_MODELS}
