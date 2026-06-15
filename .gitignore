@@ -7,10 +7,11 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment — ignore every .env* variant, but keep the committed template.
+# (Previously .env.production / .env.test were NOT ignored — a real leak risk.)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # IDE
 .vscode/
@@ -70,5 +71,16 @@ docs/audit-prep/
 # Credentials & secrets
 *.pem
 *.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+id_rsa
+id_rsa.*
+*.ppk
 credentials.json
 service-account.json
+gha-creds-*.json
+.cloudflared/
+cloudflared/*.json
+*tunnel*credentials*.json
