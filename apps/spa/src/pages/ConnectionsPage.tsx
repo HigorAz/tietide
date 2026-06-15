@@ -11,6 +11,7 @@ import { HttpConnectionModal } from '@/components/connections/HttpConnectionModa
 import { OllamaConnectionModal } from '@/components/connections/OllamaConnectionModal';
 import { OAuthConnectionModal } from '@/components/connections/OAuthConnectionModal';
 import { DeleteConnectionDialog } from '@/components/connections/DeleteConnectionDialog';
+import { EditConnectionModal } from '@/components/connections/EditConnectionModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import {
   PROVIDER_CATALOG,
@@ -67,6 +68,7 @@ export function ConnectionsPage(): JSX.Element {
 
   const [apiKeyProvider, setApiKeyProvider] = useState<ProviderEntry | null>(null);
   const [oauthProvider, setOauthProvider] = useState<ProviderEntry | null>(null);
+  const [editing, setEditing] = useState<ConnectionView | null>(null);
   const [httpModalOpen, setHttpModalOpen] = useState<boolean>(false);
   const [ollamaModalOpen, setOllamaModalOpen] = useState<boolean>(false);
   const [toRevoke, setToRevoke] = useState<ConnectionView | null>(null);
@@ -203,6 +205,31 @@ export function ConnectionsPage(): JSX.Element {
       toast({ tone: 'success', message: 'Connection renamed' });
     } catch (err) {
       toast({ tone: 'error', message: errorMessage(err, 'Could not rename connection') });
+      throw err;
+    }
+  };
+
+  const handleEdit = (connection: ConnectionView): void => {
+    // OAuth credentials can't be hand-edited — re-run the OAuth flow to refresh
+    // them ("Reconnect"). Everything else opens the schema-driven edit modal.
+    if (connection.type === ConnectionType.OAUTH2) {
+      const provider = PROVIDER_CATALOG.find((p) => p.id === connection.provider);
+      if (provider) {
+        setOauthProvider(provider);
+        return;
+      }
+    }
+    setEditing(connection);
+  };
+
+  const handleEditSave = async (config: Record<string, unknown>): Promise<void> => {
+    if (!editing) return;
+    try {
+      await update(editing.id, { config });
+      toast({ tone: 'success', message: 'Connection updated' });
+      setEditing(null);
+    } catch (err) {
+      toast({ tone: 'error', message: errorMessage(err, 'Could not update connection') });
       throw err;
     }
   };
@@ -360,6 +387,7 @@ export function ConnectionsPage(): JSX.Element {
                   onTest={(id) => void handleTest(id)}
                   onRevoke={(conn) => setToRevoke(conn)}
                   onRename={handleRename}
+                  onEdit={handleEdit}
                 />
               ))}
             </ul>
@@ -395,6 +423,14 @@ export function ConnectionsPage(): JSX.Element {
           type={apiKeyProvider.type}
           onClose={() => setApiKeyProvider(null)}
           onCreate={handleApiKeyCreate}
+        />
+      )}
+
+      {editing && (
+        <EditConnectionModal
+          connection={editing}
+          onClose={() => setEditing(null)}
+          onSave={handleEditSave}
         />
       )}
 

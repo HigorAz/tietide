@@ -80,9 +80,10 @@ export class ConnectionsController {
   @ApiOkResponse({ type: PaginatedConnectionsDto })
   async list(
     @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
     @Query() page: PageQueryDto,
   ): Promise<PaginatedConnectionsDto> {
-    return this.connections.list(org.id, page);
+    return this.connections.list(org.id, user.id, org.role, page);
   }
 
   @Post()
@@ -127,9 +128,10 @@ export class ConnectionsController {
   @ApiNotFoundResponse({ description: 'Connection not found' })
   async findOne(
     @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<ConnectionResponseDto> {
-    return this.connections.findOne(org.id, id);
+    return this.connections.findOne(org.id, id, user.id, org.role);
   }
 
   @Patch(':id')
@@ -144,10 +146,10 @@ export class ConnectionsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateConnectionDto,
   ): Promise<ConnectionResponseDto> {
-    if (dto.name === undefined && dto.status === undefined) {
-      throw new BadRequestException('Provide at least one of: name, status');
+    if (dto.name === undefined && dto.status === undefined && dto.config === undefined) {
+      throw new BadRequestException('Provide at least one of: name, status, config');
     }
-    return this.connections.update(org.id, user.id, id, dto);
+    return this.connections.update(org.id, user.id, org.role, id, dto);
   }
 
   @Post(':id/test')
@@ -237,6 +239,6 @@ export class ConnectionsController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<void> {
-    await this.connections.remove(org.id, user.id, id);
+    await this.connections.remove(org.id, user.id, org.role, id);
   }
 }

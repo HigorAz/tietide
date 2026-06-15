@@ -1,6 +1,11 @@
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
-import { InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConnectionStatus, ConnectionType } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService } from '../crypto/crypto.service';
@@ -74,7 +79,7 @@ describe('ConnectionsService', () => {
     it('should query Prisma scoped to the active organizationId, keyset-ordered, metadata-only', async () => {
       prisma.connection.findMany.mockResolvedValue([]);
 
-      await service.list(orgId);
+      await service.list(orgId, userId, 'SUPERADMIN');
 
       expect(prisma.connection.findMany).toHaveBeenCalledWith({
         where: { organizationId: orgId },
@@ -88,6 +93,7 @@ describe('ConnectionsService', () => {
           lastUsedAt: true,
           createdAt: true,
           updatedAt: true,
+          userId: true,
         },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: 51,
@@ -95,12 +101,13 @@ describe('ConnectionsService', () => {
     });
 
     it('should return rows in a paginated envelope without any encrypted/nonce fields', async () => {
-      prisma.connection.findMany.mockResolvedValue([baseRow]);
+      prisma.connection.findMany.mockResolvedValue([{ ...baseRow, userId }]);
 
-      const result = await service.list(orgId);
+      const result = await service.list(orgId, userId, 'MEMBER');
 
-      expect(result).toEqual({ items: [baseRow], nextCursor: null });
+      expect(result).toEqual({ items: [{ ...baseRow, canEdit: true }], nextCursor: null });
       for (const row of result.items as unknown as Record<string, unknown>[]) {
+        expect(row).not.toHaveProperty('userId');
         expect(row).not.toHaveProperty('configEncrypted');
         expect(row).not.toHaveProperty('configNonce');
         expect(row).not.toHaveProperty('refreshTokenEncrypted');
@@ -115,18 +122,33 @@ describe('ConnectionsService', () => {
         'utf8',
       ).toString('base64url');
 
-      await service.list(orgId, { cursor });
+      await service.list(orgId, userId, 'MEMBER', { cursor });
 
       const call = prisma.connection.findMany.mock.calls[0][0] as { where: { AND?: unknown[] } };
       expect(call.where.AND).toBeDefined();
+    });
+
+    it('marks canEdit false for a non-owner MEMBER and true for the owner / a SUPERADMIN', async () => {
+      prisma.connection.findMany.mockResolvedValue([{ ...baseRow, userId: 'owner-1' }]);
+
+      const asOther = await service.list(orgId, 'someone-else', 'MEMBER');
+      expect((asOther.items[0] as { canEdit?: boolean }).canEdit).toBe(false);
+
+      prisma.connection.findMany.mockResolvedValue([{ ...baseRow, userId: 'owner-1' }]);
+      const asOwner = await service.list(orgId, 'owner-1', 'MEMBER');
+      expect((asOwner.items[0] as { canEdit?: boolean }).canEdit).toBe(true);
+
+      prisma.connection.findMany.mockResolvedValue([{ ...baseRow, userId: 'owner-1' }]);
+      const asSuper = await service.list(orgId, 'someone-else', 'SUPERADMIN');
+      expect((asSuper.items[0] as { canEdit?: boolean }).canEdit).toBe(true);
     });
   });
 
   describe('findOne', () => {
     it('should return a metadata-only DTO when the row exists in the org', async () => {
-      prisma.connection.findFirst.mockResolvedValue(baseRow);
+      prisma.connection.findFirst.mockResolvedValue({ ...baseRow, userId });
 
-      const result = await service.findOne(orgId, connectionId);
+      const result = await service.findOne(orgId, connectionId, userId, 'MEMBER');
 
       expect(prisma.connection.findFirst).toHaveBeenCalledWith({
         where: { id: connectionId, organizationId: orgId },
@@ -140,9 +162,11 @@ describe('ConnectionsService', () => {
           lastUsedAt: true,
           createdAt: true,
           updatedAt: true,
+          userId: true,
         },
       });
-      expect(result).toEqual(baseRow);
+      expect(result).toEqual({ ...baseRow, canEdit: true });
+      expect(result).not.toHaveProperty('userId');
       expect(result).not.toHaveProperty('configEncrypted');
       expect(result).not.toHaveProperty('configNonce');
     });
@@ -150,28 +174,37 @@ describe('ConnectionsService', () => {
     it('should throw NotFoundException when the id belongs to another org (IDOR)', async () => {
       prisma.connection.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne(otherOrgId, connectionId)).rejects.toThrow(NotFoundException);
+      await expect(service.findOne(otherOrgId, connectionId, userId, 'MEMBER')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
   describe('update', () => {
+    const ownedApiKey = {
+      id: connectionId,
+      userId,
+      type: ConnectionType.API_KEY,
+      provider: 'openai',
+    };
+
     it('should verify org ownership via findFirst before updating', async () => {
-      prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
+      prisma.connection.findFirst.mockResolvedValue(ownedApiKey);
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      await service.update(orgId, userId, connectionId, { name: 'Renamed' });
+      await service.update(orgId, userId, 'MEMBER', connectionId, { name: 'Renamed' });
 
       expect(prisma.connection.findFirst).toHaveBeenCalledWith({
         where: { id: connectionId, organizationId: orgId },
-        select: { id: true },
+        select: { id: true, userId: true, type: true, provider: true },
       });
     });
 
     it('should persist name and status when both are provided', async () => {
-      prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
+      prisma.connection.findFirst.mockResolvedValue(ownedApiKey);
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      await service.update(orgId, userId, connectionId, {
+      await service.update(orgId, userId, 'MEMBER', connectionId, {
         name: 'Renamed',
         status: ConnectionStatus.REVOKED,
       });
@@ -187,18 +220,77 @@ describe('ConnectionsService', () => {
     it('should throw NotFoundException when the connection belongs to another org', async () => {
       prisma.connection.findFirst.mockResolvedValue(null);
 
-      await expect(service.update(otherOrgId, userId, connectionId, { name: 'X' })).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.update(otherOrgId, userId, 'MEMBER', connectionId, { name: 'X' }),
+      ).rejects.toThrow(NotFoundException);
 
       expect(prisma.connection.update).not.toHaveBeenCalled();
     });
 
-    it('should record an audit log entry (org-scoped) with action "connection.update"', async () => {
-      prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
+    it('should forbid a non-owner MEMBER from editing someone else’s connection', async () => {
+      prisma.connection.findFirst.mockResolvedValue({ ...ownedApiKey, userId: 'owner-1' });
+
+      await expect(
+        service.update(orgId, 'someone-else', 'MEMBER', connectionId, { name: 'X' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.connection.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow a SUPERADMIN to edit another member’s connection', async () => {
+      prisma.connection.findFirst.mockResolvedValue({ ...ownedApiKey, userId: 'owner-1' });
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      await service.update(orgId, userId, connectionId, { status: ConnectionStatus.EXPIRED });
+      await expect(
+        service.update(orgId, 'admin-1', 'SUPERADMIN', connectionId, { name: 'X' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('should validate + re-encrypt a config edit for a credential connection', async () => {
+      prisma.connection.findFirst.mockResolvedValue(ownedApiKey);
+      crypto.encrypt.mockReturnValue({ ciphertext: 'NEW_C', nonce: 'NEW_N' });
+      prisma.connection.update.mockResolvedValue(baseRow);
+
+      await service.update(orgId, userId, 'MEMBER', connectionId, {
+        config: { apiKey: 'sk-new' },
+      });
+
+      expect(crypto.encrypt).toHaveBeenCalledWith(JSON.stringify({ apiKey: 'sk-new' }));
+      expect(prisma.connection.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ configEncrypted: 'NEW_C', configNonce: 'NEW_N' }),
+        }),
+      );
+    });
+
+    it('should reject an invalid config edit', async () => {
+      prisma.connection.findFirst.mockResolvedValue(ownedApiKey);
+
+      await expect(
+        service.update(orgId, userId, 'MEMBER', connectionId, { config: { notApiKey: 1 } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.connection.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject a config edit on an OAuth2 connection (reconnect instead)', async () => {
+      prisma.connection.findFirst.mockResolvedValue({
+        ...ownedApiKey,
+        type: ConnectionType.OAUTH2,
+        provider: 'google',
+      });
+
+      await expect(
+        service.update(orgId, userId, 'MEMBER', connectionId, { config: { accessToken: 'x' } }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.connection.update).not.toHaveBeenCalled();
+    });
+
+    it('should record an audit log entry (org-scoped) with action "connection.update"', async () => {
+      prisma.connection.findFirst.mockResolvedValue(ownedApiKey);
+      prisma.connection.update.mockResolvedValue(baseRow);
+
+      await service.update(orgId, userId, 'MEMBER', connectionId, {
+        status: ConnectionStatus.EXPIRED,
+      });
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -213,12 +305,14 @@ describe('ConnectionsService', () => {
     });
 
     it('should return the response without encrypted columns', async () => {
-      prisma.connection.findFirst.mockResolvedValue({ id: connectionId });
+      prisma.connection.findFirst.mockResolvedValue(ownedApiKey);
       prisma.connection.update.mockResolvedValue(baseRow);
 
-      const result = await service.update(orgId, userId, connectionId, { name: 'Renamed' });
+      const result = await service.update(orgId, userId, 'MEMBER', connectionId, {
+        name: 'Renamed',
+      });
 
-      expect(result).toEqual(baseRow);
+      expect(result).toEqual({ ...baseRow, canEdit: true });
       expect(result).not.toHaveProperty('configEncrypted');
       expect(result).not.toHaveProperty('refreshTokenEncrypted');
     });
@@ -226,9 +320,10 @@ describe('ConnectionsService', () => {
 
   describe('remove', () => {
     it('should delete with a composite (id, organizationId) filter', async () => {
+      prisma.connection.findFirst.mockResolvedValue({ id: connectionId, userId });
       prisma.connection.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(orgId, userId, connectionId);
+      await service.remove(orgId, userId, 'MEMBER', connectionId);
 
       expect(prisma.connection.deleteMany).toHaveBeenCalledWith({
         where: { id: connectionId, organizationId: orgId },
@@ -236,17 +331,28 @@ describe('ConnectionsService', () => {
     });
 
     it('should throw NotFoundException when no row matched (wrong org or missing id)', async () => {
-      prisma.connection.deleteMany.mockResolvedValue({ count: 0 });
+      prisma.connection.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove(otherOrgId, userId, connectionId)).rejects.toThrow(
+      await expect(service.remove(otherOrgId, userId, 'MEMBER', connectionId)).rejects.toThrow(
         NotFoundException,
       );
+      expect(prisma.connection.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('should forbid a non-owner MEMBER from deleting someone else’s connection', async () => {
+      prisma.connection.findFirst.mockResolvedValue({ id: connectionId, userId: 'owner-1' });
+
+      await expect(service.remove(orgId, 'someone-else', 'MEMBER', connectionId)).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(prisma.connection.deleteMany).not.toHaveBeenCalled();
     });
 
     it('should record an audit log entry with action "connection.delete" on success', async () => {
+      prisma.connection.findFirst.mockResolvedValue({ id: connectionId, userId });
       prisma.connection.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.remove(orgId, userId, connectionId);
+      await service.remove(orgId, userId, 'MEMBER', connectionId);
 
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({

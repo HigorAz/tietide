@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsEnum, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { ConnectionStatus } from '@tietide/shared';
 
 export class UpdateConnectionDto {
@@ -21,4 +21,15 @@ export class UpdateConnectionDto {
   @IsOptional()
   @IsEnum(ConnectionStatus)
   status?: ConnectionStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'New provider-specific credentials, validated against the provider schema and re-encrypted. ' +
+      'Rejected for OAuth2 connections (reconnect to refresh those).',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  config?: Record<string, unknown>;
 }

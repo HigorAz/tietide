@@ -1,6 +1,13 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import type { ConnectionStatus, ConnectionType, OllamaModelsResult } from '@tietide/shared';
+import { PROVIDER_CONFIG_SCHEMAS } from '@tietide/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CryptoService, type EncryptedPayload } from '../crypto/crypto.service';
 import { AuditLogService } from '../audit/audit-log.service';
@@ -28,6 +35,15 @@ const SAFE_SELECT = {
   updatedAt: true,
 } as const;
 
+// Adds the owner id so the service can compute `canEdit` per row, then strips it
+// before the row is returned (owner ids are never serialized to the client).
+const SAFE_SELECT_WITH_OWNER = { ...SAFE_SELECT, userId: true } as const;
+
+// A connection may be mutated only by its owner or a workspace SUPERADMIN.
+function canEditConnection(ownerId: string, requesterId: string, role: string): boolean {
+  return ownerId === requesterId || role === 'SUPERADMIN';
+}
+
 export interface CreateConnectionInput {
   type: ConnectionType;
   provider: string;
@@ -48,7 +64,12 @@ export class ConnectionsService {
     private readonly health: ProviderHealthRegistry,
   ) {}
 
-  async list(organizationId: string, page: PageRequest = {}): Promise<Page<ConnectionResponseDto>> {
+  async list(
+    organizationId: string,
+    requesterId: string,
+    role: string,
+    page: PageRequest = {},
+  ): Promise<Page<ConnectionResponseDto>> {
     const limit = resolveLimit(page.limit);
     let where: Prisma.ConnectionWhereInput = { organizationId };
     if (page.cursor) {
@@ -63,7 +84,7 @@ export class ConnectionsService {
 
     const peeked = await this.prisma.connection.findMany({
       where,
-      select: SAFE_SELECT,
+      select: SAFE_SELECT_WITH_OWNER,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
     });
@@ -71,42 +92,81 @@ export class ConnectionsService {
     return buildPage(
       peeked,
       limit,
-      (row) => row,
+      ({ userId, ...row }) => ({ ...row, canEdit: canEditConnection(userId, requesterId, role) }),
       (row) => ({ v: row.createdAt.toISOString(), id: row.id }),
     );
   }
 
-  async findOne(organizationId: string, id: string): Promise<ConnectionResponseDto> {
+  async findOne(
+    organizationId: string,
+    id: string,
+    requesterId: string,
+    role: string,
+  ): Promise<ConnectionResponseDto> {
     const row = await this.prisma.connection.findFirst({
       where: { id, organizationId },
-      select: SAFE_SELECT,
+      select: SAFE_SELECT_WITH_OWNER,
     });
     if (!row) {
       throw new NotFoundException('Connection not found');
     }
-    return row;
+    const { userId, ...rest } = row;
+    return { ...rest, canEdit: canEditConnection(userId, requesterId, role) };
   }
 
   async update(
     organizationId: string,
     userId: string,
+    role: string,
     id: string,
     dto: UpdateConnectionDto,
   ): Promise<ConnectionResponseDto> {
     const existing = await this.prisma.connection.findFirst({
       where: { id, organizationId },
-      select: { id: true },
+      select: { id: true, userId: true, type: true, provider: true },
     });
     if (!existing) {
       throw new NotFoundException('Connection not found');
     }
+    this.assertCanMutate(existing.userId, userId, role);
 
-    const data: { name?: string; status?: ConnectionStatus } = {};
+    const data: {
+      name?: string;
+      status?: ConnectionStatus;
+      configEncrypted?: string;
+      configNonce?: string;
+    } = {};
     if (dto.name !== undefined) {
       data.name = dto.name;
     }
     if (dto.status !== undefined) {
       data.status = dto.status;
+    }
+    if (dto.config !== undefined) {
+      // Editing raw OAuth tokens by hand is wrong — those connections are
+      // refreshed by re-running the OAuth flow ("Reconnect"), not by pasting a
+      // token. Only credential-style connections accept a config edit.
+      if (existing.type === 'OAUTH2') {
+        throw new BadRequestException(
+          'Reconnect this connection to refresh its credentials (OAuth connections cannot be edited directly).',
+        );
+      }
+      const schema =
+        PROVIDER_CONFIG_SCHEMAS[existing.provider as keyof typeof PROVIDER_CONFIG_SCHEMAS];
+      if (!schema) {
+        throw new BadRequestException(
+          `Provider "${existing.provider}" does not support config edits`,
+        );
+      }
+      const parsed = schema.safeParse(dto.config);
+      if (!parsed.success) {
+        throw new BadRequestException(
+          parsed.error.issues[0]?.message ?? 'Invalid connection config',
+        );
+      }
+      const encrypted = this.encryptConfig(parsed.data);
+      data.configEncrypted = encrypted.ciphertext;
+      data.configNonce = encrypted.nonce;
     }
 
     const row = await this.prisma.connection.update({
@@ -121,19 +181,25 @@ export class ConnectionsService {
       action: 'connection.update',
       resource: 'connection',
       resourceId: id,
+      // Record WHICH fields changed, never their values. 'config' marks a
+      // credential rotation without leaking the new secret.
       metadata: { fields: Object.keys(data) },
     });
 
-    return row;
+    return { ...row, canEdit: true };
   }
 
-  async remove(organizationId: string, userId: string, id: string): Promise<void> {
-    const { count } = await this.prisma.connection.deleteMany({
+  async remove(organizationId: string, userId: string, role: string, id: string): Promise<void> {
+    const existing = await this.prisma.connection.findFirst({
       where: { id, organizationId },
+      select: { id: true, userId: true },
     });
-    if (count === 0) {
+    if (!existing) {
       throw new NotFoundException('Connection not found');
     }
+    this.assertCanMutate(existing.userId, userId, role);
+
+    await this.prisma.connection.deleteMany({ where: { id, organizationId } });
 
     await this.audit.log({
       userId,
@@ -301,6 +367,14 @@ export class ConnectionsService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: input.model, stream: true }),
     });
+  }
+
+  // Enforce that a connection is mutated only by its owner or a SUPERADMIN.
+  // Read/list stay org-wide; only update/delete are restricted.
+  private assertCanMutate(ownerId: string, requesterId: string, role: string): void {
+    if (!canEditConnection(ownerId, requesterId, role)) {
+      throw new ForbiddenException('You can only edit connections you own');
+    }
   }
 
   encryptConfig(config: object): EncryptedPayload {

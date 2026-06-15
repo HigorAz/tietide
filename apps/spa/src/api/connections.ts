@@ -19,6 +19,8 @@ export interface ConnectionView {
   lastUsedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  // Whether the current user may edit/delete this connection (owner or SUPERADMIN).
+  canEdit?: boolean;
 }
 
 export interface CreateConnectionBody {
@@ -31,6 +33,9 @@ export interface CreateConnectionBody {
 export interface UpdateConnectionBody {
   name?: string;
   status?: ConnectionStatus;
+  // New provider credentials (validated + re-encrypted server-side). Not allowed
+  // for OAuth2 connections — reconnect those instead.
+  config?: Record<string, unknown>;
 }
 
 export interface TestConnectionResult {
