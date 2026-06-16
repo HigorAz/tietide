@@ -11,7 +11,11 @@ import { GOOGLE_CLIENTS, GoogleAuthService, type GoogleClientFactories } from '.
 
 export const DRIVE_LIST_TYPE = 'drive-list';
 
-const escapeForDriveQuery = (s: string): string => s.replace(/'/g, "\\'");
+// Escape a value before embedding it in a single-quoted Google Drive `q` clause.
+// Backslash MUST be escaped first, otherwise a literal `\` in the input would
+// turn the backslash we add for a following quote into an escaped-backslash and
+// leave the quote able to break out of the clause (query injection).
+const escapeForDriveQuery = (s: string): string => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 @Injectable()
 export class DriveListAction extends BaseConnectorAction<GoogleOAuth2Config> {

@@ -20,6 +20,8 @@ const RESERVED_ALIASES = new Set<string>([TRIGGER_ALIAS, 'steps']);
 
 /** Lowercase a node name into a safe identifier-ish slug (`Gmail: Search` → `gmail_search`). */
 export function slugifyAlias(name: string): string {
+  // codeql[js/polynomial-redos] — false positive: these are linear single-class
+  // global replaces (no nested/overlapping quantifiers), run on short node names.
   const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')

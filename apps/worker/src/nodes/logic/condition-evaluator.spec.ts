@@ -63,6 +63,14 @@ describe('condition-evaluator', () => {
       expect(evaluateCondition("'hello' === 'hello'")).toBe(true);
     });
 
+    it('should handle a backslash inside a single-quoted operand without corrupting the parse', () => {
+      // `'a\zb'` — a backslash that is NOT a valid JSON escape. Before escaping
+      // the backslash, the single→double-quote conversion produced `"a\zb"`,
+      // which JSON.parse rejected, so a legitimate literal wrongly threw.
+      expect(evaluateCondition("'a\\zb' === 'a\\zb'")).toBe(true);
+      expect(evaluateCondition("'a\\zb' === 'different'")).toBe(false);
+    });
+
     it('should throw a descriptive error when an object literal operand is malformed JSON', () => {
       expect(() => evaluateCondition('{not: json} === 1')).toThrow(/JSON literal/i);
     });

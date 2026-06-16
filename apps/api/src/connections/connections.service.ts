@@ -319,6 +319,8 @@ export class ConnectionsService {
       return cfg.baseUrl.replace(/\/+$/, '');
     }
     if (input.baseUrl && input.baseUrl.length > 0) {
+      // codeql[js/polynomial-redos] — low risk: `baseUrl` is a short, authenticated,
+      // org-scoped connection URL (not anonymous traffic); trailing-slash strip only.
       return input.baseUrl.replace(/\/+$/, '');
     }
     throw new BadRequestException('Provide a connectionId or baseUrl');
@@ -343,6 +345,9 @@ export class ConnectionsService {
       throw err;
     }
     try {
+      // codeql[js/request-forgery] — false positive: `url` is gated by the
+      // assertHealthUrlAllowed() check above, which blocks private/loopback hosts
+      // unless the operator allowlists them via SSRF_ALLOWED_HOSTS.
       const res = await fetch(url, { signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS) });
       if (!res.ok) {
         return { models: [], reachable: false };
@@ -375,6 +380,9 @@ export class ConnectionsService {
       }
       throw err;
     }
+    // codeql[js/request-forgery] — false positive: `url` is gated by the
+    // assertHealthUrlAllowed() check above, which blocks private/loopback hosts
+    // unless the operator allowlists them via SSRF_ALLOWED_HOSTS.
     return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

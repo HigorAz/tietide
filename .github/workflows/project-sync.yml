@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [closed]
 
+# Least privilege: this workflow drives GitHub Projects via a separate PAT
+# (secrets.PROJECT_PAT), so the default GITHUB_TOKEN needs no write scopes.
+permissions:
+  contents: read
+
 jobs:
   sync-status-to-done:
     name: Move linked issues to Done

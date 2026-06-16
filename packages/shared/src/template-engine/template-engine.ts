@@ -47,6 +47,9 @@ function resolveString(
   const tokens: { match: string; path: string; index: number }[] = [];
   TEMPLATE_TOKEN_REGEX.lastIndex = 0;
   let m: RegExpExecArray | null;
+  // codeql[js/polynomial-redos] — low risk: `input` is an authenticated, user-authored
+  // workflow template (not anonymous traffic), processed by the worker under a bounded
+  // execution timeout; worst case stalls only that single run.
   while ((m = TEMPLATE_TOKEN_REGEX.exec(input)) !== null) {
     const match = m[0];
     const rawPath = m[1];

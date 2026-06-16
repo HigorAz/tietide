@@ -76,6 +76,8 @@ class TestExtractFacts:
         prereqs = facts["prerequisites"]
         assert prereqs["secrets"] == ["PARTNER_TOKEN"]
         assert prereqs["envVars"] == ["PARTNER_API_KEY"]
+        # codeql[py/incomplete-url-substring-sanitization] — false positive: this is a
+        # test assertion that an endpoint appears in a list, not host/URL validation.
         assert "partner.example.com" in prereqs["externalEndpoints"]
         # No catalog in Python → connection grouped under the node type.
         assert prereqs["connections"] == [
