@@ -59,9 +59,14 @@ function parseLiteral(raw: string, fullCondition: string): unknown {
     (trimmed.startsWith("'") && trimmed.endsWith("'"))
   ) {
     try {
-      return JSON.parse(
-        trimmed.startsWith("'") ? `"${trimmed.slice(1, -1).replace(/"/g, '\\"')}"` : trimmed,
-      );
+      // Convert a single-quoted literal into a valid JSON (double-quoted) string.
+      // Escape backslashes FIRST, then double-quotes — otherwise a literal `\` in
+      // the operand would corrupt the escaping (e.g. turn our added `\"` back into
+      // an escaped backslash + bare quote) and break the parse.
+      const asJson = trimmed.startsWith("'")
+        ? `"${trimmed.slice(1, -1).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+        : trimmed;
+      return JSON.parse(asJson);
     } catch {
       throw new Error(
         `Invalid condition: cannot parse string literal "${trimmed}" in "${fullCondition}"`,

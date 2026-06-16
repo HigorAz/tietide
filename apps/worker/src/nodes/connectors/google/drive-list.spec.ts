@@ -44,6 +44,14 @@ describe('DriveListAction', () => {
     expect(result.data.nextPageToken).toBe('tok');
   });
 
+  it('escapes both backslashes and single quotes in folderId to prevent query injection', async () => {
+    list.mockResolvedValue({ status: 200, data: { files: [] } });
+    // folderId = a'b\c  →  backslash escaped first (\\), then the quote (\')
+    await action.execute(makeInput({ folderId: "a'b\\c" }), makeContext());
+    const arg = list.mock.calls[0][0];
+    expect(arg.q).toBe("'a\\'b\\\\c' in parents");
+  });
+
   it('combines folderId with the user-supplied query', async () => {
     list.mockResolvedValue({ status: 200, data: { files: [] } });
     await action.execute(
