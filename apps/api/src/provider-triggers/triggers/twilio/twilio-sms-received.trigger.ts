@@ -84,6 +84,9 @@ export class TwilioSmsReceivedTrigger extends BasePushTrigger {
       concatenated += key + params[key];
     }
 
+    // codeql[js/weak-cryptographic-algorithm] — required, not a choice: Twilio signs
+    // webhooks with HMAC-SHA1 (X-Twilio-Signature), so verification MUST use SHA1 to
+    // match. Compared in constant time via timingSafeEqual below.
     const expected = createHmac('sha1', authToken).update(concatenated, 'utf8').digest();
 
     let providedBuf: Buffer;

@@ -57,6 +57,9 @@ export class TrelloCardChangedTrigger extends BasePushTrigger {
     if (!decoded) return false;
 
     const body = Buffer.from(input.rawBody).toString('utf8');
+    // codeql[js/weak-cryptographic-algorithm] — required, not a choice: Trello signs
+    // webhooks with HMAC-SHA1 (X-Trello-Webhook), so verification MUST use SHA1 to
+    // match. Compared in constant time via timingSafeEqual below.
     const expected = createHmac('sha1', decoded.apiSecret)
       .update(body + decoded.callbackUrl)
       .digest('base64');
