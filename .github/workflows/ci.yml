@@ -20,6 +20,11 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: every job here only reads the repo (lint, test, audit,
+# Docker build with push:false). No job writes contents, packages, or issues.
+permissions:
+  contents: read
+
 env:
   HUSKY: 0
 
