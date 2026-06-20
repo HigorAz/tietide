@@ -22,6 +22,7 @@ describe('ExecutionsController (integration)', () => {
     triggerTest: jest.Mock;
     triggerNodeTest: jest.Mock;
     getTriggerSample: jest.Mock;
+    repeatExecution: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
   let orgRole: OrgRole;
@@ -79,6 +80,7 @@ describe('ExecutionsController (integration)', () => {
       triggerTest: jest.fn(),
       triggerNodeTest: jest.fn(),
       getTriggerSample: jest.fn(),
+      repeatExecution: jest.fn(),
     };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
     orgRole = 'SUPERADMIN';
@@ -453,6 +455,47 @@ describe('ExecutionsController (integration)', () => {
         .post(url)
         .send({ definition: validDefinition, userId: 'forged' })
         .expect(400);
+    });
+  });
+
+  describe('POST /workflows/:id/executions/:executionId/repeat', () => {
+    const execId = '22222222-2222-4222-8222-222222222222';
+    const url = `/workflows/${workflowId}/executions/${execId}/repeat`;
+
+    it('should return 202 with the new run and forward both ids', async () => {
+      executionsService.repeatExecution.mockResolvedValue(accepted);
+
+      const res = await request(app.getHttpServer()).post(url).send({}).expect(202);
+
+      expect(res.body).toEqual(accepted);
+      expect(executionsService.repeatExecution).toHaveBeenCalledWith(
+        orgId,
+        'owner-uuid',
+        workflowId,
+        execId,
+        expect.any(Object),
+      );
+    });
+
+    it('should return 400 when the execution id is not a UUID', async () => {
+      await request(app.getHttpServer())
+        .post(`/workflows/${workflowId}/executions/not-a-uuid/repeat`)
+        .send({})
+        .expect(400);
+      expect(executionsService.repeatExecution).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 when the caller is a VIEWER', async () => {
+      orgRole = 'VIEWER';
+      await request(app.getHttpServer()).post(url).send({}).expect(403);
+      expect(executionsService.repeatExecution).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 when the service throws NotFoundException', async () => {
+      executionsService.repeatExecution.mockRejectedValue(
+        new NotFoundException('Execution not found'),
+      );
+      await request(app.getHttpServer()).post(url).send({}).expect(404);
     });
   });
 

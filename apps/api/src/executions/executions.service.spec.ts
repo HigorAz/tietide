@@ -1356,4 +1356,106 @@ describe('ExecutionsService', () => {
       ).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('repeatExecution', () => {
+    const originalId = '99999999-9999-4999-8999-999999999999';
+
+    it('creates a repeat run copying triggerData/triggerType and linking the original', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: originalId,
+        workflowId,
+        triggerData: { issue: { number: 7 } },
+        triggerType: 'provider:github',
+      });
+      prisma.workflowExecution.create.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'provider:github',
+        triggerData: { issue: { number: 7 } },
+        idempotencyKey: null,
+        repeatOfExecutionId: originalId,
+        createdAt: new Date('2026-06-20T00:00:00Z'),
+      });
+
+      const result = await service.repeatExecution(
+        organizationId,
+        userId,
+        workflowId,
+        originalId,
+        {},
+      );
+
+      expect(entitlements.assertCanRun).toHaveBeenCalledWith(organizationId);
+      expect(prisma.workflowExecution.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            workflowId,
+            triggerType: 'provider:github',
+            triggerData: { issue: { number: 7 } },
+            repeatOfExecutionId: originalId,
+          }),
+        }),
+      );
+      expect(queue.add).toHaveBeenCalledWith(
+        'execute',
+        expect.objectContaining({
+          executionId,
+          triggerType: 'provider:github',
+          triggerData: { issue: { number: 7 } },
+        }),
+        expect.any(Object),
+      );
+      expect(result.repeatOfExecutionId).toBe(originalId);
+    });
+
+    it('throws NotFoundException when the workflow does not exist', async () => {
+      prisma.workflow.findUnique.mockResolvedValue(null);
+      await expect(
+        service.repeatExecution(organizationId, userId, workflowId, originalId, {}),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws ForbiddenException when the workflow belongs to another workspace', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({
+        id: workflowId,
+        organizationId: otherOrganizationId,
+      });
+      await expect(
+        service.repeatExecution(organizationId, userId, workflowId, originalId, {}),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws NotFoundException when the execution belongs to a different workflow', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: originalId,
+        workflowId: 'some-other-workflow',
+        triggerData: {},
+        triggerType: 'manual',
+      });
+      await expect(
+        service.repeatExecution(organizationId, userId, workflowId, originalId, {}),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 402 when the run quota is exhausted', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: originalId,
+        workflowId,
+        triggerData: {},
+        triggerType: 'manual',
+      });
+      entitlements.assertCanRun.mockRejectedValueOnce(
+        new PaymentRequiredException('runs', 'over quota'),
+      );
+      await expect(
+        service.repeatExecution(organizationId, userId, workflowId, originalId, {}),
+      ).rejects.toBeInstanceOf(PaymentRequiredException);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+    });
+  });
 });

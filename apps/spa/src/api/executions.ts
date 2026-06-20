@@ -78,6 +78,22 @@ export async function executeWorkflow(workflowId: string): Promise<ExecuteWorkfl
   return data;
 }
 
+/**
+ * Repeat a past execution (Workato "Repeat job"): re-runs it on the latest
+ * workflow version with the original's trigger data, linked via
+ * repeatOfExecutionId.
+ */
+export async function repeatExecution(
+  workflowId: string,
+  executionId: string,
+): Promise<ExecuteWorkflowResponse> {
+  const { data } = await api.post<ExecuteWorkflowResponse>(
+    `/workflows/${workflowId}/executions/${executionId}/repeat`,
+    {},
+  );
+  return data;
+}
+
 export async function testWorkflow(
   workflowId: string,
   definition: WorkflowDefinition,

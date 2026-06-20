@@ -162,6 +162,32 @@ export class ExecutionsController {
     });
   }
 
+  @Post('executions/:executionId/repeat')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
+  @Throttle(EXECUTE_THROTTLE)
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Repeat a past execution with its original trigger data',
+    description:
+      "Creates a new run that replays the original execution's trigger data on the latest " +
+      'workflow version, linked back to it via repeatOfExecutionId (Workato "Repeat job").',
+  })
+  @ApiAcceptedResponse({ type: ExecutionResponseDto, description: 'Repeat run accepted' })
+  @ApiNotFoundResponse({ description: 'Workflow or execution not found' })
+  @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
+  async repeat(
+    @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('executionId', new ParseUUIDPipe({ version: '4' })) executionId: string,
+    @Req() req: Request & { id?: string },
+  ): Promise<ExecutionResponseDto> {
+    return this.executions.repeatExecution(org.id, user.id, id, executionId, {
+      requestId: extractRequestId(req),
+    });
+  }
+
   @Post('nodes/:nodeId/trigger-sample')
   @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
   @Throttle(EXECUTE_THROTTLE)

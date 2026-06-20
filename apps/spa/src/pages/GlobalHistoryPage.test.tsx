@@ -9,6 +9,7 @@ vi.mock('@/api/executions', () => ({
   listAllExecutions: vi.fn(),
   getExecution: vi.fn(),
   listExecutionSteps: vi.fn(),
+  repeatExecution: vi.fn(),
 }));
 
 vi.mock('@/api/workflows', () => ({
@@ -288,6 +289,55 @@ describe('GlobalHistoryPage', () => {
 
       const row = await screen.findByTestId('execution-row-e-real');
       expect(within(row).queryByTestId('dry-run-badge')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('repeat run', () => {
+    it('calls repeatExecution with the row’s workflow + execution ids', async () => {
+      const mockedRepeat = vi.mocked(executionsApi.repeatExecution);
+      mockedRepeat.mockResolvedValue({} as never);
+      mockedListAll.mockResolvedValue({
+        items: [makeExecution({ id: 'e-rep', workflowId: 'wf-1', isDryRun: false })],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      renderPage();
+      const button = await screen.findByTestId('repeat-run-e-rep');
+      await userEvent.click(button);
+
+      expect(mockedRepeat).toHaveBeenCalledWith('wf-1', 'e-rep');
+    });
+
+    it('shows a Repeat badge for a run that repeats another execution', async () => {
+      mockedListAll.mockResolvedValue({
+        items: [
+          makeExecution({ id: 'e-child', workflowId: 'wf-1', repeatOfExecutionId: 'e-orig' }),
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      renderPage();
+      const row = await screen.findByTestId('execution-row-e-child');
+      expect(within(row).getByTestId('repeat-badge')).toBeInTheDocument();
+    });
+
+    it('disables the repeat button for a test (dry-run) execution', async () => {
+      mockedListAll.mockResolvedValue({
+        items: [makeExecution({ id: 'e-dry', workflowId: 'wf-1', isDryRun: true })],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+        nextCursor: null,
+      });
+
+      renderPage();
+      expect(await screen.findByTestId('repeat-run-e-dry')).toBeDisabled();
     });
   });
 });

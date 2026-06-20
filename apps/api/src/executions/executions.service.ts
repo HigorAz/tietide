@@ -399,6 +399,88 @@ export class ExecutionsService {
     };
   }
 
+  /**
+   * Repeat a past execution (Workato "Repeat job"): create a new run that replays
+   * the original's triggerData + triggerType on the LATEST workflow definition,
+   * linked back via `repeatOfExecutionId` so the History page can show the repeat
+   * chain. Subject to the same run-quota gate as a manual trigger.
+   */
+  async repeatExecution(
+    organizationId: string,
+    userId: string,
+    workflowId: string,
+    executionId: string,
+    options: { requestId?: string },
+  ): Promise<ExecutionResponseDto> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: { id: true, organizationId: true },
+    });
+    if (!workflow) {
+      throw new NotFoundException('Workflow not found');
+    }
+    if (workflow.organizationId !== organizationId) {
+      throw new ForbiddenException('You do not have access to this workflow');
+    }
+
+    const original = await this.prisma.workflowExecution.findUnique({
+      where: { id: executionId },
+      select: { id: true, workflowId: true, triggerData: true, triggerType: true },
+    });
+    // Same generic 404 for a missing execution OR one that belongs to a different
+    // workflow — never confirm the existence of another workspace's execution.
+    if (!original || original.workflowId !== workflowId) {
+      throw new NotFoundException('Execution not found');
+    }
+
+    await this.entitlements.assertCanRun(organizationId);
+
+    const triggerData = (original.triggerData as Record<string, unknown> | null) ?? undefined;
+    const triggerDataJson =
+      original.triggerData != null ? (original.triggerData as Prisma.InputJsonValue) : undefined;
+
+    const created = await this.entitlements.enforceRunCapAround(organizationId, (tx) =>
+      tx.workflowExecution.create({
+        data: {
+          workflowId,
+          status: 'PENDING',
+          triggerType: original.triggerType,
+          triggerData: triggerDataJson,
+          repeatOfExecutionId: original.id,
+        },
+      }),
+    );
+
+    const payload: WorkflowExecutionJobPayload = {
+      executionId: created.id,
+      workflowId,
+      triggerType: original.triggerType,
+      triggerData,
+      userId,
+      organizationId,
+      requestId: options.requestId,
+    };
+
+    await this.queue.add(EXECUTION_JOB_NAME, payload, {
+      jobId: created.id,
+      attempts: MAX_ATTEMPTS,
+      backoff: { type: 'exponential', delay: BACKOFF_DELAY_MS },
+      removeOnComplete: { age: 3600, count: 1000 },
+      removeOnFail: { age: 24 * 3600 },
+    });
+
+    await this.audit.log({
+      userId,
+      organizationId,
+      action: 'execution.repeat',
+      resource: 'workflow',
+      resourceId: workflowId,
+      metadata: { executionId: created.id, repeatOfExecutionId: original.id },
+    });
+
+    return this.toResponse(created);
+  }
+
   async list(
     organizationId: string,
     workflowId: string,
@@ -586,6 +668,7 @@ export class ExecutionsService {
     triggerData: unknown;
     idempotencyKey: string | null;
     isDryRun?: boolean;
+    repeatOfExecutionId?: string | null;
     createdAt: Date;
   }): ExecutionResponseDto {
     return {
@@ -596,6 +679,7 @@ export class ExecutionsService {
       triggerData: (row.triggerData as Record<string, unknown> | null) ?? null,
       idempotencyKey: row.idempotencyKey,
       isDryRun: row.isDryRun ?? false,
+      repeatOfExecutionId: row.repeatOfExecutionId ?? null,
       createdAt: row.createdAt,
     };
   }
@@ -608,6 +692,7 @@ export class ExecutionsService {
     triggerData: unknown;
     idempotencyKey: string | null;
     isDryRun?: boolean;
+    repeatOfExecutionId?: string | null;
     startedAt?: Date | null;
     finishedAt?: Date | null;
     error?: string | null;
@@ -621,6 +706,7 @@ export class ExecutionsService {
       triggerData: sanitizePayload(row.triggerData) as Record<string, unknown> | null,
       idempotencyKey: row.idempotencyKey,
       isDryRun: row.isDryRun ?? false,
+      repeatOfExecutionId: row.repeatOfExecutionId ?? null,
       startedAt: row.startedAt ?? null,
       finishedAt: row.finishedAt ?? null,
       error: row.error ?? null,
