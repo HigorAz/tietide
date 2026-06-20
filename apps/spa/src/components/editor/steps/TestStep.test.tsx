@@ -23,6 +23,10 @@ const makeHook = (
   blockedReason: null,
   run,
   reset,
+  pendingSample: null,
+  confirmSampleReplace: vi.fn(),
+  discardSampleChange: vi.fn(),
+  captureExternalSample: vi.fn(),
   ...over,
 });
 

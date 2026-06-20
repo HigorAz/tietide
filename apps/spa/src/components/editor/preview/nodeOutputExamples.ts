@@ -85,6 +85,61 @@ export const NODE_OUTPUT_EXAMPLES: Record<string, Record<string, unknown>> = {
     messageSid: 'SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
   },
 
+  // ── GitHub triggers ──────────────────────────────────────────────────
+  'github-issue-opened': {
+    action: 'opened',
+    issue: {
+      number: 42,
+      title: 'Example issue title',
+      body: 'A description of the issue, in **markdown**.',
+      state: 'open',
+      locked: false,
+      node_id: 'I_kwDOExample',
+      html_url: 'https://github.com/your-org/your-repo/issues/42',
+      labels: [{ id: 1, name: 'bug', color: 'd73a4a' }],
+      user: {
+        login: 'octocat',
+        id: 583231,
+        html_url: 'https://github.com/octocat',
+        organizations_url: 'https://api.github.com/users/octocat/orgs',
+        subscriptions_url: 'https://api.github.com/users/octocat/subscriptions',
+        received_events_url: 'https://api.github.com/users/octocat/received_events',
+      },
+      created_at: '2026-05-23T12:00:00.000Z',
+      updated_at: '2026-05-23T12:00:00.000Z',
+    },
+    repository: {
+      id: 1296269,
+      name: 'your-repo',
+      full_name: 'your-org/your-repo',
+      owner: { login: 'your-org', id: 1 },
+    },
+    sender: { login: 'octocat', id: 583231 },
+  },
+  'github-pr-opened': {
+    action: 'opened',
+    number: 7,
+    pull_request: {
+      number: 7,
+      title: 'Example pull request',
+      body: 'What this PR changes.',
+      state: 'open',
+      draft: false,
+      node_id: 'PR_kwDOExample',
+      html_url: 'https://github.com/your-org/your-repo/pull/7',
+      head: { ref: 'feature/example', sha: 'a1b2c3d4' },
+      base: { ref: 'main', sha: 'e5f6a7b8' },
+      user: { login: 'octocat', id: 583231 },
+    },
+    repository: {
+      id: 1296269,
+      name: 'your-repo',
+      full_name: 'your-org/your-repo',
+      owner: { login: 'your-org', id: 1 },
+    },
+    sender: { login: 'octocat', id: 583231 },
+  },
+
   // ── Commerce ─────────────────────────────────────────────────────────
   'stripe-event-received': {
     id: 'evt_1ExampleStripeEvent',
