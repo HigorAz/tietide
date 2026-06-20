@@ -18,6 +18,7 @@ import {
   ApiForbiddenResponse,
   ApiHeader,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiTooManyRequestsResponse,
@@ -42,6 +43,7 @@ import { ExecutionsService } from './executions.service';
 import { TriggerExecutionDto } from './dto/trigger-execution.dto';
 import { TestExecutionDto } from './dto/test-execution.dto';
 import { ExecutionResponseDto } from './dto/execution-response.dto';
+import { TriggerSampleResponseDto } from './dto/trigger-sample-response.dto';
 
 // W5.8: env-tunable per-tenant execute cap. Buckets on the default (per-user)
 // tracker; the guard substitutes the env-resolved limit/ttl so THROTTLE_EXECUTE_LIMIT /
@@ -157,6 +159,34 @@ export class ExecutionsController {
       definition: dto.definition as unknown as WorkflowDefinition,
       triggerData: dto.triggerData,
       requestId: extractRequestId(req),
+    });
+  }
+
+  @Post('nodes/:nodeId/trigger-sample')
+  @OrgRoles('SUPERADMIN', 'ADMIN', 'MEMBER')
+  @Throttle(EXECUTE_THROTTLE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Fetch a candidate output sample for a trigger node',
+    description:
+      'A trigger has no live webhook to replay during editing, so this returns the most recent ' +
+      'genuine run’s trigger payload ("Use data from last run") as a data-pill sample, or ' +
+      '`source: "none"` when no prior run exists. Never persists — the editor adopts it after a diff.',
+  })
+  @ApiOkResponse({ type: TriggerSampleResponseDto })
+  @ApiBadRequestResponse({ description: 'Node is not a trigger' })
+  @ApiNotFoundResponse({ description: 'Workflow or node not found' })
+  @ApiForbiddenResponse({ description: 'You do not have access to this workflow' })
+  @ApiTooManyRequestsResponse({ description: 'Rate limit exceeded' })
+  async triggerSample(
+    @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('nodeId') nodeId: string,
+    @Body() dto: TestExecutionDto,
+  ): Promise<TriggerSampleResponseDto> {
+    return this.executions.getTriggerSample(org.id, user.id, id, nodeId, {
+      definition: dto.definition as unknown as WorkflowDefinition,
     });
   }
 }
