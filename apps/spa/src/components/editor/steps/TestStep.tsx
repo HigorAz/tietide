@@ -4,6 +4,7 @@ import { cn } from '@/utils/cn';
 import { JsonTree } from '@/components/editor/dataviewer/JsonTree';
 import { ErrorCard } from '@/components/editor/run/ErrorCard';
 import { useTestNode } from '../config/useTestNode';
+import { SampleDiffModal } from '../config/SampleDiffModal';
 import { summarizeOutput } from './summarizeOutput';
 
 export interface TestStepProps {
@@ -29,7 +30,16 @@ const BUTTON_CLASS = cn(
  * `{ ok, summary }` so the step header can read '✓ tested · N items'.
  */
 export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps): JSX.Element {
-  const { status, result, canRun, blockedReason, run } = useTestNode(nodeId);
+  const {
+    status,
+    result,
+    canRun,
+    blockedReason,
+    run,
+    pendingSample,
+    confirmSampleReplace,
+    discardSampleChange,
+  } = useTestNode(nodeId);
   const busy = status === 'running';
 
   // Report success once per transition into the success state.
@@ -88,6 +98,15 @@ export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps):
 
       {status === 'error' && result.error && (
         <ErrorCard error={result.error} onFixInConfigure={onFixInConfigure} />
+      )}
+
+      {pendingSample && (
+        <SampleDiffModal
+          previous={pendingSample.previous}
+          next={pendingSample.next}
+          onKeep={discardSampleChange}
+          onReplace={confirmSampleReplace}
+        />
       )}
     </div>
   );

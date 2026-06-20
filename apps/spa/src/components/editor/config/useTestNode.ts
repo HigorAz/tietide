@@ -29,6 +29,13 @@ export interface TestNodeResult {
 
 const EMPTY_RESULT: TestNodeResult = { output: null, durationMs: null, error: null };
 
+/** A captured sample that differs from the node's existing one, awaiting the
+ *  user's keep/replace decision (rendered by SampleDiffModal). */
+export interface PendingSample {
+  previous: unknown;
+  next: unknown;
+}
+
 export interface UseTestNodeResult {
   status: TestNodeStatus;
   result: TestNodeResult;
@@ -38,6 +45,21 @@ export interface UseTestNodeResult {
   blockedReason: string | null;
   run: () => Promise<void>;
   reset: () => void;
+  /** Non-null while a captured sample is awaiting a keep/replace decision. */
+  pendingSample: PendingSample | null;
+  /** Adopt the pending sample, overwriting the node's existing one. */
+  confirmSampleReplace: () => void;
+  /** Keep the existing sample, discarding the captured one. */
+  discardSampleChange: () => void;
+  /** Route an externally-fetched sample (e.g. a trigger's "fetch test event")
+   *  through the same overwrite-protection + diff flow as a node test. */
+  captureExternalSample: (candidate: unknown) => void;
+}
+
+/** Structural equality good enough to detect "did the sample change" between two
+ *  API-shaped JSON objects (stable key order). */
+function sameSample(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /**
@@ -59,6 +81,15 @@ export function useTestNode(nodeId: string): UseTestNodeResult {
 
   const [status, setStatus] = useState<TestNodeStatus>('idle');
   const [result, setResult] = useState<TestNodeResult>(EMPTY_RESULT);
+  // Set when a captured sample differs from the node's existing one — the panel
+  // shows a before/after diff so the user keeps or replaces it (never silently
+  // overwriting configured pills). Carries the target node id so a confirm lands
+  // on the captured node, not whatever is selected when the user clicks.
+  const [pendingSample, setPendingSample] = useState<{
+    nodeId: string;
+    previous: unknown;
+    next: unknown;
+  } | null>(null);
 
   // Per-run token: bumped on every run start AND on every `nodeId` change, so an
   // in-flight poll loop targeting the previous node can detect it is stale and
@@ -110,6 +141,53 @@ export function useTestNode(nodeId: string): UseTestNodeResult {
   const fail = (message: string, code: string | null = null): void => {
     setResult({ output: null, durationMs: null, error: { message, code } });
     setStatus('error');
+  };
+
+  // Read the node's currently-stored sample fresh from the store (not a closure)
+  // so an overwrite decision compares against the latest config.
+  const readExistingSample = (id: string): unknown => {
+    const node = useEditorStore.getState().nodes.find((n) => n.id === id);
+    return node?.data.config?.[PILL_SAMPLE_KEY];
+  };
+
+  // Adopt a captured sample, but never silently clobber an existing, different
+  // one: write straight through on first capture or when unchanged; otherwise
+  // stage a pending diff for the user to keep or replace.
+  const commitSample = (id: string, candidate: unknown): void => {
+    const existing = readExistingSample(id);
+    if (existing === undefined) {
+      updateNodeConfig(id, { [PILL_SAMPLE_KEY]: candidate });
+      toast({ tone: 'success', message: 'Output captured as a data-pill sample.' });
+      return;
+    }
+    if (sameSample(existing, candidate)) {
+      toast({ tone: 'info', message: 'Sample unchanged — existing data pills kept.' });
+      return;
+    }
+    setPendingSample({ nodeId: id, previous: existing, next: candidate });
+  };
+
+  const confirmSampleReplace = (): void => {
+    if (!pendingSample) return;
+    updateNodeConfig(pendingSample.nodeId, { [PILL_SAMPLE_KEY]: pendingSample.next });
+    toast({ tone: 'success', message: 'Data-pill sample updated.' });
+    setPendingSample(null);
+  };
+
+  const discardSampleChange = (): void => {
+    if (!pendingSample) return;
+    toast({ tone: 'info', message: 'Kept the existing data-pill sample.' });
+    setPendingSample(null);
+  };
+
+  const captureExternalSample = (candidate: unknown): void => {
+    if (JSON.stringify(candidate).length > MAX_SAMPLE_BYTES) {
+      fail('Output is too large to capture as a sample.');
+      return;
+    }
+    setResult({ output: candidate, durationMs: null, error: null });
+    setStatus('success');
+    commitSample(nodeId, candidate);
   };
 
   const run = async (): Promise<void> => {
@@ -185,15 +263,16 @@ export function useTestNode(nodeId: string): UseTestNodeResult {
         return;
       }
 
-      // Write the sample against the CAPTURED node, never the latest closure.
-      updateNodeConfig(capturedNodeId, { [PILL_SAMPLE_KEY]: step.outputData });
-      toast({ tone: 'success', message: 'Output captured as a data-pill sample.' });
       setResult({
         output: step.outputData,
         durationMs: performance.now() - startedAt,
         error: null,
       });
       setStatus('success');
+      // Capture against the CAPTURED node, never the latest closure — and route
+      // through the overwrite-protection so an existing sample is never silently
+      // clobbered (a before/after diff prompts the user; #3).
+      commitSample(capturedNodeId, step.outputData);
     } catch {
       if (isStale()) return;
       fail('Could not run this node. Please try again.');
@@ -203,7 +282,21 @@ export function useTestNode(nodeId: string): UseTestNodeResult {
   const reset = (): void => {
     setStatus('idle');
     setResult(EMPTY_RESULT);
+    setPendingSample(null);
   };
 
-  return { status, result, canRun, blockedReason, run, reset };
+  return {
+    status,
+    result,
+    canRun,
+    blockedReason,
+    run,
+    reset,
+    pendingSample: pendingSample
+      ? { previous: pendingSample.previous, next: pendingSample.next }
+      : null,
+    confirmSampleReplace,
+    discardSampleChange,
+    captureExternalSample,
+  };
 }

@@ -264,6 +264,134 @@ describe('useTestNode', () => {
     vi.useRealTimers();
   });
 
+  it('stages a pending diff instead of overwriting an existing, different sample', async () => {
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({
+      updateNodeConfig,
+      nodes: [
+        {
+          id: NODE_ID,
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Sink',
+            nodeType: NodeType.HTTP_REQUEST,
+            config: { [PILL_SAMPLE_KEY]: { id: 1, old: true } },
+          },
+        },
+      ] as never,
+      edges: [],
+    });
+
+    mockedTestNode.mockResolvedValue({ id: 'exec-d', status: 'PENDING' } as never);
+    mockedGetExecution.mockResolvedValue({ id: 'exec-d', status: 'SUCCESS' } as never);
+    mockedListSteps.mockResolvedValue([
+      { nodeId: NODE_ID, outputData: { id: 2, old: false } },
+    ] as never);
+
+    const { result } = renderHook(() => useTestNode(NODE_ID));
+    await act(async () => {
+      await result.current.run();
+    });
+
+    // The capture did NOT clobber the existing sample — it is staged for review.
+    expect(updateNodeConfig).not.toHaveBeenCalled();
+    expect(result.current.pendingSample).toEqual({
+      previous: { id: 1, old: true },
+      next: { id: 2, old: false },
+    });
+
+    // Replacing writes the new sample and clears the pending diff.
+    act(() => {
+      result.current.confirmSampleReplace();
+    });
+    expect(updateNodeConfig).toHaveBeenCalledWith(NODE_ID, {
+      [PILL_SAMPLE_KEY]: { id: 2, old: false },
+    });
+    expect(result.current.pendingSample).toBeNull();
+  });
+
+  it('keeps the existing sample (no write) when the user discards the change', async () => {
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({
+      updateNodeConfig,
+      nodes: [
+        {
+          id: NODE_ID,
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Sink',
+            nodeType: NodeType.HTTP_REQUEST,
+            config: { [PILL_SAMPLE_KEY]: { keep: true } },
+          },
+        },
+      ] as never,
+      edges: [],
+    });
+
+    mockedTestNode.mockResolvedValue({ id: 'exec-k', status: 'PENDING' } as never);
+    mockedGetExecution.mockResolvedValue({ id: 'exec-k', status: 'SUCCESS' } as never);
+    mockedListSteps.mockResolvedValue([{ nodeId: NODE_ID, outputData: { keep: false } }] as never);
+
+    const { result } = renderHook(() => useTestNode(NODE_ID));
+    await act(async () => {
+      await result.current.run();
+    });
+    act(() => {
+      result.current.discardSampleChange();
+    });
+
+    expect(updateNodeConfig).not.toHaveBeenCalled();
+    expect(result.current.pendingSample).toBeNull();
+  });
+
+  it('captureExternalSample routes a fetched sample through the same diff flow', async () => {
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({
+      updateNodeConfig,
+      nodes: [
+        {
+          id: NODE_ID,
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: {
+            label: 'Trigger',
+            nodeType: NodeType.HTTP_REQUEST,
+            config: { [PILL_SAMPLE_KEY]: { issue: { title: 'old' } } },
+          },
+        },
+      ] as never,
+      edges: [],
+    });
+
+    const { result } = renderHook(() => useTestNode(NODE_ID));
+    act(() => {
+      result.current.captureExternalSample({ issue: { title: 'new' } });
+    });
+
+    expect(updateNodeConfig).not.toHaveBeenCalled();
+    expect(result.current.pendingSample).toEqual({
+      previous: { issue: { title: 'old' } },
+      next: { issue: { title: 'new' } },
+    });
+  });
+
+  it('captureExternalSample writes straight through when the node has no existing sample', () => {
+    const updateNodeConfig = vi.fn();
+    useEditorStore.setState({ updateNodeConfig });
+
+    const { result } = renderHook(() => useTestNode(NODE_ID));
+    act(() => {
+      result.current.captureExternalSample({ issue: { title: 'first' } });
+    });
+
+    expect(updateNodeConfig).toHaveBeenCalledWith(NODE_ID, {
+      [PILL_SAMPLE_KEY]: { issue: { title: 'first' } },
+    });
+    expect(result.current.pendingSample).toBeNull();
+  });
+
   it('reset() returns to idle and clears the result', async () => {
     mockedTestNode.mockResolvedValue({ id: 'exec-5', status: 'PENDING' } as never);
     mockedGetExecution.mockResolvedValue({ id: 'exec-5', status: 'SUCCESS' } as never);
