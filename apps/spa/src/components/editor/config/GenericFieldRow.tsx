@@ -3,6 +3,7 @@ import { useEditorStore } from '@/stores/editorStore';
 import { cn } from '@/utils/cn';
 import { DataPillInput } from './DataPillInput';
 import { FieldLabel } from './FieldLabel';
+import { FxField } from './FxField';
 import { OllamaModelSelect } from './ollama/OllamaModelSelect';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import type { FieldSpec } from './GenericConnectorForm';
@@ -76,55 +77,93 @@ export function GenericFieldRow({
     );
   }
 
+  // 'pill' fields are always expression inputs (no toggle). Every other
+  // user-facing kind (text / number / select) is fx-capable — a literal⇄
+  // expression toggle — unless the spec opts out with `fx: false`.
   if (f.kind === 'select') {
-    const v = asString(config[f.key]);
+    if (f.fx === false) {
+      const v = asString(config[f.key]);
+      return (
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
+          <select
+            id={fieldId}
+            value={v}
+            onChange={(e) => updateNodeConfig(nodeId, { [f.key]: e.target.value || undefined })}
+            className={inputClass}
+          >
+            <option value="">— Select —</option>
+            {f.options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
+        </div>
+      );
+    }
     return (
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
-        <select
-          id={fieldId}
-          value={v}
-          onChange={(e) => updateNodeConfig(nodeId, { [f.key]: e.target.value || undefined })}
-          className={inputClass}
-        >
-          <option value="">— Select —</option>
-          {f.options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
-      </div>
+      <FxField
+        fieldId={fieldId}
+        testId={`${testId}-${f.key}`}
+        nodeId={nodeId}
+        label={f.label}
+        kind="select"
+        value={config[f.key]}
+        onChange={(next) => updateNodeConfig(nodeId, { [f.key]: next })}
+        required={f.required}
+        help={f.help}
+        options={f.options}
+        issue={issue}
+      />
     );
   }
 
   if (f.kind === 'number') {
-    const v = asNumberString(config[f.key]);
+    if (f.fx === false) {
+      const v = asNumberString(config[f.key]);
+      return (
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
+          <input
+            id={fieldId}
+            type="number"
+            value={v}
+            placeholder={f.placeholder}
+            onChange={(e) => {
+              const n = e.target.value === '' ? undefined : Number(e.target.value);
+              updateNodeConfig(nodeId, { [f.key]: n });
+            }}
+            className={inputClass}
+          />
+          {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
+        </div>
+      );
+    }
     return (
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
-        <input
-          id={fieldId}
-          type="number"
-          value={v}
-          placeholder={f.placeholder}
-          onChange={(e) => {
-            const n = e.target.value === '' ? undefined : Number(e.target.value);
-            updateNodeConfig(nodeId, { [f.key]: n });
-          }}
-          className={inputClass}
-        />
-        {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
-      </div>
+      <FxField
+        fieldId={fieldId}
+        testId={`${testId}-${f.key}`}
+        nodeId={nodeId}
+        label={f.label}
+        kind="number"
+        value={config[f.key]}
+        onChange={(next) => updateNodeConfig(nodeId, { [f.key]: next })}
+        required={f.required}
+        help={f.help}
+        placeholder={f.placeholder}
+        issue={issue}
+      />
     );
   }
 
-  const v = asString(config[f.key]);
-  return (
-    <div className="flex flex-col gap-1.5">
-      <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
-      {f.kind === 'pill' ? (
+  // 'pill' kind is always an expression input (no fx toggle).
+  if (f.kind === 'pill') {
+    const v = asString(config[f.key]);
+    return (
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
         <DataPillInput
           id={fieldId}
           nodeId={nodeId}
@@ -132,26 +171,54 @@ export function GenericFieldRow({
           placeholder={f.placeholder}
           onChange={(next) => updateNodeConfig(nodeId, { [f.key]: next || undefined })}
         />
-      ) : f.multiline ? (
-        <textarea
-          id={fieldId}
-          value={v}
-          rows={4}
-          placeholder={f.placeholder}
-          onChange={(e) => updateNodeConfig(nodeId, { [f.key]: e.target.value || undefined })}
-          className={inputClass}
-        />
-      ) : (
-        <input
-          id={fieldId}
-          type="text"
-          value={v}
-          placeholder={f.placeholder}
-          onChange={(e) => updateNodeConfig(nodeId, { [f.key]: e.target.value || undefined })}
-          className={inputClass}
-        />
-      )}
-      {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
-    </div>
+        {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
+      </div>
+    );
+  }
+
+  // 'text' kind — fx-capable unless opted out.
+  if (f.fx === false) {
+    const v = asString(config[f.key]);
+    return (
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor={fieldId} label={f.label} required={f.required} help={f.help} />
+        {f.multiline ? (
+          <textarea
+            id={fieldId}
+            value={v}
+            rows={4}
+            placeholder={f.placeholder}
+            onChange={(e) => updateNodeConfig(nodeId, { [f.key]: e.target.value || undefined })}
+            className={inputClass}
+          />
+        ) : (
+          <input
+            id={fieldId}
+            type="text"
+            value={v}
+            placeholder={f.placeholder}
+            onChange={(e) => updateNodeConfig(nodeId, { [f.key]: e.target.value || undefined })}
+            className={inputClass}
+          />
+        )}
+        {issue && <FieldError id={`${testId}-${f.key}-error`} message={issue} />}
+      </div>
+    );
+  }
+  return (
+    <FxField
+      fieldId={fieldId}
+      testId={`${testId}-${f.key}`}
+      nodeId={nodeId}
+      label={f.label}
+      kind="text"
+      value={config[f.key]}
+      onChange={(next) => updateNodeConfig(nodeId, { [f.key]: next })}
+      required={f.required}
+      help={f.help}
+      placeholder={f.placeholder}
+      multiline={f.multiline}
+      issue={issue}
+    />
   );
 }

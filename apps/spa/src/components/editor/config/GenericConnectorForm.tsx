@@ -18,6 +18,8 @@ export type FieldSpec =
       required?: boolean;
       multiline?: boolean;
       help?: string;
+      /** Set false to disable the literal⇄expression "fx" toggle on a text field. */
+      fx?: boolean;
     }
   | {
       kind: 'select';
@@ -26,6 +28,8 @@ export type FieldSpec =
       options: ReadonlyArray<{ value: string; label: string }>;
       required?: boolean;
       help?: string;
+      /** Set false to disable the fx toggle (selects are fx-capable by default). */
+      fx?: boolean;
     }
   | {
       kind: 'number';
@@ -34,6 +38,8 @@ export type FieldSpec =
       placeholder?: string;
       required?: boolean;
       help?: string;
+      /** Set false to disable the fx toggle (numbers are fx-capable by default). */
+      fx?: boolean;
     }
   | {
       kind: 'checkbox';
@@ -90,7 +96,12 @@ export function GenericConnectorForm({
       candidate[f.key] = config[f.key] === true || undefined;
     } else if (f.kind === 'number') {
       const v = config[f.key];
-      candidate[f.key] = typeof v === 'number' ? v : undefined;
+      // In fx/expression mode a number field holds a `{{pill}}` template string;
+      // keep it so the templatable() schema validates it rather than dropping it
+      // as "missing" (which would surface a spurious required error).
+      if (typeof v === 'number') candidate[f.key] = v;
+      else if (typeof v === 'string' && v.includes('{{')) candidate[f.key] = v;
+      else candidate[f.key] = undefined;
     } else {
       const v = asString(config[f.key]);
       candidate[f.key] = v || undefined;

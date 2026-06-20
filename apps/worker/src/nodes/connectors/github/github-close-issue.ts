@@ -34,6 +34,7 @@ export class GitHubCloseIssueAction extends BaseConnectorAction<GitHubOAuth2Conf
     context: ExecutionContext,
   ): Promise<NodeOutput> {
     const params = githubCloseIssueConfigSchema.parse(input.params);
+    const issueNumber = Number(params.issueNumber);
 
     if (context.isDryRun && params.mockOnDryRun) {
       return {
@@ -42,7 +43,7 @@ export class GitHubCloseIssueAction extends BaseConnectorAction<GitHubOAuth2Conf
           wouldHaveClosed: {
             owner: params.owner,
             repo: params.repo,
-            issueNumber: params.issueNumber,
+            issueNumber,
           },
         },
         metadata: { mocked: true },
@@ -51,7 +52,7 @@ export class GitHubCloseIssueAction extends BaseConnectorAction<GitHubOAuth2Conf
 
     const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(
       params.repo,
-    )}/issues/${params.issueNumber}`;
+    )}/issues/${issueNumber}`;
 
     const response = await this.client.call<GitHubIssueResponse>(connection, path, {
       method: 'PATCH',
@@ -60,7 +61,7 @@ export class GitHubCloseIssueAction extends BaseConnectorAction<GitHubOAuth2Conf
 
     return {
       data: {
-        number: response.data.number ?? params.issueNumber,
+        number: response.data.number ?? issueNumber,
         state: response.data.state ?? 'closed',
         url: response.data.html_url ?? null,
       },

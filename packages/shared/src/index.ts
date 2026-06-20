@@ -92,6 +92,7 @@ export {
   type UpdateTagInput,
 } from './schemas/tag.schema.js';
 export { ZodError } from 'zod';
+export { templatable, coerceNumeric, TEMPLATE_VALUE_RE } from './schemas/templatable.js';
 export {
   httpRequestConfigSchema,
   conditionalConfigSchema,

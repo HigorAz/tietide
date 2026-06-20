@@ -93,6 +93,15 @@ describe('GitHubCommentIssueAction', () => {
       expect(JSON.parse(init.body as string)).toEqual({ body: 'Looking into it.' });
       expect(result.data.id).toBe(9876);
     });
+
+    it('accepts a resolved numeric string issueNumber (fx/expression mode)', async () => {
+      // A {{pill}} in the Issue/PR number field can resolve to a numeric string;
+      // templatable() + Number() normalise it so the path is still numeric.
+      call.mockResolvedValue({ status: 201, data: { id: 1, html_url: 'x', body: 'b' } });
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+      await action.execute(makeInput({ issueNumber: '42' as unknown as number }), ctx);
+      expect(call.mock.calls[0][1]).toBe('/repos/octocat/hello-world/issues/42/comments');
+    });
   });
 
   describe('error handling', () => {

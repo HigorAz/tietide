@@ -1,16 +1,13 @@
 import { useId } from 'react';
 import { githubCommentIssueConfigSchema } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
-import { cn } from '@/utils/cn';
 import type { NodeConfigFormProps } from '../formRegistry';
 import { ConnectionPicker } from '../../ConnectionPicker';
 import { DataPillInput } from '../DataPillInput';
+import { FxField } from '../FxField';
 
-const inputClass = cn(
-  'w-full rounded-md border border-white/5 bg-elevated px-3 py-2',
-  'text-sm text-text-primary placeholder:text-text-muted',
-  'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
-);
+const isTemplate = (v: unknown): v is string => typeof v === 'string' && v.includes('{{');
+
 const labelClass = 'text-xs font-semibold uppercase tracking-wider text-text-secondary';
 const asString = (v: unknown): string => (typeof v === 'string' ? v : '');
 
@@ -20,7 +17,6 @@ export function GitHubCommentIssueForm({ nodeId, config }: NodeConfigFormProps):
   const connectionId = asString(config.connectionId);
   const owner = asString(config.owner);
   const repo = asString(config.repo);
-  const issueNumber = typeof config.issueNumber === 'number' ? config.issueNumber : '';
   const body = asString(config.body);
 
   const ownerFieldId = useId();
@@ -28,11 +24,20 @@ export function GitHubCommentIssueForm({ nodeId, config }: NodeConfigFormProps):
   const numberFieldId = useId();
   const bodyFieldId = useId();
 
+  // In fx/expression mode issueNumber is a `{{pill}}` template string — pass it
+  // through so the templatable() schema validates it instead of failing as 0.
+  const issueNumberCandidate =
+    typeof config.issueNumber === 'number'
+      ? config.issueNumber
+      : isTemplate(config.issueNumber)
+        ? config.issueNumber
+        : 0;
+
   const parsed = githubCommentIssueConfigSchema.safeParse({
     connectionId: connectionId || undefined,
     owner,
     repo,
-    issueNumber: typeof issueNumber === 'number' ? issueNumber : 0,
+    issueNumber: issueNumberCandidate,
     body,
   });
   const issueFor = (field: string): string | null =>
@@ -111,33 +116,17 @@ export function GitHubCommentIssueForm({ nodeId, config }: NodeConfigFormProps):
         </div>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={numberFieldId} className={labelClass}>
-          Issue / PR number
-        </label>
-        <input
-          id={numberFieldId}
-          type="number"
-          min={1}
-          value={issueNumber}
-          aria-invalid={numberIssue !== null}
-          onChange={(e) =>
-            updateNodeConfig(nodeId, {
-              issueNumber: e.target.value ? Number(e.target.value) : undefined,
-            })
-          }
-          className={inputClass}
-        />
-        {numberIssue && (
-          <p
-            data-testid="github-comment-issue-number-error"
-            role="alert"
-            className="text-xs text-red-400"
-          >
-            {numberIssue}
-          </p>
-        )}
-      </div>
+      <FxField
+        fieldId={numberFieldId}
+        testId="github-comment-issue-number"
+        nodeId={nodeId}
+        label="Issue / PR number"
+        kind="number"
+        value={config.issueNumber}
+        onChange={(next) => updateNodeConfig(nodeId, { issueNumber: next })}
+        placeholder="42"
+        issue={numberIssue}
+      />
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor={bodyFieldId} className={labelClass}>
