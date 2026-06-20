@@ -1,4 +1,4 @@
-import { useCallback, useState, type DragEvent } from 'react';
+import { useCallback, useMemo, useState, type DragEvent } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -10,9 +10,12 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import type { NodeType } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { useToastStore } from '@/stores/toastStore';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { cn } from '@/utils/cn';
+import { findInvalidReferences } from '@/lib/validate-references';
+import { BrokenPillsContext } from './BrokenPillsContext';
 import { ClipboardJsonDialog, type ClipboardJsonDialogMode } from './ClipboardJsonDialog';
 import { edgeTypes } from './edges';
 import { editorTouchProps } from './editorTouchProps';
@@ -45,6 +48,7 @@ const CLOSED_DIALOG: DialogState = { open: false, mode: 'copy', json: '' };
 export function Canvas() {
   const nodes = useEditorStore((s) => s.nodes);
   const edges = useEditorStore((s) => s.edges);
+  const liveNodes = useExecutionLiveStore((s) => s.nodes);
   const onNodesChange = useEditorStore((s) => s.onNodesChange);
   const onEdgesChange = useEditorStore((s) => s.onEdgesChange);
   const onConnect = useEditorStore((s) => s.onConnect);
@@ -156,6 +160,13 @@ export function Canvas() {
 
   const hasSelection = nodes.some((n) => n.selected);
 
+  // Node ids carrying at least one broken data-pill token, computed once and
+  // shared via context so each node can mark itself red (#5).
+  const brokenNodeIds = useMemo<ReadonlySet<string>>(
+    () => new Set(findInvalidReferences(nodes, edges, liveNodes).map((r) => r.nodeId)),
+    [nodes, edges, liveNodes],
+  );
+
   return (
     <div
       data-testid="canvas-dropzone"
@@ -171,36 +182,42 @@ export function Canvas() {
       onDrop={handleDrop}
     >
       <InkPlumeBackdrop />
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={handleNodeClick}
-        onPaneClick={handlePaneClick}
-        onPaneContextMenu={handlePaneContextMenu}
-        onNodeContextMenu={handleNodeContextMenu}
-        onEdgeContextMenu={handleEdgeContextMenu}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        // The editor's own delete hotkey (useEditorHotkeys) owns Delete/Backspace
-        // and routes through deleteSelected() — which now removes selected edges
-        // too. Disabling React Flow's built-in delete keeps a single delete path
-        // and avoids duplicate undo snapshots.
-        deleteKeyCode={null}
-        proOptions={{ hideAttribution: true }}
-        fitView
-        fitViewOptions={FIT_VIEW_OPTIONS}
-        {...editorTouchProps(isMobile)}
-      >
-        {/* Faint line grid mirroring the login page's `.auth-grid` (34px,
+      <BrokenPillsContext.Provider value={brokenNodeIds}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={handleNodeClick}
+          onPaneClick={handlePaneClick}
+          onPaneContextMenu={handlePaneContextMenu}
+          onNodeContextMenu={handleNodeContextMenu}
+          onEdgeContextMenu={handleEdgeContextMenu}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          // The editor's own delete hotkey (useEditorHotkeys) owns Delete/Backspace
+          // and routes through deleteSelected() — which now removes selected edges
+          // too. Disabling React Flow's built-in delete keeps a single delete path
+          // and avoids duplicate undo snapshots.
+          deleteKeyCode={null}
+          proOptions={{ hideAttribution: true }}
+          fitView
+          fitViewOptions={FIT_VIEW_OPTIONS}
+          {...editorTouchProps(isMobile)}
+        >
+          {/* Faint line grid mirroring the login page's `.auth-grid` (34px,
             rgba(255,255,255,0.05)) — uniform (no fade) and panning with the
             canvas so the editor reads on-brand but a notch darker. */}
-        <Background variant={BackgroundVariant.Lines} gap={34} color="rgba(255, 255, 255, 0.05)" />
+          <Background
+            variant={BackgroundVariant.Lines}
+            gap={34}
+            color="rgba(255, 255, 255, 0.05)"
+          />
 
-        <Controls />
-      </ReactFlow>
+          <Controls />
+        </ReactFlow>
+      </BrokenPillsContext.Provider>
       {isDragActive && (
         <div
           aria-hidden
