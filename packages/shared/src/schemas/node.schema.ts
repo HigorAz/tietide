@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CONDITION_OPERATORS } from '../condition/grammar.js';
 
 export const httpRequestConfigSchema = z.object({
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
@@ -8,8 +9,18 @@ export const httpRequestConfigSchema = z.object({
   timeout: z.number().positive().max(30000).optional(),
 });
 
+/** Structured form of the condition (the SPA builder UI). Optional + advisory:
+ *  the worker only ever evaluates `condition`, so legacy string-only configs and
+ *  hand-written advanced expressions keep working unchanged. */
+export const conditionBuilderSchema = z.object({
+  left: z.string().min(1),
+  operator: z.enum(CONDITION_OPERATORS),
+  right: z.string().min(1),
+});
+
 export const conditionalConfigSchema = z.object({
   condition: z.string().min(1),
+  conditionBuilder: conditionBuilderSchema.optional(),
 });
 
 // Code-node INPUT keys become bare variable names inside the sandbox, so they

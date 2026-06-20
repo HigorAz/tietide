@@ -94,8 +94,15 @@ export {
 export { ZodError } from 'zod';
 export { templatable, coerceNumeric, TEMPLATE_VALUE_RE } from './schemas/templatable.js';
 export {
+  CONDITION_OPERATORS,
+  splitConditionOperator,
+  type ConditionOperator,
+} from './condition/grammar.js';
+export { builderToString, stringToBuilder, type ConditionBuilder } from './condition/serialize.js';
+export {
   httpRequestConfigSchema,
   conditionalConfigSchema,
+  conditionBuilderSchema,
   codeConfigSchema,
   cronConfigSchema,
   webhookConfigSchema,
