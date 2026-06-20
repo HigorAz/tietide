@@ -72,10 +72,14 @@ export function EditorContextMenu({
       onClose();
     };
     window.addEventListener('keydown', handleKey);
-    window.addEventListener('mousedown', handleMouseDown);
+    // Capture phase: React Flow's pane handlers (pan / box-select) stopPropagation
+    // on mousedown, so a bubble-phase listener never fires and the menu stays
+    // open on an outside left-click. Capturing on window runs first, before any
+    // child can stop the event.
+    window.addEventListener('mousedown', handleMouseDown, true);
     return () => {
       window.removeEventListener('keydown', handleKey);
-      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousedown', handleMouseDown, true);
     };
   }, [open, onClose]);
 
