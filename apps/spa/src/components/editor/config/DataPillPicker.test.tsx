@@ -106,6 +106,33 @@ describe('DataPillPicker', () => {
     expect(screen.getByText(/no upstream outputs/i)).toBeInTheDocument();
   });
 
+  it('filters pills by the search query across all upstream paths', () => {
+    seed();
+    useEditorStore.setState({ activePillField: { nodeId: 'B', insert: vi.fn() } });
+    render(<DataPillPicker />);
+
+    const listbox = screen.getByTestId('data-pill-picker');
+    fireEvent.change(screen.getByTestId('data-pill-search'), { target: { value: 'status' } });
+
+    const text = within(listbox)
+      .getAllByTestId('data-pill-picker-option')
+      .map((o) => o.textContent ?? '')
+      .join(' ');
+    expect(text).toContain('Status Code');
+    expect(text).not.toContain('Body');
+  });
+
+  it('shows a no-match message when the search matches nothing', () => {
+    seed();
+    useEditorStore.setState({ activePillField: { nodeId: 'B', insert: vi.fn() } });
+    render(<DataPillPicker />);
+
+    fireEvent.change(screen.getByTestId('data-pill-search'), {
+      target: { value: 'zzz-no-such-field' },
+    });
+    expect(screen.getByText(/no data pills match your search/i)).toBeInTheDocument();
+  });
+
   const pickerText = (): string =>
     within(screen.getByTestId('data-pill-picker'))
       .getAllByTestId('data-pill-picker-option')
