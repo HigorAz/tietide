@@ -1483,6 +1483,40 @@ describe('ExecutionsService', () => {
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
     });
 
+    it('dedupes a rapid second repeat of the same original (idempotency window)', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: originalId,
+        workflowId,
+        triggerData: {},
+        triggerType: 'manual',
+        isDryRun: false,
+      });
+      // A repeat created moments ago shares the time-bucketed idempotency key.
+      prisma.workflowExecution.findFirst.mockResolvedValue({
+        id: executionId,
+        workflowId,
+        status: 'PENDING',
+        triggerType: 'manual',
+        triggerData: null,
+        idempotencyKey: `repeat:${originalId}:bucket`,
+        repeatOfExecutionId: originalId,
+        createdAt: new Date(),
+      });
+
+      const result = await service.repeatExecution(
+        organizationId,
+        userId,
+        workflowId,
+        originalId,
+        {},
+      );
+
+      expect(result.id).toBe(executionId);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+      expect(queue.add).not.toHaveBeenCalled();
+    });
+
     it('refuses to repeat a node-test execution', async () => {
       prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
       prisma.workflowExecution.findUnique.mockResolvedValue({
