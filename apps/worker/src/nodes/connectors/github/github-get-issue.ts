@@ -39,10 +39,11 @@ export class GitHubGetIssueAction extends BaseConnectorAction<GitHubOAuth2Config
     _context: ExecutionContext,
   ): Promise<NodeOutput> {
     const params = githubGetIssueConfigSchema.parse(input.params);
+    const issueNumber = Number(params.issueNumber);
 
     const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(
       params.repo,
-    )}/issues/${params.issueNumber}`;
+    )}/issues/${issueNumber}`;
 
     const response = await this.client.call<GitHubIssueResponse>(connection, path, {
       method: 'GET',
@@ -51,7 +52,7 @@ export class GitHubGetIssueAction extends BaseConnectorAction<GitHubOAuth2Config
     return {
       data: {
         id: response.data.id ?? null,
-        number: response.data.number ?? params.issueNumber,
+        number: response.data.number ?? issueNumber,
         title: response.data.title ?? null,
         state: response.data.state ?? null,
         url: response.data.html_url ?? null,

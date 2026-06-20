@@ -82,5 +82,23 @@ describe('condition-evaluator', () => {
     it('should parse valid JSON object operands', () => {
       expect(evaluateCondition('{"a":1} === {"a":1}')).toBe(false);
     });
+
+    describe('contains', () => {
+      it('matches a substring of a string operand', () => {
+        expect(evaluateCondition('"hello world" contains "world"')).toBe(true);
+        expect(evaluateCondition('"hello world" contains "xyz"')).toBe(false);
+      });
+
+      it('matches membership of an array operand', () => {
+        expect(evaluateCondition('["a","urgent","b"] contains "urgent"')).toBe(true);
+        expect(evaluateCondition('["a","b"] contains "urgent"')).toBe(false);
+      });
+
+      it('does not mis-split on the word "contains" inside a quoted literal', () => {
+        // The left operand holds the substring but the only top-level operator
+        // is `===`, so it must split there, not on the embedded word.
+        expect(evaluateCondition('"it contains stuff" === "it contains stuff"')).toBe(true);
+      });
+    });
   });
 });

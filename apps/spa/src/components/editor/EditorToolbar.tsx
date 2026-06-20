@@ -42,6 +42,7 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const future = useEditorStore((s) => s.future);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
+  const selectNode = useEditorStore((s) => s.selectNode);
   const docStatus = useDocumentationStore((s) => s.status);
   const docs = useDocumentationStore((s) => s.docs);
   const docError = useDocumentationStore((s) => s.error);
@@ -138,12 +139,14 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   // the red pills must be fixed first (referential integrity). Pass live run output
   // so validation matches the picker (live output beats a possibly-stale sample).
   const liveNodes = useExecutionLiveStore((s) => s.nodes);
-  const invalidCount = useMemo(
-    () => findInvalidReferences(nodes, edges, liveNodes).length,
+  const invalidRefs = useMemo(
+    () => findInvalidReferences(nodes, edges, liveNodes),
     [nodes, edges, liveNodes],
   );
+  const invalidCount = invalidRefs.length;
   const hasInvalid = invalidCount > 0;
-  const invalidMessage = `${invalidCount} data-pill reference${invalidCount > 1 ? 's' : ''} point to a deleted/invalid node — fix the red pills to save or run.`;
+  const firstBrokenNodeId = invalidRefs[0]?.nodeId;
+  const invalidMessage = `${invalidCount} data-pill reference${invalidCount > 1 ? 's' : ''} point to a deleted/invalid node — click to jump to the first red node, then fix the red pills to save or run.`;
 
   const saveDisabled = !isDirty || isSaving || hasInvalid;
   const runDisabled = isRunning || isSaving || hasInvalid;
@@ -180,17 +183,20 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
       >
         <EditorViewTabs />
         {hasInvalid && (
-          <span
-            role="status"
+          <button
+            type="button"
             data-testid="invalid-refs-warning"
             title={invalidMessage}
-            className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-1 text-xs font-medium text-red-400"
+            onClick={() => {
+              if (firstBrokenNodeId) selectNode(firstBrokenNodeId);
+            }}
+            className="inline-flex items-center gap-1 rounded bg-red-500/15 px-2 py-1 text-xs font-medium text-red-400 hover:bg-red-500/25 focus:outline-none focus:ring-1 focus:ring-red-400"
           >
             <AlertTriangle size={14} aria-hidden />
             <span className="sr-only sm:not-sr-only">
               {invalidCount} broken pill{invalidCount > 1 ? 's' : ''}
             </span>
-          </span>
+          </button>
         )}
         <ToolbarButton
           label="Undo"

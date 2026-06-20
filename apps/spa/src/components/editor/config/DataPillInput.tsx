@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -259,7 +260,13 @@ export function DataPillInput({
     onChange: handleChange,
     onKeyDown: handleKeyDown,
     onFocus: () => setActivePillField({ nodeId, insert: insertAtCaret }),
-    onBlur: () => setActivePillField(null),
+    // Keep the picker open when focus moves INTO it (e.g. its search box) — a
+    // plain blur-to-null would unmount the picker before the click resolves.
+    onBlur: (e: ReactFocusEvent) => {
+      const next = e.relatedTarget as HTMLElement | null;
+      if (next && next.closest('[data-pill-keepalive]')) return;
+      setActivePillField(null);
+    },
     onKeyUp: refreshFromEvent,
     onClick: refreshFromEvent,
     // onSelect tracks caret moves so the #258 append-operator affordance re-evaluates.

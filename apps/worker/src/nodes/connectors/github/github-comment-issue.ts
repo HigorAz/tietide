@@ -34,6 +34,9 @@ export class GitHubCommentIssueAction extends BaseConnectorAction<GitHubOAuth2Co
     context: ExecutionContext,
   ): Promise<NodeOutput> {
     const params = githubCommentIssueConfigSchema.parse(input.params);
+    // issueNumber may arrive as a resolved numeric string (fx/expression mode);
+    // normalise to a number for the API + output.
+    const issueNumber = Number(params.issueNumber);
 
     if (context.isDryRun && params.mockOnDryRun) {
       return {
@@ -42,7 +45,7 @@ export class GitHubCommentIssueAction extends BaseConnectorAction<GitHubOAuth2Co
           wouldHaveCommented: {
             owner: params.owner,
             repo: params.repo,
-            issueNumber: params.issueNumber,
+            issueNumber,
           },
         },
         metadata: { mocked: true },
@@ -52,7 +55,7 @@ export class GitHubCommentIssueAction extends BaseConnectorAction<GitHubOAuth2Co
     // GitHub treats issues and PRs as the same resource for comments.
     const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(
       params.repo,
-    )}/issues/${params.issueNumber}/comments`;
+    )}/issues/${issueNumber}/comments`;
 
     const response = await this.client.call<GitHubCommentResponse>(connection, path, {
       method: 'POST',

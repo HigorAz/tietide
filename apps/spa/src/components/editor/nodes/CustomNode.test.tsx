@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ReactFlowProvider, type NodeProps } from 'reactflow';
 import { NodeType } from '@tietide/shared';
 import { CustomNode } from './CustomNode';
+import { BrokenPillsContext } from '../BrokenPillsContext';
 import type { CustomNodeData } from './CustomNode.types';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore, type NodeRunState } from '@/stores/executionLiveStore';
@@ -84,6 +85,37 @@ describe('CustomNode', () => {
       });
 
       expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-status', 'idle');
+    });
+
+    it('marks the node red with a warning badge when it has a broken pill', () => {
+      render(
+        <ReactFlowProvider>
+          <BrokenPillsContext.Provider value={new Set(['node-1'])}>
+            <CustomNode
+              id="node-1"
+              type="custom"
+              data={{ label: 'Sink', nodeType: NodeType.HTTP_REQUEST }}
+              selected={false}
+              isConnectable
+              xPos={0}
+              yPos={0}
+              zIndex={0}
+              dragging={false}
+              targetPosition={undefined}
+              sourcePosition={undefined}
+            />
+          </BrokenPillsContext.Provider>
+        </ReactFlowProvider>,
+      );
+
+      expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-broken-pills', 'true');
+      expect(screen.getByTestId('custom-node-broken-badge')).toBeInTheDocument();
+    });
+
+    it('does not mark a node red when no pill is broken', () => {
+      renderNode({ data: { label: 'OK', nodeType: NodeType.HTTP_REQUEST } });
+      expect(screen.getByTestId('custom-node-ring')).toHaveAttribute('data-broken-pills', 'false');
+      expect(screen.queryByTestId('custom-node-broken-badge')).not.toBeInTheDocument();
     });
   });
 

@@ -1,8 +1,11 @@
-const OPERATORS = ['===', '!==', '==', '!=', '>=', '<=', '>', '<'] as const;
-type Operator = (typeof OPERATORS)[number];
+import { splitConditionOperator, type ConditionOperator } from '@tietide/shared';
+
+type Operator = ConditionOperator;
 
 export function evaluateCondition(condition: string): boolean {
-  const tokens = splitOnOperator(condition);
+  // The operator grammar is shared with the SPA builder (@tietide/shared) so a
+  // condition the builder serialises always splits back the same way (#7).
+  const tokens = splitConditionOperator(condition);
   if (!tokens) {
     throw new Error(`Invalid condition: no recognised operator in "${condition}"`);
   }
@@ -10,42 +13,6 @@ export function evaluateCondition(condition: string): boolean {
   const left = parseLiteral(leftRaw, condition);
   const right = parseLiteral(rightRaw, condition);
   return compare(left, op, right);
-}
-
-function splitOnOperator(condition: string): [string, Operator, string] | null {
-  let inString = false;
-  let stringChar = '';
-  for (let i = 0; i < condition.length; i++) {
-    const ch = condition[i];
-    if (inString) {
-      if (ch === '\\') {
-        i++;
-        continue;
-      }
-      if (ch === stringChar) {
-        inString = false;
-      }
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      inString = true;
-      stringChar = ch;
-      continue;
-    }
-    for (const op of OPERATORS) {
-      if (
-        condition.startsWith(op, i) &&
-        condition[i - 1] === ' ' &&
-        condition[i + op.length] === ' '
-      ) {
-        const left = condition.slice(0, i - 1).trim();
-        const right = condition.slice(i + op.length + 1).trim();
-        if (left.length === 0 || right.length === 0) return null;
-        return [left, op, right];
-      }
-    }
-  }
-  return null;
 }
 
 function parseLiteral(raw: string, fullCondition: string): unknown {
@@ -106,5 +73,9 @@ function compare(left: unknown, op: Operator, right: unknown): boolean {
       return (left as number) >= (right as number);
     case '<=':
       return (left as number) <= (right as number);
+    case 'contains':
+      // Array membership when the left operand is a list, else substring match.
+      if (Array.isArray(left)) return left.includes(right);
+      return String(left).includes(String(right));
   }
 }

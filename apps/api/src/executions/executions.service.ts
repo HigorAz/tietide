@@ -1,7 +1,13 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit-log.service';
 import { EntitlementsService } from '../billing/entitlements.service';
@@ -12,9 +18,15 @@ import type {
   ExecutionListResponseDto,
 } from './dto/execution-detail-response.dto';
 import type { ExecutionStepResponseDto } from './dto/execution-step-response.dto';
-import { sanitizePayload, type WorkflowDefinition } from '@tietide/shared';
+import {
+  NODE_CATALOG,
+  NodeCategory,
+  sanitizePayload,
+  type WorkflowDefinition,
+} from '@tietide/shared';
 import { decodeCursor, encodeCursor } from './cursor';
 import { buildSingleNodeDefinition } from './single-node-subgraph';
+import type { TriggerSampleResponseDto } from './dto/trigger-sample-response.dto';
 
 export interface TriggerOptions {
   triggerData?: Record<string, unknown>;
@@ -319,6 +331,170 @@ export class ExecutionsService {
     return this.toResponse(created);
   }
 
+  /**
+   * Produce a candidate output sample for a TRIGGER node so the editor can map
+   * data pills without a live webhook (the "Use data from last run" flow). A
+   * trigger node has no provider API to poll synchronously, so the real-data
+   * source is the most recent genuine run's `triggerData`; when none exists the
+   * caller falls back to a built-in example client-side. Never persists.
+   */
+  async getTriggerSample(
+    organizationId: string,
+    userId: string,
+    workflowId: string,
+    nodeId: string,
+    options: { definition: WorkflowDefinition },
+  ): Promise<TriggerSampleResponseDto> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: { id: true, organizationId: true },
+    });
+    if (!workflow) {
+      throw new NotFoundException('Workflow not found');
+    }
+    if (workflow.organizationId !== organizationId) {
+      throw new ForbiddenException('You do not have access to this workflow');
+    }
+
+    const node = options.definition.nodes.find((n) => n.id === nodeId);
+    if (!node) {
+      throw new NotFoundException('Node not found');
+    }
+    const category = NODE_CATALOG.find((d) => d.type === node.type)?.category;
+    if (category !== NodeCategory.TRIGGER) {
+      throw new BadRequestException('Sample fetch is only available for trigger nodes');
+    }
+
+    // The most recent GENUINE run (not a dry-run or node/workflow test) that
+    // carried an inbound trigger payload — that payload is exactly the trigger
+    // node's output shape, so it seeds the downstream {{trigger.*}} pills.
+    const lastRun = await this.prisma.workflowExecution.findFirst({
+      where: {
+        workflowId,
+        isDryRun: false,
+        triggerData: { not: Prisma.DbNull },
+        triggerType: { notIn: ['node-test', 'test'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, triggerData: true, createdAt: true },
+    });
+
+    await this.audit.log({
+      userId,
+      organizationId,
+      action: 'execution.trigger-sample',
+      resource: 'workflow',
+      resourceId: workflowId,
+      metadata: { nodeId, source: lastRun ? 'last-run' : 'none' },
+    });
+
+    if (!lastRun || lastRun.triggerData == null) {
+      return { source: 'none', sample: null };
+    }
+    return {
+      source: 'last-run',
+      // Redact secret-like keys, mirroring the detail/step surfaces — an inbound
+      // webhook payload (Stripe/Meta/…) can carry tokens/secrets, which must not
+      // be exposed in cleartext just because they're served as a pill sample.
+      sample: sanitizePayload(lastRun.triggerData) as Record<string, unknown>,
+      executionId: lastRun.id,
+      capturedAt: lastRun.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Repeat a past execution (Workato "Repeat job"): create a new run that replays
+   * the original's triggerData + triggerType on the LATEST workflow definition,
+   * linked back via `repeatOfExecutionId` so the History page can show the repeat
+   * chain. Subject to the same run-quota gate as a manual trigger.
+   */
+  async repeatExecution(
+    organizationId: string,
+    userId: string,
+    workflowId: string,
+    executionId: string,
+    options: { requestId?: string },
+  ): Promise<ExecutionResponseDto> {
+    const workflow = await this.prisma.workflow.findUnique({
+      where: { id: workflowId },
+      select: { id: true, organizationId: true },
+    });
+    if (!workflow) {
+      throw new NotFoundException('Workflow not found');
+    }
+    if (workflow.organizationId !== organizationId) {
+      throw new ForbiddenException('You do not have access to this workflow');
+    }
+
+    const original = await this.prisma.workflowExecution.findUnique({
+      where: { id: executionId },
+      select: { id: true, workflowId: true, triggerData: true, triggerType: true, isDryRun: true },
+    });
+    // Same generic 404 for a missing execution OR one that belongs to a different
+    // workflow — never confirm the existence of another workspace's execution.
+    if (!original || original.workflowId !== workflowId) {
+      throw new NotFoundException('Execution not found');
+    }
+    // A repeat is a REAL, side-effecting run. Refuse to promote a dry-run/test
+    // execution into one (the UI disables this, but the API must enforce it too,
+    // else a direct call could fire real Slack/GitHub/Stripe side effects from a
+    // test's captured trigger data).
+    if (
+      original.isDryRun ||
+      original.triggerType === 'test' ||
+      original.triggerType === 'node-test'
+    ) {
+      throw new BadRequestException('Test runs cannot be repeated');
+    }
+
+    await this.entitlements.assertCanRun(organizationId);
+
+    const triggerData = (original.triggerData as Record<string, unknown> | null) ?? undefined;
+    const triggerDataJson =
+      original.triggerData != null ? (original.triggerData as Prisma.InputJsonValue) : undefined;
+
+    const created = await this.entitlements.enforceRunCapAround(organizationId, (tx) =>
+      tx.workflowExecution.create({
+        data: {
+          workflowId,
+          status: 'PENDING',
+          triggerType: original.triggerType,
+          triggerData: triggerDataJson,
+          repeatOfExecutionId: original.id,
+        },
+      }),
+    );
+
+    const payload: WorkflowExecutionJobPayload = {
+      executionId: created.id,
+      workflowId,
+      triggerType: original.triggerType,
+      triggerData,
+      userId,
+      organizationId,
+      requestId: options.requestId,
+    };
+
+    await this.queue.add(EXECUTION_JOB_NAME, payload, {
+      jobId: created.id,
+      attempts: MAX_ATTEMPTS,
+      backoff: { type: 'exponential', delay: BACKOFF_DELAY_MS },
+      removeOnComplete: { age: 3600, count: 1000 },
+      removeOnFail: { age: 24 * 3600 },
+    });
+
+    await this.audit.log({
+      userId,
+      organizationId,
+      action: 'execution.repeat',
+      resource: 'workflow',
+      resourceId: workflowId,
+      metadata: { executionId: created.id, repeatOfExecutionId: original.id },
+    });
+
+    return this.toResponse(created);
+  }
+
   async list(
     organizationId: string,
     workflowId: string,
@@ -506,6 +682,7 @@ export class ExecutionsService {
     triggerData: unknown;
     idempotencyKey: string | null;
     isDryRun?: boolean;
+    repeatOfExecutionId?: string | null;
     createdAt: Date;
   }): ExecutionResponseDto {
     return {
@@ -516,6 +693,7 @@ export class ExecutionsService {
       triggerData: (row.triggerData as Record<string, unknown> | null) ?? null,
       idempotencyKey: row.idempotencyKey,
       isDryRun: row.isDryRun ?? false,
+      repeatOfExecutionId: row.repeatOfExecutionId ?? null,
       createdAt: row.createdAt,
     };
   }
@@ -528,6 +706,7 @@ export class ExecutionsService {
     triggerData: unknown;
     idempotencyKey: string | null;
     isDryRun?: boolean;
+    repeatOfExecutionId?: string | null;
     startedAt?: Date | null;
     finishedAt?: Date | null;
     error?: string | null;
@@ -541,6 +720,7 @@ export class ExecutionsService {
       triggerData: sanitizePayload(row.triggerData) as Record<string, unknown> | null,
       idempotencyKey: row.idempotencyKey,
       isDryRun: row.isDryRun ?? false,
+      repeatOfExecutionId: row.repeatOfExecutionId ?? null,
       startedAt: row.startedAt ?? null,
       finishedAt: row.finishedAt ?? null,
       error: row.error ?? null,

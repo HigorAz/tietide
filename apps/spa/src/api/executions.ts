@@ -78,6 +78,22 @@ export async function executeWorkflow(workflowId: string): Promise<ExecuteWorkfl
   return data;
 }
 
+/**
+ * Repeat a past execution (Workato "Repeat job"): re-runs it on the latest
+ * workflow version with the original's trigger data, linked via
+ * repeatOfExecutionId.
+ */
+export async function repeatExecution(
+  workflowId: string,
+  executionId: string,
+): Promise<ExecuteWorkflowResponse> {
+  const { data } = await api.post<ExecuteWorkflowResponse>(
+    `/workflows/${workflowId}/executions/${executionId}/repeat`,
+    {},
+  );
+  return data;
+}
+
 export async function testWorkflow(
   workflowId: string,
   definition: WorkflowDefinition,
@@ -104,6 +120,30 @@ export async function testNode(
   const { data } = await api.post<ExecuteWorkflowResponse>(
     `/workflows/${workflowId}/nodes/${nodeId}/test`,
     body,
+  );
+  return data;
+}
+
+export interface TriggerSampleResponse {
+  source: 'last-run' | 'none';
+  sample: Record<string, unknown> | null;
+  executionId?: string;
+  capturedAt?: string;
+}
+
+/**
+ * Fetch a candidate output sample for a trigger node ("Use data from last run").
+ * Returns `source: 'none'` when no prior genuine run exists; the caller then
+ * falls back to a built-in example. Never persists server-side.
+ */
+export async function getTriggerSample(
+  workflowId: string,
+  nodeId: string,
+  definition: WorkflowDefinition,
+): Promise<TriggerSampleResponse> {
+  const { data } = await api.post<TriggerSampleResponse>(
+    `/workflows/${workflowId}/nodes/${nodeId}/trigger-sample`,
+    { definition },
   );
   return data;
 }

@@ -1,7 +1,13 @@
 import { z } from 'zod';
+import { templatable, coerceNumeric } from './templatable.js';
 
 const connectionId = z.string().uuid();
 const mockOnDryRun = z.boolean().optional();
+
+// Issue/PR number accepts a literal OR a `{{pill}}` template (the editor's fx
+// toggle) — a sole pill resolves to the real number at runtime; a resolved
+// numeric string is coerced. Executors normalise with Number() at use.
+const githubIssueNumber = templatable(z.number().int().min(1).max(2_147_483_647), coerceNumeric);
 
 // GitHub repo owners and names: 1–39 chars for users/orgs (alphanumeric + dash);
 // repo names: alphanumeric + dot/dash/underscore, up to 100 chars.
@@ -44,7 +50,7 @@ export const githubCommentIssueConfigSchema = z.object({
   connectionId,
   owner: githubOwner,
   repo: githubRepo,
-  issueNumber: z.number().int().min(1).max(2_147_483_647),
+  issueNumber: githubIssueNumber,
   body: z.string().min(1).max(65_536),
   mockOnDryRun,
 });
@@ -63,7 +69,6 @@ export const githubCreatePrConfigSchema = z.object({
 });
 export type GitHubCreatePrConfig = z.infer<typeof githubCreatePrConfigSchema>;
 
-const githubIssueNumber = z.number().int().min(1).max(2_147_483_647);
 export const GITHUB_ISSUE_STATES = ['open', 'closed', 'all'] as const;
 export type GitHubIssueState = (typeof GITHUB_ISSUE_STATES)[number];
 export const GITHUB_MERGE_METHODS = ['merge', 'squash', 'rebase'] as const;

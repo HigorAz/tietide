@@ -38,6 +38,7 @@ export function DataPillPicker(): JSX.Element | null {
   const liveNodes = useExecutionLiveStore((s) => s.nodes);
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
 
   // A user-declared (or test-captured) `__pillSample` overrides the node's static
   // schema, but a live run output (when present) wins over it — see resolveEntries
@@ -61,6 +62,23 @@ export function DataPillPicker(): JSX.Element | null {
   }, [activePillField, nodes, edges, liveNodes, overrides]);
 
   const groups = useMemo(() => groupSuggestions(suggestions), [suggestions]);
+
+  // Free-text filter across every upstream node's pills (label + humanized path
+  // + raw path), so a user can find a field without expanding each group (#4).
+  const q = query.trim().toLowerCase();
+  const filteredGroups = useMemo(() => {
+    if (!q) return groups;
+    return groups
+      .map((group) => {
+        // A node-label match keeps all of that node's pills; otherwise filter by path.
+        if (group.nodeLabel.toLowerCase().includes(q)) return group;
+        const matches = group.suggestions.filter(
+          (s) => humanizePath(s.path).toLowerCase().includes(q) || s.path.toLowerCase().includes(q),
+        );
+        return { ...group, suggestions: matches };
+      })
+      .filter((group) => group.suggestions.length > 0);
+  }, [groups, q]);
 
   // Environment variables are a flat, workflow-independent pill source. They
   // resolve as single UPPER_SNAKE tokens (`{{MY_KEY}}`) at execution time.
@@ -92,18 +110,43 @@ export function DataPillPicker(): JSX.Element | null {
     });
   };
 
-  const envOpen = !collapsed.has(ENV_GROUP_ID);
-  const isEmpty = groups.length === 0 && envKeys.length === 0;
+  // When searching, ignore collapse state so every match is visible.
+  const filteredEnvKeys = q ? envKeys.filter((k) => k.toLowerCase().includes(q)) : envKeys;
+  const envOpen = q ? true : !collapsed.has(ENV_GROUP_ID);
+  const isEmpty = filteredGroups.length === 0 && filteredEnvKeys.length === 0;
+
+  const search = (
+    <div className="border-b border-white/5 p-2">
+      <input
+        type="text"
+        data-testid="data-pill-search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        // Don't preventDefault — the input must take focus to be typed into; the
+        // picker stays mounted because its root carries data-pill-keepalive.
+        onPointerDown={(e) => e.stopPropagation()}
+        placeholder="Search data pills…"
+        aria-label="Search data pills"
+        className={cn(
+          'w-full rounded-md border border-white/10 bg-deep-blue/40 px-2.5 py-1.5 text-xs',
+          'text-text-primary placeholder:text-text-muted',
+          'focus:border-accent-teal focus:outline-none focus:ring-1 focus:ring-accent-teal',
+        )}
+      />
+    </div>
+  );
 
   const list = (
     <div role="listbox" aria-label="Upstream data pills" className="min-h-0 flex-1 overflow-y-auto">
       {isEmpty && (
-        <p className="px-3 py-2 text-xs text-text-muted">No upstream outputs to reference yet.</p>
+        <p className="px-3 py-2 text-xs text-text-muted">
+          {q ? 'No data pills match your search.' : 'No upstream outputs to reference yet.'}
+        </p>
       )}
-      {groups.length > 0 &&
-        groups.map((group) => {
+      {filteredGroups.length > 0 &&
+        filteredGroups.map((group) => {
           const Icon = getNodeIcon(group.nodeType);
-          const isOpen = !collapsed.has(group.nodeId);
+          const isOpen = q ? true : !collapsed.has(group.nodeId);
           return (
             <section key={group.nodeId} className="border-b border-white/5 last:border-b-0">
               <button
@@ -143,7 +186,7 @@ export function DataPillPicker(): JSX.Element | null {
             </section>
           );
         })}
-      {envKeys.length > 0 && (
+      {filteredEnvKeys.length > 0 && (
         <section
           key={ENV_GROUP_ID}
           data-testid="data-pill-env-group"
@@ -163,11 +206,11 @@ export function DataPillPicker(): JSX.Element | null {
             )}
             <KeyRound size={14} className="shrink-0 text-accent-teal" aria-hidden />
             <span className="truncate">Environment variables</span>
-            <span className="ml-auto shrink-0 text-text-muted">{envKeys.length}</span>
+            <span className="ml-auto shrink-0 text-text-muted">{filteredEnvKeys.length}</span>
           </button>
           {envOpen && (
             <ul className="pb-1">
-              {envKeys.map((key) => (
+              {filteredEnvKeys.map((key) => (
                 <li key={key} role="option" aria-selected={false}>
                   <button
                     type="button"
@@ -196,7 +239,11 @@ export function DataPillPicker(): JSX.Element | null {
         onClose={() => setActivePillField(null)}
         data-testid="data-pill-picker-sheet"
       >
-        {list}
+        {/* keepalive: focusing the search box must not blur the pill field shut. */}
+        <div data-pill-keepalive className="flex min-h-0 flex-1 flex-col">
+          {search}
+          {list}
+        </div>
       </BottomSheet>
     );
   }
@@ -204,6 +251,9 @@ export function DataPillPicker(): JSX.Element | null {
   return (
     <div
       data-testid="data-pill-picker"
+      // Focusing the search box moves focus off the DataPillInput; the keepalive
+      // marker tells its blur handler to keep the picker open (see DataPillInput).
+      data-pill-keepalive
       // Stop React Flow (underneath) from starting a pan/zoom when the user
       // interacts with the panel — mirrors InspectorDock.
       onPointerDown={(e) => e.stopPropagation()}
@@ -216,6 +266,7 @@ export function DataPillPicker(): JSX.Element | null {
       <div className="border-b border-white/5 px-3 py-2 text-xs font-semibold text-text-secondary">
         Insert data pill
       </div>
+      {search}
       {list}
     </div>
   );

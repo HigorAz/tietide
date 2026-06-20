@@ -1,11 +1,12 @@
-import { useEffect, useMemo, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useExecutionsStore } from '@/stores/executionsStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
+import { useToastStore } from '@/stores/toastStore';
 import { StatusBadge } from '@/components/executions/StatusBadge';
 import { computeDurationMs, formatDuration } from '@/components/executions/duration';
 import { cn } from '@/utils/cn';
-import type { ExecutionStatus } from '@/api/executions';
+import { repeatExecution, type ExecutionStatus } from '@/api/executions';
 
 const STATUS_OPTIONS: { value: '' | ExecutionStatus; label: string }[] = [
   { value: '', label: 'All' },
@@ -47,6 +48,23 @@ export function GlobalHistoryPage(): JSX.Element {
 
   const workflows = useWorkflowsStore((s) => s.workflows);
   const fetchWorkflows = useWorkflowsStore((s) => s.fetch);
+  const toast = useToastStore((s) => s.show);
+  const [repeatingId, setRepeatingId] = useState<string | null>(null);
+
+  const handleRepeat = async (workflowId: string, executionId: string): Promise<void> => {
+    setRepeatingId(executionId);
+    try {
+      await repeatExecution(workflowId, executionId);
+      // Queued, not necessarily succeeded — the run executes on the latest
+      // workflow version; the refreshed list + Repeat badge show the outcome.
+      toast({ tone: 'success', message: 'Repeat run queued — check the list for its result.' });
+      void fetchAll(filters);
+    } catch {
+      toast({ tone: 'error', message: 'Could not start the repeat run.' });
+    } finally {
+      setRepeatingId(null);
+    }
+  };
 
   useEffect(() => {
     void fetchWorkflows();
@@ -185,6 +203,7 @@ export function GlobalHistoryPage(): JSX.Element {
                   <th className="px-4 py-2 font-semibold">Trigger</th>
                   <th className="px-4 py-2 font-semibold">Started</th>
                   <th className="px-4 py-2 font-semibold">Duration</th>
+                  <th className="px-4 py-2 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -225,12 +244,45 @@ export function GlobalHistoryPage(): JSX.Element {
                             Test
                           </span>
                         )}
+                        {row.repeatOfExecutionId && (
+                          <span
+                            data-testid="repeat-badge"
+                            title={`Repeat of ${row.repeatOfExecutionId}`}
+                            className="ml-2 inline-block rounded-full bg-purple-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-purple-300"
+                          >
+                            Repeat
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{row.triggerType}</td>
                       <td className="px-4 py-3 text-text-secondary">
                         {formatStartedAt(row.startedAt ?? row.createdAt)}
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{formatDuration(duration)}</td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          data-testid={`repeat-run-${row.id}`}
+                          disabled={repeatingId === row.id || row.isDryRun === true}
+                          title={
+                            row.isDryRun === true
+                              ? 'Test runs can’t be repeated'
+                              : 'Re-run with the original trigger data'
+                          }
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleRepeat(row.workflowId, row.id);
+                          }}
+                          className={cn(
+                            'rounded-md border border-white/10 bg-elevated px-2.5 py-1 text-xs font-medium',
+                            'text-text-secondary hover:text-text-primary hover:border-accent-teal',
+                            'focus:outline-none focus:ring-1 focus:ring-accent-teal',
+                            'disabled:cursor-not-allowed disabled:opacity-40',
+                          )}
+                        >
+                          {repeatingId === row.id ? 'Starting…' : 'Repeat run'}
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}

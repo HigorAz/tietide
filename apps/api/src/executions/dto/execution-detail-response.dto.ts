@@ -34,6 +34,13 @@ export class ExecutionDetailResponseDto {
   @ApiProperty({ type: String, nullable: true })
   error!: string | null;
 
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Id of the execution this run repeats, or null for an original run.',
+  })
+  repeatOfExecutionId!: string | null;
+
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: Date;
 }

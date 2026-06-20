@@ -4,6 +4,7 @@
 import {
   NODE_CATALOG,
   NodeCategory,
+  PILL_SAMPLE_KEY,
   RESERVED_CONFIG_KEYS,
   TRIGGER_ALIAS,
   resolveTemplate,
@@ -35,6 +36,19 @@ export function stripReservedConfigKeys(config: Record<string, unknown>): Record
   return sanitized;
 }
 
+/**
+ * Read a trigger node's declared output sample (`__pillSample`) as a data object,
+ * or `{}` when it is absent or not a plain object. Used only to seed a trigger's
+ * output during a sample-less test/dry-run (see buildInput).
+ */
+function triggerSampleData(n: WorkflowNode): Record<string, unknown> {
+  const sample = (n.config as Record<string, unknown>)[PILL_SAMPLE_KEY];
+  if (sample !== null && typeof sample === 'object' && !Array.isArray(sample)) {
+    return sample as Record<string, unknown>;
+  }
+  return {};
+}
+
 export function buildInput(
   n: WorkflowNode,
   executionOrder: string[],
@@ -44,7 +58,13 @@ export function buildInput(
 ) {
   let data: Record<string, unknown> = {};
   if (incoming.length === 0) {
-    data = triggerData ?? {};
+    // A root node's data is the run's trigger payload. During a node-test or
+    // dry-run there is no live webhook, so triggerData is absent — fall back to
+    // the trigger's declared output sample (`__pillSample`) so downstream
+    // {{trigger.*}} pills resolve instead of failing "Template path not found".
+    // Only TRIGGER nodes fall back: an action root's sample is its own captured
+    // OUTPUT, not its input, so feeding it back as input would be wrong.
+    data = triggerData ?? (isTriggerNode(n) ? triggerSampleData(n) : {});
   } else {
     // Only predecessors that actually produced an output (executed or
     // skipped-passthrough) feed this node; cancelled/unreached ones do not.

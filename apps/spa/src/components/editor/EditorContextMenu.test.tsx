@@ -191,6 +191,34 @@ describe('EditorContextMenu', () => {
 
       expect(onClose).not.toHaveBeenCalled();
     });
+
+    it('closes on an outside click even when the target stops propagation (capture phase)', () => {
+      // React Flow's pane stopPropagation() on mousedown used to keep the menu
+      // open; the capture-phase listener must still fire (#10).
+      const onClose = vi.fn();
+      render(
+        <>
+          <EditorContextMenu
+            open
+            x={0}
+            y={0}
+            canCopy
+            canDelete
+            onClose={onClose}
+            onCopy={noop}
+            onPaste={noop}
+            onCopyAsJson={noop}
+            onPasteFromJson={noop}
+            onDelete={noop}
+          />
+          <div data-testid="outside-stop" onMouseDown={(e) => e.stopPropagation()} />
+        </>,
+      );
+
+      fireEvent.mouseDown(screen.getByTestId('outside-stop'));
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('positioning', () => {

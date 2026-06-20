@@ -17,6 +17,11 @@ describe('editorTouchProps', () => {
       expect(props.selectionKeyCode).toBeUndefined();
       expect(props.zoomOnDoubleClick).toBeUndefined();
     });
+
+    it('keeps left-drag panning (no selectionOnDrag / panOnDrag override) so Shift+drag box-selects', () => {
+      expect(props).not.toHaveProperty('selectionOnDrag');
+      expect(props).not.toHaveProperty('panOnDrag');
+    });
   });
 
   describe('mobile (isMobile = true)', () => {

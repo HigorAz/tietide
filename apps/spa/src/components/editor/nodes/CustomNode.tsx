@@ -1,11 +1,12 @@
 import { memo, type MouseEvent } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import { SkipForward } from 'lucide-react';
+import { AlertTriangle, SkipForward } from 'lucide-react';
 import { NODE_CATALOG, NodeCategory } from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { useEditorStore } from '@/stores/editorStore';
 import { selectNodeStateAt, useExecutionLiveStore } from '@/stores/executionLiveStore';
 import { NodeGlyph } from '../NodeGlyph';
+import { useBrokenPills } from '../BrokenPillsContext';
 import type { CustomNodeData, NodeStatus, NodeVersionState } from './CustomNode.types';
 
 const STATUS_RING_CLASS: Record<NodeStatus, string> = {
@@ -33,6 +34,9 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
     NODE_CATALOG.find((d) => d.type === data.nodeType)?.category === NodeCategory.TRIGGER;
   const toggleNodeSkip = useEditorStore((s) => s.toggleNodeSkip);
   const hasErrorHandler = data.config?.hasErrorHandler === true;
+  // This node references a deleted/invalid upstream field — surface it on the
+  // canvas (not just the toolbar count) so the user can find the broken pill (#5).
+  const hasBrokenPills = useBrokenPills().has(id);
 
   const onSkipClick = (e: MouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation();
@@ -82,6 +86,7 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
         data-testid="custom-node-ring"
         data-status={status}
         data-version-state={data.versionState ?? null}
+        data-broken-pills={hasBrokenPills ? 'true' : 'false'}
         className={cn(
           'relative flex items-center justify-center rounded-full',
           'h-16 w-16 ring-4 ring-offset-2 ring-offset-deep-blue',
@@ -89,15 +94,28 @@ function CustomNodeImpl({ id, data, selected }: NodeProps<CustomNodeData>) {
           // inset shading for a glassy bead + a soft ambient teal glow so nodes
           // read like glowing buoys on the tide canvas.
           'shadow-[inset_0_-4px_8px_rgba(0,0,0,0.35),inset_0_2px_3px_rgba(255,255,255,0.05),0_0_24px_-6px_rgba(0,212,179,0.35)]',
-          data.versionState
-            ? VERSION_STATE_RING_CLASS[data.versionState]
-            : STATUS_RING_CLASS[status],
+          // A broken pill blocks save/run, so it takes ring priority over the
+          // run-status and version-diff colours.
+          hasBrokenPills
+            ? 'ring-red-500'
+            : data.versionState
+              ? VERSION_STATE_RING_CLASS[data.versionState]
+              : STATUS_RING_CLASS[status],
           selected && 'outline outline-2 outline-accent-teal',
         )}
       >
         <div data-testid="custom-node-icon" className="text-accent-teal">
           <NodeGlyph type={data.nodeType} size={24} />
         </div>
+        {hasBrokenPills && (
+          <span
+            data-testid="custom-node-broken-badge"
+            title="This node has a broken data pill — it references a deleted or invalid upstream field."
+            className="absolute -top-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-[0_0_8px_rgba(239,68,68,0.7)]"
+          >
+            <AlertTriangle size={12} strokeWidth={2.5} aria-hidden />
+          </span>
+        )}
       </div>
 
       <div

@@ -25,6 +25,8 @@ export interface WorkflowExecution {
   triggerType: string;
   triggerData: Record<string, unknown> | null;
   isDryRun?: boolean;
+  /** Set when this run repeats an earlier execution (Workato "Repeat job"). */
+  repeatOfExecutionId?: string | null;
   startedAt: Date | null;
   finishedAt: Date | null;
   error: string | null;

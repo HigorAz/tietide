@@ -368,6 +368,11 @@ model WorkflowExecution {
   id                String          @id @default(uuid())
   workflowId        String          @map("workflow_id")
   parentExecutionId String?         @map("parent_execution_id")
+  // The execution this run repeats (Workato "Repeat job"): a re-run replays the
+  // original's triggerData on the latest workflow version and links back here so
+  // the History page can show a repeat chain. SetNull so deleting the original
+  // doesn't cascade-delete its repeats.
+  repeatOfExecutionId String?       @map("repeat_of_execution_id")
   status            ExecutionStatus @default(PENDING)
   triggerType       String          @map("trigger_type")
   triggerData       Json?           @map("trigger_data")
@@ -381,11 +386,14 @@ model WorkflowExecution {
   workflow        Workflow            @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   parentExecution WorkflowExecution?  @relation("ParentChild", fields: [parentExecutionId], references: [id], onDelete: SetNull)
   childExecutions WorkflowExecution[] @relation("ParentChild")
+  repeatOf        WorkflowExecution?  @relation("RepeatOf", fields: [repeatOfExecutionId], references: [id], onDelete: SetNull)
+  repeats         WorkflowExecution[] @relation("RepeatOf")
   steps           ExecutionStep[]
 
   @@unique([workflowId, idempotencyKey], name: "workflow_idempotency_key")
   @@index([workflowId, createdAt(sort: Desc)])
   @@index([parentExecutionId])
+  @@index([repeatOfExecutionId])
   @@map("workflow_executions")
 }
 

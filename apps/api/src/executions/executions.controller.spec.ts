@@ -1,5 +1,6 @@
 import type { ExecutionContext, INestApplication } from '@nestjs/common';
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
   UnauthorizedException,
@@ -20,6 +21,8 @@ describe('ExecutionsController (integration)', () => {
     triggerManual: jest.Mock;
     triggerTest: jest.Mock;
     triggerNodeTest: jest.Mock;
+    getTriggerSample: jest.Mock;
+    repeatExecution: jest.Mock;
   };
   let authedUser: { id: string; email: string; role: string } | null;
   let orgRole: OrgRole;
@@ -76,6 +79,8 @@ describe('ExecutionsController (integration)', () => {
       triggerManual: jest.fn(),
       triggerTest: jest.fn(),
       triggerNodeTest: jest.fn(),
+      getTriggerSample: jest.fn(),
+      repeatExecution: jest.fn(),
     };
     authedUser = { id: 'owner-uuid', email: 'owner@example.com', role: 'USER' };
     orgRole = 'SUPERADMIN';
@@ -449,6 +454,103 @@ describe('ExecutionsController (integration)', () => {
       await request(app.getHttpServer())
         .post(url)
         .send({ definition: validDefinition, userId: 'forged' })
+        .expect(400);
+    });
+  });
+
+  describe('POST /workflows/:id/executions/:executionId/repeat', () => {
+    const execId = '22222222-2222-4222-8222-222222222222';
+    const url = `/workflows/${workflowId}/executions/${execId}/repeat`;
+
+    it('should return 202 with the new run and forward both ids', async () => {
+      executionsService.repeatExecution.mockResolvedValue(accepted);
+
+      const res = await request(app.getHttpServer()).post(url).send({}).expect(202);
+
+      expect(res.body).toEqual(accepted);
+      expect(executionsService.repeatExecution).toHaveBeenCalledWith(
+        orgId,
+        'owner-uuid',
+        workflowId,
+        execId,
+        expect.any(Object),
+      );
+    });
+
+    it('should return 400 when the execution id is not a UUID', async () => {
+      await request(app.getHttpServer())
+        .post(`/workflows/${workflowId}/executions/not-a-uuid/repeat`)
+        .send({})
+        .expect(400);
+      expect(executionsService.repeatExecution).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 when the caller is a VIEWER', async () => {
+      orgRole = 'VIEWER';
+      await request(app.getHttpServer()).post(url).send({}).expect(403);
+      expect(executionsService.repeatExecution).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 when the service throws NotFoundException', async () => {
+      executionsService.repeatExecution.mockRejectedValue(
+        new NotFoundException('Execution not found'),
+      );
+      await request(app.getHttpServer()).post(url).send({}).expect(404);
+    });
+  });
+
+  describe('POST /workflows/:id/nodes/:nodeId/trigger-sample', () => {
+    const url = `/workflows/${workflowId}/nodes/n1/trigger-sample`;
+    const sampleResponse = {
+      source: 'last-run',
+      sample: { issue: { title: 'real' } },
+      executionId,
+      capturedAt: new Date('2026-06-01T00:00:00Z').toISOString(),
+    };
+
+    it('should return 200 with the candidate sample and forward the node id', async () => {
+      executionsService.getTriggerSample.mockResolvedValue(sampleResponse);
+
+      const res = await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(200);
+
+      expect(res.body).toEqual(sampleResponse);
+      expect(executionsService.getTriggerSample).toHaveBeenCalledWith(
+        orgId,
+        'owner-uuid',
+        workflowId,
+        'n1',
+        expect.objectContaining({ definition: validDefinition }),
+      );
+    });
+
+    it('should return 401 when no authenticated user', async () => {
+      authedUser = null;
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(401);
+      expect(executionsService.getTriggerSample).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 when the caller is a VIEWER', async () => {
+      orgRole = 'VIEWER';
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
+        .expect(403);
+      expect(executionsService.getTriggerSample).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when the service throws BadRequestException (not a trigger)', async () => {
+      executionsService.getTriggerSample.mockRejectedValue(
+        new BadRequestException('Sample fetch is only available for trigger nodes'),
+      );
+      await request(app.getHttpServer())
+        .post(url)
+        .send({ definition: validDefinition })
         .expect(400);
     });
   });

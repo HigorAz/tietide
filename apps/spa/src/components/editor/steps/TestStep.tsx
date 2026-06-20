@@ -1,9 +1,13 @@
 import { useEffect, useRef, type JSX } from 'react';
 import { Loader2 } from 'lucide-react';
+import { NODE_CATALOG, NodeCategory } from '@tietide/shared';
 import { cn } from '@/utils/cn';
+import { useEditorStore } from '@/stores/editorStore';
 import { JsonTree } from '@/components/editor/dataviewer/JsonTree';
 import { ErrorCard } from '@/components/editor/run/ErrorCard';
 import { useTestNode } from '../config/useTestNode';
+import { SampleDiffModal } from '../config/SampleDiffModal';
+import { TriggerSampleControls } from './TriggerSampleControls';
 import { summarizeOutput } from './summarizeOutput';
 
 export interface TestStepProps {
@@ -29,8 +33,26 @@ const BUTTON_CLASS = cn(
  * `{ ok, summary }` so the step header can read '✓ tested · N items'.
  */
 export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps): JSX.Element {
-  const { status, result, canRun, blockedReason, run } = useTestNode(nodeId);
+  const {
+    status,
+    result,
+    canRun,
+    blockedReason,
+    run,
+    pendingSample,
+    confirmSampleReplace,
+    discardSampleChange,
+    captureExternalSample,
+  } = useTestNode(nodeId);
   const busy = status === 'running';
+
+  // A trigger node has no live webhook to replay during editing, so it captures
+  // data via "Fetch test event" (last run / built-in example) rather than the
+  // action node's live "Test this node" run.
+  const nodeType = useEditorStore((s) => s.nodes.find((n) => n.id === nodeId)?.data.nodeType);
+  const isTrigger =
+    nodeType !== undefined &&
+    NODE_CATALOG.find((d) => d.type === nodeType)?.category === NodeCategory.TRIGGER;
 
   // Report success once per transition into the success state.
   const reportedRef = useRef(false);
@@ -50,27 +72,39 @@ export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps):
 
   return (
     <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        data-testid="test-step-run"
-        disabled={busy || !canRun}
-        title={blockedReason ?? undefined}
-        onClick={() => void run()}
-        className={BUTTON_CLASS}
-      >
-        {busy ? (
-          <span className="flex items-center justify-center gap-1.5">
-            <Loader2 size={14} data-testid="test-step-spinner" className="animate-spin" />
-            Testing…
-          </span>
-        ) : (
-          'Test this node'
-        )}
-      </button>
+      {isTrigger && nodeType ? (
+        <TriggerSampleControls
+          nodeId={nodeId}
+          nodeType={nodeType}
+          onCapture={captureExternalSample}
+          disabled={!canRun}
+          blockedReason={blockedReason}
+        />
+      ) : (
+        <>
+          <button
+            type="button"
+            data-testid="test-step-run"
+            disabled={busy || !canRun}
+            title={blockedReason ?? undefined}
+            onClick={() => void run()}
+            className={BUTTON_CLASS}
+          >
+            {busy ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <Loader2 size={14} data-testid="test-step-spinner" className="animate-spin" />
+                Testing…
+              </span>
+            ) : (
+              'Test this node'
+            )}
+          </button>
 
-      <p className="text-xs text-text-muted">
-        Runs this node with live credentials and captures its output as a data-pill sample.
-      </p>
+          <p className="text-xs text-text-muted">
+            Runs this node with live credentials and captures its output as a data-pill sample.
+          </p>
+        </>
+      )}
 
       {status === 'success' && (
         <div className="flex flex-col gap-2">
@@ -88,6 +122,15 @@ export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps):
 
       {status === 'error' && result.error && (
         <ErrorCard error={result.error} onFixInConfigure={onFixInConfigure} />
+      )}
+
+      {pendingSample && (
+        <SampleDiffModal
+          previous={pendingSample.previous}
+          next={pendingSample.next}
+          onKeep={discardSampleChange}
+          onReplace={confirmSampleReplace}
+        />
       )}
     </div>
   );
