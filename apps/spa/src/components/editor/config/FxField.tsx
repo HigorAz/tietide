@@ -70,9 +70,10 @@ export function FxField({
   };
   const toLiteral = (): void => {
     setOverride(false);
-    // A template can't be a literal number/enum — clear it so the native input
-    // starts blank rather than showing a broken value.
-    if (isTemplate(value)) onChange(undefined);
+    // A text input can safely display a `{{pill}}` string, so keep it (no data
+    // loss). Only number/select — which can't hold a template literal — are
+    // cleared so the native input doesn't show a broken value.
+    if (isTemplate(value) && kind !== 'text') onChange(undefined);
   };
 
   return (
@@ -83,6 +84,7 @@ export function FxField({
           type="button"
           data-testid={`${testId}-fx-toggle`}
           aria-pressed={isExpr}
+          aria-label={`Use an expression for ${label}`}
           title={isExpr ? 'Switch to a fixed value' : 'Switch to an expression (use data pills)'}
           onClick={() => (isExpr ? toLiteral() : toExpr())}
           className={cn(

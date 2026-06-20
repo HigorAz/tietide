@@ -36,11 +36,20 @@ describe('FxField', () => {
     expect(onChange).toHaveBeenCalledWith('7');
   });
 
-  it('clears a template value when toggling back to literal', () => {
+  it('clears a template value when toggling a NUMBER field back to literal', () => {
     const onChange = vi.fn();
     render(<FxField {...base} kind="number" value="{{x}}" onChange={onChange} />);
     fireEvent.click(screen.getByTestId('fld-fx-toggle'));
     expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+
+  it('keeps a template value when toggling a TEXT field back to literal (no data loss)', () => {
+    const onChange = vi.fn();
+    render(
+      <FxField {...base} kind="text" label="Email" value="{{trigger.email}}" onChange={onChange} />,
+    );
+    fireEvent.click(screen.getByTestId('fld-fx-toggle')); // expr → literal
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('renders a select in literal mode with the provided options', () => {

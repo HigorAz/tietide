@@ -1323,6 +1323,32 @@ describe('ExecutionsService', () => {
       expect(result).toEqual({ source: 'none', sample: null });
     });
 
+    it('redacts secret-like keys in the returned sample', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.findFirst.mockResolvedValue({
+        id: executionId,
+        triggerData: {
+          issue: { title: 'x' },
+          access_token: 'gho_secret',
+          headers: { authorization: 'Bearer y' },
+        },
+        createdAt: new Date('2026-06-01T10:00:00Z'),
+      });
+
+      const result = await service.getTriggerSample(
+        organizationId,
+        userId,
+        workflowId,
+        triggerNodeId,
+        { definition },
+      );
+
+      const sample = result.sample as Record<string, unknown>;
+      expect(sample.access_token).toBe('[REDACTED]');
+      expect((sample.headers as Record<string, unknown>).authorization).toBe('[REDACTED]');
+      expect((sample.issue as Record<string, unknown>).title).toBe('x');
+    });
+
     it('throws NotFoundException when the workflow does not exist', async () => {
       prisma.workflow.findUnique.mockResolvedValue(null);
       await expect(
@@ -1434,11 +1460,41 @@ describe('ExecutionsService', () => {
         workflowId: 'some-other-workflow',
         triggerData: {},
         triggerType: 'manual',
+        isDryRun: false,
       });
       await expect(
         service.repeatExecution(organizationId, userId, workflowId, originalId, {}),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses to repeat a dry-run/test execution (no real side effects from a test)', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: originalId,
+        workflowId,
+        triggerData: {},
+        triggerType: 'test',
+        isDryRun: true,
+      });
+      await expect(
+        service.repeatExecution(organizationId, userId, workflowId, originalId, {}),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.workflowExecution.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses to repeat a node-test execution', async () => {
+      prisma.workflow.findUnique.mockResolvedValue({ id: workflowId, organizationId });
+      prisma.workflowExecution.findUnique.mockResolvedValue({
+        id: originalId,
+        workflowId,
+        triggerData: {},
+        triggerType: 'node-test',
+        isDryRun: false,
+      });
+      await expect(
+        service.repeatExecution(organizationId, userId, workflowId, originalId, {}),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('rejects with 402 when the run quota is exhausted', async () => {

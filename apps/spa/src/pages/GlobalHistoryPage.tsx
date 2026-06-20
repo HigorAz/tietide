@@ -55,7 +55,9 @@ export function GlobalHistoryPage(): JSX.Element {
     setRepeatingId(executionId);
     try {
       await repeatExecution(workflowId, executionId);
-      toast({ tone: 'success', message: 'Repeat run started.' });
+      // Queued, not necessarily succeeded — the run executes on the latest
+      // workflow version; the refreshed list + Repeat badge show the outcome.
+      toast({ tone: 'success', message: 'Repeat run queued — check the list for its result.' });
       void fetchAll(filters);
     } catch {
       toast({ tone: 'error', message: 'Could not start the repeat run.' });

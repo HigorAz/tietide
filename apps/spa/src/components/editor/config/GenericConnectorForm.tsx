@@ -89,19 +89,25 @@ export function GenericConnectorForm({
   const mockOnDryRun = config.mockOnDryRun === true;
   const mockId = useId();
 
+  // A field in fx/expression mode holds a `{{pill}}` template that resolves only
+  // at run time, so it can't be validated against the literal schema here — the
+  // worker validates the resolved value. Skip such fields client-side (don't
+  // include them in the candidate, and suppress their issues below).
+  const isExprField = (key: string): boolean => {
+    const v = config[key];
+    return typeof v === 'string' && v.includes('{{');
+  };
+
   // Build a candidate object for validation that drops empty optional values.
   const candidate: Record<string, unknown> = { connectionId: connectionId || undefined };
   for (const f of fields) {
-    if (f.kind === 'checkbox') {
+    if (isExprField(f.key)) {
+      candidate[f.key] = undefined; // validated at run time, not here
+    } else if (f.kind === 'checkbox') {
       candidate[f.key] = config[f.key] === true || undefined;
     } else if (f.kind === 'number') {
       const v = config[f.key];
-      // In fx/expression mode a number field holds a `{{pill}}` template string;
-      // keep it so the templatable() schema validates it rather than dropping it
-      // as "missing" (which would surface a spurious required error).
-      if (typeof v === 'number') candidate[f.key] = v;
-      else if (typeof v === 'string' && v.includes('{{')) candidate[f.key] = v;
-      else candidate[f.key] = undefined;
+      candidate[f.key] = typeof v === 'number' ? v : undefined;
     } else {
       const v = asString(config[f.key]);
       candidate[f.key] = v || undefined;
@@ -110,17 +116,24 @@ export function GenericConnectorForm({
   if (showMockToggle) candidate.mockOnDryRun = mockOnDryRun || undefined;
 
   const parsed = schema.safeParse(candidate);
-  const issueFor = (field: string): string | null =>
-    parsed.success ? null : (parsed.error.issues.find((i) => i.path[0] === field)?.message ?? null);
+  const issueFor = (field: string): string | null => {
+    if (isExprField(field)) return null; // expression fields validate at run time
+    return parsed.success
+      ? null
+      : (parsed.error.issues.find((i) => i.path[0] === field)?.message ?? null);
+  };
 
   const connIssue = issueFor('connectionId');
 
-  // Configure validity ignores connectionId problems — the connection lives in
-  // step 1, so a missing connection must not keep the Configure step invalid
-  // (and thus permanently lock Test).
+  // Configure validity ignores connectionId problems (the connection lives in
+  // step 1) and any expression-mode field (resolved + validated at run time), so
+  // neither permanently locks Test.
   const layout = useStepLayout();
   const configureValid =
-    parsed.success || parsed.error.issues.every((i) => i.path[0] === 'connectionId');
+    parsed.success ||
+    parsed.error.issues.every(
+      (i) => i.path[0] === 'connectionId' || isExprField(String(i.path[0])),
+    );
   useReportConfigValidity(configureValid);
 
   const requiredFields = fields.filter(isRequiredField);

@@ -393,7 +393,10 @@ export class ExecutionsService {
     }
     return {
       source: 'last-run',
-      sample: lastRun.triggerData as Record<string, unknown>,
+      // Redact secret-like keys, mirroring the detail/step surfaces — an inbound
+      // webhook payload (Stripe/Meta/…) can carry tokens/secrets, which must not
+      // be exposed in cleartext just because they're served as a pill sample.
+      sample: sanitizePayload(lastRun.triggerData) as Record<string, unknown>,
       executionId: lastRun.id,
       capturedAt: lastRun.createdAt.toISOString(),
     };
@@ -425,12 +428,23 @@ export class ExecutionsService {
 
     const original = await this.prisma.workflowExecution.findUnique({
       where: { id: executionId },
-      select: { id: true, workflowId: true, triggerData: true, triggerType: true },
+      select: { id: true, workflowId: true, triggerData: true, triggerType: true, isDryRun: true },
     });
     // Same generic 404 for a missing execution OR one that belongs to a different
     // workflow — never confirm the existence of another workspace's execution.
     if (!original || original.workflowId !== workflowId) {
       throw new NotFoundException('Execution not found');
+    }
+    // A repeat is a REAL, side-effecting run. Refuse to promote a dry-run/test
+    // execution into one (the UI disables this, but the API must enforce it too,
+    // else a direct call could fire real Slack/GitHub/Stripe side effects from a
+    // test's captured trigger data).
+    if (
+      original.isDryRun ||
+      original.triggerType === 'test' ||
+      original.triggerType === 'node-test'
+    ) {
+      throw new BadRequestException('Test runs cannot be repeated');
     }
 
     await this.entitlements.assertCanRun(organizationId);

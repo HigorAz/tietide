@@ -67,7 +67,8 @@ export function TriggerSampleControls({
       } else if (!useExample()) {
         toast({
           tone: 'info',
-          message: 'No sample yet — run the workflow once to capture real trigger data.',
+          message:
+            'No sample yet — trigger this workflow once (or send a real event) so its data is captured here.',
         });
       }
     } catch {

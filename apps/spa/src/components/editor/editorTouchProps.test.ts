@@ -18,10 +18,9 @@ describe('editorTouchProps', () => {
       expect(props.zoomOnDoubleClick).toBeUndefined();
     });
 
-    it('enables Figma-style box-selection with panning on the middle mouse button', () => {
-      expect(props.selectionOnDrag).toBe(true);
-      expect(props.panOnDrag).toEqual([1]);
-      expect(props.selectionMode).toBeDefined();
+    it('keeps left-drag panning (no selectionOnDrag / panOnDrag override) so Shift+drag box-selects', () => {
+      expect(props).not.toHaveProperty('selectionOnDrag');
+      expect(props).not.toHaveProperty('panOnDrag');
     });
   });
 
@@ -36,11 +35,6 @@ describe('editorTouchProps', () => {
 
     it('disables double-click zoom to avoid accidental double-tap zoom', () => {
       expect(props.zoomOnDoubleClick).toBe(false);
-    });
-
-    it('does not enable box-selection on touch (one-finger drag pans)', () => {
-      expect(props.selectionOnDrag).toBeUndefined();
-      expect(props.panOnDrag).toBeUndefined();
     });
   });
 });

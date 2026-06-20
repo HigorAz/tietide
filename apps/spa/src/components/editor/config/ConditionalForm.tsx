@@ -155,6 +155,12 @@ export function ConditionalForm({ nodeId, config }: NodeConfigFormProps): JSX.El
               Quote text values (e.g. <span className="font-mono">&quot;active&quot;</span>);
               numbers and booleans are bare.
             </p>
+            {builder.operator === 'contains' && (
+              <p className="text-xs text-text-muted">
+                <span className="font-mono">contains</span> matches when the left value is a list
+                holding the right item, or text holding the right substring.
+              </p>
+            )}
           </div>
         </div>
       ) : (
