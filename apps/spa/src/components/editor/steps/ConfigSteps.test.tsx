@@ -58,6 +58,9 @@ const renderSteps = (
 beforeEach(() => {
   useEditorStore.setState({
     ...initialEditorState,
+    // useTestNode gates `canRun` on a loaded workflow — set one so a ready node's
+    // Test button can actually enable.
+    workflowId: 'wf-1',
     nodes: [
       {
         id: NODE_ID,
@@ -100,18 +103,24 @@ describe('ConfigSteps', () => {
     expect(within(slot).getByTestId('connection-card-change')).toBeInTheDocument();
   });
 
-  it('BLOCKER REGRESSION 1: Configure step + connection registration persist when Configure collapses', () => {
-    // A selected connection makes connection+configure complete, so auto-open
-    // advances OFF Configure (to Test). The Configure body must stay mounted.
+  it('BLOCKER REGRESSION 1: Configure step + connection registration persist when Configure is collapsed', () => {
+    // Every step starts expanded now; manually collapse Configure via its header
+    // and assert its body stays mounted (just hidden) so the portal + form
+    // registration never churn.
     renderSteps(makeConnectorForm({ value: googleConnection.id, valid: true }));
 
-    // Test is the active/open step now.
-    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'active');
+    // The Configure body is initially visible (expanded by default).
+    const formBody = screen.getByTestId('connector-form-body');
+    expect(formBody.closest('.hidden')).toBeNull();
+
+    // Collapse the Configure step from its header.
+    const configureHeader = within(screen.getByTestId('config-step-configure'))
+      .getAllByRole('button')
+      .find((b) => within(b).queryByText('Configure'));
+    fireEvent.click(configureHeader as HTMLElement);
 
     // (a) The Configure body (the Form) is STILL in the DOM — just hidden.
-    const formBody = screen.getByTestId('connector-form-body');
     expect(formBody).toBeInTheDocument();
-    // Its closest keepMounted wrapper carries the `hidden` class while collapsed.
     expect(formBody.closest('.hidden')).not.toBeNull();
 
     // (b) The connection step + its slot are still present (registration intact).
@@ -154,49 +163,43 @@ describe('ConfigSteps', () => {
     expect(screen.queryByText('Continue')).not.toBeInTheDocument();
   });
 
-  it('RE-ARM: editing config on a tested node re-shows Continue and re-arms the Test step', () => {
+  it('RE-ARM: editing config on a tested node re-arms the Test step (no Continue button)', () => {
     const Form = makeConnectorForm({ value: googleConnection.id, valid: true });
     const base = { connectionId: googleConnection.id, [PILL_SAMPLE_KEY]: { id: 1 } };
 
     const { rerender } = render(
       <ConfigSteps nodeId={NODE_ID} config={{ ...base, query: 'a' }} Form={Form} />,
     );
-    expect(screen.queryByText('Continue')).not.toBeInTheDocument();
     expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'done');
 
     // Simulate a Configure edit: the parent feeds a changed config prop.
     rerender(<ConfigSteps nodeId={NODE_ID} config={{ ...base, query: 'b' }} Form={Form} />);
 
-    expect(screen.getByText('Continue')).toBeInTheDocument();
+    // Test re-arms to active; the guided-flow Continue button no longer exists.
     expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'active');
+    expect(screen.queryByText('Continue')).not.toBeInTheDocument();
   });
 
-  it('locks the Test step with a "Finish step N first" summary while Configure is invalid', () => {
+  it('keeps the Test step open+active (never locked) while Configure is invalid, but disables its run button', () => {
     renderSteps(makeConnectorForm({ value: googleConnection.id, valid: false }));
 
     const test = screen.getByTestId('config-step-test');
-    expect(test).toHaveAttribute('data-status', 'locked');
-    // Configure is step 2 here (connection step present), so "Finish step 2 first".
-    expect(within(test).getByText(/finish step 2 first/i)).toBeInTheDocument();
-    // The locked header button is disabled.
-    expect(within(test).getByRole('button')).toBeDisabled();
+    // No locking — the step is just active and expanded.
+    expect(test).not.toHaveAttribute('data-status', 'locked');
+    expect(test).toHaveAttribute('data-status', 'active');
+    // Its run button is disabled with the not-ready reason as the tooltip.
+    const runButton = within(test).getByTestId('test-step-run');
+    expect(runButton).toBeDisabled();
+    expect(runButton).toHaveAttribute('title', 'Complete the Configure step first');
   });
 
-  it('WR-05: switching from an invalid reporting node to a non-reporting node leaves Test unlocked', () => {
-    // Node A: a connector form that reports configure validity = false (Test locked).
-    const InvalidConnector = makeConnectorForm({ value: googleConnection.id, valid: false });
-    const { rerender } = render(
-      <ConfigSteps nodeId="node-A" config={{}} Form={InvalidConnector} />,
-    );
-    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'locked');
-
-    // Node B: a plain form that NEVER reports validity (manual/cron-style node).
-    // The previous form's unmount cleanup must clear the stale `false`, so Test
-    // is not inherited as locked even though node A left it invalid.
-    rerender(<ConfigSteps nodeId="node-B" config={{}} Form={PlainForm} />);
+  it('enables the Test run button once Configure is valid and a connection is selected', () => {
+    renderSteps(makeConnectorForm({ value: googleConnection.id, valid: true }), {
+      connectionId: googleConnection.id,
+    });
 
     const test = screen.getByTestId('config-step-test');
-    expect(test).not.toHaveAttribute('data-status', 'locked');
+    expect(within(test).getByTestId('test-step-run')).toBeEnabled();
   });
 
   it('renders the error-handler ToggleSwitch in the Configure step body and dispatches on toggle', () => {
@@ -221,24 +224,30 @@ describe('ConfigSteps', () => {
     expect(screen.getByTestId('node-preview-toggle')).toBeInTheDocument();
   });
 
-  it('reopens a collapsed step when its header is clicked, closing the previously open one', () => {
-    // Saved node: Test is auto-open; Configure is collapsed (done).
+  it('collapses only the clicked step, leaving the other steps expanded (no single-open invariant)', () => {
     renderSteps(makeConnectorForm({ value: googleConnection.id, valid: true }), {
       connectionId: googleConnection.id,
     });
 
-    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'active');
+    // All steps start expanded: the Configure body is visible.
+    const formBody = screen.getByTestId('connector-form-body');
+    expect(formBody.closest('.hidden')).toBeNull();
 
-    // Click the Configure header → it opens, Test collapses back to done.
-    // The header is the section's first button (carries the step title).
+    // Click the Configure header → only Configure collapses (its body hides).
     const configureHeader = within(screen.getByTestId('config-step-configure'))
       .getAllByRole('button')
       .find((b) => within(b).queryByText('Configure'));
     expect(configureHeader).toBeDefined();
     fireEvent.click(configureHeader as HTMLElement);
 
-    expect(screen.getByTestId('config-step-configure')).toHaveAttribute('data-status', 'active');
-    // Test is unlocked but not yet tested, so it collapses to pending (only one open).
-    expect(screen.getByTestId('config-step-test')).toHaveAttribute('data-status', 'pending');
+    expect(formBody.closest('.hidden')).not.toBeNull();
+    // The Connection step is unaffected — still expanded, slot still present.
+    const connection = screen.getByTestId('config-step-connection');
+    expect(within(connection).getByTestId('connection-step-slot')).toBeInTheDocument();
+    expect(within(connection).getByTestId('connection-step-slot').closest('.hidden')).toBeNull();
+
+    // Click the Configure header again → it re-expands.
+    fireEvent.click(configureHeader as HTMLElement);
+    expect(formBody.closest('.hidden')).toBeNull();
   });
 });

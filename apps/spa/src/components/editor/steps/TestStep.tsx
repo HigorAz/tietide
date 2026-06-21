@@ -12,7 +12,14 @@ import { summarizeOutput } from './summarizeOutput';
 
 export interface TestStepProps {
   nodeId: string;
-  /** ConfigSteps passes openStep('configure') — fired by the ErrorCard. */
+  /**
+   * Whether the node's config is complete enough to run a live test. The step is
+   * always shown (never locked), but the run button is disabled until ready.
+   */
+  ready: boolean;
+  /** Tooltip explaining what is missing while `ready` is false (else null). */
+  notReadyReason: string | null;
+  /** ConfigSteps passes expandStep('configure') — fired by the ErrorCard. */
   onFixInConfigure: () => void;
   /** Drives the `tested` state + the '✓ tested · N items' header summary. */
   onResult: (r: { ok: boolean; summary: string }) => void;
@@ -32,7 +39,13 @@ const BUTTON_CLASS = cn(
  * (its "Fix in Configure" reopens step 2). On success it reports an
  * `{ ok, summary }` so the step header can read '✓ tested · N items'.
  */
-export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps): JSX.Element {
+export function TestStep({
+  nodeId,
+  ready,
+  notReadyReason,
+  onFixInConfigure,
+  onResult,
+}: TestStepProps): JSX.Element {
   const {
     status,
     result,
@@ -45,6 +58,12 @@ export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps):
     captureExternalSample,
   } = useTestNode(nodeId);
   const busy = status === 'running';
+
+  // Fold the panel's config-readiness guard into useTestNode's own gating
+  // (workflow loaded + no invalid data pills). An unmet config readiness wins
+  // the tooltip so the user sees the most actionable next step.
+  const effectiveCanRun = canRun && ready;
+  const effectiveReason = !ready ? notReadyReason : blockedReason;
 
   // A trigger node has no live webhook to replay during editing, so it captures
   // data via "Fetch test event" (last run / built-in example) rather than the
@@ -77,16 +96,16 @@ export function TestStep({ nodeId, onFixInConfigure, onResult }: TestStepProps):
           nodeId={nodeId}
           nodeType={nodeType}
           onCapture={captureExternalSample}
-          disabled={!canRun}
-          blockedReason={blockedReason}
+          disabled={!effectiveCanRun}
+          blockedReason={effectiveReason}
         />
       ) : (
         <>
           <button
             type="button"
             data-testid="test-step-run"
-            disabled={busy || !canRun}
-            title={blockedReason ?? undefined}
+            disabled={busy || !effectiveCanRun}
+            title={effectiveReason ?? undefined}
             onClick={() => void run()}
             className={BUTTON_CLASS}
           >

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { StepStatus } from './StepSection';
 import type { ConnectionStepMeta } from './StepLayoutContext';
 
@@ -10,23 +10,17 @@ export interface ConfigStepsInput {
   /**
    * Configure-step validity. Defaults to true for forms that never report
    * validity (manual/cron/webhook nodes have no generically-detectable required
-   * fields), so the Test step is never permanently locked. GenericConnectorForm
-   * and opportunistically-migrated forms report real zod validity.
+   * fields). Drives the Configure step's done-vs-active state (and, in the panel,
+   * whether the Test button is enabled). GenericConnectorForm and
+   * opportunistically-migrated forms report real zod validity.
    */
   configureValid: boolean;
   /** A live test has succeeded for the current config. */
   tested: boolean;
   /**
-   * The node has been tested at least once (a live run this session OR a
-   * persisted sample from a prior session). When true the panel switches to the
-   * "expanded" layout — every step renders open so the whole node is editable at
-   * a glance, instead of the guided single-open flow used for brand-new nodes.
-   */
-  expandedAll?: boolean;
-  /**
    * The configuration changed since the last successful test. Re-arms the Test
-   * step (it is no longer "done") so the Continue button reappears and the user
-   * re-tests to refresh the captured sample output.
+   * step (it is no longer "done", shows as active) so the user re-tests to
+   * refresh the captured sample output.
    */
   dirty?: boolean;
 }
@@ -41,89 +35,69 @@ export interface StepModel {
 
 export interface UseConfigStepsResult {
   steps: StepModel[];
-  openStep: (id: StepId) => void;
+  /** Flip a single step's collapsed state (header click). */
+  toggleStep: (id: StepId) => void;
+  /** Ensure a step is expanded (e.g. ErrorCard "Fix in Configure"). */
+  expandStep: (id: StepId) => void;
 }
 
+/**
+ * Derives the numbered Connection → Configure → Test step list for the node
+ * config panel. Every step renders OPEN by default so the whole node is editable
+ * at a glance; a user can collapse/expand any step independently via its header
+ * (tracked in `collapsed`). Steps never lock — an incomplete step shows as
+ * 'active' and a completed one as 'done' (green ✓ bubble). The Test step's
+ * run-readiness guard lives in the panel/TestStep (button disabled until the
+ * config is valid), not in a step-level lock.
+ */
 export function useConfigSteps(input: ConfigStepsInput): UseConfigStepsResult {
-  const { connection, configureValid, tested, expandedAll = false, dirty = false } = input;
-  // null = "auto": follow the first-incomplete-unlocked rule. A user click sets
-  // an explicit step, which only sticks while that step is unlocked.
-  const [explicit, setExplicit] = useState<StepId | null>(null);
+  const { connection, configureValid, tested, dirty = false } = input;
+  // Steps the user has explicitly collapsed; empty = all open (the default).
+  const [collapsed, setCollapsed] = useState<Set<StepId>>(() => new Set());
 
-  const result = useMemo<UseConfigStepsResult>(() => {
+  const toggleStep = useCallback((id: StepId) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const expandStep = useCallback((id: StepId) => {
+    setCollapsed((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const steps = useMemo<StepModel[]>(() => {
     const order: StepId[] = connection
       ? ['connection', 'configure', 'test']
       : ['configure', 'test'];
 
     // An OPTIONAL connection is "complete" whenever no live selection is required
-    // to run: explicitly cleared (none) OR a saved id that went stale — the node
-    // still runs unauthenticated, so Test must NOT be locked. The amber
-    // "Connection unavailable" warning still surfaces via `connectionSummary`,
-    // which prioritises `stale`. A REQUIRED connection stays incomplete when
-    // stale (no usable credential to run with).
+    // to run: a selection, or none/stale on an optional connection (the node still
+    // runs unauthenticated — the amber "Connection unavailable" warning surfaces
+    // via `connectionSummary`). A REQUIRED connection stays incomplete when stale.
     const connectionComplete =
       connection !== null && (connection.hasSelection || connection.optional);
-    const configureComplete = configureValid;
     // A pending edit since the last test re-arms the Test step (no longer done).
-    const testComplete = tested && !dirty;
-
     const complete: Record<StepId, boolean> = {
       connection: connectionComplete,
-      configure: configureComplete,
-      test: testComplete,
+      configure: configureValid,
+      test: tested && !dirty,
     };
 
-    // Expanded layout (a previously-tested node): every step renders open so the
-    // node is fully editable at a glance — no Continue gating, no collapsing.
-    // Nothing locks here because the node has already run end-to-end; a re-armed
-    // (dirty) Test shows as active rather than done.
-    if (expandedAll) {
-      const expandedSteps: StepModel[] = order.map((id, i) => ({
-        id,
-        index: i + 1,
-        status: complete[id] ? 'done' : 'active',
-        open: true,
-      }));
-      return { steps: expandedSteps, openStep: (id: StepId) => setExplicit(id) };
-    }
+    return order.map((id, i) => ({
+      id,
+      index: i + 1,
+      status: (complete[id] ? 'done' : 'active') as StepStatus,
+      open: !collapsed.has(id),
+    }));
+  }, [connection, configureValid, tested, dirty, collapsed]);
 
-    // Test is locked until Configure is valid AND (no connection step or the
-    // connection step is complete).
-    const testLocked = !(configureValid && (connection === null || connectionComplete));
-    const locked: Record<StepId, boolean> = {
-      connection: false,
-      configure: false,
-      test: testLocked,
-    };
-
-    // Effective open: honor an explicit choice only when that step is unlocked,
-    // otherwise fall back to auto = first incomplete unlocked step. When every
-    // step is already complete (e.g. a tested node) Configure opens — the panel
-    // is never all-collapsed, and Configure is never locked so this is safe.
-    let openId: StepId;
-    if (explicit !== null && !locked[explicit]) {
-      openId = explicit;
-    } else {
-      openId = order.find((id) => !locked[id] && !complete[id]) ?? 'configure';
-    }
-
-    const steps: StepModel[] = order.map((id, i) => {
-      let status: StepStatus;
-      if (locked[id]) status = 'locked';
-      else if (id === openId) status = 'active';
-      else if (complete[id]) status = 'done';
-      else status = 'pending';
-      return { id, index: i + 1, status, open: id === openId };
-    });
-
-    return {
-      steps,
-      openStep: (id: StepId) => {
-        if (locked[id]) return; // locked steps are not openable
-        setExplicit(id);
-      },
-    };
-  }, [connection, configureValid, tested, expandedAll, dirty, explicit]);
-
-  return result;
+  return { steps, toggleStep, expandStep };
 }
