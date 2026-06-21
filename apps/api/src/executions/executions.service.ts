@@ -69,6 +69,9 @@ export interface WorkflowExecutionJobPayload {
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_DELAY_MS = 1000;
+// Two "Repeat run" clicks on the same original within this window collapse to one
+// execution (idempotency), defeating accidental double-spend of run quota.
+const REPEAT_IDEMPOTENCY_WINDOW_MS = 10_000;
 
 @Injectable()
 export class ExecutionsService {
@@ -453,17 +456,44 @@ export class ExecutionsService {
     const triggerDataJson =
       original.triggerData != null ? (original.triggerData as Prisma.InputJsonValue) : undefined;
 
-    const created = await this.entitlements.enforceRunCapAround(organizationId, (tx) =>
-      tx.workflowExecution.create({
-        data: {
-          workflowId,
-          status: 'PENDING',
-          triggerType: original.triggerType,
-          triggerData: triggerDataJson,
-          repeatOfExecutionId: original.id,
-        },
-      }),
-    );
+    // Dedupe accidental double-repeats (rapid double-click / list-refresh re-click)
+    // with a short time-bucketed idempotency key: two repeats of the same original
+    // within REPEAT_IDEMPOTENCY_WINDOW_MS collapse to one execution (no double
+    // run-quota spend). Reuses the @@unique([workflowId, idempotencyKey]) index.
+    const bucket = Math.floor(Date.now() / REPEAT_IDEMPOTENCY_WINDOW_MS);
+    const idempotencyKey = `repeat:${original.id}:${bucket}`;
+    const dup = await this.prisma.workflowExecution.findFirst({
+      where: { workflowId, idempotencyKey },
+    });
+    if (dup) {
+      return this.toResponse(dup);
+    }
+
+    let created: Awaited<ReturnType<typeof this.prisma.workflowExecution.create>>;
+    try {
+      created = await this.entitlements.enforceRunCapAround(organizationId, (tx) =>
+        tx.workflowExecution.create({
+          data: {
+            workflowId,
+            status: 'PENDING',
+            triggerType: original.triggerType,
+            triggerData: triggerDataJson,
+            repeatOfExecutionId: original.id,
+            idempotencyKey,
+          },
+        }),
+      );
+    } catch (err) {
+      // Concurrent repeats racing the same key: the loser returns the winner's row
+      // without enqueuing a second job (mirrors triggerManual).
+      if (this.isUniqueViolation(err)) {
+        const winner = await this.prisma.workflowExecution.findFirst({
+          where: { workflowId, idempotencyKey },
+        });
+        if (winner) return this.toResponse(winner);
+      }
+      throw err;
+    }
 
     const payload: WorkflowExecutionJobPayload = {
       executionId: created.id,

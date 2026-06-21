@@ -86,7 +86,9 @@ export const githubListIssuesConfigSchema = z.object({
   connectionId,
   owner: githubOwner,
   repo: githubRepo,
-  state: z.enum(GITHUB_ISSUE_STATES).optional(),
+  // Templatable enum (editor fx toggle): literal state OR a `{{pill}}` that
+  // resolves to a valid GITHUB_ISSUE_STATES value at runtime.
+  state: templatable(z.enum(GITHUB_ISSUE_STATES)).optional(),
   labels: z.array(githubLabel).max(50).optional(),
   perPage: z.number().int().min(1).max(100).optional(),
 });
@@ -112,7 +114,8 @@ export const githubListPrsConfigSchema = z.object({
   connectionId,
   owner: githubOwner,
   repo: githubRepo,
-  state: z.enum(GITHUB_ISSUE_STATES).optional(),
+  // Templatable enum (editor fx toggle): literal state OR a `{{pill}}`.
+  state: templatable(z.enum(GITHUB_ISSUE_STATES)).optional(),
   perPage: z.number().int().min(1).max(100).optional(),
 });
 export type GitHubListPrsConfig = z.infer<typeof githubListPrsConfigSchema>;
@@ -122,7 +125,8 @@ export const githubMergePrConfigSchema = z.object({
   owner: githubOwner,
   repo: githubRepo,
   pullNumber: githubIssueNumber,
-  mergeMethod: z.enum(GITHUB_MERGE_METHODS).optional(),
+  // Templatable enum (editor fx toggle): literal merge method OR a `{{pill}}`.
+  mergeMethod: templatable(z.enum(GITHUB_MERGE_METHODS)).optional(),
   commitTitle: z.string().min(1).max(256).optional(),
   mockOnDryRun,
 });

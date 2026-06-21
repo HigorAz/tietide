@@ -116,6 +116,23 @@ describe('GitHubMergePrAction', () => {
     });
   });
 
+  describe('templatable mergeMethod (fx/expression mode)', () => {
+    it('accepts a {{pill}} template in the mergeMethod field', async () => {
+      // templatable() lets the merge-method enum field also hold a {{pill}};
+      // the unresolved token passes the schema and flows into the payload here
+      // (the engine resolves it before execution in the real path).
+      call.mockResolvedValue({
+        status: 200,
+        data: { sha: 'abc', merged: true },
+      } as GitHubResponse);
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+      await action.execute(makeInput({ mergeMethod: '{{ trigger.method }}' }), ctx);
+      expect(JSON.parse(call.mock.calls[0][2].body as string)).toEqual({
+        merge_method: '{{ trigger.method }}',
+      });
+    });
+  });
+
   describe('schema rejection', () => {
     it('rejects an invalid merge method before hitting GitHub', async () => {
       const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
