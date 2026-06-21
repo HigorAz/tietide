@@ -1,4 +1,5 @@
 import type { ExecutionContext, NodeInput } from '@tietide/sdk';
+import { httpRequestConfigSchema } from '@tietide/shared';
 import {
   buildPinnedLookup,
   HttpRequestAction,
@@ -870,5 +871,34 @@ describe('HttpRequestAction', () => {
         action.execute(makeInput({ method: 'GET', url: 'https://api.test/huge' }), makeContext()),
       ).rejects.toThrow(/byte limit/i);
     });
+  });
+});
+
+// The worker executor parses params loosely, so the templatable `method` enum is
+// enforced at the API/SPA boundary via httpRequestConfigSchema. These assert the
+// fx-toggle contract directly on the shared schema.
+describe('httpRequestConfigSchema — templatable method', () => {
+  it('accepts a valid literal HTTP method', () => {
+    const result = httpRequestConfigSchema.safeParse({
+      method: 'POST',
+      url: 'https://api.test/x',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a {{pill}} template in the method field', () => {
+    const result = httpRequestConfigSchema.safeParse({
+      method: '{{ trigger.method }}',
+      url: 'https://api.test/x',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a non-pill invalid method literal', () => {
+    const result = httpRequestConfigSchema.safeParse({
+      method: 'FETCH',
+      url: 'https://api.test/x',
+    });
+    expect(result.success).toBe(false);
   });
 });

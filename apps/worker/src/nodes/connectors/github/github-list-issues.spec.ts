@@ -120,10 +120,29 @@ describe('GitHubListIssuesAction', () => {
     });
   });
 
+  describe('templatable state (fx/expression mode)', () => {
+    it('accepts a {{pill}} template in the state field', async () => {
+      // The per-field fx toggle stores a template; templatable() lets the enum
+      // field hold a {{pill}} so the schema parse no longer rejects it. The
+      // unresolved token flows straight into the query string here (the engine
+      // resolves it before execution in the real path).
+      call.mockResolvedValue({ status: 200, data: [] } as GitHubResponse);
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+      await action.execute(makeInput({ state: '{{ trigger.state }}' }), ctx);
+      expect(call.mock.calls[0][1]).toContain('state=');
+    });
+  });
+
   describe('schema rejection', () => {
     it('rejects perPage > 100 before hitting GitHub', async () => {
       const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
       await expect(action.execute(makeInput({ perPage: 101 }), ctx)).rejects.toThrow();
+      expect(call).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-pill invalid state literal', async () => {
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+      await expect(action.execute(makeInput({ state: 'archived' }), ctx)).rejects.toThrow();
       expect(call).not.toHaveBeenCalled();
     });
   });

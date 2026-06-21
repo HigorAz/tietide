@@ -116,10 +116,27 @@ describe('GitHubListPrsAction', () => {
     });
   });
 
+  describe('templatable state (fx/expression mode)', () => {
+    it('accepts a {{pill}} template in the state field', async () => {
+      // templatable() lets the state enum field also hold a {{pill}}; the
+      // unresolved token passes the schema (the engine resolves it pre-execution).
+      call.mockResolvedValue({ status: 200, data: [] } as GitHubResponse);
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+      await action.execute(makeInput({ state: '{{ trigger.state }}' }), ctx);
+      expect(call.mock.calls[0][1]).toContain('state=');
+    });
+  });
+
   describe('schema rejection', () => {
     it('rejects perPage > 100 before hitting GitHub', async () => {
       const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
       await expect(action.execute(makeInput({ perPage: 101 }), ctx)).rejects.toThrow();
+      expect(call).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-pill invalid state literal', async () => {
+      const ctx = makeContext({ getConnection: jest.fn().mockResolvedValue(makeConnection()) });
+      await expect(action.execute(makeInput({ state: 'merged' }), ctx)).rejects.toThrow();
       expect(call).not.toHaveBeenCalled();
     });
   });

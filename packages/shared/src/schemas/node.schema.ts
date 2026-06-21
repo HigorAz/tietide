@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import { CONDITION_OPERATORS } from '../condition/grammar.js';
+import { templatable } from './templatable.js';
 
 export const httpRequestConfigSchema = z.object({
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
+  // Accepts a literal HTTP method OR a `{{pill}}` template (editor fx toggle) —
+  // a resolved pill validates against the inner enum at runtime.
+  method: templatable(z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])),
   url: z.string().url(),
   headers: z.record(z.string()).optional(),
   body: z.unknown().optional(),
