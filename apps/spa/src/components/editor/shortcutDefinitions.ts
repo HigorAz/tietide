@@ -4,9 +4,13 @@ export type ShortcutId =
   | 'save'
   | 'undo'
   | 'redo'
+  | 'copy'
+  | 'paste'
   | 'delete'
   | 'duplicate'
   | 'toggleSkip'
+  | 'multiSelect'
+  | 'boxSelect'
   | 'run'
   | 'test'
   | 'pan'
@@ -63,6 +67,24 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     preventDefault: true,
   },
   {
+    // Display-only: the Ctrl/⌘+C handler lives in useCanvasClipboard, not
+    // react-hotkeys-hook, so hotkey is null to avoid a double binding.
+    id: 'copy',
+    category: 'Edit',
+    description: 'Copy selected nodes',
+    displayKeys: 'Ctrl/⌘ + C',
+    hotkey: null,
+    preventDefault: false,
+  },
+  {
+    id: 'paste',
+    category: 'Edit',
+    description: 'Paste nodes',
+    displayKeys: 'Ctrl/⌘ + V',
+    hotkey: null,
+    preventDefault: false,
+  },
+  {
     id: 'delete',
     category: 'Selection',
     description: 'Delete selected nodes and their edges',
@@ -85,6 +107,25 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     displayKeys: 'Ctrl/⌘ + /',
     hotkey: 'mod+slash',
     preventDefault: true,
+  },
+  {
+    // Display-only: handled by React Flow's multiSelectionKeyCode.
+    id: 'multiSelect',
+    category: 'Selection',
+    description: 'Add or remove a node from the selection',
+    displayKeys: 'Ctrl/⌘/Shift + click',
+    hotkey: null,
+    preventDefault: false,
+  },
+  {
+    // Display-only: handled by React Flow's selectionKeyCode (Shift or Alt),
+    // or by left-drag in Select mode.
+    id: 'boxSelect',
+    category: 'Selection',
+    description: 'Box-select nodes',
+    displayKeys: 'Shift/Alt + drag',
+    hotkey: null,
+    preventDefault: false,
   },
   {
     id: 'run',

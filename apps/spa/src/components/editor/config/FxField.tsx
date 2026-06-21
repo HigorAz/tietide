@@ -1,4 +1,4 @@
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { cn } from '@/utils/cn';
 import { DataPillInput } from './DataPillInput';
 import { FieldLabel } from './FieldLabel';
@@ -61,6 +61,15 @@ export function FxField({
   // it (e.g. to start typing a pill into an empty field).
   const [override, setOverride] = useState<boolean | null>(null);
   const isExpr = override ?? isTemplate(value);
+
+  // Once a field is in expression mode, latch it there even when fully cleared.
+  // Without this, emptying a {{pill}} flips isExpr→false, unmounting the
+  // DataPillInput mid-edit; keyboard focus falls to <body> and the next
+  // Backspace falls through to the canvas and deletes the selected node. The fx
+  // toggle still wins (toLiteral sets override=false).
+  useEffect(() => {
+    if (override === null && isTemplate(value)) setOverride(true);
+  }, [override, value]);
 
   const toExpr = (): void => {
     setOverride(true);

@@ -35,6 +35,13 @@ export interface EditorSnapshot {
 export type EditorViewMode = 'configure' | 'result';
 
 /**
+ * Canvas pointer behavior. 'pan' (default) = left-drag moves the canvas, hold
+ * Shift/Alt to box-select. 'select' = left-drag draws a selection box, hold
+ * Space to pan. Transient UI state — not captured by undo history.
+ */
+export type InteractionMode = 'pan' | 'select';
+
+/**
  * The config field currently focused by the user. `insert` is the focused
  * DataPillInput's own caret-aware inserter, registered on focus so the
  * standalone DataPillPicker can drop a token into the live field. Transient UI
@@ -65,6 +72,9 @@ export interface EditorState {
   // editorStore + executionLiveStore — only the presentation flips, so editing
   // and inspecting never reload or clobber each other.
   viewMode: EditorViewMode;
+  // Canvas pointer behavior (pan vs. box-select). Fed into editorTouchProps by
+  // Canvas; toggled from the editor toolbar. Transient — not undo-tracked.
+  interactionMode: InteractionMode;
 }
 
 export interface EditorActions {
@@ -91,6 +101,8 @@ export interface EditorActions {
   }) => void;
   markSaved: () => void;
   setViewMode: (mode: EditorViewMode) => void;
+  setInteractionMode: (mode: InteractionMode) => void;
+  toggleInteractionMode: () => void;
   resetEditor: () => void;
 }
 
@@ -108,6 +120,7 @@ export const initialEditorState: EditorState = {
   future: [],
   entryRoute: null,
   viewMode: 'configure',
+  interactionMode: 'pan',
 };
 
 const generateNodeId = (): string => {
@@ -459,6 +472,10 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     markSaved: () => set({ isDirty: false }),
 
     setViewMode: (mode) => set({ viewMode: mode }),
+
+    setInteractionMode: (mode) => set({ interactionMode: mode }),
+    toggleInteractionMode: () =>
+      set((s) => ({ interactionMode: s.interactionMode === 'pan' ? 'select' : 'pan' })),
 
     resetEditor: () => set({ ...initialEditorState }),
   };

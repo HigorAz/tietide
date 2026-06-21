@@ -52,6 +52,25 @@ describe('FxField', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('stays in expression mode after a template value is cleared (no remount → keeps keyboard focus)', () => {
+    // Regression: emptying a {{pill}} used to flip the field back to a literal
+    // input, unmounting the DataPillInput mid-edit. Focus then fell to <body>
+    // and the next Backspace deleted the selected node. The field must stay an
+    // expression input once it has been one.
+    const { rerender } = render(
+      <FxField {...base} kind="text" label="Email" value="{{trigger.email}}" onChange={vi.fn()} />,
+    );
+    // Expression mode renders the DataPillInput (a combobox textarea).
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+
+    // The user deletes every character — value collapses to empty.
+    rerender(<FxField {...base} kind="text" label="Email" value="" onChange={vi.fn()} />);
+
+    // Still an expression input (not swapped to a literal <input type="text">).
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByTestId('fld-fx-toggle')).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('renders a select in literal mode with the provided options', () => {
     render(
       <FxField

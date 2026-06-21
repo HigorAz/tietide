@@ -56,6 +56,7 @@ export function Canvas() {
   const selectNode = useEditorStore((s) => s.selectNode);
   const setActivePillField = useEditorStore((s) => s.setActivePillField);
   const deleteSelected = useEditorStore((s) => s.deleteSelected);
+  const interactionMode = useEditorStore((s) => s.interactionMode);
   const showToast = useToastStore((s) => s.show);
   const { screenToFlowPosition } = useReactFlow();
   const isMobile = useIsMobile();
@@ -204,7 +205,7 @@ export function Canvas() {
           proOptions={{ hideAttribution: true }}
           fitView
           fitViewOptions={FIT_VIEW_OPTIONS}
-          {...editorTouchProps(isMobile)}
+          {...editorTouchProps(isMobile, interactionMode)}
         >
           {/* Faint line grid mirroring the login page's `.auth-grid` (34px,
             rgba(255,255,255,0.05)) — uniform (no fade) and panning with the
