@@ -175,3 +175,16 @@ input[type='checkbox'].checkbox-danger:checked {
     height: 14px;
   }
 }
+
+/* Brand the box-selection visuals: the drag rectangle and the bounding box
+   drawn around multi-selected nodes. React Flow ships a browser-blue default
+   that clashes with the teal/dark theme — re-tint both with --accent-teal
+   (rgba 0,212,179). */
+.react-flow__selection {
+  background: rgba(0, 212, 179, 0.08);
+  border: 1px solid rgba(0, 212, 179, 0.6);
+}
+.react-flow__nodesselection-rect {
+  background: rgba(0, 212, 179, 0.04);
+  border: 1px solid rgba(0, 212, 179, 0.4);
+}
