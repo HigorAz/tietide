@@ -5,6 +5,7 @@ import { NodeType, type Workflow } from '@tietide/shared';
 import { initialEditorState, useEditorStore } from '@/stores/editorStore';
 import { initialToastState, useToastStore } from '@/stores/toastStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
+import { useExecutionLiveStore } from '@/stores/executionLiveStore';
 
 vi.mock('@/api/workflows', () => ({
   getWorkflow: vi.fn(),
@@ -14,6 +15,8 @@ vi.mock('@/api/workflows', () => ({
 vi.mock('@/api/executions', () => ({
   executeWorkflow: vi.fn(),
   testWorkflow: vi.fn(),
+  getExecution: vi.fn(),
+  repeatExecution: vi.fn(),
 }));
 
 vi.mock('@/lib/downloadFile', () => ({
@@ -28,13 +31,15 @@ vi.mock('react-router-dom', () => ({
 }));
 
 import { updateWorkflow } from '@/api/workflows';
-import { executeWorkflow, testWorkflow } from '@/api/executions';
+import { executeWorkflow, getExecution, repeatExecution, testWorkflow } from '@/api/executions';
 import { downloadJson } from '@/lib/downloadFile';
 import { EditorToolbar } from './EditorToolbar';
 
 const mockedUpdate = vi.mocked(updateWorkflow);
 const mockedExecute = vi.mocked(executeWorkflow);
 const mockedTest = vi.mocked(testWorkflow);
+const mockedGetExecution = vi.mocked(getExecution);
+const mockedRepeat = vi.mocked(repeatExecution);
 const mockedDownload = vi.mocked(downloadJson);
 
 const savedResponse: Workflow = {
@@ -58,9 +63,14 @@ describe('EditorToolbar', () => {
     useEditorStore.setState({ ...initialEditorState });
     useToastStore.setState({ ...initialToastState });
     useWorkflowsStore.setState({ workflows: [], status: 'idle', error: null });
+    useExecutionLiveStore.setState({ executionId: null });
     mockedUpdate.mockReset();
     mockedExecute.mockReset();
     mockedTest.mockReset();
+    mockedGetExecution.mockReset();
+    mockedGetExecution.mockResolvedValue({ id: 'exec-1', isDryRun: false } as never);
+    mockedRepeat.mockReset();
+    mockedRepeat.mockResolvedValue({ id: 'new-1' } as never);
     mockedDownload.mockReset();
     mockNavigate.mockReset();
     mockSetSearchParams.mockReset();
@@ -567,6 +577,42 @@ describe('EditorToolbar', () => {
       expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /run/i })).toBeDisabled();
       expect(screen.getByRole('button', { name: /test/i })).toBeDisabled();
+    });
+  });
+
+  describe('Repeat run (Result view only)', () => {
+    const renderResult = (): void => {
+      useExecutionLiveStore.setState({ executionId: 'exec-1' });
+      useEditorStore.setState({ viewMode: 'result' });
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+    };
+
+    it('is hidden in Configure view (no loaded execution)', () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+      expect(screen.queryByRole('button', { name: /repeat run/i })).not.toBeInTheDocument();
+    });
+
+    it('is shown in Result view when an execution is loaded', () => {
+      renderResult();
+      expect(screen.getByRole('button', { name: /repeat run/i })).toBeInTheDocument();
+    });
+
+    it('is disabled for a dry-run (test) execution', async () => {
+      mockedGetExecution.mockResolvedValue({ id: 'exec-1', isDryRun: true } as never);
+      renderResult();
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /repeat run/i })).toBeDisabled(),
+      );
+    });
+
+    it('repeats the loaded execution and toasts on click', async () => {
+      const user = userEvent.setup();
+      renderResult();
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /repeat run/i })).toBeEnabled(),
+      );
+      await user.click(screen.getByRole('button', { name: /repeat run/i }));
+      expect(mockedRepeat).toHaveBeenCalledWith('wf-1', 'exec-1');
     });
   });
 });
