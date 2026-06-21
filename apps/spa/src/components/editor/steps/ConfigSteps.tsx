@@ -152,20 +152,27 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
     [slotEl, registerConnection, unregisterConnection, reportValidity],
   );
 
-  const { steps, openStep } = useConfigSteps({
+  const { steps, toggleStep, expandStep } = useConfigSteps({
     connection: connectionMeta,
     configureValid,
     tested: testedDone,
-    expandedAll: everTested,
     dirty,
   });
 
-  // Continue gates the guided flow for brand-new nodes; for an already-tested
-  // node it only reappears when an edit re-arms the Test step.
-  const showContinue = configureValid && (!everTested || dirty);
+  // Test-run readiness. The step is always shown (never locked), but the run
+  // button stays disabled — with an explanatory tooltip — until the config is
+  // valid and any required connection is chosen. An optional/stale connection
+  // still counts as ready (the node runs unauthenticated).
+  const connectionComplete =
+    connectionMeta === null || connectionMeta.hasSelection || connectionMeta.optional;
+  const testReady = configureValid && connectionComplete;
+  const testNotReadyReason = !configureValid
+    ? 'Complete the Configure step first'
+    : !connectionComplete
+      ? 'Choose a connection first'
+      : null;
 
   const hasErrorHandler = config.hasErrorHandler === true;
-  const configureIndex = steps.find((s) => s.id === 'configure')?.index ?? 1;
 
   const renderBody = (step: StepModel): JSX.Element => {
     switch (step.id) {
@@ -196,23 +203,15 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
                 Configuration changed — re-test to refresh the captured sample output.
               </p>
             )}
-
-            {showContinue && (
-              <button
-                type="button"
-                onClick={() => openStep('test')}
-                className="self-start rounded-md bg-accent-teal px-3.5 py-2 text-xs font-semibold text-deep-blue transition hover:bg-accent-teal-hover focus:outline-none focus-visible:ring-1 focus-visible:ring-accent-teal"
-              >
-                Continue
-              </button>
-            )}
           </div>
         );
       case 'test':
         return (
           <TestStep
             nodeId={nodeId}
-            onFixInConfigure={() => openStep('configure')}
+            ready={testReady}
+            notReadyReason={testNotReadyReason}
+            onFixInConfigure={() => expandStep('configure')}
             onResult={handleTestResult}
           />
         );
@@ -235,7 +234,6 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
     }
     if (step.id === 'configure') return configureSummary(config);
     if (step.id === 'test') {
-      if (step.status === 'locked') return `Finish step ${configureIndex} first`;
       if (dirty) return 'Configuration changed — re-test to refresh sample output';
       if (testSummary) return `✓ tested · ${testSummary}`;
       if (testedDone) return '✓ tested · sample output captured';
@@ -256,7 +254,7 @@ export function ConfigSteps({ nodeId, config, Form }: ConfigStepsProps): JSX.Ele
             status={step.status}
             summary={summaryFor(step)}
             open={step.open}
-            onToggle={() => openStep(step.id)}
+            onToggle={() => toggleStep(step.id)}
             keepMounted={step.id !== 'test'}
           >
             {renderBody(step)}

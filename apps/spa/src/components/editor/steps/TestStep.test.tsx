@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { ComponentProps } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { TestNodeResult, TestNodeStatus, UseTestNodeResult } from '../config/useTestNode';
 import { TestStep } from './TestStep';
@@ -34,10 +35,26 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+// Defaults to a ready node so existing behavioural tests stay focused on the run
+// flow; the readiness-gating tests below override `ready`/`notReadyReason`.
+const renderStep = (
+  over: Partial<ComponentProps<typeof TestStep>> = {},
+): ReturnType<typeof render> =>
+  render(
+    <TestStep
+      nodeId="n1"
+      ready
+      notReadyReason={null}
+      onFixInConfigure={vi.fn()}
+      onResult={vi.fn()}
+      {...over}
+    />,
+  );
+
 describe('TestStep', () => {
   it('renders the run button when idle and triggers run on click', () => {
     mockHook = makeHook('idle');
-    render(<TestStep nodeId="n1" onFixInConfigure={vi.fn()} onResult={vi.fn()} />);
+    renderStep();
 
     const button = screen.getByTestId('test-step-run');
     expect(button).toBeEnabled();
@@ -47,7 +64,7 @@ describe('TestStep', () => {
 
   it('shows a spinner and disables the button while running', () => {
     mockHook = makeHook('running');
-    render(<TestStep nodeId="n1" onFixInConfigure={vi.fn()} onResult={vi.fn()} />);
+    renderStep();
 
     expect(screen.getByTestId('test-step-spinner')).toBeInTheDocument();
     expect(screen.getByTestId('test-step-run')).toBeDisabled();
@@ -59,7 +76,7 @@ describe('TestStep', () => {
       output: { messages: new Array(3).fill({}) },
       durationMs: 1310,
     });
-    render(<TestStep nodeId="n1" onFixInConfigure={vi.fn()} onResult={onResult} />);
+    renderStep({ onResult });
 
     const chip = screen.getByTestId('test-step-success-chip');
     expect(chip.textContent ?? '').toMatch(/✓ Success · \d+(\.\d+)?s · output captured/);
@@ -73,7 +90,7 @@ describe('TestStep', () => {
   it('renders the Phase-1 ErrorCard on failure and wires Fix in Configure', () => {
     const onFixInConfigure = vi.fn();
     mockHook = makeHook('error', { error: { message: 'Boom went the run', code: null } });
-    render(<TestStep nodeId="n1" onFixInConfigure={onFixInConfigure} onResult={vi.fn()} />);
+    renderStep({ onFixInConfigure });
 
     expect(screen.getByText('Boom went the run')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Fix in Configure'));
@@ -86,10 +103,26 @@ describe('TestStep', () => {
       {},
       { canRun: false, blockedReason: 'Fix the red data pills first.' },
     );
-    render(<TestStep nodeId="n1" onFixInConfigure={vi.fn()} onResult={vi.fn()} />);
+    renderStep();
 
     const button = screen.getByTestId('test-step-run');
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', 'Fix the red data pills first.');
+  });
+
+  it('disables the button with the not-ready reason when the config is not ready', () => {
+    mockHook = makeHook('idle');
+    renderStep({ ready: false, notReadyReason: 'Complete the Configure step first' });
+
+    const button = screen.getByTestId('test-step-run');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Complete the Configure step first');
+  });
+
+  it('enables the button when ready and the hook permits a run', () => {
+    mockHook = makeHook('idle');
+    renderStep({ ready: true, notReadyReason: null });
+
+    expect(screen.getByTestId('test-step-run')).toBeEnabled();
   });
 });
