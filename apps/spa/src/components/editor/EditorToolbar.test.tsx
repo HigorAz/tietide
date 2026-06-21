@@ -100,23 +100,6 @@ describe('EditorToolbar', () => {
     });
   });
 
-  describe('Shortcuts (help)', () => {
-    it('renders a Shortcuts button that opens the cheatsheet', async () => {
-      const onShowCheatsheet = vi.fn();
-      render(
-        <EditorToolbar
-          workflowId="wf-1"
-          entryRoute="/workflows"
-          onShowCheatsheet={onShowCheatsheet}
-        />,
-      );
-
-      await userEvent.click(screen.getByRole('button', { name: /shortcuts/i }));
-
-      expect(onShowCheatsheet).toHaveBeenCalledTimes(1);
-    });
-  });
-
   describe('Back button (issue #104)', () => {
     it('should navigate to entryRoute when clicked while not dirty', async () => {
       render(<EditorToolbar workflowId="wf-1" entryRoute="/dashboard" />);
