@@ -31,6 +31,14 @@ describe('ShortcutCheatsheet', () => {
     }
   });
 
+  it('includes the completed Copy / Paste / multi-select / box-select entries', () => {
+    render(<ShortcutCheatsheet open onClose={vi.fn()} />);
+    expect(screen.getByText('Copy selected nodes')).toBeInTheDocument();
+    expect(screen.getByText('Paste nodes')).toBeInTheDocument();
+    expect(screen.getByText('Add or remove a node from the selection')).toBeInTheDocument();
+    expect(screen.getByText('Box-select nodes')).toBeInTheDocument();
+  });
+
   it('should call onClose when Escape is pressed', () => {
     const onClose = vi.fn();
     render(<ShortcutCheatsheet open onClose={onClose} />);

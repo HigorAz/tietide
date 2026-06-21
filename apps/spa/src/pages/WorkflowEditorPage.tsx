@@ -264,7 +264,11 @@ export function WorkflowEditorPage() {
         {!isMobile && <NodeLibrary />}
         <div className="relative flex-1">
           <Canvas />
-          <EditorToolbar workflowId={id} entryRoute={entryRoute} />
+          <EditorToolbar
+            workflowId={id}
+            entryRoute={entryRoute}
+            onShowCheatsheet={handleShowCheatsheet}
+          />
           {/* The inspector dock sits below the toolbar (top-right); the data-pill
               picker takes the vacated bottom-right slot while a field is focused.
               Both are desktop overlays — the picker self-renders as a bottom
