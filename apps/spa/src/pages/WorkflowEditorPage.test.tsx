@@ -22,6 +22,7 @@ vi.mock('reactflow', () => ({
   Background: () => null,
   BackgroundVariant: { Lines: 'lines', Dots: 'dots', Cross: 'cross' },
   Controls: () => null,
+  ControlButton: () => null,
   MiniMap: () => null,
   ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useReactFlow: () => ({ screenToFlowPosition: (p: { x: number; y: number }) => p }),
