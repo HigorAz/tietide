@@ -92,6 +92,12 @@ describe('EditorToolbar', () => {
 
       expect(screen.getByRole('button', { name: /^back$/i })).toBeInTheDocument();
     });
+
+    it('should render the pan/select interaction-mode toggle', () => {
+      render(<EditorToolbar workflowId="wf-1" entryRoute="/workflows" />);
+
+      expect(screen.getByTestId('interaction-mode-toggle')).toBeInTheDocument();
+    });
   });
 
   describe('Shortcuts (help)', () => {

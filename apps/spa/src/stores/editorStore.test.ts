@@ -8,6 +8,25 @@ describe('editorStore', () => {
     useEditorStore.setState({ ...initialEditorState });
   });
 
+  describe('interactionMode', () => {
+    it('defaults to pan mode', () => {
+      expect(useEditorStore.getState().interactionMode).toBe('pan');
+    });
+
+    it('setInteractionMode switches to select mode', () => {
+      useEditorStore.getState().setInteractionMode('select');
+      expect(useEditorStore.getState().interactionMode).toBe('select');
+    });
+
+    it('toggleInteractionMode flips between pan and select', () => {
+      const { toggleInteractionMode } = useEditorStore.getState();
+      toggleInteractionMode();
+      expect(useEditorStore.getState().interactionMode).toBe('select');
+      toggleInteractionMode();
+      expect(useEditorStore.getState().interactionMode).toBe('pan');
+    });
+  });
+
   describe('addNode', () => {
     it('should add a custom node with catalog-derived label, description, and idle status', () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 100, y: 200 });

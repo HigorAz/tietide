@@ -26,7 +26,9 @@ import { cn } from '@/utils/cn';
 import { buildExportPayload, exportFilename, serializeExport } from '@/lib/workflowExport';
 import { downloadJson } from '@/lib/downloadFile';
 import { DocumentationModal } from '@/components/documentation/DocumentationModal';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { EditorViewTabs } from './EditorViewTabs';
+import { InteractionModeToggle } from './InteractionModeToggle';
 import { saveWorkflow } from './saveWorkflow';
 import { toWorkflowDefinition } from './serialization';
 
@@ -57,6 +59,7 @@ export function EditorToolbar({ workflowId, entryRoute, onShowCheatsheet }: Edit
   );
   const toast = useToastStore((s) => s.show);
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const [, setSearchParams] = useSearchParams();
 
   // Result-view-only "Repeat run": repeats the currently-loaded execution,
@@ -260,6 +263,8 @@ export function EditorToolbar({ workflowId, entryRoute, onShowCheatsheet }: Edit
           icon={<Redo2 size={16} aria-hidden />}
         />
         <div aria-hidden className="mx-1 h-5 w-px bg-white/10" />
+        {/* Pan/Select canvas mode — meaningless without a mouse, so desktop only. */}
+        {!isMobile && <InteractionModeToggle />}
         <ToolbarButton
           label="Export"
           onClick={handleExport}
