@@ -217,7 +217,7 @@ importers:
         version: 6.0.2
     optionalDependencies:
       nodemailer:
-        specifier: '>=9.0.1 <10'
+        specifier: ^9.0.1
         version: 9.0.1
 
   apps/spa:

@@ -77,6 +77,6 @@
     "typescript": "^6.0.2"
   },
   "optionalDependencies": {
-    "nodemailer": "^8.0.10"
+    "nodemailer": "^9.0.1"
   }
 }
