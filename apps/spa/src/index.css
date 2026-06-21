@@ -176,6 +176,30 @@ input[type='checkbox'].checkbox-danger:checked {
   }
 }
 
+/* React Flow ships white control buttons; re-tint the bottom-left zoom cluster
+   (+ / − / fit / lock, plus our Shortcuts button) to match the dark/teal theme.
+   The Shortcuts ControlButton inherits these rules automatically. */
+.react-flow__controls {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.react-flow__controls-button {
+  background: var(--bg-surface);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary); /* lucide (stroke) Shortcuts icon */
+  fill: var(--text-secondary); /* React Flow built-in (fill) zoom/fit/lock icons */
+}
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+.react-flow__controls-button:hover {
+  background: var(--bg-elevated);
+  color: var(--accent-teal);
+  fill: var(--accent-teal);
+}
+
 /* Brand the box-selection visuals: the drag rectangle and the bounding box
    drawn around multi-selected nodes. React Flow ships a browser-blue default
    that clashes with the teal/dark theme — re-tint both with --accent-teal

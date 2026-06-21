@@ -50,7 +50,23 @@ vi.mock('reactflow', () => ({
   },
   Background: () => null,
   BackgroundVariant: { Lines: 'lines', Dots: 'dots', Cross: 'cross' },
-  Controls: () => null,
+  Controls: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="rf-controls">{children}</div>
+  ),
+  ControlButton: ({
+    children,
+    onClick,
+    title,
+    ...rest
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+    title?: string;
+  }) => (
+    <button type="button" onClick={onClick} title={title} {...rest}>
+      {children}
+    </button>
+  ),
   MiniMap: () => null,
   ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useReactFlow: () => ({ screenToFlowPosition: screenToFlowPositionMock }),
@@ -101,6 +117,22 @@ describe('Canvas', () => {
         minZoom: 0.5,
         maxZoom: 0.85,
       });
+    });
+
+    it('should lower the manual zoom-out floor to minZoom 0.2', () => {
+      render(<Canvas />);
+      expect(lastReactFlowProps.current?.minZoom).toBe(0.2);
+    });
+  });
+
+  describe('shortcuts control button', () => {
+    it('renders a Keyboard control button that calls onShowCheatsheet', () => {
+      const onShowCheatsheet = vi.fn();
+      render(<Canvas onShowCheatsheet={onShowCheatsheet} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /keyboard shortcuts/i }));
+
+      expect(onShowCheatsheet).toHaveBeenCalledTimes(1);
     });
   });
 

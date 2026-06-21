@@ -2,12 +2,14 @@ import { useCallback, useMemo, useState, type DragEvent } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   useReactFlow,
   type Edge,
   type Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { Keyboard } from 'lucide-react';
 import type { NodeType } from '@tietide/shared';
 import { useEditorStore } from '@/stores/editorStore';
 import { useExecutionLiveStore } from '@/stores/executionLiveStore';
@@ -45,7 +47,12 @@ interface DialogState {
 const CLOSED_MENU: MenuState = { open: false, x: 0, y: 0, variant: 'default' };
 const CLOSED_DIALOG: DialogState = { open: false, mode: 'copy', json: '' };
 
-export function Canvas() {
+interface CanvasProps {
+  /** Opens the keyboard-shortcuts cheatsheet (wired to the bottom-left control). */
+  onShowCheatsheet?: () => void;
+}
+
+export function Canvas({ onShowCheatsheet }: CanvasProps = {}) {
   const nodes = useEditorStore((s) => s.nodes);
   const edges = useEditorStore((s) => s.edges);
   const liveNodes = useExecutionLiveStore((s) => s.nodes);
@@ -205,6 +212,9 @@ export function Canvas() {
           proOptions={{ hideAttribution: true }}
           fitView
           fitViewOptions={FIT_VIEW_OPTIONS}
+          // Allow zooming out further than React Flow's 0.5 default so large
+          // workflows fit on screen.
+          minZoom={0.2}
           {...editorTouchProps(isMobile, interactionMode)}
         >
           {/* Faint line grid mirroring the login page's `.auth-grid` (34px,
@@ -216,7 +226,15 @@ export function Canvas() {
             color="rgba(255, 255, 255, 0.05)"
           />
 
-          <Controls />
+          <Controls>
+            <ControlButton
+              onClick={() => onShowCheatsheet?.()}
+              title="Keyboard shortcuts & canvas tips (press ?)"
+              aria-label="Keyboard shortcuts"
+            >
+              <Keyboard size={14} aria-hidden />
+            </ControlButton>
+          </Controls>
         </ReactFlow>
       </BrokenPillsContext.Provider>
       {isDragActive && (

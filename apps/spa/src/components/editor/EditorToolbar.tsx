@@ -6,7 +6,6 @@ import {
   Download,
   FileText,
   FlaskConical,
-  Keyboard,
   Play,
   Redo2,
   RotateCcw,
@@ -35,10 +34,9 @@ import { toWorkflowDefinition } from './serialization';
 interface EditorToolbarProps {
   workflowId: string;
   entryRoute: string;
-  onShowCheatsheet?: () => void;
 }
 
-export function EditorToolbar({ workflowId, entryRoute, onShowCheatsheet }: EditorToolbarProps) {
+export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const isDirty = useEditorStore((s) => s.isDirty);
   const nodeCount = useEditorStore((s) => s.nodes.length);
   const nodes = useEditorStore((s) => s.nodes);
@@ -290,12 +288,6 @@ export function EditorToolbar({ workflowId, entryRoute, onShowCheatsheet }: Edit
               </span>
             )
           }
-        />
-        <ToolbarButton
-          label="Shortcuts"
-          onClick={() => onShowCheatsheet?.()}
-          title="Keyboard shortcuts & canvas tips (or press ?)"
-          icon={<Keyboard size={16} aria-hidden />}
         />
         {viewMode === 'result' && loadedExecutionId && (
           <ToolbarButton
