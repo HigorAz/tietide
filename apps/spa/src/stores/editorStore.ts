@@ -75,6 +75,10 @@ export interface EditorState {
   // Canvas pointer behavior (pan vs. box-select). Fed into editorTouchProps by
   // Canvas; toggled from the editor toolbar. Transient — not undo-tracked.
   interactionMode: InteractionMode;
+  // Transient one-shot signal: when set, the config panel header should open the
+  // matching field (currently only 'label') in inline-edit mode and focus it.
+  // Set by beginNodeRename (right-click → Rename) and cleared once consumed.
+  pendingHeaderEdit: 'label' | null;
 }
 
 export interface EditorActions {
@@ -86,6 +90,10 @@ export interface EditorActions {
   onConnect: (connection: Connection) => void;
   selectNode: (id: string | null) => void;
   setActivePillField: (field: ActivePillField | null) => void;
+  renameNode: (id: string, label: string) => void;
+  setNodeDescription: (id: string, description: string) => void;
+  beginNodeRename: (id: string) => void;
+  clearPendingHeaderEdit: () => void;
   updateNodeConfig: (id: string, patch: Record<string, unknown>) => void;
   toggleNodeSkip: (id: string) => void;
   toggleSkipOnSelected: () => void;
@@ -121,6 +129,7 @@ export const initialEditorState: EditorState = {
   entryRoute: null,
   viewMode: 'configure',
   interactionMode: 'pan',
+  pendingHeaderEdit: null,
 };
 
 const generateNodeId = (): string => {
@@ -292,6 +301,41 @@ export const useEditorStore = create<EditorStore>((set, get) => {
     selectNode: (id) => set({ selectedNodeId: id }),
 
     setActivePillField: (field) => set({ activePillField: field }),
+
+    renameNode: (id, label) => {
+      const trimmed = label.trim();
+      if (trimmed === '') return; // names are required — keep the previous one
+      const { nodes } = get();
+      const index = nodes.findIndex((n) => n.id === id);
+      if (index === -1) return;
+      if (nodes[index].data.label === trimmed) return;
+
+      const nextNodes = [...nodes];
+      nextNodes[index] = {
+        ...nodes[index],
+        data: { ...nodes[index].data, label: trimmed },
+      };
+      commit({ nodes: nextNodes });
+    },
+
+    setNodeDescription: (id, description) => {
+      const { nodes } = get();
+      const index = nodes.findIndex((n) => n.id === id);
+      if (index === -1) return;
+      if (nodes[index].data.description === description) return;
+
+      const nextNodes = [...nodes];
+      nextNodes[index] = {
+        ...nodes[index],
+        data: { ...nodes[index].data, description },
+      };
+      commit({ nodes: nextNodes });
+    },
+
+    beginNodeRename: (id) =>
+      set({ selectedNodeId: id, viewMode: 'configure', pendingHeaderEdit: 'label' }),
+
+    clearPendingHeaderEdit: () => set({ pendingHeaderEdit: null }),
 
     updateNodeConfig: (id, patch) => {
       const { nodes } = get();

@@ -239,6 +239,115 @@ describe('serialization', () => {
     });
   });
 
+  describe('custom description', () => {
+    it('persists data.description when it differs from the catalog default', () => {
+      const rfNode = makeRfNode({
+        id: 'n-desc',
+        data: {
+          label: 'My HTTP Call',
+          description: 'Fetches the nightly orders report',
+          nodeType: NodeType.HTTP_REQUEST,
+          status: 'idle',
+          config: {},
+        },
+      });
+
+      const def = toWorkflowDefinition([rfNode], []);
+
+      expect(def.nodes[0].description).toBe('Fetches the nightly orders report');
+    });
+
+    it('does not persist description when it equals the catalog default', () => {
+      // Hydrate a node so data.description holds the exact catalog default, then
+      // serialize: the default must not be baked into the saved definition.
+      const { nodes } = fromWorkflowDefinition({
+        nodes: [
+          {
+            id: 'n-1',
+            type: NodeType.CODE,
+            name: 'Transform payload',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [],
+      });
+
+      const def = toWorkflowDefinition(nodes, []);
+
+      expect('description' in def.nodes[0]).toBe(false);
+    });
+
+    it('does not persist an empty description', () => {
+      const rfNode = makeRfNode({
+        id: 'n-empty',
+        data: { label: 'Plain', description: '', nodeType: NodeType.HTTP_REQUEST, status: 'idle' },
+      });
+
+      const def = toWorkflowDefinition([rfNode], []);
+
+      expect('description' in def.nodes[0]).toBe(false);
+    });
+
+    it('rehydrates a persisted custom description over the catalog default', () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'n-1',
+            type: NodeType.CODE,
+            name: 'Transform payload',
+            description: 'Custom prose the user wrote',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [],
+      };
+
+      const { nodes } = fromWorkflowDefinition(def);
+
+      expect(nodes[0].data.description).toBe('Custom prose the user wrote');
+    });
+
+    it('falls back to the catalog description when none is persisted', () => {
+      const { nodes } = fromWorkflowDefinition({
+        nodes: [
+          {
+            id: 'n-1',
+            type: NodeType.CODE,
+            name: 'Transform payload',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [],
+      });
+
+      expect(nodes[0].data.description).toBe('Execute custom JavaScript code');
+    });
+
+    it('round-trips a node carrying a custom description', () => {
+      const def: WorkflowDefinition = {
+        nodes: [
+          {
+            id: 'n-1',
+            type: NodeType.CODE,
+            name: 'Transform payload',
+            description: 'Custom prose the user wrote',
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [],
+      };
+
+      const hydrated = fromWorkflowDefinition(def);
+      const roundTripped = toWorkflowDefinition(hydrated.nodes, hydrated.edges);
+
+      expect(withoutAliases(roundTripped)).toEqual(def);
+    });
+  });
+
   describe('edge kind (error path)', () => {
     it('should write kind:"error" onto the WorkflowEdge when edge.data.kind is "error"', () => {
       const edge: Edge = {

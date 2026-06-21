@@ -19,6 +19,8 @@ export interface WorkflowFactNode {
   provider?: string;
   alias?: string;
   skipped?: boolean;
+  /** User-authored description override — only present when the user set one. */
+  description?: string;
 }
 
 export interface WorkflowFactTrigger {
@@ -149,6 +151,7 @@ export function extractWorkflowFacts(definition: WorkflowDefinition): WorkflowFa
       ...(def?.provider ? { provider: def.provider } : {}),
       ...(n.alias ? { alias: n.alias } : {}),
       ...(n.skipped ? { skipped: true } : {}),
+      ...(n.description ? { description: n.description } : {}),
     };
   });
 

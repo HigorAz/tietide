@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Clipboard, ClipboardCopy, ClipboardPaste, Code2, Trash2 } from 'lucide-react';
+import { Clipboard, ClipboardCopy, ClipboardPaste, Code2, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export type EditorContextMenuVariant = 'default' | 'edge';
@@ -10,10 +10,13 @@ export interface EditorContextMenuProps {
   y: number;
   canCopy: boolean;
   canDelete: boolean;
+  // True when a single node is the menu target — gates the Rename action.
+  canRename: boolean;
   // 'edge' collapses the menu to a single "Delete connection" action — the
   // clipboard items are meaningless for a connection line.
   variant?: EditorContextMenuVariant;
   onClose: () => void;
+  onRename: () => void;
   onCopy: () => void;
   onPaste: () => void;
   onCopyAsJson: () => void;
@@ -51,8 +54,10 @@ export function EditorContextMenu({
   y,
   canCopy,
   canDelete,
+  canRename,
   variant = 'default',
   onClose,
+  onRename,
   onCopy,
   onPaste,
   onCopyAsJson,
@@ -103,6 +108,12 @@ export function EditorContextMenu({
         <Item label="Delete connection" icon={<Trash2 size={14} />} onClick={select(onDelete)} />
       ) : (
         <>
+          {canRename && (
+            <>
+              <Item label="Rename" icon={<Pencil size={14} />} onClick={select(onRename)} />
+              <div className="my-1 h-px bg-white/10" />
+            </>
+          )}
           <Item
             label="Copy"
             icon={<ClipboardCopy size={14} />}

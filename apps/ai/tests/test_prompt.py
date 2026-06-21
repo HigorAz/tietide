@@ -157,3 +157,32 @@ class TestPromptBuilder:
             prompt = builder.build(workflow=WORKFLOW, context_docs=[])
 
             assert "Ground truth" not in prompt
+
+        def test_renders_user_authored_node_description(self):
+            builder = PromptBuilder()
+            facts = {
+                "nodes": [
+                    {
+                        "id": "p",
+                        "label": "Notify Slack",
+                        "type": "slack-post-message",
+                        "category": "action",
+                        "description": "Pings the on-call channel with the order count",
+                    },
+                ],
+                "executionOrder": ["p"],
+                "trigger": None,
+                "branches": [],
+                "errorEdges": [],
+                "prerequisites": {
+                    "connections": [],
+                    "secrets": [],
+                    "envVars": [],
+                    "externalEndpoints": [],
+                },
+                "dataPillRefs": [],
+            }
+
+            prompt = builder.build(workflow=WORKFLOW, context_docs=[], facts=facts)
+
+            assert "Pings the on-call channel with the order count" in prompt

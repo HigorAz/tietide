@@ -22,6 +22,12 @@ export function toWorkflowDefinition(
         position: { x: n.position.x, y: n.position.y },
         config: n.data.config ?? {},
       };
+      // Persist the description only when the user overrode the catalog default,
+      // so un-customized nodes stay clean and catalog wording stays live.
+      const catalogDesc = NODE_CATALOG.find((d) => d.type === n.data.nodeType)?.description ?? '';
+      if (n.data.description && n.data.description !== catalogDesc) {
+        base.description = n.data.description;
+      }
       if (n.data.alias) base.alias = n.data.alias;
       if (n.data.skipped) base.skipped = true;
       return base;
@@ -50,7 +56,7 @@ export function fromWorkflowDefinition(def: WorkflowDefinition): {
     const catalogEntry = NODE_CATALOG.find((d) => d.type === n.type);
     const data: CustomNodeData = {
       label: n.name,
-      description: catalogEntry?.description ?? '',
+      description: n.description ?? catalogEntry?.description ?? '',
       nodeType: n.type as NodeType,
       status: 'idle',
       config: n.config ?? {},

@@ -71,6 +71,9 @@ export const workflowNodeSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
   name: z.string().min(1).max(255),
+  // Optional user-authored description overriding the catalog default. Additive
+  // and backward-compatible: legacy definitions omit it and fall back to catalog.
+  description: z.string().max(500).optional(),
   // Stable, human-readable reference alias (`gmail_search`). Data-pill tokens use
   // it as `{{steps.<alias>.field}}`. Optional/additive: legacy definitions and the
   // worker backfill it deterministically via assignNodeAliases (see node-alias.ts).

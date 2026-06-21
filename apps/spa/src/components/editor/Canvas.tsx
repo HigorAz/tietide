@@ -63,6 +63,7 @@ export function Canvas({ onShowCheatsheet }: CanvasProps = {}) {
   const selectNode = useEditorStore((s) => s.selectNode);
   const setActivePillField = useEditorStore((s) => s.setActivePillField);
   const deleteSelected = useEditorStore((s) => s.deleteSelected);
+  const beginNodeRename = useEditorStore((s) => s.beginNodeRename);
   const interactionMode = useEditorStore((s) => s.interactionMode);
   const showToast = useToastStore((s) => s.show);
   const { screenToFlowPosition } = useReactFlow();
@@ -167,6 +168,14 @@ export function Canvas({ onShowCheatsheet }: CanvasProps = {}) {
   const closeDialog = useCallback(() => setDialog(CLOSED_DIALOG), []);
 
   const hasSelection = nodes.some((n) => n.selected);
+  // Rename targets a single node; the node context menu selects exactly the
+  // right-clicked node, so a lone selection is the right gate.
+  const singleNodeSelected = nodes.filter((n) => n.selected).length === 1;
+
+  const handleRename = useCallback(() => {
+    const id = useEditorStore.getState().selectedNodeId;
+    if (id) beginNodeRename(id);
+  }, [beginNodeRename]);
 
   // Node ids carrying at least one broken data-pill token, computed once and
   // shared via context so each node can mark itself red (#5).
@@ -269,7 +278,9 @@ export function Canvas({ onShowCheatsheet }: CanvasProps = {}) {
         variant={menu.variant}
         canCopy={hasSelection}
         canDelete={hasSelection}
+        canRename={singleNodeSelected}
         onClose={closeMenu}
+        onRename={handleRename}
         onCopy={() => void runCopy()}
         onPaste={() => void runPaste()}
         onCopyAsJson={() => setDialog({ open: true, mode: 'copy', json: buildSelectedJson() })}
