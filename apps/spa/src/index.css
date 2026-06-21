@@ -180,6 +180,10 @@ input[type='checkbox'].checkbox-danger:checked {
    (+ / − / fit / lock, plus our Shortcuts button) to match the dark/teal theme.
    The Shortcuts ControlButton inherits these rules automatically. */
 .react-flow__controls {
+  /* Flex column so the Shortcuts button can be re-ordered above the zoom-in (+)
+     via `order` — by default the buttons just stack in block flow. */
+  display: flex;
+  flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   overflow: hidden;
@@ -191,13 +195,20 @@ input[type='checkbox'].checkbox-danger:checked {
   color: var(--text-secondary); /* lucide (stroke) Shortcuts icon */
   fill: var(--text-secondary); /* React Flow built-in (fill) zoom/fit/lock icons */
 }
-.react-flow__controls-button:last-child {
-  border-bottom: none;
-}
 .react-flow__controls-button:hover {
   background: var(--bg-elevated);
   color: var(--accent-teal);
   fill: var(--accent-teal);
+}
+/* Lift the Shortcuts button to the top of the cluster (above the +) without
+   reordering the DOM. */
+.react-flow__controls-button.tt-shortcuts-control {
+  order: -1;
+}
+/* The interactive/lock button is the visual bottom of the stack — drop its
+   separator so it sits flush against the container's rounded bottom edge. */
+.react-flow__controls-button.react-flow__controls-interactive {
+  border-bottom: none;
 }
 
 /* Brand the box-selection visuals: the drag rectangle and the bounding box

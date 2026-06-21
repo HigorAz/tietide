@@ -231,6 +231,8 @@ export function Canvas({ onShowCheatsheet }: CanvasProps = {}) {
               onClick={() => onShowCheatsheet?.()}
               title="Keyboard shortcuts & canvas tips (press ?)"
               aria-label="Keyboard shortcuts"
+              // `order: -1` (see index.css) lifts this above the zoom-in button.
+              className="tt-shortcuts-control"
             >
               <Keyboard size={14} aria-hidden />
             </ControlButton>
