@@ -27,6 +27,93 @@ describe('editorStore', () => {
     });
   });
 
+  describe('renameNode', () => {
+    const seedNode = (): string => {
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      useEditorStore.setState({ isDirty: false, past: [], future: [] });
+      return useEditorStore.getState().nodes[0].id;
+    };
+
+    it('updates the node label and marks the store dirty', () => {
+      const id = seedNode();
+      useEditorStore.getState().renameNode(id, 'Fetch orders');
+      expect(useEditorStore.getState().nodes[0].data.label).toBe('Fetch orders');
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+
+    it('trims surrounding whitespace', () => {
+      const id = seedNode();
+      useEditorStore.getState().renameNode(id, '  Fetch orders  ');
+      expect(useEditorStore.getState().nodes[0].data.label).toBe('Fetch orders');
+    });
+
+    it('ignores an empty/whitespace-only label and keeps the previous one', () => {
+      const id = seedNode();
+      const before = useEditorStore.getState().nodes[0].data.label;
+      useEditorStore.getState().renameNode(id, '   ');
+      expect(useEditorStore.getState().nodes[0].data.label).toBe(before);
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+
+    it('is undoable', () => {
+      const id = seedNode();
+      const before = useEditorStore.getState().nodes[0].data.label;
+      useEditorStore.getState().renameNode(id, 'Renamed');
+      useEditorStore.getState().undo();
+      expect(useEditorStore.getState().nodes[0].data.label).toBe(before);
+    });
+
+    it('is a no-op for an unknown id', () => {
+      seedNode();
+      useEditorStore.getState().renameNode('missing', 'X');
+      expect(useEditorStore.getState().isDirty).toBe(false);
+    });
+  });
+
+  describe('setNodeDescription', () => {
+    const seedNode = (): string => {
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      useEditorStore.setState({ isDirty: false, past: [], future: [] });
+      return useEditorStore.getState().nodes[0].id;
+    };
+
+    it('updates the node description and marks the store dirty', () => {
+      const id = seedNode();
+      useEditorStore.getState().setNodeDescription(id, 'Nightly orders report');
+      expect(useEditorStore.getState().nodes[0].data.description).toBe('Nightly orders report');
+      expect(useEditorStore.getState().isDirty).toBe(true);
+    });
+
+    it('is undoable', () => {
+      const id = seedNode();
+      const before = useEditorStore.getState().nodes[0].data.description;
+      useEditorStore.getState().setNodeDescription(id, 'New prose');
+      useEditorStore.getState().undo();
+      expect(useEditorStore.getState().nodes[0].data.description).toBe(before);
+    });
+  });
+
+  describe('beginNodeRename', () => {
+    it('selects the node, switches to configure view, and flags a pending label edit', () => {
+      useEditorStore.getState().addNode(NodeType.HTTP_REQUEST, { x: 0, y: 0 });
+      const id = useEditorStore.getState().nodes[0].id;
+      useEditorStore.setState({ viewMode: 'result', selectedNodeId: null });
+
+      useEditorStore.getState().beginNodeRename(id);
+
+      const s = useEditorStore.getState();
+      expect(s.selectedNodeId).toBe(id);
+      expect(s.viewMode).toBe('configure');
+      expect(s.pendingHeaderEdit).toBe('label');
+    });
+
+    it('clearPendingHeaderEdit resets the flag', () => {
+      useEditorStore.setState({ pendingHeaderEdit: 'label' });
+      useEditorStore.getState().clearPendingHeaderEdit();
+      expect(useEditorStore.getState().pendingHeaderEdit).toBeNull();
+    });
+  });
+
   describe('addNode', () => {
     it('should add a custom node with catalog-derived label, description, and idle status', () => {
       useEditorStore.getState().addNode(NodeType.MANUAL_TRIGGER, { x: 100, y: 200 });

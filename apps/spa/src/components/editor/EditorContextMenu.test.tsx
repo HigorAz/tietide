@@ -11,7 +11,9 @@ const renderMenu = (overrides: Partial<React.ComponentProps<typeof EditorContext
     y: 100,
     canCopy: true,
     canDelete: true,
+    canRename: false,
     onClose: vi.fn(),
+    onRename: vi.fn(),
     onCopy: vi.fn(),
     onPaste: vi.fn(),
     onCopyAsJson: vi.fn(),
@@ -32,6 +34,16 @@ describe('EditorContextMenu', () => {
       expect(screen.getByRole('menuitem', { name: 'Copy as JSON' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Paste from JSON' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+    });
+
+    it('should not render Rename when canRename is false', () => {
+      renderMenu({ canRename: false });
+      expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull();
+    });
+
+    it('should render Rename at the top when canRename is true', () => {
+      renderMenu({ canRename: true });
+      expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
     });
 
     it('should disable Delete when canDelete is false', () => {
@@ -75,6 +87,17 @@ describe('EditorContextMenu', () => {
   });
 
   describe('actions', () => {
+    it('should call onRename and then onClose when the Rename item is clicked', () => {
+      const onRename = vi.fn();
+      const onClose = vi.fn();
+      renderMenu({ canRename: true, onRename, onClose });
+
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+
+      expect(onRename).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
     it('should call onCopy and then onClose when the Copy item is clicked', () => {
       const onCopy = vi.fn();
       const onClose = vi.fn();
@@ -165,7 +188,9 @@ describe('EditorContextMenu', () => {
             y={0}
             canCopy
             canDelete
+            canRename={false}
             onClose={onClose}
+            onRename={noop}
             onCopy={noop}
             onPaste={noop}
             onCopyAsJson={noop}
@@ -204,7 +229,9 @@ describe('EditorContextMenu', () => {
             y={0}
             canCopy
             canDelete
+            canRename={false}
             onClose={onClose}
+            onRename={noop}
             onCopy={noop}
             onPaste={noop}
             onCopyAsJson={noop}

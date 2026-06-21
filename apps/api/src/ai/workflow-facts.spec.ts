@@ -84,6 +84,36 @@ describe('extractWorkflowFacts', () => {
     expect(trig).toMatchObject({ label: 'Daily 9am', category: 'trigger' });
   });
 
+  it('includes a user-authored node description when present, omits it otherwise', () => {
+    const withDesc: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'fetch',
+          type: 'http-request',
+          name: 'Fetch Orders',
+          description: 'Pulls the nightly orders report from the partner API',
+          position: { x: 0, y: 0 },
+          config: {},
+        },
+        {
+          id: 'bare',
+          type: 'http-request',
+          name: 'No description',
+          position: { x: 0, y: 0 },
+          config: {},
+        },
+      ],
+      edges: [],
+    };
+
+    const facts = extractWorkflowFacts(withDesc);
+
+    expect(facts.nodes.find((n) => n.id === 'fetch')?.description).toBe(
+      'Pulls the nightly orders report from the partner API',
+    );
+    expect(facts.nodes.find((n) => n.id === 'bare')).not.toHaveProperty('description');
+  });
+
   it('identifies the trigger node and its config', () => {
     const facts = extractWorkflowFacts(definition);
     expect(facts.trigger).toMatchObject({

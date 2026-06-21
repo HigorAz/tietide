@@ -6,6 +6,7 @@ import { cn } from '@/utils/cn';
 import { BottomSheet } from './BottomSheet';
 import { FORM_REGISTRY } from './config/formRegistry';
 import { NodeGlyph } from './NodeGlyph';
+import { NodeHeaderEditable } from './NodeHeaderEditable';
 import { NodeRunInspection } from './NodeRunInspection';
 import { ConfigSteps } from './steps/ConfigSteps';
 import { useResizableWidth, PanelResizeHandle } from './NodeConfigPanelResize';
@@ -88,18 +89,16 @@ export function NodeConfigPanel() {
     >
       <PanelResizeHandle onPointerDown={onPointerDown} />
       <header className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <span className="mt-1 text-accent-teal">
             <NodeGlyph type={data.nodeType} size={18} />
           </span>
-          <div className="min-w-0">
-            <h2 className="truncate text-sm font-semibold text-text-primary">{data.label}</h2>
-            {catalogEntry?.description && (
-              <p className="mt-0.5 text-xs leading-snug text-text-secondary">
-                {catalogEntry.description}
-              </p>
-            )}
-          </div>
+          <NodeHeaderEditable
+            nodeId={selectedNodeId}
+            label={data.label}
+            description={data.description ?? catalogEntry?.description ?? ''}
+            descriptionPlaceholder={catalogEntry?.description}
+          />
         </div>
         <button
           type="button"

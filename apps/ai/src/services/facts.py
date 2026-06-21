@@ -83,6 +83,8 @@ def extract_facts(definition: dict[str, Any]) -> dict[str, Any]:
             node["alias"] = n["alias"]
         if n.get("skipped"):
             node["skipped"] = True
+        if n.get("description"):
+            node["description"] = n["description"]
         fact_nodes.append(node)
 
     # Trigger: a node whose type contains "trigger", else an in-degree-0 node.

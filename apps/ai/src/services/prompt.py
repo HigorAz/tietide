@@ -113,6 +113,10 @@ def _render_facts(facts: dict[str, Any]) -> str:
                 f"  - {n.get('label')} (type: {n.get('type')}, category: {n.get('category')}"
                 f"{provider}){skipped}"
             )
+            # The user's own description of this node — authoritative intent.
+            description = n.get("description")
+            if description:
+                lines.append(f"      note: {description}")
 
     prereqs = facts.get("prerequisites") or {}
     connections = prereqs.get("connections") or []
