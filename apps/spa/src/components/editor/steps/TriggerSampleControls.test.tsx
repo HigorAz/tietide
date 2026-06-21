@@ -48,7 +48,34 @@ describe('TriggerSampleControls', () => {
     );
   });
 
-  it('does not capture when there is no run and no example for the type', async () => {
+  it('derives a sample from the trigger output schema when there is no run and no example', async () => {
+    const onCapture = vi.fn();
+    mockedFetch.mockResolvedValue({ source: 'none', sample: null });
+
+    // airtable-record-created has a concrete output schema but no curated
+    // NODE_OUTPUT_EXAMPLES entry, so it exercises the schema-derived fallback.
+    expect(NODE_OUTPUT_EXAMPLES['airtable-record-created']).toBeUndefined();
+
+    render(
+      <TriggerSampleControls
+        nodeId="t1"
+        nodeType="airtable-record-created"
+        onCapture={onCapture}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('trigger-fetch-sample'));
+
+    await waitFor(() => expect(onCapture).toHaveBeenCalledTimes(1));
+    const captured = onCapture.mock.calls[0][0] as Record<string, unknown>;
+    // A field-bearing object the picker can derive `{{trigger.*}}` paths from.
+    expect(captured).toBeTypeOf('object');
+    expect(Object.keys(captured).length).toBeGreaterThan(0);
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringMatching(/generated example/i) }),
+    );
+  });
+
+  it('does not capture when there is no run, no example, and no concrete schema', async () => {
     const onCapture = vi.fn();
     mockedFetch.mockResolvedValue({ source: 'none', sample: null });
 

@@ -1,10 +1,12 @@
 import { useState, type JSX } from 'react';
 import { Loader2 } from 'lucide-react';
+import { nodeOutputSchemas } from '@tietide/shared';
 import { cn } from '@/utils/cn';
 import { useEditorStore } from '@/stores/editorStore';
 import { useToastStore } from '@/stores/toastStore';
 import { getTriggerSample } from '@/api/executions';
 import { NODE_OUTPUT_EXAMPLES } from '@/components/editor/preview/nodeOutputExamples';
+import { zodToExample } from '@/lib/schemaExample';
 import { toWorkflowDefinition } from '../serialization';
 
 export interface TriggerSampleControlsProps {
@@ -27,8 +29,10 @@ const BUTTON_CLASS = cn(
  * Step-3 controls for a TRIGGER node. A trigger has no live webhook to replay
  * while editing, so "Fetch test event" pulls the most recent genuine run's
  * payload ("use data from last run"); when none exists it falls back to a
- * built-in example so downstream {{trigger.*}} pills still resolve. The captured
- * sample is routed through the shared overwrite-protection (before/after diff).
+ * built-in example and, lacking that, to a skeleton generated from the trigger's
+ * concrete output schema — so downstream {{trigger.*}} pills still resolve. The
+ * captured sample is routed through the shared overwrite-protection (before/after
+ * diff).
  */
 export function TriggerSampleControls({
   nodeId,
@@ -50,6 +54,20 @@ export function TriggerSampleControls({
     if (example !== undefined) {
       onCapture(example);
       toast({ tone: 'info', message: 'No past run found — captured a built-in example.' });
+      return true;
+    }
+    // No curated example: derive a skeleton from the trigger's concrete output
+    // schema (the same field-bearing schema the data-pill picker walks) so its
+    // `{{trigger.*}}` fields still resolve. `nodeOutputSchemas` holds only concrete
+    // schemas — types that fall back to the generic record schema are absent here,
+    // so we never fabricate fields for a raw/opaque-payload trigger.
+    const schema = nodeOutputSchemas[nodeType];
+    if (schema) {
+      onCapture(zodToExample(schema));
+      toast({
+        tone: 'info',
+        message: "Using a generated example from this trigger's output shape.",
+      });
       return true;
     }
     return false;
