@@ -72,13 +72,19 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
       return;
     }
     let cancelled = false;
-    void getExecution(loadedExecutionId)
-      .then((exec) => {
-        if (!cancelled) setLoadedIsDryRun(exec.isDryRun === true);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadedIsDryRun(null);
-      });
+    // Defensive: never let a misbehaving call crash the editor render.
+    const pending = getExecution(loadedExecutionId) as ReturnType<typeof getExecution> | undefined;
+    if (pending && typeof pending.then === 'function') {
+      pending
+        .then((exec) => {
+          if (!cancelled) setLoadedIsDryRun(exec.isDryRun === true);
+        })
+        .catch(() => {
+          if (!cancelled) setLoadedIsDryRun(null);
+        });
+    } else {
+      setLoadedIsDryRun(null);
+    }
     return () => {
       cancelled = true;
     };
