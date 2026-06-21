@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -8,6 +8,7 @@ import {
   FlaskConical,
   Play,
   Redo2,
+  RotateCcw,
   Save,
   Sparkles,
   Undo2,
@@ -18,7 +19,7 @@ import { useToastStore } from '@/stores/toastStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
 import { useDocumentationStore } from '@/stores/documentationStore';
 import { useExecutionLiveStore } from '@/stores/executionLiveStore';
-import { executeWorkflow, testWorkflow } from '@/api/executions';
+import { executeWorkflow, getExecution, repeatExecution, testWorkflow } from '@/api/executions';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/utils/cn';
 import { buildExportPayload, exportFilename, serializeExport } from '@/lib/workflowExport';
@@ -55,6 +56,46 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
   const toast = useToastStore((s) => s.show);
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
+
+  // Result-view-only "Repeat run": repeats the currently-loaded execution,
+  // reusing the same source (repeatExecution) as the History page button.
+  const viewMode = useEditorStore((s) => s.viewMode);
+  const loadedExecutionId = useExecutionLiveStore((s) => s.executionId);
+  const [repeatingId, setRepeatingId] = useState<string | null>(null);
+  const [loadedIsDryRun, setLoadedIsDryRun] = useState<boolean | null>(null);
+
+  // The live store carries only per-node steps, not the run's isDryRun — fetch it
+  // so the button can disable for a Test run (parity with the History button).
+  useEffect(() => {
+    if (!loadedExecutionId) {
+      setLoadedIsDryRun(null);
+      return;
+    }
+    let cancelled = false;
+    void getExecution(loadedExecutionId)
+      .then((exec) => {
+        if (!cancelled) setLoadedIsDryRun(exec.isDryRun === true);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadedIsDryRun(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadedExecutionId]);
+
+  const handleRepeatRun = useCallback(async () => {
+    if (!loadedExecutionId) return;
+    setRepeatingId(loadedExecutionId);
+    try {
+      await repeatExecution(workflowId, loadedExecutionId);
+      toast({ tone: 'success', message: 'Repeat run queued — check History for its result.' });
+    } catch {
+      toast({ tone: 'error', message: 'Could not start the repeat run.' });
+    } finally {
+      setRepeatingId(null);
+    }
+  }, [loadedExecutionId, workflowId, toast]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -237,6 +278,19 @@ export function EditorToolbar({ workflowId, entryRoute }: EditorToolbarProps) {
             )
           }
         />
+        {viewMode === 'result' && loadedExecutionId && (
+          <ToolbarButton
+            label={repeatingId === loadedExecutionId ? 'Starting…' : 'Repeat run'}
+            onClick={() => void handleRepeatRun()}
+            disabled={repeatingId === loadedExecutionId || loadedIsDryRun === true}
+            title={
+              loadedIsDryRun === true
+                ? 'Test runs can’t be repeated'
+                : 'Re-run this execution with its original trigger data'
+            }
+            icon={<RotateCcw size={16} aria-hidden />}
+          />
+        )}
         <ToolbarButton
           label={isRunning ? 'Running…' : 'Run'}
           onClick={handleRun}
