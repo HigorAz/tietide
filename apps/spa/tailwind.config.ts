@@ -21,6 +21,16 @@ const config: Config = {
         error: '#F03E3E',
         warning: '#FAB005',
         info: '#339AF0',
+        // `feedback-*` aliases for the same semantic palette (mirrors the
+        // `--feedback-*` CSS vars in index.css + design-system.md). Several
+        // components (DangerZoneSection, WorkspaceAdminSection, BillingSection)
+        // reference `bg-/border-/ring-/text-feedback-error`; without these keys
+        // Tailwind purges the class and the destructive red never renders. Plain
+        // hex (not var()) so opacity modifiers like `/90` and `/40` work.
+        'feedback-error': '#F03E3E',
+        'feedback-success': '#12B886',
+        'feedback-warning': '#FAB005',
+        'feedback-info': '#339AF0',
         'status-idle': '#6B7C93',
         'status-running': '#FAB005',
         'status-success': '#12B886',
