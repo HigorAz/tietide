@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Checkout Production with full history
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: Production
           # Full history is required so the fast-forward merge can resolve correctly.
