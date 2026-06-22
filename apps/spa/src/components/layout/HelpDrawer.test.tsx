@@ -10,8 +10,20 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
+import type { PublicUser } from '@tietide/shared';
 import { HelpDrawer } from './HelpDrawer';
 import { useOnboardingStore, initialOnboardingState } from '@/stores/onboardingStore';
+import { useAuthStore } from '@/stores/authStore';
+import { isTourCompleted, markTourCompleted } from '@/utils/tourStorage';
+
+const fakeUser: PublicUser = {
+  id: 'user-1',
+  email: 'u@example.com',
+  name: 'U',
+  role: 'USER',
+  emailVerified: true,
+  createdAt: new Date('2026-01-01T00:00:00Z'),
+};
 
 const renderAt = (initial = '/dashboard'): ReturnType<typeof render> =>
   render(
@@ -24,6 +36,8 @@ describe('HelpDrawer', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     useOnboardingStore.setState(initialOnboardingState);
+    useAuthStore.setState({ user: null });
+    localStorage.clear();
   });
 
   describe('visibility', () => {
@@ -63,6 +77,17 @@ describe('HelpDrawer', () => {
       await user.click(screen.getByRole('button', { name: /restart onboarding/i }));
       expect(useOnboardingStore.getState().welcomeOpen).toBe(true);
       expect(useOnboardingStore.getState().helpDrawerOpen).toBe(false);
+    });
+
+    it('restart onboarding wipes the persisted onboarding flags for the user', async () => {
+      const user = userEvent.setup();
+      useAuthStore.setState({ user: fakeUser });
+      markTourCompleted(fakeUser.id);
+      useOnboardingStore.setState({ helpDrawerOpen: true });
+      renderAt();
+      await user.click(screen.getByRole('button', { name: /restart onboarding/i }));
+      expect(isTourCompleted(fakeUser.id)).toBe(false);
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(true);
     });
 
     it('opens the cheat sheet from the shortcuts action', async () => {
