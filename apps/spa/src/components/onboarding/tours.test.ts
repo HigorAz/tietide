@@ -8,7 +8,6 @@ import {
   TOUR_ID,
   TOUR_ORDER,
   EDITOR_TOUR_STEPS,
-  ORIENTATION_STEPS,
   FIRST_ACCESS_STEPS,
   FIRST_ACCESS_EDITOR_START,
 } from './tours';
@@ -109,16 +108,39 @@ describe('tours', () => {
   });
 
   describe('first-access sequence', () => {
-    it('should be orientation steps followed by the editor tour', () => {
-      expect(FIRST_ACCESS_STEPS).toEqual([...ORIENTATION_STEPS, ...EDITOR_TOUR_STEPS]);
+    it('should walk every main page before the editor, each step routed', () => {
+      const pageSteps = FIRST_ACCESS_STEPS.slice(0, FIRST_ACCESS_EDITOR_START);
+      expect(pageSteps.length).toBeGreaterThan(0);
+      for (const step of pageSteps) expect(step.route).toBeTruthy();
+      expect(new Set(pageSteps.map((s) => s.route))).toEqual(
+        new Set(['/', '/workflows', '/connections', '/library', '/history', '/dashboard']),
+      );
     });
 
-    it('should transition into the editor right after the orientation steps', () => {
-      expect(FIRST_ACCESS_EDITOR_START).toBe(ORIENTATION_STEPS.length);
+    it('should start on home anchored to the always-mounted sidebar', () => {
+      expect(FIRST_ACCESS_STEPS[0].route).toBe('/');
+      expect(FIRST_ACCESS_STEPS[0].target).toBe(tourSelector(TOUR_TARGET.sidebar));
     });
 
-    it('orientation steps should anchor on the always-mounted sidebar nav', () => {
-      expect(ORIENTATION_STEPS[0].target).toBe(tourSelector(TOUR_TARGET.sidebar));
+    it('should transition into the editor right after the page lap', () => {
+      expect(FIRST_ACCESS_EDITOR_START).toBe(FIRST_ACCESS_STEPS.filter((s) => s.route).length);
+    });
+
+    it('should anchor every editor step to a real element (no centered cards)', () => {
+      const editorSteps = FIRST_ACCESS_STEPS.slice(FIRST_ACCESS_EDITOR_START);
+      expect(editorSteps.length).toBeGreaterThan(0);
+      for (const step of editorSteps) {
+        expect(step.target).not.toBe('body');
+        expect(step.route).toBeUndefined();
+      }
+    });
+
+    it('should reveal the config panel by selecting a seeded node', () => {
+      const configSteps = FIRST_ACCESS_STEPS.slice(FIRST_ACCESS_EDITOR_START).filter(
+        (s) => s.target === tourSelector(TOUR_TARGET.editorConfigPanel),
+      );
+      expect(configSteps.length).toBeGreaterThan(0);
+      for (const step of configSteps) expect(step.selectNodeId).toBeTruthy();
     });
   });
 });

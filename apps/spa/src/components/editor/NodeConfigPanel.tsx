@@ -46,6 +46,7 @@ export function NodeConfigPanel() {
     return (
       <aside
         data-testid="node-config-panel"
+        data-tour="editor-config-panel"
         style={{ width }}
         className="relative flex h-full flex-col gap-4 border-l border-white/5 bg-surface p-4"
       >
@@ -84,6 +85,7 @@ export function NodeConfigPanel() {
   return (
     <aside
       data-testid="node-config-panel"
+      data-tour="editor-config-panel"
       style={{ width }}
       className="relative flex h-full flex-col gap-4 border-l border-white/5 bg-surface p-4"
     >

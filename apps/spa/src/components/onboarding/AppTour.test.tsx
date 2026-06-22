@@ -40,12 +40,24 @@ vi.mock('react-router-dom', async (importOriginal) => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
+// The element-ready gate is exercised in its own unit (useElementReady.test.ts).
+// Here we render AppTour in isolation (no page DOM), so the real gate would hold
+// `run` false until its fail-safe timeout. Mock it with a controllable value so
+// these tests focus on tour orchestration; one test flips it to assert wiring.
+let elementReady = true;
+vi.mock('@/hooks/useElementReady', () => ({
+  useElementReady: () => elementReady,
+}));
+
 import { AppTour } from './AppTour';
 import { useAuthStore } from '@/stores/authStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
+import { useEditorStore } from '@/stores/editorStore';
 import { useOnboardingStore, initialOnboardingState } from '@/stores/onboardingStore';
 import { tourCompletedKey, isTourSeen, markTourSeen } from '@/utils/tourStorage';
 import { FIRST_ACCESS_STEPS, FIRST_ACCESS_EDITOR_START, EDITOR_TOUR_STEPS } from './tours';
+
+const SAMPLE_WORKFLOW_NAME = 'Tour demo — Email triage';
 
 const renderAt = (initial = '/'): ReturnType<typeof render> =>
   render(
@@ -88,6 +100,7 @@ const startFirstAccess = (): void => {
 describe('AppTour', () => {
   beforeEach(() => {
     lastJoyrideProps = null;
+    elementReady = true;
     mockNavigate.mockClear();
     localStorage.clear();
     useAuthStore.setState({ user: null, token: null });
@@ -199,15 +212,15 @@ describe('AppTour', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/workflows/wf-new');
     });
 
-    it('should navigate to an existing workflow without seeding a demo', async () => {
+    it('should reuse the existing demo workflow without seeding a duplicate', async () => {
       mockUser('u-1');
       const create = vi.fn();
       useWorkflowsStore.setState({
         workflows: [
           {
-            id: 'wf-existing',
+            id: 'wf-demo',
             userId: 'u-1',
-            name: 'Existing',
+            name: SAMPLE_WORKFLOW_NAME,
             description: null,
             isActive: false,
             version: 1,
@@ -233,8 +246,46 @@ describe('AppTour', () => {
         lifecycle: 'complete',
       });
 
-      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/workflows/wf-existing'));
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/workflows/wf-demo'));
       expect(create).not.toHaveBeenCalled();
+    });
+
+    it('should seed a new demo when no prior demo workflow exists', async () => {
+      mockUser('u-1');
+      const create = useWorkflowsStore.getState().create as ReturnType<typeof vi.fn>;
+      // An unrelated workflow exists, but not the named demo — so it must create.
+      useWorkflowsStore.setState({
+        workflows: [
+          {
+            id: 'wf-other',
+            userId: 'u-1',
+            name: 'My real workflow',
+            description: null,
+            isActive: false,
+            version: 1,
+            executionCount: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            documentation: null,
+            folderId: null,
+            tags: [],
+          },
+        ],
+      });
+
+      renderAt();
+      startFirstAccess();
+      await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
+      fireCallback({
+        status: 'running',
+        type: 'step:after',
+        action: 'next',
+        index: transitionIndex,
+        lifecycle: 'complete',
+      });
+
+      await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+      expect(mockNavigate).toHaveBeenCalledWith('/workflows/wf-new');
     });
 
     it('should abort the tour without persisting if seeding a demo workflow fails', async () => {
@@ -257,6 +308,50 @@ describe('AppTour', () => {
 
       await waitFor(() => expect(useOnboardingStore.getState().tourRun).toBe(false));
       expect(localStorage.getItem('tietide-tour-completed-u-1')).toBeNull();
+    });
+  });
+
+  describe('element-ready gate', () => {
+    it('keeps Joyride off while the step target is not yet in the DOM', async () => {
+      elementReady = false;
+      mockUser('u-1');
+      renderAt();
+      startFirstAccess();
+      await act(async () => {
+        await Promise.resolve();
+      });
+      // The store says the tour is running, but Joyride stays gated off until the
+      // target mounts — this is what stops a step from anchoring on the old page.
+      expect(useOnboardingStore.getState().tourRun).toBe(true);
+      expect(lastJoyrideProps?.run).toBe(false);
+    });
+  });
+
+  describe('per-step navigation', () => {
+    it('navigates to a step’s route so the page shows behind the tooltip', async () => {
+      mockUser('u-1');
+      renderAt('/settings'); // start off the first step's route
+      startFirstAccess();
+      // First step lives on '/', so the tour drives the user there.
+      await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/'));
+    });
+
+    it('selects the seeded node when entering a config-panel step', async () => {
+      const selectNode = vi.fn();
+      useEditorStore.setState({ selectNode });
+      mockUser('u-1');
+      renderAt('/workflows/wf-demo');
+      startFirstAccess();
+
+      const idx = FIRST_ACCESS_STEPS.findIndex((s) => s.selectNodeId);
+      expect(idx).toBeGreaterThanOrEqual(0);
+      act(() => {
+        useOnboardingStore.getState().setStepIndex(idx);
+      });
+
+      await waitFor(() =>
+        expect(selectNode).toHaveBeenCalledWith(FIRST_ACCESS_STEPS[idx].selectNodeId),
+      );
     });
   });
 

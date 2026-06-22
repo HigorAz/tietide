@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
 import { useOnboardingStore } from '@/stores/onboardingStore';
 import {
   TOURS,
@@ -20,6 +21,7 @@ import {
   type TourId,
 } from '@/components/onboarding/tours';
 import { filterConcepts } from '@/components/onboarding/onboardingContent';
+import { resetOnboarding } from '@/utils/tourStorage';
 import { cn } from '@/utils/cn';
 
 const QUICK_LINKS = [
@@ -31,6 +33,7 @@ const QUICK_LINKS = [
 const matchesQuery = (text: string, q: string): boolean => text.toLowerCase().includes(q);
 
 export function HelpDrawer(): JSX.Element | null {
+  const userId = useAuthStore((s) => s.user?.id);
   const open = useOnboardingStore((s) => s.helpDrawerOpen);
   const close = useOnboardingStore((s) => s.closeHelpDrawer);
   const startTour = useOnboardingStore((s) => s.startTour);
@@ -60,6 +63,9 @@ export function HelpDrawer(): JSX.Element | null {
   const launchTourById = (id: TourId): void => launchTour(TOURS[id]);
 
   const handleRestart = (): void => {
+    // A true restart: wipe the persisted onboarding markers so the welcome
+    // screen and per-route auto-tours replay from scratch, not just resurface.
+    if (userId) resetOnboarding(userId);
     close();
     openWelcome();
   };

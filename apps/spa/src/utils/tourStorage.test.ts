@@ -13,6 +13,7 @@ import {
   markChecklistDismissed,
   isLibraryVisited,
   markLibraryVisited,
+  resetOnboarding,
 } from './tourStorage';
 
 describe('tourStorage', () => {
@@ -134,6 +135,44 @@ describe('tourStorage', () => {
         expect(isLibraryVisited('user-1')).toBe(false);
         markLibraryVisited('user-1');
         expect(isLibraryVisited('user-1')).toBe(true);
+      });
+    });
+
+    describe('resetOnboarding', () => {
+      it('should clear completion, welcome-seen and every per-tour seen flag for the user', () => {
+        markTourCompleted('user-1');
+        markWelcomeSeen('user-1');
+        markTourSeen('user-1', 'home');
+        markTourSeen('user-1', 'editor');
+        markChecklistDismissed('user-1');
+        markLibraryVisited('user-1');
+
+        resetOnboarding('user-1');
+
+        expect(isTourCompleted('user-1')).toBe(false);
+        expect(isWelcomeSeen('user-1')).toBe(false);
+        expect(isTourSeen('user-1', 'home')).toBe(false);
+        expect(isTourSeen('user-1', 'editor')).toBe(false);
+        expect(isChecklistDismissed('user-1')).toBe(false);
+        expect(isLibraryVisited('user-1')).toBe(false);
+      });
+
+      it('should not touch another user’s onboarding flags', () => {
+        markTourCompleted('user-1');
+        markTourSeen('user-2', 'home');
+        markWelcomeSeen('user-2');
+
+        resetOnboarding('user-1');
+
+        expect(isTourCompleted('user-1')).toBe(false);
+        expect(isTourSeen('user-2', 'home')).toBe(true);
+        expect(isWelcomeSeen('user-2')).toBe(true);
+      });
+
+      it('should be a no-op for an empty userId', () => {
+        markTourCompleted('user-1');
+        expect(() => resetOnboarding('')).not.toThrow();
+        expect(isTourCompleted('user-1')).toBe(true);
       });
     });
 
