@@ -4,7 +4,9 @@ import Joyride, { STATUS, EVENTS, ACTIONS, type CallBackProps, type Step } from 
 import { NodeType, type WorkflowDefinition } from '@tietide/shared';
 import { useAuthStore } from '@/stores/authStore';
 import { useWorkflowsStore } from '@/stores/workflowsStore';
+import { useEditorStore } from '@/stores/editorStore';
 import { useOnboardingStore, FIRST_ACCESS_TOUR_ID } from '@/stores/onboardingStore';
+import { useElementReady } from '@/hooks/useElementReady';
 import { isTourCompleted, markTourCompleted, isTourSeen, markTourSeen } from '@/utils/tourStorage';
 import {
   FIRST_ACCESS_STEPS,
@@ -15,23 +17,56 @@ import {
   type TourStep,
 } from './tours';
 
-const DEMO_WORKFLOW_DEFINITION: WorkflowDefinition = {
+// A small but real, recognizable automation seeded for the editor walkthrough:
+// email arrives → Ollama categorizes it → the category is added back as a Gmail
+// label → a row is appended to a Google Sheet. Node ids are stable so the tour
+// can select them to reveal the config panel. Configs are left empty — the nodes
+// render as "needs setup", which is exactly what the walkthrough teaches.
+const SAMPLE_WORKFLOW_NAME = 'Tour demo — Email triage';
+
+const SAMPLE_WORKFLOW_DEFINITION: WorkflowDefinition = {
   nodes: [
     {
-      id: 'start',
-      type: NodeType.MANUAL_TRIGGER,
-      name: 'Start',
+      id: 'trigger',
+      type: NodeType.GMAIL_MESSAGE_RECEIVED,
+      name: 'Email received',
       position: { x: 80, y: 160 },
       config: {},
     },
+    {
+      id: 'categorize',
+      type: NodeType.OLLAMA_GENERATE,
+      name: 'Categorize with Ollama',
+      position: { x: 380, y: 160 },
+      config: {},
+    },
+    {
+      id: 'label',
+      type: NodeType.GMAIL_MODIFY_LABELS,
+      name: 'Add Gmail label',
+      position: { x: 680, y: 160 },
+      config: {},
+    },
+    {
+      id: 'sheet',
+      type: NodeType.SHEETS_APPEND,
+      name: 'Append row to Sheet',
+      position: { x: 980, y: 160 },
+      config: {},
+    },
   ],
-  edges: [],
+  edges: [
+    { id: 'e-trigger-categorize', source: 'trigger', target: 'categorize' },
+    { id: 'e-categorize-label', source: 'categorize', target: 'label' },
+    { id: 'e-label-sheet', source: 'label', target: 'sheet' },
+  ],
 };
 
-const DEMO_WORKFLOW_BODY = {
-  name: 'Tour demo',
-  description: 'Created by the onboarding tour to walk you through the editor.',
-  definition: DEMO_WORKFLOW_DEFINITION,
+const SAMPLE_WORKFLOW_BODY = {
+  name: SAMPLE_WORKFLOW_NAME,
+  description:
+    'Created by the onboarding tour: categorize incoming email with Ollama, label it in Gmail, and log it to a Google Sheet.',
+  definition: SAMPLE_WORKFLOW_DEFINITION,
 };
 
 const JOYRIDE_STYLES = {
@@ -60,6 +95,17 @@ export function AppTour(): JSX.Element | null {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
+  const isFirstAccess = activeTourId === FIRST_ACCESS_TOUR_ID;
+  const steps: TourStep[] = isFirstAccess
+    ? FIRST_ACCESS_STEPS
+    : activeTourId
+      ? (getTour(activeTourId as TourId)?.steps ?? [])
+      : [];
+  const currentStep = tourRun ? steps[stepIndex] : undefined;
+  const currentRoute = currentStep?.route;
+  const currentSelectNodeId = currentStep?.selectNodeId;
+  const currentTarget = tourRun ? (currentStep?.target ?? null) : null;
+
   // The first-access tour is launched from the WelcomeModal's "Take the tour"
   // CTA (not auto-started here), so a brand-new user is greeted by the welcome
   // screen first and opts in rather than being dropped straight into a tour.
@@ -77,14 +123,27 @@ export function AppTour(): JSX.Element | null {
     startTour({ tourId: routeTourId });
   }, [userId, routeTourId, welcomeOpen, tourRun, activeTourId, startTour]);
 
-  if (!userId) return null;
+  // Per-step navigation: bring the destination page into view behind the
+  // tooltip. The element-ready gate below holds `run` until the target mounts,
+  // so the step never anchors on the old page mid-navigation.
+  useEffect(() => {
+    if (!tourRun) return;
+    if (currentRoute && currentRoute !== pathname) navigate(currentRoute);
+  }, [tourRun, stepIndex, currentRoute, pathname, navigate]);
 
-  const isFirstAccess = activeTourId === FIRST_ACCESS_TOUR_ID;
-  const steps: TourStep[] = isFirstAccess
-    ? FIRST_ACCESS_STEPS
-    : activeTourId
-      ? (getTour(activeTourId as TourId)?.steps ?? [])
-      : [];
+  // Per-step editor driving: select a node so its (otherwise transient) config
+  // panel mounts, giving the "configure" / "data pills" steps a real anchor.
+  useEffect(() => {
+    if (!tourRun || !currentSelectNodeId) return;
+    useEditorStore.getState().selectNode(currentSelectNodeId);
+  }, [tourRun, stepIndex, currentSelectNodeId]);
+
+  // Hold Joyride until the current step's target is actually in the DOM (after a
+  // route change, or once the editor finishes loading). Fixes steps that would
+  // otherwise "disappear" by anchoring before the page renders.
+  const targetReady = useElementReady(currentTarget, tourRun);
+
+  if (!userId) return null;
 
   const completeTour = (): void => {
     if (isFirstAccess) {
@@ -97,10 +156,15 @@ export function AppTour(): JSX.Element | null {
   const handleTransitionToEditor = async (): Promise<void> => {
     const store = useWorkflowsStore.getState();
     try {
-      let target = store.workflows[0];
-      if (!target) {
-        target = await store.create(DEMO_WORKFLOW_BODY);
+      if (store.status === 'idle') {
+        await store.fetch();
       }
+      // Reuse the single named demo if it already exists (e.g. on a re-run) so
+      // repeated tours don't pile up duplicate workflows; otherwise create it.
+      const existing = useWorkflowsStore
+        .getState()
+        .workflows.find((w) => w.name === SAMPLE_WORKFLOW_NAME);
+      const target = existing ?? (await store.create(SAMPLE_WORKFLOW_BODY));
       navigate(`/workflows/${target.id}`);
       setStepIndex(FIRST_ACCESS_EDITOR_START);
     } catch {
@@ -137,7 +201,7 @@ export function AppTour(): JSX.Element | null {
   return (
     <Joyride
       steps={steps as unknown as Step[]}
-      run={tourRun && steps.length > 0}
+      run={tourRun && steps.length > 0 && targetReady}
       stepIndex={stepIndex}
       callback={handleCallback}
       continuous
