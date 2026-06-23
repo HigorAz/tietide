@@ -90,6 +90,24 @@ describe('HelpDrawer', () => {
       expect(useOnboardingStore.getState().welcomeOpen).toBe(true);
     });
 
+    it('restart onboarding stops any tour already running (older-account path)', async () => {
+      const user = userEvent.setup();
+      // Older accounts have completed onboarding, so a per-route tour may already
+      // be auto-running when they restart. It must be torn down cleanly first, or
+      // the welcome → first-access swap happens mid-run and breaks Joyride.
+      useOnboardingStore.setState({
+        helpDrawerOpen: true,
+        tourRun: true,
+        activeTourId: 'dashboard',
+        tourStepIndex: 2,
+      });
+      renderAt('/dashboard');
+      await user.click(screen.getByRole('button', { name: /restart onboarding/i }));
+      expect(useOnboardingStore.getState().tourRun).toBe(false);
+      expect(useOnboardingStore.getState().activeTourId).toBeNull();
+      expect(useOnboardingStore.getState().welcomeOpen).toBe(true);
+    });
+
     it('opens the cheat sheet from the shortcuts action', async () => {
       const user = userEvent.setup();
       useOnboardingStore.setState({ helpDrawerOpen: true });

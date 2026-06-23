@@ -200,6 +200,11 @@ export function AppTour(): JSX.Element | null {
 
   return (
     <Joyride
+      // Remount a fresh Joyride per tour. react-joyride is controlled here; swapping
+      // the whole steps array + stepIndex on a *running* instance (e.g. an older
+      // user's auto-started route tour giving way to the restarted first-access
+      // tour) leaves its internal lifecycle stuck. A keyed remount starts clean.
+      key={activeTourId ?? 'idle'}
       steps={steps as unknown as Step[]}
       run={tourRun && steps.length > 0 && targetReady}
       stepIndex={stepIndex}
