@@ -198,6 +198,19 @@ describe('AppTour', () => {
       expect(localStorage.getItem('tietide-tour-completed-u-1')).not.toBeNull();
       expect(useOnboardingStore.getState().tourRun).toBe(false);
     });
+
+    it('does NOT end the tour on a terminal-looking status without the tour:end event', async () => {
+      // Gating `run` for readiness can emit a finished-looking status mid-tour;
+      // only `tour:end` should complete it (otherwise the editor config-panel
+      // step kills the walkthrough). This guards that regression.
+      mockUser('u-1');
+      renderAt();
+      startFirstAccess();
+      await waitFor(() => expect(lastJoyrideProps?.run).toBe(true));
+      fireCallback({ status: 'finished', type: 'step:after', action: 'next', index: 2 });
+      expect(useOnboardingStore.getState().tourRun).toBe(true);
+      expect(localStorage.getItem('tietide-tour-completed-u-1')).toBeNull();
+    });
   });
 
   describe('first-access → editor transition', () => {

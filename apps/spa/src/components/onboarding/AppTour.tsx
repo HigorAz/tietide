@@ -28,7 +28,7 @@ const SAMPLE_WORKFLOW_DEFINITION: WorkflowDefinition = {
   nodes: [
     {
       id: 'trigger',
-      type: NodeType.GMAIL_MESSAGE_RECEIVED,
+      type: NodeType.GMAIL_NEW_EMAIL_RECEIVED,
       name: 'Email received',
       position: { x: 80, y: 160 },
       config: {},
@@ -177,7 +177,10 @@ export function AppTour(): JSX.Element | null {
   const handleCallback = (data: CallBackProps): void => {
     const { status, type, action, index } = data;
 
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+    // Only end the tour on the genuine end-of-tour event. Gating `run` for the
+    // readiness check can momentarily emit a terminal-looking status mid-tour;
+    // requiring `tour:end` stops a transient flip from killing the walkthrough.
+    if (type === EVENTS.TOUR_END && (status === STATUS.FINISHED || status === STATUS.SKIPPED)) {
       completeTour();
       return;
     }

@@ -142,5 +142,22 @@ describe('tours', () => {
       expect(configSteps.length).toBeGreaterThan(0);
       for (const step of configSteps) expect(step.selectNodeId).toBeTruthy();
     });
+
+    it('should pre-open the config panel on the canvas step, before the first panel step', () => {
+      const editorSteps = FIRST_ACCESS_STEPS.slice(FIRST_ACCESS_EDITOR_START);
+      const canvasStep = editorSteps.find(
+        (s) => s.target === tourSelector(TOUR_TARGET.editorCanvas),
+      );
+      const firstPanelIndex = editorSteps.findIndex(
+        (s) => s.target === tourSelector(TOUR_TARGET.editorConfigPanel),
+      );
+      const canvasIndex = editorSteps.findIndex(
+        (s) => s.target === tourSelector(TOUR_TARGET.editorCanvas),
+      );
+      // The canvas step selects a node so the panel is mounted BEFORE the gated
+      // config-panel step — otherwise the readiness gate flips `run` mid-step.
+      expect(canvasStep?.selectNodeId).toBe('trigger');
+      expect(canvasIndex).toBeLessThan(firstPanelIndex);
+    });
   });
 });

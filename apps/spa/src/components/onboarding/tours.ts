@@ -467,12 +467,20 @@ const FIRST_ACCESS_EDITOR_STEPS: TourStep[] = [
     placement: 'right',
     disableBeacon: true,
   }),
-  anchor(TOUR_TARGET.editorCanvas, {
-    title: 'Build on the canvas',
-    content:
-      'Here’s the sample: when an email arrives, Ollama categorizes it, the category is added back as a Gmail label, and a row is appended to a Google Sheet. Nodes connect top-handle to bottom-handle to set the order.',
-    placement: 'top',
-  }),
+  {
+    // Open the config panel here (one step BEFORE the panel-anchored step) so
+    // its `editor-config-panel` target is already mounted when the tour advances
+    // — otherwise the readiness gate flips `run` off mid-step while selectNode
+    // mounts the panel, which kills the controlled Joyride. The canvas target is
+    // always present, so selecting a node here doesn't toggle `run`.
+    ...anchor(TOUR_TARGET.editorCanvas, {
+      title: 'Build on the canvas',
+      content:
+        'Here’s the sample: when an email arrives, Ollama categorizes it, the category is added back as a Gmail label, and a row is appended to a Google Sheet. Nodes connect top-handle to bottom-handle to set the order.',
+      placement: 'top',
+    }),
+    selectNodeId: 'trigger',
+  },
   {
     ...anchor(TOUR_TARGET.editorConfigPanel, {
       title: 'Configure a node in 3 steps',
