@@ -32,6 +32,7 @@ import { CalendarListEventsForm } from './google/CalendarListEventsForm';
 import { CalendarGetEventForm } from './google/CalendarGetEventForm';
 import { SheetsRowAddedForm } from './google/SheetsRowAddedForm';
 import { GmailMessageReceivedForm } from './google/GmailMessageReceivedForm';
+import { GmailNewEmailReceivedForm } from './google/GmailNewEmailReceivedForm';
 import { GmailLabelAddedForm } from './google/GmailLabelAddedForm';
 import { GmailAttachmentReceivedForm } from './google/GmailAttachmentReceivedForm';
 import { DriveFileAddedForm } from './google/DriveFileAddedForm';
@@ -223,6 +224,7 @@ export const FORM_REGISTRY: Partial<Record<NodeType, ComponentType<NodeConfigFor
   [NodeType.CALENDAR_GET_EVENT]: CalendarGetEventForm,
   [NodeType.SHEETS_ROW_ADDED]: SheetsRowAddedForm,
   [NodeType.GMAIL_MESSAGE_RECEIVED]: GmailMessageReceivedForm,
+  [NodeType.GMAIL_NEW_EMAIL_RECEIVED]: GmailNewEmailReceivedForm,
   [NodeType.GMAIL_LABEL_ADDED]: GmailLabelAddedForm,
   [NodeType.GMAIL_ATTACHMENT_RECEIVED]: GmailAttachmentReceivedForm,
   [NodeType.DRIVE_FILE_ADDED]: DriveFileAddedForm,

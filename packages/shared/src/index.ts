@@ -276,6 +276,7 @@ export {
 } from './schemas/google.schema.js';
 export {
   gmailMessageReceivedConfigSchema,
+  gmailNewEmailReceivedConfigSchema,
   gmailLabelAddedConfigSchema,
   gmailAttachmentReceivedConfigSchema,
   driveFileAddedConfigSchema,
@@ -285,6 +286,7 @@ export {
   calendarEventUpdatedConfigSchema,
   GOOGLE_TRIGGER_REQUIRED_SCOPES,
   type GmailMessageReceivedConfig,
+  type GmailNewEmailReceivedConfig,
   type GmailLabelAddedConfig,
   type GmailAttachmentReceivedConfig,
   type DriveFileAddedConfig,

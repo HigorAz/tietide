@@ -23,6 +23,17 @@ export const gmailMessageReceivedConfigSchema = z.object({
 });
 export type GmailMessageReceivedConfig = z.infer<typeof gmailMessageReceivedConfigSchema>;
 
+// Poll-based "new email" trigger — the beginner-friendly alternative to the
+// push-only gmail-message-received. Needs only a Google connection (no GCP
+// Pub/Sub). `query` is an optional Gmail search filter (e.g. `from:boss@x.com`);
+// `intervalSeconds` overrides the default poll cadence.
+export const gmailNewEmailReceivedConfigSchema = z.object({
+  connectionId,
+  query: z.string().max(2048).optional(),
+  intervalSeconds: z.number().int().positive().max(3600).optional(),
+});
+export type GmailNewEmailReceivedConfig = z.infer<typeof gmailNewEmailReceivedConfigSchema>;
+
 export const gmailLabelAddedConfigSchema = z.object({
   connectionId,
   labelId: z.string().min(1).max(128),
@@ -74,6 +85,7 @@ export type CalendarEventUpdatedConfig = z.infer<typeof calendarEventUpdatedConf
 
 export const GOOGLE_TRIGGER_REQUIRED_SCOPES: Readonly<Record<string, string>> = {
   [NodeType.GMAIL_MESSAGE_RECEIVED]: 'https://www.googleapis.com/auth/gmail.readonly',
+  [NodeType.GMAIL_NEW_EMAIL_RECEIVED]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_LABEL_ADDED]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.GMAIL_ATTACHMENT_RECEIVED]: 'https://www.googleapis.com/auth/gmail.readonly',
   [NodeType.DRIVE_FILE_ADDED]: 'https://www.googleapis.com/auth/drive.readonly',
