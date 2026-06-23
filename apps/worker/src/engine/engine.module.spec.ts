@@ -159,6 +159,7 @@ import { ExcelRowUpdatedTrigger } from '../nodes/triggers/poll/excel-row-updated
 import { CalendarEventUpdatedTrigger } from '../nodes/triggers/poll/calendar-event-updated';
 import { GmailAttachmentReceivedTrigger } from '../nodes/triggers/poll/gmail-attachment-received';
 import { SheetsRowAddedTrigger } from '../nodes/triggers/poll/sheets-row-added';
+import { GmailNewEmailReceivedTrigger } from '../nodes/triggers/poll/gmail-new-email-received';
 import { GmailLabelAddedTrigger } from '../nodes/triggers/poll/gmail-label-added';
 import { CalendarEventCreatedTrigger } from '../nodes/triggers/poll/calendar-event-created';
 import { NotionGetPageAction } from '../nodes/connectors/notion/notion-get-page';
@@ -323,6 +324,10 @@ describe('EngineModule', () => {
       undefined as never,
     );
     const sheetsRowAdded = new SheetsRowAddedTrigger(undefined as never, undefined as never);
+    const gmailNewEmailReceived = new GmailNewEmailReceivedTrigger(
+      undefined as never,
+      undefined as never,
+    );
     const gmailLabelAdded = new GmailLabelAddedTrigger(undefined as never, undefined as never);
     const calendarEventCreated = new CalendarEventCreatedTrigger(
       undefined as never,
@@ -512,6 +517,7 @@ describe('EngineModule', () => {
       calendarEventUpdated,
       gmailAttachmentReceived,
       sheetsRowAdded,
+      gmailNewEmailReceived,
       gmailLabelAdded,
       calendarEventCreated,
       driveFileUpdated,
@@ -699,6 +705,7 @@ describe('EngineModule', () => {
       calendarEventUpdated,
       gmailAttachmentReceived,
       sheetsRowAdded,
+      gmailNewEmailReceived,
       gmailLabelAdded,
       calendarEventCreated,
       driveFileUpdated,
@@ -883,6 +890,7 @@ describe('EngineModule', () => {
       ['CalendarEventUpdatedTrigger', 'calendar-event-updated', 'calendarEventUpdated'],
       ['GmailAttachmentReceivedTrigger', 'gmail-attachment-received', 'gmailAttachmentReceived'],
       ['SheetsRowAddedTrigger', 'sheets-row-added', 'sheetsRowAdded'],
+      ['GmailNewEmailReceivedTrigger', 'gmail-new-email-received', 'gmailNewEmailReceived'],
       ['GmailLabelAddedTrigger', 'gmail-label-added', 'gmailLabelAdded'],
       ['CalendarEventCreatedTrigger', 'calendar-event-created', 'calendarEventCreated'],
       ['DriveFileUpdatedPassthrough', 'drive-file-updated', 'driveFileUpdated'],
@@ -963,7 +971,8 @@ describe('EngineModule', () => {
       // +W1.2: sheets-row-added + gmail-label-added + calendar-event-created (poll) — these 3
       // were registered in PollModule but missing from NodeRegistry until the dual-registration fix.
       // +2 Meta triggers: whatsapp-message-received (push) + instagram-comment-added (poll).
-      expect(counts.trigger).toBe(40);
+      // +1 Gmail poll trigger: gmail-new-email-received (beginner-friendly "new email", no Pub/Sub).
+      expect(counts.trigger).toBe(41);
       expect(counts.logic).toBe(4);
       // 2 generic actions (http-request, code) + 21 Google connector actions +
       // 13 Microsoft connector actions +

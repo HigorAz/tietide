@@ -212,6 +212,7 @@ import {
 } from '../nodes/triggers/push/passthrough-push.executor';
 import { GmailMessageReceivedExecutor } from '../nodes/triggers/push/gmail-message-received.executor';
 import { SheetsRowAddedTrigger } from '../nodes/triggers/poll/sheets-row-added';
+import { GmailNewEmailReceivedTrigger } from '../nodes/triggers/poll/gmail-new-email-received';
 import { GmailLabelAddedTrigger } from '../nodes/triggers/poll/gmail-label-added';
 import { CalendarEventCreatedTrigger } from '../nodes/triggers/poll/calendar-event-created';
 import { ExcelRowAddedTrigger } from '../nodes/triggers/poll/excel-row-added';
@@ -432,6 +433,7 @@ import { S3ObjectCreatedTrigger } from '../nodes/triggers/poll/s3-object-created
     TrelloCardChangedPassthrough,
     GmailMessageReceivedExecutor,
     SheetsRowAddedTrigger,
+    GmailNewEmailReceivedTrigger,
     GmailLabelAddedTrigger,
     CalendarEventCreatedTrigger,
     ExcelRowAddedTrigger,
@@ -567,6 +569,7 @@ export class EngineModule implements OnModuleInit {
     private readonly calendarEventUpdated: CalendarEventUpdatedTrigger,
     private readonly gmailAttachmentReceived: GmailAttachmentReceivedTrigger,
     private readonly sheetsRowAdded: SheetsRowAddedTrigger,
+    private readonly gmailNewEmailReceived: GmailNewEmailReceivedTrigger,
     private readonly gmailLabelAdded: GmailLabelAddedTrigger,
     private readonly calendarEventCreated: CalendarEventCreatedTrigger,
     private readonly driveFileUpdated: DriveFileUpdatedPassthrough,
@@ -686,6 +689,7 @@ export class EngineModule implements OnModuleInit {
     this.registry.register(this.outlookMessageWithAttachment);
     this.registry.register(this.onedriveFileAdded);
     this.registry.register(this.sheetsRowAdded);
+    this.registry.register(this.gmailNewEmailReceived);
     this.registry.register(this.gmailLabelAdded);
     this.registry.register(this.calendarEventCreated);
     this.registry.register(this.excelRowAdded);

@@ -81,6 +81,7 @@ export const NODE_ICONS: Record<NodeType, LucideIcon> = {
   [NodeType.CALENDAR_LIST_EVENTS]: Calendar,
   [NodeType.CALENDAR_GET_EVENT]: Calendar,
   [NodeType.GMAIL_MESSAGE_RECEIVED]: Mail,
+  [NodeType.GMAIL_NEW_EMAIL_RECEIVED]: Mail,
   [NodeType.GMAIL_LABEL_ADDED]: Mail,
   [NodeType.GMAIL_ATTACHMENT_RECEIVED]: Mail,
   [NodeType.DRIVE_FILE_ADDED]: HardDrive,

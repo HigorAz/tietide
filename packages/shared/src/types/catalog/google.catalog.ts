@@ -170,10 +170,19 @@ export const GOOGLE_NODES: NodeTypeDefinition[] = [
     provider: 'google',
   },
   {
-    type: NodeType.GMAIL_MESSAGE_RECEIVED,
-    name: 'Gmail: Message Received',
+    type: NodeType.GMAIL_NEW_EMAIL_RECEIVED,
+    name: 'Gmail: New Email Received',
     description:
-      'Trigger when a new Gmail message arrives (poll by default; push via Cloud Pub/Sub when configured)',
+      'Trigger when a new email arrives in Gmail (poll-based — only needs a Google connection, no Pub/Sub)',
+    category: NodeCategory.TRIGGER,
+    group: NodeGroup.GOOGLE_TRIGGERS,
+    provider: 'google',
+  },
+  {
+    type: NodeType.GMAIL_MESSAGE_RECEIVED,
+    name: 'Gmail: Message Received (Pub/Sub)',
+    description:
+      'Trigger on new Gmail messages via Google Cloud Pub/Sub push (advanced — requires a provisioned Pub/Sub topic)',
     category: NodeCategory.TRIGGER,
     group: NodeGroup.GOOGLE_TRIGGERS,
     provider: 'google',

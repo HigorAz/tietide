@@ -40,6 +40,7 @@ export const NodeType = {
   CALENDAR_LIST_EVENTS: 'calendar-list-events',
   CALENDAR_GET_EVENT: 'calendar-get-event',
   GMAIL_MESSAGE_RECEIVED: 'gmail-message-received',
+  GMAIL_NEW_EMAIL_RECEIVED: 'gmail-new-email-received',
   GMAIL_LABEL_ADDED: 'gmail-label-added',
   GMAIL_ATTACHMENT_RECEIVED: 'gmail-attachment-received',
   DRIVE_FILE_ADDED: 'drive-file-added',
