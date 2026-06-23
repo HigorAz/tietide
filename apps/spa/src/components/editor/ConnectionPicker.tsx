@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import * as Select from '@radix-ui/react-select';
-import { AlertTriangle, Check, ChevronDown, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown } from 'lucide-react';
 import type { ConnectionView } from '@/api/connections';
 import { ConnectionStatusBadge } from '@/components/connections/ConnectionStatusBadge';
 import { getProviderIcon, getProviderLabel } from '@/components/connections/providerCatalog';
 import { useConnectionsStore } from '@/stores/connectionsStore';
 import { cn } from '@/utils/cn';
 import { ConnectionCard } from './steps/ConnectionCard';
+import { InlineConnectionCreator } from './InlineConnectionCreator';
 import { useStepLayout } from './steps/StepLayoutContext';
 
 export interface ConnectionPickerProps {
@@ -114,131 +115,162 @@ export function ConnectionPicker({
   ]);
   useEffect(() => () => unregisterRef.current?.(), []);
 
-  const addHref = `/connections?provider=${encodeURIComponent(provider)}&connect=true`;
   const errorAlert = errorMessage ? (
     <p role="alert" data-testid="connection-picker-error" className="text-xs text-red-400">
       {errorMessage}
     </p>
   ) : null;
 
-  const pickerUi =
-    compatible.length === 0 ? (
-      <div className="space-y-1.5">
-        <div
-          className="rounded-lg border border-dashed border-white/10 bg-surface p-4 text-sm"
-          data-testid="connection-picker-empty"
-        >
-          <p className="text-text-secondary">No {label} connections yet.</p>
-          <a
-            href={addHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              'mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-accent-teal',
-              'hover:underline focus:outline-none focus:ring-1 focus:ring-accent-teal',
-            )}
-          >
-            <span>Add a {label} connection</span>
-            <ExternalLink aria-hidden className="h-3 w-3" />
-          </a>
-        </div>
-        {errorAlert}
-      </div>
-    ) : (
-      <div className="space-y-1.5">
-        {isStale && (
-          <div
-            role="alert"
-            data-testid="connection-picker-stale"
-            className="flex items-start gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2.5 py-2 text-xs text-amber-200"
-          >
-            <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-            <span>
-              The {label} connection saved on this node is no longer available — it was deleted or
-              revoked. Re-pick a connection below.
-            </span>
-          </div>
+  const staleAlert = isStale ? (
+    <div
+      role="alert"
+      data-testid="connection-picker-stale"
+      className="flex items-start gap-2 rounded-md border border-amber-400/30 bg-amber-400/10 px-2.5 py-2 text-xs text-amber-200"
+    >
+      <AlertTriangle aria-hidden className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+      <span>
+        The {label} connection saved on this node is no longer available — it was deleted or
+        revoked. Re-pick a connection below.
+      </span>
+    </div>
+  ) : null;
+
+  const optionsPortal = (
+    <Select.Portal>
+      <Select.Content
+        position="popper"
+        sideOffset={4}
+        className={cn(
+          'z-50 min-w-[--radix-select-trigger-width] overflow-hidden rounded-md border border-white/10 bg-surface shadow-lg',
         )}
-        <Select.Root
-          value={value ?? ''}
-          onValueChange={(next) => onChange(next === NONE_VALUE ? null : next || null)}
-          disabled={disabled}
-        >
-          <Select.Trigger
-            aria-label="Connection"
-            className={cn(
-              'inline-flex w-full items-center justify-between gap-2 rounded-md border bg-elevated px-3 py-2 text-sm text-text-primary transition',
-              'hover:border-white/20 focus:outline-none focus:ring-1 focus:ring-accent-teal',
-              'disabled:cursor-not-allowed disabled:opacity-60',
-              isStale ? 'border-amber-400/40 focus:ring-amber-400' : 'border-white/10',
-            )}
-          >
-            <Select.Value
-              placeholder={`Select a ${label} connection…`}
-              aria-label={selected ? selected.name : undefined}
-            >
-              {selected ? <ConnectionTriggerContent connection={selected} /> : undefined}
-            </Select.Value>
-            <Select.Icon>
-              <ChevronDown aria-hidden className="h-4 w-4 text-text-secondary" />
-            </Select.Icon>
-          </Select.Trigger>
-          <Select.Portal>
-            <Select.Content
-              position="popper"
-              sideOffset={4}
+      >
+        <Select.Viewport className="p-1">
+          {allowClear && (
+            <Select.Item
+              value={NONE_VALUE}
               className={cn(
-                'z-50 min-w-[--radix-select-trigger-width] overflow-hidden rounded-md border border-white/10 bg-surface shadow-lg',
+                'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm text-text-secondary outline-none',
+                'data-[highlighted]:bg-white/5 data-[state=checked]:bg-white/10',
               )}
             >
-              <Select.Viewport className="p-1">
-                {allowClear && (
-                  <Select.Item
-                    value={NONE_VALUE}
-                    className={cn(
-                      'relative flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-sm text-text-secondary outline-none',
-                      'data-[highlighted]:bg-white/5 data-[state=checked]:bg-white/10',
-                    )}
-                  >
-                    <span className="w-4 flex-shrink-0">
-                      <Select.ItemIndicator>
-                        <Check aria-hidden className="h-4 w-4 text-accent-teal" />
-                      </Select.ItemIndicator>
-                    </span>
-                    <Select.ItemText>None — no authentication</Select.ItemText>
-                  </Select.Item>
-                )}
-                {compatible.map((conn) => (
-                  <ConnectionPickerOption key={conn.id} connection={conn} />
-                ))}
-              </Select.Viewport>
-            </Select.Content>
-          </Select.Portal>
-        </Select.Root>
+              <span className="w-4 flex-shrink-0">
+                <Select.ItemIndicator>
+                  <Check aria-hidden className="h-4 w-4 text-accent-teal" />
+                </Select.ItemIndicator>
+              </span>
+              <Select.ItemText>None — no authentication</Select.ItemText>
+            </Select.Item>
+          )}
+          {compatible.map((conn) => (
+            <ConnectionPickerOption key={conn.id} connection={conn} />
+          ))}
+        </Select.Viewport>
+      </Select.Content>
+    </Select.Portal>
+  );
+
+  const selectWith = (trigger: JSX.Element): JSX.Element => (
+    <Select.Root
+      value={value ?? ''}
+      onValueChange={(next) => onChange(next === NONE_VALUE ? null : next || null)}
+      disabled={disabled}
+    >
+      {trigger}
+      {optionsPortal}
+    </Select.Root>
+  );
+
+  const defaultTrigger = (
+    <Select.Trigger
+      aria-label="Connection"
+      className={cn(
+        'inline-flex w-full items-center justify-between gap-2 rounded-md border bg-elevated px-3 py-2 text-sm text-text-primary transition',
+        'hover:border-white/20 focus:outline-none focus:ring-1 focus:ring-accent-teal',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        isStale ? 'border-amber-400/40 focus:ring-amber-400' : 'border-white/10',
+      )}
+    >
+      <Select.Value
+        placeholder={`Select a ${label} connection…`}
+        aria-label={selected ? selected.name : undefined}
+      >
+        {selected ? <ConnectionTriggerContent connection={selected} /> : undefined}
+      </Select.Value>
+      <Select.Icon>
+        <ChevronDown aria-hidden className="h-4 w-4 text-text-secondary" />
+      </Select.Icon>
+    </Select.Trigger>
+  );
+
+  const emptyState = (
+    <div
+      className="rounded-lg border border-dashed border-white/10 bg-surface p-4 text-sm"
+      data-testid="connection-picker-empty"
+    >
+      <p className="text-text-secondary">No {label} connections yet.</p>
+      <InlineConnectionCreator
+        provider={provider}
+        label={label}
+        onCreated={(id) => onChange(id)}
+        variant="cta"
+      />
+    </div>
+  );
+
+  // No step layout → render inline exactly as before (a plain Select); only the
+  // broken `target=_blank` empty-state link is swapped for inline creation.
+  if (!layout) {
+    return (
+      <div className="space-y-1.5">
+        {compatible.length === 0 ? (
+          emptyState
+        ) : (
+          <>
+            {staleAlert}
+            {selectWith(defaultTrigger)}
+          </>
+        )}
         {errorAlert}
       </div>
     );
+  }
 
-  // No step layout → render inline exactly as before (the ~100 per-node forms
-  // that render ConnectionPicker directly are untouched — no ConnectionCard).
-  if (!layout) return pickerUi;
-
-  // Inside a step layout: relocate into the registered Connection step slot,
-  // wrapped as a connection card. Until the slot element exists, render nothing
-  // inline (the panel mounts the slot on its first commit).
+  // Inside a step layout: relocate into the registered Connection step slot. The
+  // ConnectionCard summary row IS the dropdown trigger (one click opens the
+  // list), and an inline creator lets the user add a connection without leaving.
   if (!layout.connectionSlot) return null;
 
   const iconUrl = getProviderIcon(provider);
+  const cardTrigger = (
+    <Select.Trigger asChild aria-label="Connection">
+      <ConnectionCard
+        providerIcon={iconUrl ? <img src={iconUrl} alt="" /> : null}
+        name={selected?.name ?? null}
+        status={selected?.status ?? null}
+        optional={allowClear}
+        stale={isStale}
+      />
+    </Select.Trigger>
+  );
+
   return createPortal(
-    <ConnectionCard
-      providerIcon={iconUrl ? <img src={iconUrl} alt="" /> : null}
-      name={selected?.name ?? null}
-      status={selected?.status ?? null}
-      optional={allowClear}
-      stale={isStale}
-    >
-      {pickerUi}
-    </ConnectionCard>,
+    <div className="flex flex-col gap-1.5">
+      {compatible.length === 0 ? (
+        emptyState
+      ) : (
+        <>
+          {staleAlert}
+          {selectWith(cardTrigger)}
+          <InlineConnectionCreator
+            provider={provider}
+            label={label}
+            onCreated={(id) => onChange(id)}
+            variant="link"
+          />
+        </>
+      )}
+      {errorAlert}
+    </div>,
     layout.connectionSlot,
   );
 }

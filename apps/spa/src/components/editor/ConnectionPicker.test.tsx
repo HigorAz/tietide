@@ -117,16 +117,19 @@ describe('ConnectionPicker', () => {
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('should render the empty-state link to /connections with provider preselected and connect=true, opening in a new tab', () => {
+  it('should offer inline connection creation in the empty state (no new-tab link)', () => {
     seedConnections([]);
 
     render(<ConnectionPicker provider="google" value={null} onChange={vi.fn()} />);
 
-    const link = screen.getByRole('link', { name: /add a google connection/i });
-    expect(link).toHaveAttribute('href', '/connections?provider=google&connect=true');
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link.getAttribute('rel') ?? '').toMatch(/noopener/);
-    expect(link.getAttribute('rel') ?? '').toMatch(/noreferrer/);
+    // The old `target=_blank` link to /connections lost the session (token lives
+    // in per-tab sessionStorage) and bounced to /login. It is replaced by an
+    // in-editor "Add a … connection" control.
+    expect(
+      screen.queryByRole('link', { name: /add a google connection/i }),
+    ).not.toBeInTheDocument();
+    const addButton = screen.getByTestId('inline-add-connection');
+    expect(addButton).toHaveTextContent(/add a google connection/i);
   });
 
   it('should render a status badge for each option that reflects the connection status', async () => {
@@ -362,6 +365,42 @@ describe('ConnectionPicker', () => {
       expect(unregisterConnection).not.toHaveBeenCalled();
       unmount();
       expect(unregisterConnection).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('inline connection creation', () => {
+    it('opens a creation modal in-place when the empty-state add button is clicked (no navigation)', async () => {
+      const user = userEvent.setup();
+      seedConnections([]);
+
+      render(<ConnectionPicker provider="google" value={null} onChange={vi.fn()} />);
+
+      await user.click(screen.getByTestId('inline-add-connection'));
+      // Google is OAuth2 → an in-editor modal dialog opens (rather than routing
+      // to /connections in a new tab, which dropped the session).
+      expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('offers "add another" creation inside the step layout when connections exist', () => {
+      seedConnections([makeConnection({ id: 'g-1', name: 'Work Google' })]);
+      const slot = document.createElement('div');
+      document.body.appendChild(slot);
+
+      render(
+        <StepLayoutProvider
+          value={{
+            connectionSlot: slot,
+            registerConnection: vi.fn(),
+            unregisterConnection: vi.fn(),
+            reportValidity: vi.fn(),
+          }}
+        >
+          <ConnectionPicker provider="google" value="g-1" onChange={vi.fn()} />
+        </StepLayoutProvider>,
+      );
+
+      expect(slot.querySelector('[data-testid="inline-add-connection"]')).not.toBeNull();
+      document.body.removeChild(slot);
     });
   });
 
