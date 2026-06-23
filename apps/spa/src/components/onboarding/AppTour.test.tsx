@@ -12,27 +12,36 @@ type JoyrideMockProps = {
   callback: (data: unknown) => void;
 };
 let lastJoyrideProps: JoyrideMockProps | null = null;
+// Counts how many times the (mocked) Joyride instance mounts, so a test can prove
+// the component fully remounts on a tour change rather than mutating mid-run.
+let joyrideMountCount = 0;
 
-vi.mock('react-joyride', () => ({
-  default: (props: JoyrideMockProps) => {
-    lastJoyrideProps = props;
-    return null;
-  },
-  STATUS: { FINISHED: 'finished', SKIPPED: 'skipped', RUNNING: 'running' },
-  ACTIONS: {
-    NEXT: 'next',
-    PREV: 'prev',
-    SKIP: 'skip',
-    CLOSE: 'close',
-    UPDATE: 'update',
-    START: 'start',
-  },
-  EVENTS: {
-    STEP_AFTER: 'step:after',
-    TOUR_END: 'tour:end',
-    TARGET_NOT_FOUND: 'error:target_not_found',
-  },
-}));
+vi.mock('react-joyride', async () => {
+  const React = await import('react');
+  return {
+    default: (props: JoyrideMockProps) => {
+      lastJoyrideProps = props;
+      React.useEffect(() => {
+        joyrideMountCount += 1;
+      }, []);
+      return null;
+    },
+    STATUS: { FINISHED: 'finished', SKIPPED: 'skipped', RUNNING: 'running' },
+    ACTIONS: {
+      NEXT: 'next',
+      PREV: 'prev',
+      SKIP: 'skip',
+      CLOSE: 'close',
+      UPDATE: 'update',
+      START: 'start',
+    },
+    EVENTS: {
+      STEP_AFTER: 'step:after',
+      TOUR_END: 'tour:end',
+      TARGET_NOT_FOUND: 'error:target_not_found',
+    },
+  };
+});
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -100,6 +109,7 @@ const startFirstAccess = (): void => {
 describe('AppTour', () => {
   beforeEach(() => {
     lastJoyrideProps = null;
+    joyrideMountCount = 0;
     elementReady = true;
     mockNavigate.mockClear();
     localStorage.clear();
@@ -324,6 +334,29 @@ describe('AppTour', () => {
       // target mounts — this is what stops a step from anchoring on the old page.
       expect(useOnboardingStore.getState().tourRun).toBe(true);
       expect(lastJoyrideProps?.run).toBe(false);
+    });
+  });
+
+  describe('switching tours cleanly (older-account restart path)', () => {
+    it('remounts Joyride when the active tour changes so the swap is not mid-run', async () => {
+      mockUser('u-1');
+      localStorage.setItem(tourCompletedKey('u-1'), '1'); // older account → route auto-starts
+      renderAt('/dashboard');
+      // A per-route tour auto-starts for the unseen page.
+      await waitFor(() => expect(useOnboardingStore.getState().activeTourId).toBe('dashboard'));
+      const mountsBefore = joyrideMountCount;
+
+      // Restarting onboarding then taking the tour swaps to the first-access tour.
+      act(() => {
+        useOnboardingStore.getState().startTour({ tourId: 'firstAccess' });
+      });
+      await waitFor(() => expect(lastJoyrideProps?.steps).toEqual(FIRST_ACCESS_STEPS));
+
+      // key={activeTourId} forces a fresh Joyride instance instead of mutating the
+      // running route tour's steps/stepIndex in place (which leaves it stuck).
+      expect(joyrideMountCount).toBeGreaterThan(mountsBefore);
+      expect(lastJoyrideProps?.stepIndex).toBe(0);
+      expect(lastJoyrideProps?.run).toBe(true);
     });
   });
 

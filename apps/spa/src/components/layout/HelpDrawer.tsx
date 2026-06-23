@@ -37,6 +37,7 @@ export function HelpDrawer(): JSX.Element | null {
   const open = useOnboardingStore((s) => s.helpDrawerOpen);
   const close = useOnboardingStore((s) => s.closeHelpDrawer);
   const startTour = useOnboardingStore((s) => s.startTour);
+  const finishTour = useOnboardingStore((s) => s.finishTour);
   const openCheatSheet = useOnboardingStore((s) => s.openCheatSheet);
   const openWelcome = useOnboardingStore((s) => s.openWelcome);
   const { pathname } = useLocation();
@@ -66,6 +67,10 @@ export function HelpDrawer(): JSX.Element | null {
     // A true restart: wipe the persisted onboarding markers so the welcome
     // screen and per-route auto-tours replay from scratch, not just resurface.
     if (userId) resetOnboarding(userId);
+    // Stop any tour already running (older accounts often have a per-route tour
+    // auto-started) so the welcome → first-access tour starts from a clean slate
+    // instead of swapping steps on a live Joyride instance.
+    finishTour();
     close();
     openWelcome();
   };
