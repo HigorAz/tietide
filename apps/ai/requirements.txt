@@ -14,5 +14,5 @@ pytest-asyncio>=0.24.0
 
 # Dev tooling (lint, typecheck, coverage)
 ruff>=0.6.0
-mypy>=1.10.0
+mypy>=2.1.0
 pytest-cov>=5.0.0
