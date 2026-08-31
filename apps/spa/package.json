@@ -24,7 +24,7 @@
     "axios": "^1.16.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "jsondiffpatch": "^0.7.3",
+    "jsondiffpatch": "^0.7.6",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.453.0",
     "react": "^18.3.1",
